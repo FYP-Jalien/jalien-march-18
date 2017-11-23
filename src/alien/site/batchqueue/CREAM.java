@@ -11,15 +11,18 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.sql.Timestamp;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeSet;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import alien.user.LDAPHelper;
 import alien.log.LogUtils;
 import alien.test.utils.Functions;
 import lia.util.process.ExternalProcess.ExitStatus;
@@ -33,10 +36,17 @@ public class CREAM extends BatchQueue {
 	private boolean updateClassad = false;
 	private HashMap<String, String> commands = new HashMap<>();
 	private Map<String, String> environment = System.getenv();
+	private TreeSet<String> _env_from_config;
 	private File _temp_file;
 	private File _job_id_file;
+	private String _last_job_id;
+	private ArrayList<ArrayList<String>> _ce_clusterstatus;
 	
-	private int _last_job_id;
+	private enum InfoMode {
+		SUM,
+		MIN,
+		MAX;
+	}
 
 	/**
 	 * @param conf
@@ -56,6 +66,12 @@ public class CREAM extends BatchQueue {
 				logger.info("Could not create a file for JobId storage.");
 				e.printStackTrace();
 			}
+		}
+		
+		this._env_from_config = (TreeSet<String>) this.config.get("ce_environment");		// this type is checked
+		if (!this.readCEList()) {
+			logger.severe("Error reading CE list.");
+			return;
 		}
 
 		logger.info("This VO-Box is " + config.get("ALIEN_CM_AS_LDAP_PROXY") + ", site is " + config.get("site_accountName"));
@@ -78,6 +94,43 @@ public class CREAM extends BatchQueue {
 		commands.put("delegationcmd", (config.containsKey("ce_delegationcmd") ? (String) config.get("ce_delegationcmd") : "glite-ce-delegate-proxy"));
 	}
 	
+	private boolean readCEList() {		// Form the CE lists
+		boolean has_field = false;
+		String CE_LCGCE_str = "test-cream-el6.cern.ch:8443/cream-pbs-alice";		// Current default
+		for( String env_field : _env_from_config) {
+			if( env_field.contains("CE_LCGCE") ){
+				CE_LCGCE_str = env_field.split("=")[1];
+				has_field = true;
+				break;
+			}
+		}
+		if (!has_field) {
+			logger.severe("No CE list defined in environment from LDAP.");
+			return false;
+		}
+		
+		Matcher matcher = Pattern.compile("\\((.*?)\\)").matcher(CE_LCGCE_str);		// Find groups
+		while(matcher.find()) {
+			String group_str = matcher.group(1);
+			CE_LCGCE_str = CE_LCGCE_str.replace("(" + group_str + ")", "");
+			String[] splitted_group_str = group_str.split(",");
+			ArrayList<String> arr = new ArrayList<String>();
+			for (String sub : splitted_group_str) {
+				arr.add(sub);
+			}
+			_ce_clusterstatus.add(arr);
+		}
+		String[] splitted_CE_LCGCE_str = CE_LCGCE_str.split(",");					// Find complementary
+		for (String sub : splitted_CE_LCGCE_str) {
+			if (sub.length() > 0) {
+				ArrayList<String> arr = new ArrayList<String>();
+				arr.add(sub);
+				_ce_clusterstatus.add(arr);
+			}
+		}
+		return true;
+	}
+	
 	private String generateStartAgent(String command) {		// TODO: wip
 		return "StartAgent dummy";
 	}
@@ -86,8 +139,119 @@ public class CREAM extends BatchQueue {
 		return "requirements dummy";
 	}
 	
-	private int wrapSubmit(File log_file, HashMap<String, String> arguments) {
-		int job_id = -1;
+	private String selectCE() {		// TODO: wip
+		String selected_ce = "test-cream-el6.cern.ch:8443/cream-pbs-alice";		// default
+		for (ArrayList<String> ce_group : _ce_clusterstatus) {
+			// TODO: Add optimized ce selection logic
+//			We need to imitate the load-balancing over several such endpoints,
+//			which can be grouped e.g. like this:
+//
+//			     (host-1:8443/cream-xyz-abc,host-2:8443/cream-xyz-abc),host-3:8443/cream-foo-bar
+//
+//			Hosts _within_ brackets are _equivalent_: they cover the same "subcluster"
+//			in the same batch system and their job numbers need to be _averaged_
+//			(or you just check one of them, as CREAM.pm does today).
+//
+//			We need to spread the job submissions evenly over any of those hosts
+//			that currently are available.
+//
+//			Hosts _outside_ brackets are _complementary_: your code needs to try
+//			and fill _all_ of them round-robin, up to the limits for the total number
+//			of jobs and the number of waiting jobs, configured in LDAP.
+		}
+		return selected_ce;
+	}
+	
+	private HashMap<String, String> queryBDII(String ce, String filter, String base, String[] items) {		// TODO: wip	// Do we still need this?
+		HashMap<String, String> results = new HashMap<String, String>();
+		if (filter == "") {
+			filter = "objectclass=*";
+		}
+
+		if (base == "") {
+			String GlueVOViewLocalID = (String)config.get("LCGVO");
+			base = "GlueVOViewLocalID=" + GlueVOViewLocalID.toLowerCase();		// + ",GlueCEUniqueID=$CE";
+		}
+
+		this.logger.info("Querying CE for: " + items);
+		this.logger.info("DN string: " + base);
+		this.logger.info("Filter: " + filter);
+
+		String IS = "ldap://" + (String)config.get("ce_host") + ":2170,mds-vo-name=resource,o=grid";		// Resource BDII
+		if (config.containsKey("CE_SITE_BDII")) {
+			IS = (String)config.get("CE_SITE_BDII");
+		}
+		
+		// TODO: Use LDAPHelper for query
+		
+		return results;
+	}
+	
+	private int getCEInfo(InfoMode mode, String[] items) {		// Really unsure about the types here
+		boolean gotResults = false;
+		int results = 0;
+		HashMap<String, String> values = new HashMap<String, String>();
+		this.logger.info("Querying CEs, mode: " + mode.name() + ", requested info: " + items);
+		
+		for (ArrayList<String> cluster : this._ce_clusterstatus) {
+			for (String ce : cluster) {
+				this.logger.info("Querying for $CE");
+				String lcgvo = (String)config.get("LCGVO");
+				lcgvo = lcgvo.toLowerCase();
+				HashMap<String, String> res = this.queryBDII(ce, "", "GlueVOViewLocalID=" + lcgvo + ",GlueCEUniqueID=" + ce, items);
+				this.logger.info("getCEInfo() returned results: " + res);
+				if (res != null) {
+					for (String item : items) {
+						if (res.get(item).contains("444444")) {
+							this.logger.warning("Query for " + ce + " gave " + item + "=444444.");
+							this.logger.info("Query for " + ce + " gave " + item + "=444444.");
+							continue;
+						}
+						if (res.containsKey(item)) {
+							values.put(item, res.get(item));
+							gotResults = true;
+						}
+					}
+				}else {
+					this.logger.warning("Query for " + ce + " failed.");
+					this.logger.info("Query for " + ce + " failed.");
+					continue;
+				}
+				break;
+			}
+		}
+		
+		if (!gotResults) {
+			this.logger.severe("getCEInfo() got no valid answer from any CE");
+			this.logger.info("getCEInfo() got no valid answer from any CE");
+			return 0;
+		}
+		
+		for (String item : items) {
+			ArrayList<Integer> value_int_array = new ArrayList<Integer>();
+			for (int i = 0; i<values.size(); i++) {
+				value_int_array.add(Integer.parseInt(values.get(item)));
+			}
+			int res = 0;
+			switch (mode) {
+			case SUM:
+				for (Integer i : value_int_array) res += i;
+				break;
+			case MIN:
+				res = Collections.min(value_int_array);
+				break;
+			case MAX:
+				res = Collections.max(value_int_array);
+				break;
+			}
+			results = res;
+		}
+		
+		return results;
+	}
+	
+	private String wrapSubmit(File log_file, HashMap<String, String> arguments) {
+		String job_id = "";
 		
 		ArrayList<String> submit_cmd = new ArrayList<String>();
 		submit_cmd.add(this.commands.get("submitcmd"));
@@ -113,16 +277,13 @@ public class CREAM extends BatchQueue {
 				break;
 			}
 		}
-		Pattern comment_pattern = Pattern.compile("https:\\/\\/[A-Za-z0-9.-]*:8443\\/CREAM\\d+");
+		Pattern comment_pattern = Pattern.compile("https:\\/\\/[A-Za-z0-9.-]*:8443\\/cream\\d+");
 		Matcher comment_matcher = comment_pattern.matcher(link_from_output);
 		if(!comment_matcher.matches()) {
 			this.logger.info("Could not find link in submission output. JobID unknown.");
-			return -1;
+			return "";
 		}
-		String[] split_link = link_from_output.split("/");
-		link_from_output = split_link[split_link.length - 1];
-		link_from_output = link_from_output.replaceAll("\\D+","");		// Leave only the id at the end
-		job_id = Integer.parseInt(link_from_output);
+		job_id = link_from_output;
 		
 		return job_id;
 	}
@@ -277,11 +438,20 @@ public class CREAM extends BatchQueue {
 			return;
 		}
 		
-		HashMap<String, String> arguments = new HashMap<>();
+		// pick a CE from the list (this._ce_clusterstatus)
+		String selected_ce = this.selectCE();
+		if (selected_ce == "") {
+			this.logger.severe("No suitable CE found for submission!");
+			this.logger.info("No more slots in the queues?");
+			return;
+		}
+		
+		HashMap<String, String> arguments = new HashMap<String, String>();
 		if (this.config.containsKey("CE_SUBMITARG_LIST")) {
 			arguments = (HashMap<String, String>)this.config.get("CE_SUBMITARG_LIST");		// TODO: Need to check type
 		}
 		
+		arguments.put("-r", selected_ce);
 		arguments.put("-D", (String)this.config.get("DELEGATION_ID"));
 		logger.info("Submitting to CREAM with arguments: " + arguments);
 		
@@ -294,7 +464,7 @@ public class CREAM extends BatchQueue {
 			return;
 		}
 		
-		int job_id = this.wrapSubmit(submit_log_file, arguments);
+		String job_id = this.wrapSubmit(submit_log_file, arguments);
 		this._last_job_id = job_id;
 		
 //		  # //Comment from Perl//
@@ -306,7 +476,7 @@ public class CREAM extends BatchQueue {
 //		  # to ensure the submission loop will terminate.
 //		  #
 		
-		if (job_id == -1) {
+		if (job_id == "") {
 			return;
 		}
 		this.logger.info("Current Job ID: " + job_id);
@@ -326,12 +496,28 @@ public class CREAM extends BatchQueue {
 
 	@Override
 	public int getNumberActive() {
-		return 0;
+		int result = -1;
+		String[] items = {"GlueCEStateRunningJobs", "GlueCEStateWaitingJobs"};
+		result = this.getCEInfo(InfoMode.SUM, items);
+		if (result == -1) {
+			this.logger.info("Could not get number of running/waiting jobs");
+			return 0;
+		}
+		this.logger.info("JobAgents running, waiting total: " + result);
+		return result;
 	}
 
 	@Override
 	public int getNumberQueued() {
-		return 0;
+		int result = -1;
+		String[] items = {"GlueCEStateWaitingJobs"};
+		result = this.getCEInfo(InfoMode.MIN, items);
+		if (result == -1) {
+			this.logger.info("Could not get number of waiting jobs");
+			return 0;
+		}
+		this.logger.info("JobAgents waiting: " + result);
+		return result;
 	}
 
 	@Override
