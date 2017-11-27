@@ -13,6 +13,8 @@ import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.Hashtable;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
@@ -22,8 +24,22 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.naming.Context;
+import javax.naming.NamingEnumeration;
+import javax.naming.NamingException;
+import javax.naming.directory.Attribute;
+import javax.naming.directory.Attributes;
+import javax.naming.directory.BasicAttribute;
+import javax.naming.directory.DirContext;
+import javax.naming.directory.InitialDirContext;
+import javax.naming.directory.SearchControls;
+import javax.naming.directory.SearchResult;
+
 import alien.user.LDAPHelper;
+import lazyj.cache.ExpirationCache;
 import alien.log.LogUtils;
+import alien.monitoring.Monitor;
+import alien.monitoring.MonitorFactory;
 import alien.test.utils.Functions;
 import lia.util.process.ExternalProcess.ExitStatus;
 import utils.ProcessWithTimeout;
@@ -162,35 +178,71 @@ public class CREAM extends BatchQueue {
 		return selected_ce;
 	}
 	
-	private HashMap<String, String> queryBDII(String ce, String filter, String base, String[] items) {		// TODO: wip	// Do we still need this?
-		HashMap<String, String> results = new HashMap<String, String>();
-		if (filter == "") {
-			filter = "objectclass=*";
-		}
-
-		if (base == "") {
+	private HashMap<String, String> queryBDII(String ce, String query, String[] items) {		// TODO: wip
+		if (query == "") {
 			String GlueVOViewLocalID = (String)config.get("LCGVO");
-			base = "GlueVOViewLocalID=" + GlueVOViewLocalID.toLowerCase();		// + ",GlueCEUniqueID=$CE";
+			query = "GlueVOViewLocalID=" + GlueVOViewLocalID.toLowerCase() + ",GlueCEUniqueID=" + ce;
 		}
 
 		this.logger.info("Querying CE for: " + items);
-		this.logger.info("DN string: " + base);
-		this.logger.info("Filter: " + filter);
+		this.logger.info("DN string: " + query);
 
-		String IS = "ldap://" + (String)config.get("ce_host") + ":2170,mds-vo-name=resource,o=grid";		// Resource BDII
+		String IS = "ldap://" + (String)config.get("ce_host") + ":2170/mds-vo-name=resource,o=grid";
 		if (config.containsKey("CE_SITE_BDII")) {
 			IS = (String)config.get("CE_SITE_BDII");
 		}
 		
-		// TODO: Use LDAPHelper for query
-		
-		return results;
+//		Code adapted from LDAPHelper
+		Map<String, String> defaultEnv = new HashMap<>();
+		defaultEnv.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
+		defaultEnv.put("com.sun.jndi.ldap.read.timeout", "30000");
+		defaultEnv.put("com.sun.jndi.ldap.connect.timeout", "10000");
+		defaultEnv.put("com.sun.jndi.ldap.connect.pool.maxsize", "50");
+		defaultEnv.put("com.sun.jndi.ldap.connect.pool.prefsize", "5");
+		defaultEnv.put("com.sun.jndi.ldap.connect.pool.timeout", "120000");
+		HashMap<String, String> result = new HashMap<String, String>();
+
+		try {
+			final Hashtable<String, String> env = new Hashtable<>();
+			env.putAll(defaultEnv);
+			env.put(Context.PROVIDER_URL, IS);
+
+			final DirContext context = new InitialDirContext(env);
+
+			try {
+				final SearchControls ctrl = new SearchControls();
+				ctrl.setSearchScope(SearchControls.SUBTREE_SCOPE);
+
+				final NamingEnumeration<SearchResult> enumeration = context.search("", query, ctrl);
+
+				while (enumeration.hasMore()) {
+					final SearchResult entry = enumeration.next();
+
+					final Attributes attribs = entry.getAttributes();
+
+					if (attribs == null)
+						continue;
+
+					for (String item : items) {
+						final BasicAttribute ba = (BasicAttribute) attribs.get(item);
+						result.put(ba.getID(), (String)ba.get());
+					}
+				}
+			} finally {
+				context.close();
+			}
+
+		} catch (final NamingException ne) {
+			ne.printStackTrace();
+		}
+
+		return result;
 	}
 	
 	private int getCEInfo(InfoMode mode, String[] items) {		// Really unsure about the types here
 		boolean gotResults = false;
 		int results = 0;
-		HashMap<String, String> values = new HashMap<String, String>();
+		ArrayList<HashMap<String, String>> values = new ArrayList<HashMap<String, String>>();
 		this.logger.info("Querying CEs, mode: " + mode.name() + ", requested info: " + items);
 		
 		for (ArrayList<String> cluster : this._ce_clusterstatus) {
@@ -198,17 +250,19 @@ public class CREAM extends BatchQueue {
 				this.logger.info("Querying for $CE");
 				String lcgvo = (String)config.get("LCGVO");
 				lcgvo = lcgvo.toLowerCase();
-				HashMap<String, String> res = this.queryBDII(ce, "", "GlueVOViewLocalID=" + lcgvo + ",GlueCEUniqueID=" + ce, items);
+				HashMap<String, String> res = this.queryBDII(ce, "GlueVOViewLocalID=" + lcgvo + ",GlueCEUniqueID=" + ce, items);
 				this.logger.info("getCEInfo() returned results: " + res);
 				if (res != null) {
+					HashMap<String, String> ce_results = new HashMap<String, String>();
 					for (String item : items) {
-						if (res.get(item).contains("444444")) {
+						if (res.get(item) == "444444") {
 							this.logger.warning("Query for " + ce + " gave " + item + "=444444.");
 							this.logger.info("Query for " + ce + " gave " + item + "=444444.");
 							continue;
 						}
 						if (res.containsKey(item)) {
-							values.put(item, res.get(item));
+							ce_results.put(item, res.get(item));
+							values.add(ce_results);
 							gotResults = true;
 						}
 					}
@@ -227,24 +281,25 @@ public class CREAM extends BatchQueue {
 			return 0;
 		}
 		
-		for (String item : items) {
-			ArrayList<Integer> value_int_array = new ArrayList<Integer>();
-			for (int i = 0; i<values.size(); i++) {
-				value_int_array.add(Integer.parseInt(values.get(item)));
+		ArrayList<Integer> value_int_array = new ArrayList<Integer>();
+		for (HashMap<String, String> ce_values : values) {
+			for (String item : items) {
+				if (ce_values.containsKey(item)) {
+					value_int_array.add(Integer.parseInt(ce_values.get(item)));
+				}
 			}
-			int res = 0;
-			switch (mode) {
-			case SUM:
-				for (Integer i : value_int_array) res += i;
-				break;
-			case MIN:
-				res = Collections.min(value_int_array);
-				break;
-			case MAX:
-				res = Collections.max(value_int_array);
-				break;
-			}
-			results = res;
+		}
+		
+		switch (mode) {
+		case SUM:
+			for (Integer i : value_int_array) results += i;
+			break;
+		case MIN:
+			results = Collections.min(value_int_array);
+			break;
+		case MAX:
+			results = Collections.max(value_int_array);
+			break;
 		}
 		
 		return results;
