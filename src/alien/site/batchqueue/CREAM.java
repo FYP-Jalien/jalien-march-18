@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Hashtable;
-import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
@@ -27,7 +26,6 @@ import java.util.regex.Pattern;
 import javax.naming.Context;
 import javax.naming.NamingEnumeration;
 import javax.naming.NamingException;
-import javax.naming.directory.Attribute;
 import javax.naming.directory.Attributes;
 import javax.naming.directory.BasicAttribute;
 import javax.naming.directory.DirContext;
@@ -35,11 +33,7 @@ import javax.naming.directory.InitialDirContext;
 import javax.naming.directory.SearchControls;
 import javax.naming.directory.SearchResult;
 
-import alien.user.LDAPHelper;
-import lazyj.cache.ExpirationCache;
 import alien.log.LogUtils;
-import alien.monitoring.Monitor;
-import alien.monitoring.MonitorFactory;
 import alien.test.utils.Functions;
 import lia.util.process.ExternalProcess.ExitStatus;
 import utils.ProcessWithTimeout;
@@ -56,7 +50,7 @@ public class CREAM extends BatchQueue {
 	private File _temp_file;
 	private File _job_id_file;
 	private String _last_job_id;
-	private ArrayList<ArrayList<String>> _ce_clusterstatus;
+	private ArrayList<ArrayList<String>> _ce_clusterstatus = new ArrayList<ArrayList<String>>();
 	
 	private enum InfoMode {
 		SUM,
@@ -155,26 +149,56 @@ public class CREAM extends BatchQueue {
 		return "requirements dummy";
 	}
 	
-	private String selectCE() {		// TODO: wip
+	private String selectCE() {
+//		We need to imitate the load-balancing over several such endpoints,
+//		which can be grouped e.g. like this:
+//
+//		     (host-1:8443/cream-xyz-abc,host-2:8443/cream-xyz-abc),host-3:8443/cream-foo-bar
+//
+//		Hosts _within_ brackets are _equivalent_: they cover the same "subcluster"
+//		in the same batch system and their job numbers need to be _averaged_
+//		(or you just check one of them, as CREAM.pm does today).
+//
+//		We need to spread the job submissions evenly over any of those hosts
+//		that currently are available.
+//
+//		Hosts _outside_ brackets are _complementary_: your code needs to try
+//		and fill _all_ of them round-robin, up to the limits for the total number
+//		of jobs and the number of waiting jobs, configured in LDAP.
+		
 		String selected_ce = "test-cream-el6.cern.ch:8443/cream-pbs-alice";		// default
-		for (ArrayList<String> ce_group : _ce_clusterstatus) {
-			// TODO: Add optimized ce selection logic
-//			We need to imitate the load-balancing over several such endpoints,
-//			which can be grouped e.g. like this:
-//
-//			     (host-1:8443/cream-xyz-abc,host-2:8443/cream-xyz-abc),host-3:8443/cream-foo-bar
-//
-//			Hosts _within_ brackets are _equivalent_: they cover the same "subcluster"
-//			in the same batch system and their job numbers need to be _averaged_
-//			(or you just check one of them, as CREAM.pm does today).
-//
-//			We need to spread the job submissions evenly over any of those hosts
-//			that currently are available.
-//
-//			Hosts _outside_ brackets are _complementary_: your code needs to try
-//			and fill _all_ of them round-robin, up to the limits for the total number
-//			of jobs and the number of waiting jobs, configured in LDAP.
+		int lowest_avg = Integer.MAX_VALUE;
+		
+		String[] items = {"GlueCEStateRunningJobs", "GlueCEStateWaitingJobs"};
+		for (int i = 0; i < _ce_clusterstatus.size(); i++) {		// find the lowest average in _ce_clusterstatus
+			int sum = 0;
+			int count = 0;
+			boolean can_submit = false;
+			int min_jobs = Integer.MAX_VALUE;
+			String smallest_ce = "";
+			ArrayList<String> ce_group = _ce_clusterstatus.get(i);
+			for (String ce : ce_group) {
+				HashMap<String, String> query_results = this.queryBDII(ce, "GlueCEUniqueID=" + ce, items);
+				int active_jobs = 0;
+				count++;
+				active_jobs += Integer.parseInt((String)query_results.get("GlueCEStateWaitingJobs")) + 
+						Integer.parseInt((String)query_results.get("GlueCEStateRunningJobs"));
+				sum += active_jobs;
+				if (Integer.parseInt(query_results.get("GlueCEStateWaitingJobs")) < (Integer)config.get("ce_maxqueuedjobs")){
+					if (active_jobs < min_jobs) {
+						min_jobs = active_jobs;
+						smallest_ce = ce;
+					}
+					can_submit = true;
+				}
+			}
+			int avg = sum/count;
+			if ((avg < lowest_avg) && can_submit) {
+				lowest_avg = avg;
+				selected_ce = smallest_ce;
+			}
 		}
+		
 		return selected_ce;
 	}
 	
@@ -239,7 +263,7 @@ public class CREAM extends BatchQueue {
 		return result;
 	}
 	
-	private int getCEInfo(InfoMode mode, String[] items) {		// Really unsure about the types here
+	private int getCEInfo(InfoMode mode, String[] items) {
 		boolean gotResults = false;
 		int results = 0;
 		ArrayList<HashMap<String, String>> values = new ArrayList<HashMap<String, String>>();
