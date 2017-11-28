@@ -28,6 +28,7 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.logging.Level;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 
@@ -48,7 +49,7 @@ public class ConfigUtils {
 	/**
 	 * Logger
 	 */
-	static transient final Logger logger = ConfigUtils.getLogger(ConfigUtils.class.getCanonicalName());
+	static transient final Logger logger;
 
 	private static final Map<String, ExtProperties> dbConfigFiles;
 
@@ -176,8 +177,6 @@ public class ConfigUtils {
 		for (final Map.Entry<Object, Object> entry : System.getProperties().entrySet())
 			appConfig.set(entry.getKey().toString(), entry.getValue().toString());
 
-		appConfig.makeReadOnly();
-
 		// now let's configure the logging, if allowed to
 		if (appConfig.getb("jalien.configure.logging", true) && logConfig != null) {
 			logging = new LoggingConfigurator(logConfig);
@@ -202,6 +201,21 @@ public class ConfigUtils {
 				}
 			}
 		}
+		else {
+			// assume running as a library inside ML code, inherit the configuration keys from its main config file
+			final Properties mlConfigProperties = AppConfig.getPropertiesConfigApp();
+
+			for (final String key : mlConfigProperties.stringPropertyNames())
+				appConfig.set(key, mlConfigProperties.getProperty(key));
+		}
+
+		appConfig.makeReadOnly();
+
+		logger = ConfigUtils.getLogger(ConfigUtils.class.getCanonicalName());
+
+		if (logger.isLoggable(Level.FINE))
+			logger.log(Level.FINE,
+					"Configuration loaded. Own logging configuration: " + (logging != null ? "true" : "false") + ", ML configuration detected: " + hasMLConfig + ", config folder: " + CONFIG_FOLDER);
 	}
 
 	/**
