@@ -35,16 +35,6 @@ public class JBox {
 		
 		// logger.log(Level.FINE, "No context yet");
 		Context.addToLoggingContext("JBox");
-		logger.log(Level.FINE, "This should go only to JBox log");
-/*
-		logger.log(Level.FINE, "Starting JBox");
-		Context.addToLoggingContext("Debug");
-		logger.log(Level.FINE, "This should go to JBox Debug!");
-		
-		Context.resetLoggingContext();
-		logger.log(Level.FINE, "This should only go to default log");
-	*/	
-		Context.resetLoggingContext();
 		
 		final OptionParser parser = new OptionParser();
 		parser.accepts("login");

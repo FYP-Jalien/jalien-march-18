@@ -1,5 +1,6 @@
 package alien;
 
+import alien.config.Context;
 import alien.optimizers.Optimizer;
 
 /**
@@ -13,6 +14,7 @@ public class JOptimizers {
 	 * @throws Exception
 	 */
 	public static void main(final String[] args) throws Exception {
+		Context.addToLoggingContext("JOptimizer");
 		Optimizer opt = new Optimizer();
 		opt.start();
 	}

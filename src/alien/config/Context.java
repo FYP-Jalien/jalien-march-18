@@ -128,9 +128,6 @@ public class Context {
 			currLogContext = tag;
 		}
 		
-		// if the thread context does not exist, make sure to create it
-		
-		
 		// update the thread context
 		currThreadContetxt.put(loggingTag, currLogContext);
 	}

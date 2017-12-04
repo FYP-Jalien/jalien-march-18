@@ -9,11 +9,9 @@ import java.util.HashMap;
 import java.util.Map;
 
 import java.util.logging.Filter;
-import java.util.logging.Level;
 import java.util.logging.LogRecord;
 import java.util.logging.Logger;
 
-import com.codahale.metrics.Slf4jReporter.LoggingLevel;
 
 /**
  * @author lyb

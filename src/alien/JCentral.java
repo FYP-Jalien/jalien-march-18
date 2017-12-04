@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 import alien.api.DispatchSSLServer;
 import alien.api.TomcatServer;
 import alien.config.ConfigUtils;
+import alien.config.Context;
 import alien.user.JAKeyStore;
 
 /**
@@ -38,6 +39,7 @@ public class JCentral {
 		}
 
 		logger.setLevel(Level.WARNING);
+		Context.addToLoggingContext("JCentral");
 
 		try {
 			// SimpleCatalogueApiService catalogueAPIService = new SimpleCatalogueApiService();
