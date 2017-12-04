@@ -73,7 +73,7 @@ public class JAliEnCommandtoken extends JAliEnBaseCommand {
 
 	@Override
 	public void run() {
-		GetTokenCertificate tokenreq = new GetTokenCertificate(commander.user, requestedUser, tokentype, extension, validity, commander.user.getUserCert()[0]);
+		GetTokenCertificate tokenreq = new GetTokenCertificate(commander.user, requestedUser, tokentype, extension, validity);
 
 		try {
 			tokenreq = Dispatcher.execute(tokenreq);

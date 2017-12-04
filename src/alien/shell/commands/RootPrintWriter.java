@@ -170,11 +170,6 @@ public class RootPrintWriter extends UIPrintWriter {
 	}
 
 	@Override
-	protected void degraded() {
-		// ignore - not to be implemented in the root printer
-	}
-
-	@Override
 	protected void blackwhitemode() {
 		// ignore - not to be implemented in the root printer
 	}

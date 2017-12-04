@@ -139,7 +139,6 @@ public class TomcatServer {
 
 		Connector connector = new Connector("org.apache.coyote.http11.Http11NioProtocol");
 
-		connector.setProtocol("org.apache.coyote.http11.Http11NioProtocol");
 		connector.setPort(tomcatPort);
 		connector.setSecure(true);
 		connector.setScheme("https");

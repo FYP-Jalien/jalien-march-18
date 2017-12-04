@@ -64,7 +64,6 @@ public class GetTokenCertificate extends Request {
 	final TokenCertificateType certificateType;
 	final String extension;
 	final int validity;
-	final X509Certificate userCertificate;
 	final String requestedUser;
 
 	// incoming fields
@@ -81,17 +80,15 @@ public class GetTokenCertificate extends Request {
 	 * @param certificateType
 	 * @param extension
 	 * @param validity
-	 * @param userCertificate
 	 *            the certificate the user presented to identify itself. This
 	 *            will restrict the validity of the issued token
 	 */
-	public GetTokenCertificate(final AliEnPrincipal user, final String requestedUser, final TokenCertificateType certificateType, final String extension, final int validity, final X509Certificate userCertificate) {
-		setRequestUser(user);		
+	public GetTokenCertificate(final AliEnPrincipal user, final String requestedUser, final TokenCertificateType certificateType, final String extension, final int validity) {
+		setRequestUser(user);
 
 		this.certificateType = certificateType;
 		this.extension = extension;
 		this.validity = validity;
-		this.userCertificate = userCertificate;
 		this.requestedUser = requestedUser;
 	}
 
@@ -101,7 +98,7 @@ public class GetTokenCertificate extends Request {
 			throw new IllegalArgumentException("Certificate type cannot be null");
 
 		DnBuilder builder = CA.dn().setC("ch").setO("AliEn");
-		
+
 		final String requester = getEffectiveRequester().getDefaultUser();
 		final String requested = getEffectiveRequester().canBecome(requestedUser) ? requestedUser : requester;
 
@@ -109,9 +106,6 @@ public class GetTokenCertificate extends Request {
 		case USER_CERTIFICATE:
 			if (getEffectiveRequester().isJob() || getEffectiveRequester().isJobAgent())
 				throw new IllegalArgumentException("You can't request a User token as JobAgent or Job");
-
-			if (userCertificate == null)
-				throw new IllegalArgumentException("When issuing a user certificate you need to pass the current one, that will limit the validity of the issued token");
 
 			builder = builder.setCn("Users").setCn(requester).setOu(requested);
 			break;
@@ -145,11 +139,14 @@ public class GetTokenCertificate extends Request {
 
 		ZonedDateTime notAfter = ZonedDateTime.now().plus(amount);
 
-		if (userCertificate != null) {
-			final ZonedDateTime userNotAfter = userCertificate.getNotAfter().toInstant().atZone(ZoneId.systemDefault());
+		if (getEffectiveRequester().getUserCert() != null) {
+			final ZonedDateTime userNotAfter = getEffectiveRequester().getUserCert()[0].getNotAfter().toInstant().atZone(ZoneId.systemDefault());
 
 			if (notAfter.isAfter(userNotAfter))
 				notAfter = userNotAfter;
+		}
+		else {
+			throw new IllegalArgumentException("When issuing a user certificate you need to pass the current one, that will limit the validity of the issued token");
 		}
 
 		final javax.security.cert.X509Certificate partnerCertificateChain[] = getPartnerCertificate();
@@ -223,21 +220,22 @@ public class GetTokenCertificate extends Request {
 		}
 		return sw.toString();
 	}
-/*
-	@Override
-	public String getKey() {
-		// only cache user tokens, job tokens have the job ID in them and cannot
-		// be effectively cached
-		if (certificateType == TokenCertificateType.USER_CERTIFICATE)
-			return getEffectiveRequester().getName();
-
-		return null;
-	}
-
-	@Override
-	public long getTimeout() {
-		// for the same user don't generate another certificate for 10 minutes
-		// but return the same one
-		return 1000L * 60 * 10;
-	}*/
+	/*
+	 * @Override
+	 * public String getKey() {
+	 * // only cache user tokens, job tokens have the job ID in them and cannot
+	 * // be effectively cached
+	 * if (certificateType == TokenCertificateType.USER_CERTIFICATE)
+	 * return getEffectiveRequester().getName();
+	 * 
+	 * return null;
+	 * }
+	 * 
+	 * @Override
+	 * public long getTimeout() {
+	 * // for the same user don't generate another certificate for 10 minutes
+	 * // but return the same one
+	 * return 1000L * 60 * 10;
+	 * }
+	 */
 }

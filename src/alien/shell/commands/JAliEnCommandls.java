@@ -107,15 +107,16 @@ public class JAliEnCommandls extends JAliEnBaseCommand {
 					if (out.isRootPrinter()) {
 						out.nextResult();
 
-						if (localLFN.guid != null)
-							out.setField("guid", localLFN.guid.toString().toUpperCase());
-						out.setField("perm", FileSystemUtils.getFormatedTypeAndPerm(localLFN));
-						out.setField("owner", localLFN.owner);
+						out.setField("permissions", FileSystemUtils.getFormatedTypeAndPerm(localLFN));
+						out.setField("user", localLFN.owner);
 						out.setField("group", localLFN.gowner);
 						out.setField("size", String.valueOf(localLFN.size));
 						out.setField("ctime", String.valueOf(localLFN.ctime.getTime() / 1000));
 						out.setField("name", localLFN.getFileName() + (bF && localLFN.isDirectory() ? "/" : ""));
 						out.setField("path", localLFN.getCanonicalName() + (bF && localLFN.isDirectory() ? "/" : ""));
+
+						if (localLFN.guid != null)
+							out.setField("guid", localLFN.guid.toString().toUpperCase());
 					}
 					else {
 						String ret = "";

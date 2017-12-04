@@ -30,18 +30,12 @@ public class JCentral {
 	 */
 	public static void main(final String[] args) throws KeyStoreException {
 
-		try {
-			JAKeyStore.loadServerKeyStorage();
-		} catch (final Exception e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-
 		logger.setLevel(Level.WARNING);
 
 		try {
 			// SimpleCatalogueApiService catalogueAPIService = new SimpleCatalogueApiService();
 			// catalogueAPIService.start();
+			JAKeyStore.loadKeyStore();
 			TomcatServer.startTomcatServer(0);
 			DispatchSSLServer.runService();
 			

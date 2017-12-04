@@ -129,11 +129,6 @@ public class XMLPrintWriter extends UIPrintWriter {
 	}
 
 	@Override
-	protected void degraded() {
-		// nothing
-	}
-
-	@Override
 	protected boolean isRootPrinter() {
 		return true;
 	}

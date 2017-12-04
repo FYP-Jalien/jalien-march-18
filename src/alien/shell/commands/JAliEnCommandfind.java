@@ -58,7 +58,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 	private boolean bC = false;
 
 	/**
-	 * marker for -l argument :limit the number of returned files per database host
+	 * marker for -l argument : long format, optionally human readable file sizes
 	 */
 	private boolean bL = false;
 
@@ -158,10 +158,11 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			else
 				for (final LFN lfn : lfns)
 					if (out.isRootPrinter()) {
+						out.nextResult();
 
 						if (bL) {
-							out.setField("perm", FileSystemUtils.getFormatedTypeAndPerm(lfn));
-							out.setField("owner", lfn.owner);
+							out.setField("permissions", FileSystemUtils.getFormatedTypeAndPerm(lfn));
+							out.setField("user", lfn.owner);
 							out.setField("group", lfn.gowner);
 							out.setField("size", (bH ? Format.size(lfn.size) : String.valueOf(lfn.size)));
 							out.setField("ctime", " " + lfn.ctime);
@@ -175,7 +176,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 						if (bL)
 							// print long
 							out.printOutln(FileSystemUtils.getFormatedTypeAndPerm(lfn) + padSpace(3) + padLeft(lfn.owner, 8) + padSpace(1) + padLeft(lfn.gowner, 8) + padSpace(1)
-									+ padLeft(bH ? Format.size(lfn.size) : String.valueOf(lfn.size), 12) + format(lfn.ctime) + padSpace(1) + padSpace(4) + lfn.getCanonicalName());
+									+ padLeft(bH ? Format.size(lfn.size) : String.valueOf(lfn.size), 12) + padSpace(1) + format(lfn.ctime) + padSpace(1) + padSpace(4) + lfn.getCanonicalName());
 						else
 							out.printOutln(lfn.getCanonicalName());
 
@@ -195,15 +196,14 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 		out.printOutln();
 		out.printOutln(helpUsage("find", "<path>  <pattern> flags"));
 		out.printOutln();
-		// out.printOutln(helpUsage("Possible flags are coming soon..."));
 
 		out.printOutln(helpStartOptions());
 
 		out.printOutln(helpOption("-a", "show hidden .* files"));
 		out.printOutln(helpOption("-s", "no sorting"));
-		out.printOutln(helpOption("-c", "c filename"));
+		out.printOutln(helpOption("-c", "collection filename (put the output in a collection)"));
 		out.printOutln(helpOption("-y", "(FOR THE OCDB) return only the biggest version of each file"));
-		out.printOutln(helpOption("-x", "x collection name"));
+		out.printOutln(helpOption("-x", "xml collection name (return the LFN list through XmlCollection)"));
 		out.printOutln(helpOption("-d", "return also the directories"));
 		out.printOutln(helpOption("-l[h]", "long format, optionally human readable file sizes"));
 		out.printOutln();
