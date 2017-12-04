@@ -1,0 +1,412 @@
+1512406472268  FINE  Configuration loaded. Own logging configuration: true, ML configuration detected: false, config folder: /home/lyb/.j/config  
+1512406472638  INFO  Loading trusts from /home/lyb/.j/trusts  
+1512406472645  FINE  Trusting now: CN=DFN-Verein PCA Grid - G01, OU=DFN-PKI, O=DFN-Verein, C=DE  
+1512406472649  FINE  Trusting now: CN=HellasGrid CA 2016, OU=Certification Authorities, O=HellasGrid, C=GR  
+1512406472654  FINE  Trusting now: CN=RomanianGRID CA, OU=Certification Authority, O=ROSA, DC=RomanianGRID, DC=RO  
+1512406472657  FINE  Trusting now: CN=CESNET CA Root, O=CESNET CA, DC=cesnet-ca, DC=cz  
+1512406472661  FINE  Trusting now: CN=KISTI Grid Certificate Authority, O=GRID, O=KISTI, C=KR  
+1512406472665  FINE  Trusting now: CN=UTN-USERFirst-Client Authentication and Email, OU=http://www.usertrust.com, O=The USERTRUST Network, L=Salt Lake City, ST=UT, C=US  
+1512406472669  FINE  Trusting now: CN=TERENA eScience Personal CA, O=TERENA, C=NL  
+1512406472671  FINE  Trusting now: CN=UK e-Science Root, OU=Authority, O=eScienceRoot, C=UK  
+1512406472675  FINE  Trusting now: CN=COMODO RSA Certification Authority, O=COMODO CA Limited, L=Salford, ST=Greater Manchester, C=GB  
+1512406472678  FINE  Trusting now: CN=MyProxy CA 2013, OU=Certificate Authorities, O=National Center for Supercomputing Applications, C=US  
+1512406472683  FINE  Trusting now: CN=DarkMatter Secure CA, O=DarkMatter LLC, C=AE  
+1512406472686  FINE  Trusting now: CN=Polish Grid CA, O=GRID, C=PL  
+1512406472688  FINE  Trusting now: CN=GRID2-FR, O=CNRS, C=FR  
+1512406472693  FINE  Trusting now: CN=REUNA Certification Authority, O=REUNACA, C=CL  
+1512406472697  FINE  Trusting now: CN=Belarusian Grid Certification Authority, O=uiip.bas-net.by, DC=grid, DC=by  
+1512406472700  FINE  Trusting now: CN=CILogon Basic CA 1, O=CILogon, C=US, DC=cilogon, DC=org  
+1512406472703  FINE  Trusting now: CN=PKIGrid, L=CeSPI, OU=UNLP, O=e-Ciencia, C=AR  
+1512406472706  FINE  Trusting now: CN=CyGridCA, O=HPCL, O=CyGrid, C=CY  
+1512406472708  FINE  Trusting now: CN=CNRS2-Projets, O=CNRS, C=FR  
+1512406472711  FINE  Trusting now: CN=HKU Grid CA, DC=GRID, DC=HKU, DC=HK  
+1512406472714  FINE  Trusting now: CN=QuoVadis Root CA 3 G3, O=QuoVadis Limited, C=BM  
+1512406472717  FINE  Trusting now: CN=UTN-USERFirst-Client Authentication and Email, OU=http://www.usertrust.com, O=The USERTRUST Network, L=Salt Lake City, ST=UT, C=US  
+1512406472720  FINE  Trusting now: CN=SEE-GRID CA 2013, DC=SEE-GRID, DC=ORG  
+1512406472722  FINE  Trusting now: CN=Certificate Issuer, OU=Certification Authority, O=AustrianGrid, C=AT  
+1512406472725  FINE  Trusting now: CN=ArmeSFo CA, O=ArmeSFo, C=AM  
+1512406472728  FINE  Trusting now: CN=KEK GRID Certificate Authority, OU=CRC, O=KEK, C=JP  
+1512406472732  FINE  Trusting now: CN=QuoVadis Root CA 2, O=QuoVadis Limited, C=BM  
+1512406472735  FINE  Trusting now: CN=DigiCert Assured ID Root CA, OU=www.digicert.com, O=DigiCert Inc, C=US  
+1512406472738  FINE  Trusting now: CN=IRAN-GRID CA, O=IRAN-GRID, O=IPM, C=IR  
+1512406472741  FINE  Trusting now: CN=PKIGrid, L=CeSPI, OU=UNLP, O=e-Ciencia, C=AR  
+1512406472744  FINE  Trusting now: CN=TERENA eScience SSL CA 3, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL  
+1512406472748  FINE  Trusting now: CN=Scientific Data Grid CA - G2, DC=SDG, DC=Grid, DC=CN  
+1512406472752  FINE  Trusting now: CN=KENET CA, OU=Research Services, O=Kenya Education Network Trust, DC=kenet, DC=ke  
+1512406472756  FINE  Trusting now: CN=CERN Grid Certification Authority, DC=cern, DC=ch  
+1512406472760  FINE  Trusting now: CN=DarkMatter Assured CA, O=DarkMatter LLC, C=AE  
+1512406472762  FINE  Trusting now: CN=HKU Grid CA, DC=GRID, DC=HKU, DC=HK  
+1512406472767  FINE  Trusting now: CN=EG-GRID Certification Authority, O=EG-GRID, C=EG  
+1512406472770  FINE  Trusting now: CN=DCA Root G1 CA, O=Certification Authorities, DC=dutchgrid, DC=nl  
+1512406472772  FINE  Trusting now: CN=Kerberized CA HSM, OU=Certificate Authorities, O=Fermilab, DC=fnal, DC=gov  
+1512406472776  FINE  Trusting now: CN=UFF Latin American and Caribbean Catch-all Grid CA, O=UFF LACGrid CA, DC=IC, DC=UFF, DC=BR  
+1512406472781  FINE  Trusting now: CN=IRAN-GRID-G2 CA, OU=GCG, O=IPM, C=IR  
+1512406472783  FINE  Trusting now: CN=DigiCert Grid Trust CA, OU=www.digicert.com, O=DigiCert Grid, C=US  
+1512406472786  FINE  Trusting now: CN=NorduGrid Certification Authority 2015, O=NorduGrid, O=Grid  
+1512406472788  FINE  Trusting now: CN=MREN-CA, DC=MREN, DC=ac, DC=me  
+1512406472791  FINE  Trusting now: CN=CESNET CA 3, O=CESNET CA, DC=cesnet-ca, DC=cz  
+1512406472793  FINE  Trusting now: CN=CNRS2-Projets, O=CNRS, C=FR  
+1512406472794  FINE  Trusting now: CN=KEK GRID Certificate Authority, OU=CRC, O=KEK, C=JP  
+1512406472796  FINE  Trusting now: CN=TERENA eScience SSL CA 3, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL  
+1512406472798  FINE  Trusting now: CN=CILogon Silver CA 1, O=CILogon, C=US, DC=cilogon, DC=org  
+1512406472801  FINE  Trusting now: CN=USERTrust RSA Certification Authority, O=The USERTRUST Network, L=Jersey City, ST=New Jersey, C=US  
+1512406472803  FINE  Trusting now: CN=KISTI Grid Certificate Authority, O=GRID, O=KISTI, C=KR  
+1512406472806  FINE  Trusting now: CN=PK-GRID-CA, O=NCP, C=PK  
+1512406472809  FINE  Trusting now: CN=UK e-Science CA 2B, OU=Authority, O=eScienceCA, C=UK  
+1512406472811  FINE  Trusting now: CN=Institute of High Energy Physics Certification Authority, O=HEP, C=CN  
+1512406472820  FINE  Trusting now: CN=DigiCert Grid Root CA, O=DigiCert Grid, DC=DigiCert-Grid, DC=com  
+1512406472823  FINE  Trusting now: CN=SiGNET CA, O=SiGNET, C=SI  
+1512406472826  FINE  Trusting now: CN=TERENA eScience Personal CA 2, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL  
+1512406472829  FINE  Trusting now: CN=AEGIS-CA, O=AEGIS, C=RS  
+1512406472831  FINE  Trusting now: CN=AliEn CA, O=AliEn, C=ch  
+1512406472834  FINE  Trusting now: CN=SRCE CA, OU=srce, O=edu, C=HR  
+1512406472837  FINE  Trusting now: CN=Indian Grid Certification Authority, DC=GARUDAINDIA, DC=IN  
+1512406472842  FINE  Trusting now: CN=CERN Grid Certification Authority, DC=cern, DC=ch  
+1512406472850  FINE  Trusting now: CN=SlovakGrid CA, O=SlovakGrid, C=SK  
+1512406472852  FINE  Trusting now: CN=DarkMatter Secure CA, O=DarkMatter LLC, C=AE  
+1512406472854  FINE  Trusting now: CN=NorduGrid Certification Authority 2015, O=NorduGrid, O=Grid  
+1512406472856  FINE  Trusting now: CN=UTN-USERFirst-Hardware, OU=http://www.usertrust.com, O=The USERTRUST Network, L=Salt Lake City, ST=UT, C=US  
+1512406472858  FINE  Trusting now: CN=SEE-GRID CA 2013, DC=SEE-GRID, DC=ORG  
+1512406472860  FINE  Trusting now: CN=USERTrust RSA Certification Authority, O=The USERTRUST Network, L=Jersey City, ST=New Jersey, C=US  
+1512406472862  FINE  Trusting now: CN=DFN SLCS-CA, OU=DFN-PKI, O=DFN-Verein, C=DE  
+1512406472863  FINE  Trusting now: CN=IRAN-GRID CA, O=IRAN-GRID, O=IPM, C=IR  
+1512406472865  FINE  Trusting now: CN=DCA Root G1 CA, O=Certification Authorities, DC=dutchgrid, DC=nl  
+1512406472867  FINE  Trusting now: CN=QuoVadis Root CA 3 G3, O=QuoVadis Limited, C=BM  
+1512406472870  FINE  Trusting now: CN=DigiCert Grid Trust CA, OU=www.digicert.com, O=DigiCert Grid, C=US  
+1512406472872  FINE  Trusting now: CN=NERSC Online CA, OU=Certificate Authorities, DC=ES, DC=net  
+1512406472875  FINE  Trusting now: CN=Russian Data-Intensive Grid CA, O=RDIG, C=RU  
+1512406472878  FINE  Trusting now: CN=Research and Collaboration Authentication Pilot G1 CA, O=Certification Authorities, DC=rcauth, DC=eu  
+1512406472880  FINE  Trusting now: CN=UTN-USERFirst-Hardware, OU=http://www.usertrust.com, O=The USERTRUST Network, L=Salt Lake City, ST=UT, C=US  
+1512406472883  FINE  Trusting now: CN=IRAN-GRID-G2 CA, OU=GCG, O=IPM, C=IR  
+1512406472885  FINE  Trusting now: CN=IRISGridCA, DC=irisgrid, DC=es  
+1512406472888  FINE  Trusting now: CN=TSU Root CA, DC=TSU, DC=GE  
+1512406472889  FINE  Trusting now: CN=DFN SLCS-CA, OU=DFN-PKI, O=DFN-Verein, C=DE  
+1512406472892  FINE  Trusting now: CN=INFN Certification Authority, O=INFN, C=IT  
+1512406472894  FINE  Trusting now: CN=PSC MyProxy CA, O=Pittsburgh Supercomputing Center, C=US  
+1512406472896  FINE  Trusting now: CN=TERENA eScience Personal CA 2, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL  
+1512406472898  FINE  Trusting now: CN=ANSPGrid CA, OU=ANSPGrid CA, O=ANSP, C=BR  
+1512406472901  FINE  Trusting now: CN=DigiCert Grid CA-1 G2, O=DigiCert Grid, DC=DigiCert-Grid, DC=com  
+1512406472904  FINE  Trusting now: CN=Root Certificate Authority at CNIC, DC=Grid, DC=CN  
+1512406472910  FINE  Trusting now: CN=Academia Sinica Grid Computing Certification Authority Mercury, O=AS, C=TW  
+1512406472912  FINE  Trusting now: CN=Research and Collaboration Authentication Pilot G1 CA, O=Certification Authorities, DC=rcauth, DC=eu  
+1512406472914  FINE  Trusting now: CN=AddTrust External CA Root, OU=AddTrust External TTP Network, O=AddTrust AB, C=SE  
+1512406472916  FINE  Trusting now: CN=LIP Certification Authority, O=LIPCA, C=PT  
+1512406472920  FINE  Trusting now: CN=MD-Grid CA, OU=Certification Authority, O=RENAM, DC=MD-Grid, DC=MD  
+1512406472921  FINE  Trusting now: CN=Institute of High Energy Physics Certification Authority, O=HEP, C=CN  
+1512406472922  FINE  Trusting now: CN=SlovakGrid CA, O=SlovakGrid, C=SK  
+1512406472925  FINE  Trusting now: CN=DigiCert Grid CA-1, O=DigiCert Grid, DC=DigiCert-Grid, DC=com  
+1512406472927  FINE  Trusting now: CN=Indian Grid Certification Authority, DC=GARUDAINDIA, DC=IN  
+1512406472929  FINE  Trusting now: CN=DigiCert Grid CA-1 G2, O=DigiCert Grid, DC=DigiCert-Grid, DC=com  
+1512406472931  FINE  Trusting now: CN=HPCI CA, OU=HPCI, O=NII, C=JP  
+1512406472933  FINE  Trusting now: CN=DFN-Verein PCA Grid - G01, OU=DFN-PKI, O=DFN-Verein, C=DE  
+1512406472934  FINE  Trusting now: CN=AEGIS-CA, O=AEGIS, C=RS  
+1512406472936  FINE  Trusting now: CN=QuoVadis Root CA 2, O=QuoVadis Limited, C=BM  
+1512406472939  FINE  Trusting now: CN=BG.ACAD CA, DC=acad, DC=bg  
+1512406472941  FINE  Trusting now: CN=CILogon OSG CA 1, O=CILogon, C=US, DC=cilogon, DC=org  
+1512406472943  FINE  Trusting now: CN=DigiCert Grid Root CA, O=DigiCert Grid, DC=DigiCert-Grid, DC=com  
+1512406472946  FINE  Trusting now: CN=MARGI-CA, O=MARGI, C=MK  
+1512406472948  FINE  Trusting now: CN=TR-Grid CA, O=TRGrid, C=TR  
+1512406472951  FINE  Trusting now: CN=InCommon IGTF Server CA, OU=InCommon, O=Internet2, C=US  
+1512406472953  FINE  Trusting now: CN=MaGrid CA, O=MaGrid, C=MA  
+1512406472955  FINE  Trusting now: CN=TR-Grid CA, O=TRGrid, C=TR  
+1512406472956  FINE  Trusting now: CN=UK e-Science Root, OU=Authority, O=eScienceRoot, C=UK  
+1512406472958  FINE  Trusting now: CN=TSU Root CA, DC=TSU, DC=GE  
+1512406472959  FINE  Trusting now: CN=LIP Certification Authority, O=LIPCA, C=PT  
+1512406472961  FINE  Trusting now: CN=UFF Latin American and Caribbean Catch-all Grid CA, O=UFF LACGrid CA, DC=IC, DC=UFF, DC=BR  
+1512406472964  FINE  Trusting now: CN=GridKa-CA, O=GermanGrid, C=DE  
+1512406472965  FINE  Trusting now: CN=MARGI-CA, O=MARGI, C=MK  
+1512406472973  FINE  Trusting now: CN=PK-GRID-CA, O=NCP, C=PK  
+1512406472975  FINE  Trusting now: CN=CESNET CA 3, O=CESNET CA, DC=cesnet-ca, DC=cz  
+1512406472976  FINE  Trusting now: CN=Russian Data-Intensive Grid CA, O=RDIG, C=RU  
+1512406472978  FINE  Trusting now: CN=CILogon OSG CA 1, O=CILogon, C=US, DC=cilogon, DC=org  
+1512406472982  FINE  Trusting now: CN=TERENA eScience SSL CA 2, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL  
+1512406472990  FINE  Trusting now: CN=HellasGrid CA 2016, OU=Certification Authorities, O=HellasGrid, C=GR  
+1512406472992  FINE  Trusting now: CN=Two Factor CA 2013, OU=Certificate Authorities, O=National Center for Supercomputing Applications, C=US  
+1512406472993  FINE  Trusting now: CN=ArmeSFo CA, O=ArmeSFo, C=AM  
+1512406472998  FINE  Trusting now: CN=Academia Sinica Grid Computing Certification Authority Mercury, O=AS, C=TW  
+1512406473000  FINE  Trusting now: CN=ANSPGrid CA, OU=ANSPGrid CA, O=ANSP, C=BR  
+1512406473004  FINE  Trusting now: CN=DigiCert Assured ID Root CA, OU=www.digicert.com, O=DigiCert Inc, C=US  
+1512406473007  FINE  Trusting now: CN=RomanianGRID CA, OU=Certification Authority, O=ROSA, DC=RomanianGRID, DC=RO  
+1512406473013  FINE  Trusting now: CN=NIKHEF medium-security certification auth, O=NIKHEF, C=NL  
+1512406473017  FINE  Trusting now: CN=CA, OU=UNAM, O=UNAMgrid, C=MX  
+1512406473020  FINE  Trusting now: CN=QuoVadis Grid ICA, OU=Issuing Certification Authority, O=QuoVadis Limited, C=BM  
+1512406473023  FINE  Trusting now: CN=CERN Root Certification Authority 2, O=CERN, C=ch  
+1512406473025  FINE  Trusting now: CN=INFN Certification Authority, O=INFN, C=IT  
+1512406473028  FINE  Trusting now: CN=HPCI CA, OU=HPCI, O=NII, C=JP  
+1512406473031  FINE  Trusting now: CN=QuoVadis Root CA 2 G3, O=QuoVadis Limited, C=BM  
+1512406473042  FINE  Trusting now: CN=MREN-CA, DC=MREN, DC=ac, DC=me  
+1512406473062  FINE  Trusting now: CN=TERENA eScience SSL CA, O=TERENA, C=NL  
+1512406473064  FINE  Trusting now: CN=QuoVadis Grid ICA, OU=Issuing Certification Authority, O=QuoVadis Limited, C=BM  
+1512406473066  FINE  Trusting now: CN=NIIF Root CA 2, OU=Certificate Authorities, O=NIIF, C=HU  
+1512406473070  FINE  Trusting now: CN=AAA Certificate Services, O=Comodo CA Limited, L=Salford, ST=Greater Manchester, C=GB  
+1512406473071  FINE  Trusting now: CN=CILogon Silver CA 1, O=CILogon, C=US, DC=cilogon, DC=org  
+1512406473073  FINE  Trusting now: CN=TERENA eScience SSL CA, O=TERENA, C=NL  
+1512406473074  FINE  Trusting now: CN=COMODO RSA Certification Authority, O=COMODO CA Limited, L=Salford, ST=Greater Manchester, C=GB  
+1512406473076  FINE  Trusting now: CN=TERENA eScience Personal CA 3, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL  
+1512406473078  FINE  Trusting now: CN=UGRID CA, DC=ugrid, DC=org  
+1512406473081  FINE  Trusting now: CN=TERENA eScience SSL CA 2, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL  
+1512406473082  FINE  Trusting now: CN=UGRID CA, DC=ugrid, DC=org  
+1512406473084  FINE  Trusting now: CN=CyGridCA, O=HPCL, O=CyGrid, C=CY  
+1512406473086  FINE  Trusting now: CN=DarkMatter Assured CA, O=DarkMatter LLC, C=AE  
+1512406473088  FINE  Trusting now: CN=InCommon IGTF Server CA, OU=InCommon, O=Internet2, C=US  
+1512406473089  FINE  Trusting now: CN=REUNA Certification Authority, O=REUNACA, C=CL  
+1512406473091  FINE  Trusting now: CN=GridKa-CA, O=GermanGrid, C=DE  
+1512406473093  FINE  Trusting now: CN=QuoVadis Grid ICA G2, O=QuoVadis Limited, C=BM  
+1512406473097  FINE  Trusting now: CN=DZ e-Science CA, O=DZ e-Science GRID, DC=ARN, DC=DZ  
+1512406473099  FINE  Trusting now: CN=DigiCert Grid Trust CA G2, OU=www.digicert.com, O=DigiCert Grid, C=US  
+1512406473100  FINE  Trusting now: CN=Certificate Issuer, OU=Certification Authority, O=AustrianGrid, C=AT  
+1512406473102  FINE  Trusting now: CN=Belarusian Grid Certification Authority, O=uiip.bas-net.by, DC=grid, DC=by  
+1512406473103  FINE  Trusting now: CN=SiGNET CA, O=SiGNET, C=SI  
+1512406473105  FINE  Trusting now: CN=Grid Canada Certificate Authority, O=Grid, C=CA  
+1512406473107  FINE  Trusting now: CN=CNRS2, O=CNRS, C=FR  
+1512406473108  FINE  Trusting now: CN=BG.ACAD CA, DC=acad, DC=bg  
+1512406473110  FINE  Trusting now: CN=UK e-Science CA 2B, OU=Authority, O=eScienceCA, C=UK  
+1512406473112  FINE  Trusting now: CN=DZ e-Science CA, O=DZ e-Science GRID, DC=ARN, DC=DZ  
+1512406473114  FINE  Trusting now: CN=AliEn CA, O=AliEn, C=ch  
+1512406473116  FINE  Trusting now: CN=QuoVadis Root Certification Authority, OU=Root Certification Authority, O=QuoVadis Limited, C=BM  
+1512406473118  FINE  Trusting now: CN=DigiCert Grid Trust CA G2, OU=www.digicert.com, O=DigiCert Grid, C=US  
+1512406473119  FINE  Trusting now: CN=QuoVadis Root Certification Authority, OU=Root Certification Authority, O=QuoVadis Limited, C=BM  
+1512406473121  FINE  Trusting now: CN=CILogon Basic CA 1, O=CILogon, C=US, DC=cilogon, DC=org  
+1512406473122  FINE  Trusting now: CN=MD-Grid CA, OU=Certification Authority, O=RENAM, DC=MD-Grid, DC=MD  
+1512406473125  FINE  Trusting now: CN=Malaysian Identity Federation and Access Management, O=MYIFAM, C=MY, DC=MYIFAM, DC=UPM, DC=MY  
+1512406473126  FINE  Trusting now: CN=MyProxy CA 2013, OU=Certificate Authorities, O=National Center for Supercomputing Applications, C=US  
+1512406473128  FINE  Trusting now: CN=MaGrid CA, O=MaGrid, C=MA  
+1512406473130  FINE  Trusting now: CN=IRISGridCA, DC=irisgrid, DC=es  
+1512406473131  FINE  Trusting now: CN=CNRS2, O=CNRS, C=FR  
+1512406473134  FINE  Trusting now: CN=CERN LCG IOTA Certification Authority, DC=cern, DC=ch  
+1512406473135  FINE  Trusting now: CN=Root Certificate Authority at CNIC, DC=Grid, DC=CN  
+1512406473137  FINE  Trusting now: CN=Scientific Data Grid CA - G2, DC=SDG, DC=Grid, DC=CN  
+1512406473139  FINE  Trusting now: CN=CERN Root Certification Authority 2, O=CERN, C=ch  
+1512406473140  FINE  Trusting now: CN=KENET CA, OU=Research Services, O=Kenya Education Network Trust, DC=kenet, DC=ke  
+1512406473142  FINE  Trusting now: CN=QuoVadis Grid ICA G2, O=QuoVadis Limited, C=BM  
+1512406473143  FINE  Trusting now: CN=Grid Canada Certificate Authority, O=Grid, C=CA  
+1512406473145  FINE  Trusting now: CN=NIKHEF medium-security certification auth, O=NIKHEF, C=NL  
+1512406473146  FINE  Trusting now: CN=AddTrust External CA Root, OU=AddTrust External TTP Network, O=AddTrust AB, C=SE  
+1512406473147  FINE  Trusting now: CN=NIIF Root CA 2, OU=Certificate Authorities, O=NIIF, C=HU  
+1512406473148  FINE  Trusting now: CN=TERENA eScience Personal CA, O=TERENA, C=NL  
+1512406473154  FINE  Trusting now: CN=AAA Certificate Services, O=Comodo CA Limited, L=Salford, ST=Greater Manchester, C=GB  
+1512406473158  FINE  Trusting now: CN=PSC MyProxy CA, O=Pittsburgh Supercomputing Center, C=US  
+1512406473160  FINE  Trusting now: CN=Malaysian Identity Federation and Access Management, O=MYIFAM, C=MY, DC=MYIFAM, DC=UPM, DC=MY  
+1512406473162  FINE  Trusting now: CN=Two Factor CA 2013, OU=Certificate Authorities, O=National Center for Supercomputing Applications, C=US  
+1512406473164  FINE  Trusting now: CN=CERN LCG IOTA Certification Authority, DC=cern, DC=ch  
+1512406473165  FINE  Trusting now: CN=CA, OU=UNAM, O=UNAMgrid, C=MX  
+1512406473166  FINE  Trusting now: CN=NERSC Online CA, OU=Certificate Authorities, DC=ES, DC=net  
+1512406473170  FINE  Trusting now: CN=EG-GRID Certification Authority, O=EG-GRID, C=EG  
+1512406473171  FINE  Trusting now: CN=Kerberized CA HSM, OU=Certificate Authorities, O=Fermilab, DC=fnal, DC=gov  
+1512406473173  FINE  Trusting now: CN=KENET ROOT CA, OU=Research Services, O=Kenya Education Network Trust, DC=kenet, DC=ke  
+1512406473175  FINE  Trusting now: CN=DigiCert Grid CA-1, O=DigiCert Grid, DC=DigiCert-Grid, DC=com  
+1512406473176  FINE  Trusting now: CN=Polish Grid CA, O=GRID, C=PL  
+1512406473178  FINE  Trusting now: CN=KENET ROOT CA, OU=Research Services, O=Kenya Education Network Trust, DC=kenet, DC=ke  
+1512406473179  FINE  Trusting now: CN=SRCE CA, OU=srce, O=edu, C=HR  
+1512406473181  FINE  Trusting now: CN=GRID2-FR, O=CNRS, C=FR  
+1512406473182  FINE  Trusting now: CN=CESNET CA Root, O=CESNET CA, DC=cesnet-ca, DC=cz  
+1512406473183  FINE  Trusting now: CN=QuoVadis Root CA 2 G3, O=QuoVadis Limited, C=BM  
+1512406473185  FINE  Trusting now: CN=TERENA eScience Personal CA 3, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL  
+1512406473185  INFO  Loaded 202 certificates from /home/lyb/.j/trusts  
+1512406473191  SEVERE  TRY USER CERT  
+18:04:22:169 FINE Configuration loaded. Own logging configuration: true, ML configuration detected: false, config folder: /home/lyb/.j/config 
+18:04:22:622 INFO Loading trusts from /home/lyb/.j/trusts 
+18:04:22:628 FINE Trusting now: CN=DFN-Verein PCA Grid - G01, OU=DFN-PKI, O=DFN-Verein, C=DE 
+18:04:22:633 FINE Trusting now: CN=HellasGrid CA 2016, OU=Certification Authorities, O=HellasGrid, C=GR 
+18:04:22:638 FINE Trusting now: CN=RomanianGRID CA, OU=Certification Authority, O=ROSA, DC=RomanianGRID, DC=RO 
+18:04:22:642 FINE Trusting now: CN=CESNET CA Root, O=CESNET CA, DC=cesnet-ca, DC=cz 
+18:04:22:645 FINE Trusting now: CN=KISTI Grid Certificate Authority, O=GRID, O=KISTI, C=KR 
+18:04:22:648 FINE Trusting now: CN=UTN-USERFirst-Client Authentication and Email, OU=http://www.usertrust.com, O=The USERTRUST Network, L=Salt Lake City, ST=UT, C=US 
+18:04:22:652 FINE Trusting now: CN=TERENA eScience Personal CA, O=TERENA, C=NL 
+18:04:22:655 FINE Trusting now: CN=UK e-Science Root, OU=Authority, O=eScienceRoot, C=UK 
+18:04:22:659 FINE Trusting now: CN=COMODO RSA Certification Authority, O=COMODO CA Limited, L=Salford, ST=Greater Manchester, C=GB 
+18:04:22:662 FINE Trusting now: CN=MyProxy CA 2013, OU=Certificate Authorities, O=National Center for Supercomputing Applications, C=US 
+18:04:22:668 FINE Trusting now: CN=DarkMatter Secure CA, O=DarkMatter LLC, C=AE 
+18:04:22:671 FINE Trusting now: CN=Polish Grid CA, O=GRID, C=PL 
+18:04:22:674 FINE Trusting now: CN=GRID2-FR, O=CNRS, C=FR 
+18:04:22:678 FINE Trusting now: CN=REUNA Certification Authority, O=REUNACA, C=CL 
+18:04:22:682 FINE Trusting now: CN=Belarusian Grid Certification Authority, O=uiip.bas-net.by, DC=grid, DC=by 
+18:04:22:686 FINE Trusting now: CN=CILogon Basic CA 1, O=CILogon, C=US, DC=cilogon, DC=org 
+18:04:22:689 FINE Trusting now: CN=PKIGrid, L=CeSPI, OU=UNLP, O=e-Ciencia, C=AR 
+18:04:22:692 FINE Trusting now: CN=CyGridCA, O=HPCL, O=CyGrid, C=CY 
+18:04:22:695 FINE Trusting now: CN=CNRS2-Projets, O=CNRS, C=FR 
+18:04:22:698 FINE Trusting now: CN=HKU Grid CA, DC=GRID, DC=HKU, DC=HK 
+18:04:22:701 FINE Trusting now: CN=QuoVadis Root CA 3 G3, O=QuoVadis Limited, C=BM 
+18:04:22:704 FINE Trusting now: CN=UTN-USERFirst-Client Authentication and Email, OU=http://www.usertrust.com, O=The USERTRUST Network, L=Salt Lake City, ST=UT, C=US 
+18:04:22:707 FINE Trusting now: CN=SEE-GRID CA 2013, DC=SEE-GRID, DC=ORG 
+18:04:22:710 FINE Trusting now: CN=Certificate Issuer, OU=Certification Authority, O=AustrianGrid, C=AT 
+18:04:22:713 FINE Trusting now: CN=ArmeSFo CA, O=ArmeSFo, C=AM 
+18:04:22:715 FINE Trusting now: CN=KEK GRID Certificate Authority, OU=CRC, O=KEK, C=JP 
+18:04:22:719 FINE Trusting now: CN=QuoVadis Root CA 2, O=QuoVadis Limited, C=BM 
+18:04:22:722 FINE Trusting now: CN=DigiCert Assured ID Root CA, OU=www.digicert.com, O=DigiCert Inc, C=US 
+18:04:22:725 FINE Trusting now: CN=IRAN-GRID CA, O=IRAN-GRID, O=IPM, C=IR 
+18:04:22:729 FINE Trusting now: CN=PKIGrid, L=CeSPI, OU=UNLP, O=e-Ciencia, C=AR 
+18:04:22:733 FINE Trusting now: CN=TERENA eScience SSL CA 3, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL 
+18:04:22:736 FINE Trusting now: CN=Scientific Data Grid CA - G2, DC=SDG, DC=Grid, DC=CN 
+18:04:22:740 FINE Trusting now: CN=KENET CA, OU=Research Services, O=Kenya Education Network Trust, DC=kenet, DC=ke 
+18:04:22:745 FINE Trusting now: CN=CERN Grid Certification Authority, DC=cern, DC=ch 
+18:04:22:750 FINE Trusting now: CN=DarkMatter Assured CA, O=DarkMatter LLC, C=AE 
+18:04:22:752 FINE Trusting now: CN=HKU Grid CA, DC=GRID, DC=HKU, DC=HK 
+18:04:22:755 FINE Trusting now: CN=EG-GRID Certification Authority, O=EG-GRID, C=EG 
+18:04:22:758 FINE Trusting now: CN=DCA Root G1 CA, O=Certification Authorities, DC=dutchgrid, DC=nl 
+18:04:22:761 FINE Trusting now: CN=Kerberized CA HSM, OU=Certificate Authorities, O=Fermilab, DC=fnal, DC=gov 
+18:04:22:764 FINE Trusting now: CN=UFF Latin American and Caribbean Catch-all Grid CA, O=UFF LACGrid CA, DC=IC, DC=UFF, DC=BR 
+18:04:22:768 FINE Trusting now: CN=IRAN-GRID-G2 CA, OU=GCG, O=IPM, C=IR 
+18:04:22:772 FINE Trusting now: CN=DigiCert Grid Trust CA, OU=www.digicert.com, O=DigiCert Grid, C=US 
+18:04:22:775 FINE Trusting now: CN=NorduGrid Certification Authority 2015, O=NorduGrid, O=Grid 
+18:04:22:778 FINE Trusting now: CN=MREN-CA, DC=MREN, DC=ac, DC=me 
+18:04:22:781 FINE Trusting now: CN=CESNET CA 3, O=CESNET CA, DC=cesnet-ca, DC=cz 
+18:04:22:783 FINE Trusting now: CN=CNRS2-Projets, O=CNRS, C=FR 
+18:04:22:785 FINE Trusting now: CN=KEK GRID Certificate Authority, OU=CRC, O=KEK, C=JP 
+18:04:22:787 FINE Trusting now: CN=TERENA eScience SSL CA 3, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL 
+18:04:22:790 FINE Trusting now: CN=CILogon Silver CA 1, O=CILogon, C=US, DC=cilogon, DC=org 
+18:04:22:794 FINE Trusting now: CN=USERTrust RSA Certification Authority, O=The USERTRUST Network, L=Jersey City, ST=New Jersey, C=US 
+18:04:22:796 FINE Trusting now: CN=KISTI Grid Certificate Authority, O=GRID, O=KISTI, C=KR 
+18:04:22:799 FINE Trusting now: CN=PK-GRID-CA, O=NCP, C=PK 
+18:04:22:802 FINE Trusting now: CN=UK e-Science CA 2B, OU=Authority, O=eScienceCA, C=UK 
+18:04:22:805 FINE Trusting now: CN=Institute of High Energy Physics Certification Authority, O=HEP, C=CN 
+18:04:22:811 FINE Trusting now: CN=DigiCert Grid Root CA, O=DigiCert Grid, DC=DigiCert-Grid, DC=com 
+18:04:22:816 FINE Trusting now: CN=SiGNET CA, O=SiGNET, C=SI 
+18:04:22:820 FINE Trusting now: CN=TERENA eScience Personal CA 2, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL 
+18:04:22:824 FINE Trusting now: CN=AEGIS-CA, O=AEGIS, C=RS 
+18:04:22:826 FINE Trusting now: CN=AliEn CA, O=AliEn, C=ch 
+18:04:22:828 FINE Trusting now: CN=SRCE CA, OU=srce, O=edu, C=HR 
+18:04:22:831 FINE Trusting now: CN=Indian Grid Certification Authority, DC=GARUDAINDIA, DC=IN 
+18:04:22:834 FINE Trusting now: CN=CERN Grid Certification Authority, DC=cern, DC=ch 
+18:04:22:837 FINE Trusting now: CN=SlovakGrid CA, O=SlovakGrid, C=SK 
+18:04:22:840 FINE Trusting now: CN=DarkMatter Secure CA, O=DarkMatter LLC, C=AE 
+18:04:22:842 FINE Trusting now: CN=NorduGrid Certification Authority 2015, O=NorduGrid, O=Grid 
+18:04:22:845 FINE Trusting now: CN=UTN-USERFirst-Hardware, OU=http://www.usertrust.com, O=The USERTRUST Network, L=Salt Lake City, ST=UT, C=US 
+18:04:22:846 FINE Trusting now: CN=SEE-GRID CA 2013, DC=SEE-GRID, DC=ORG 
+18:04:22:849 FINE Trusting now: CN=USERTrust RSA Certification Authority, O=The USERTRUST Network, L=Jersey City, ST=New Jersey, C=US 
+18:04:22:851 FINE Trusting now: CN=DFN SLCS-CA, OU=DFN-PKI, O=DFN-Verein, C=DE 
+18:04:22:853 FINE Trusting now: CN=IRAN-GRID CA, O=IRAN-GRID, O=IPM, C=IR 
+18:04:22:855 FINE Trusting now: CN=DCA Root G1 CA, O=Certification Authorities, DC=dutchgrid, DC=nl 
+18:04:22:858 FINE Trusting now: CN=QuoVadis Root CA 3 G3, O=QuoVadis Limited, C=BM 
+18:04:22:860 FINE Trusting now: CN=DigiCert Grid Trust CA, OU=www.digicert.com, O=DigiCert Grid, C=US 
+18:04:22:862 FINE Trusting now: CN=NERSC Online CA, OU=Certificate Authorities, DC=ES, DC=net 
+18:04:22:865 FINE Trusting now: CN=Russian Data-Intensive Grid CA, O=RDIG, C=RU 
+18:04:22:867 FINE Trusting now: CN=Research and Collaboration Authentication Pilot G1 CA, O=Certification Authorities, DC=rcauth, DC=eu 
+18:04:22:869 FINE Trusting now: CN=UTN-USERFirst-Hardware, OU=http://www.usertrust.com, O=The USERTRUST Network, L=Salt Lake City, ST=UT, C=US 
+18:04:22:872 FINE Trusting now: CN=IRAN-GRID-G2 CA, OU=GCG, O=IPM, C=IR 
+18:04:22:874 FINE Trusting now: CN=IRISGridCA, DC=irisgrid, DC=es 
+18:04:22:877 FINE Trusting now: CN=TSU Root CA, DC=TSU, DC=GE 
+18:04:22:879 FINE Trusting now: CN=DFN SLCS-CA, OU=DFN-PKI, O=DFN-Verein, C=DE 
+18:04:22:882 FINE Trusting now: CN=INFN Certification Authority, O=INFN, C=IT 
+18:04:22:885 FINE Trusting now: CN=PSC MyProxy CA, O=Pittsburgh Supercomputing Center, C=US 
+18:04:22:887 FINE Trusting now: CN=TERENA eScience Personal CA 2, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL 
+18:04:22:889 FINE Trusting now: CN=ANSPGrid CA, OU=ANSPGrid CA, O=ANSP, C=BR 
+18:04:22:893 FINE Trusting now: CN=DigiCert Grid CA-1 G2, O=DigiCert Grid, DC=DigiCert-Grid, DC=com 
+18:04:22:895 FINE Trusting now: CN=Root Certificate Authority at CNIC, DC=Grid, DC=CN 
+18:04:22:898 FINE Trusting now: CN=Academia Sinica Grid Computing Certification Authority Mercury, O=AS, C=TW 
+18:04:22:901 FINE Trusting now: CN=Research and Collaboration Authentication Pilot G1 CA, O=Certification Authorities, DC=rcauth, DC=eu 
+18:04:22:903 FINE Trusting now: CN=AddTrust External CA Root, OU=AddTrust External TTP Network, O=AddTrust AB, C=SE 
+18:04:22:905 FINE Trusting now: CN=LIP Certification Authority, O=LIPCA, C=PT 
+18:04:22:911 FINE Trusting now: CN=MD-Grid CA, OU=Certification Authority, O=RENAM, DC=MD-Grid, DC=MD 
+18:04:22:912 FINE Trusting now: CN=Institute of High Energy Physics Certification Authority, O=HEP, C=CN 
+18:04:22:914 FINE Trusting now: CN=SlovakGrid CA, O=SlovakGrid, C=SK 
+18:04:22:916 FINE Trusting now: CN=DigiCert Grid CA-1, O=DigiCert Grid, DC=DigiCert-Grid, DC=com 
+18:04:22:917 FINE Trusting now: CN=Indian Grid Certification Authority, DC=GARUDAINDIA, DC=IN 
+18:04:22:919 FINE Trusting now: CN=DigiCert Grid CA-1 G2, O=DigiCert Grid, DC=DigiCert-Grid, DC=com 
+18:04:22:922 FINE Trusting now: CN=HPCI CA, OU=HPCI, O=NII, C=JP 
+18:04:22:924 FINE Trusting now: CN=DFN-Verein PCA Grid - G01, OU=DFN-PKI, O=DFN-Verein, C=DE 
+18:04:22:926 FINE Trusting now: CN=AEGIS-CA, O=AEGIS, C=RS 
+18:04:22:927 FINE Trusting now: CN=QuoVadis Root CA 2, O=QuoVadis Limited, C=BM 
+18:04:22:930 FINE Trusting now: CN=BG.ACAD CA, DC=acad, DC=bg 
+18:04:22:932 FINE Trusting now: CN=CILogon OSG CA 1, O=CILogon, C=US, DC=cilogon, DC=org 
+18:04:22:934 FINE Trusting now: CN=DigiCert Grid Root CA, O=DigiCert Grid, DC=DigiCert-Grid, DC=com 
+18:04:22:937 FINE Trusting now: CN=MARGI-CA, O=MARGI, C=MK 
+18:04:22:939 FINE Trusting now: CN=TR-Grid CA, O=TRGrid, C=TR 
+18:04:22:942 FINE Trusting now: CN=InCommon IGTF Server CA, OU=InCommon, O=Internet2, C=US 
+18:04:22:945 FINE Trusting now: CN=MaGrid CA, O=MaGrid, C=MA 
+18:04:22:947 FINE Trusting now: CN=TR-Grid CA, O=TRGrid, C=TR 
+18:04:22:948 FINE Trusting now: CN=UK e-Science Root, OU=Authority, O=eScienceRoot, C=UK 
+18:04:22:962 FINE Trusting now: CN=TSU Root CA, DC=TSU, DC=GE 
+18:04:22:964 FINE Trusting now: CN=LIP Certification Authority, O=LIPCA, C=PT 
+18:04:22:966 FINE Trusting now: CN=UFF Latin American and Caribbean Catch-all Grid CA, O=UFF LACGrid CA, DC=IC, DC=UFF, DC=BR 
+18:04:22:968 FINE Trusting now: CN=GridKa-CA, O=GermanGrid, C=DE 
+18:04:22:970 FINE Trusting now: CN=MARGI-CA, O=MARGI, C=MK 
+18:04:22:973 FINE Trusting now: CN=PK-GRID-CA, O=NCP, C=PK 
+18:04:22:975 FINE Trusting now: CN=CESNET CA 3, O=CESNET CA, DC=cesnet-ca, DC=cz 
+18:04:22:977 FINE Trusting now: CN=Russian Data-Intensive Grid CA, O=RDIG, C=RU 
+18:04:22:978 FINE Trusting now: CN=CILogon OSG CA 1, O=CILogon, C=US, DC=cilogon, DC=org 
+18:04:22:981 FINE Trusting now: CN=TERENA eScience SSL CA 2, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL 
+18:04:22:984 FINE Trusting now: CN=HellasGrid CA 2016, OU=Certification Authorities, O=HellasGrid, C=GR 
+18:04:22:987 FINE Trusting now: CN=Two Factor CA 2013, OU=Certificate Authorities, O=National Center for Supercomputing Applications, C=US 
+18:04:22:988 FINE Trusting now: CN=ArmeSFo CA, O=ArmeSFo, C=AM 
+18:04:22:990 FINE Trusting now: CN=Academia Sinica Grid Computing Certification Authority Mercury, O=AS, C=TW 
+18:04:22:992 FINE Trusting now: CN=ANSPGrid CA, OU=ANSPGrid CA, O=ANSP, C=BR 
+18:04:22:994 FINE Trusting now: CN=DigiCert Assured ID Root CA, OU=www.digicert.com, O=DigiCert Inc, C=US 
+18:04:22:996 FINE Trusting now: CN=RomanianGRID CA, OU=Certification Authority, O=ROSA, DC=RomanianGRID, DC=RO 
+18:04:22:999 FINE Trusting now: CN=NIKHEF medium-security certification auth, O=NIKHEF, C=NL 
+18:04:23:001 FINE Trusting now: CN=CA, OU=UNAM, O=UNAMgrid, C=MX 
+18:04:23:004 FINE Trusting now: CN=QuoVadis Grid ICA, OU=Issuing Certification Authority, O=QuoVadis Limited, C=BM 
+18:04:23:007 FINE Trusting now: CN=CERN Root Certification Authority 2, O=CERN, C=ch 
+18:04:23:009 FINE Trusting now: CN=INFN Certification Authority, O=INFN, C=IT 
+18:04:23:010 FINE Trusting now: CN=HPCI CA, OU=HPCI, O=NII, C=JP 
+18:04:23:013 FINE Trusting now: CN=QuoVadis Root CA 2 G3, O=QuoVadis Limited, C=BM 
+18:04:23:014 FINE Trusting now: CN=MREN-CA, DC=MREN, DC=ac, DC=me 
+18:04:23:017 FINE Trusting now: CN=TERENA eScience SSL CA, O=TERENA, C=NL 
+18:04:23:020 FINE Trusting now: CN=QuoVadis Grid ICA, OU=Issuing Certification Authority, O=QuoVadis Limited, C=BM 
+18:04:23:023 FINE Trusting now: CN=NIIF Root CA 2, OU=Certificate Authorities, O=NIIF, C=HU 
+18:04:23:025 FINE Trusting now: CN=AAA Certificate Services, O=Comodo CA Limited, L=Salford, ST=Greater Manchester, C=GB 
+18:04:23:027 FINE Trusting now: CN=CILogon Silver CA 1, O=CILogon, C=US, DC=cilogon, DC=org 
+18:04:23:029 FINE Trusting now: CN=TERENA eScience SSL CA, O=TERENA, C=NL 
+18:04:23:030 FINE Trusting now: CN=COMODO RSA Certification Authority, O=COMODO CA Limited, L=Salford, ST=Greater Manchester, C=GB 
+18:04:23:033 FINE Trusting now: CN=TERENA eScience Personal CA 3, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL 
+18:04:23:036 FINE Trusting now: CN=UGRID CA, DC=ugrid, DC=org 
+18:04:23:038 FINE Trusting now: CN=TERENA eScience SSL CA 2, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL 
+18:04:23:039 FINE Trusting now: CN=UGRID CA, DC=ugrid, DC=org 
+18:04:23:041 FINE Trusting now: CN=CyGridCA, O=HPCL, O=CyGrid, C=CY 
+18:04:23:043 FINE Trusting now: CN=DarkMatter Assured CA, O=DarkMatter LLC, C=AE 
+18:04:23:044 FINE Trusting now: CN=InCommon IGTF Server CA, OU=InCommon, O=Internet2, C=US 
+18:04:23:046 FINE Trusting now: CN=REUNA Certification Authority, O=REUNACA, C=CL 
+18:04:23:052 FINE Trusting now: CN=GridKa-CA, O=GermanGrid, C=DE 
+18:04:23:056 FINE Trusting now: CN=QuoVadis Grid ICA G2, O=QuoVadis Limited, C=BM 
+18:04:23:061 FINE Trusting now: CN=DZ e-Science CA, O=DZ e-Science GRID, DC=ARN, DC=DZ 
+18:04:23:068 FINE Trusting now: CN=DigiCert Grid Trust CA G2, OU=www.digicert.com, O=DigiCert Grid, C=US 
+18:04:23:071 FINE Trusting now: CN=Certificate Issuer, OU=Certification Authority, O=AustrianGrid, C=AT 
+18:04:23:073 FINE Trusting now: CN=Belarusian Grid Certification Authority, O=uiip.bas-net.by, DC=grid, DC=by 
+18:04:23:088 FINE Trusting now: CN=SiGNET CA, O=SiGNET, C=SI 
+18:04:23:099 FINE Trusting now: CN=Grid Canada Certificate Authority, O=Grid, C=CA 
+18:04:23:102 FINE Trusting now: CN=CNRS2, O=CNRS, C=FR 
+18:04:23:103 FINE Trusting now: CN=BG.ACAD CA, DC=acad, DC=bg 
+18:04:23:105 FINE Trusting now: CN=UK e-Science CA 2B, OU=Authority, O=eScienceCA, C=UK 
+18:04:23:107 FINE Trusting now: CN=DZ e-Science CA, O=DZ e-Science GRID, DC=ARN, DC=DZ 
+18:04:23:109 FINE Trusting now: CN=AliEn CA, O=AliEn, C=ch 
+18:04:23:112 FINE Trusting now: CN=QuoVadis Root Certification Authority, OU=Root Certification Authority, O=QuoVadis Limited, C=BM 
+18:04:23:114 FINE Trusting now: CN=DigiCert Grid Trust CA G2, OU=www.digicert.com, O=DigiCert Grid, C=US 
+18:04:23:115 FINE Trusting now: CN=QuoVadis Root Certification Authority, OU=Root Certification Authority, O=QuoVadis Limited, C=BM 
+18:04:23:117 FINE Trusting now: CN=CILogon Basic CA 1, O=CILogon, C=US, DC=cilogon, DC=org 
+18:04:23:119 FINE Trusting now: CN=MD-Grid CA, OU=Certification Authority, O=RENAM, DC=MD-Grid, DC=MD 
+18:04:23:122 FINE Trusting now: CN=Malaysian Identity Federation and Access Management, O=MYIFAM, C=MY, DC=MYIFAM, DC=UPM, DC=MY 
+18:04:23:124 FINE Trusting now: CN=MyProxy CA 2013, OU=Certificate Authorities, O=National Center for Supercomputing Applications, C=US 
+18:04:23:125 FINE Trusting now: CN=MaGrid CA, O=MaGrid, C=MA 
+18:04:23:126 FINE Trusting now: CN=IRISGridCA, DC=irisgrid, DC=es 
+18:04:23:130 FINE Trusting now: CN=CNRS2, O=CNRS, C=FR 
+18:04:23:134 FINE Trusting now: CN=CERN LCG IOTA Certification Authority, DC=cern, DC=ch 
+18:04:23:135 FINE Trusting now: CN=Root Certificate Authority at CNIC, DC=Grid, DC=CN 
+18:04:23:137 FINE Trusting now: CN=Scientific Data Grid CA - G2, DC=SDG, DC=Grid, DC=CN 
+18:04:23:139 FINE Trusting now: CN=CERN Root Certification Authority 2, O=CERN, C=ch 
+18:04:23:141 FINE Trusting now: CN=KENET CA, OU=Research Services, O=Kenya Education Network Trust, DC=kenet, DC=ke 
+18:04:23:143 FINE Trusting now: CN=QuoVadis Grid ICA G2, O=QuoVadis Limited, C=BM 
+18:04:23:145 FINE Trusting now: CN=Grid Canada Certificate Authority, O=Grid, C=CA 
+18:04:23:146 FINE Trusting now: CN=NIKHEF medium-security certification auth, O=NIKHEF, C=NL 
+18:04:23:147 FINE Trusting now: CN=AddTrust External CA Root, OU=AddTrust External TTP Network, O=AddTrust AB, C=SE 
+18:04:23:149 FINE Trusting now: CN=NIIF Root CA 2, OU=Certificate Authorities, O=NIIF, C=HU 
+18:04:23:150 FINE Trusting now: CN=TERENA eScience Personal CA, O=TERENA, C=NL 
+18:04:23:152 FINE Trusting now: CN=AAA Certificate Services, O=Comodo CA Limited, L=Salford, ST=Greater Manchester, C=GB 
+18:04:23:153 FINE Trusting now: CN=PSC MyProxy CA, O=Pittsburgh Supercomputing Center, C=US 
+18:04:23:154 FINE Trusting now: CN=Malaysian Identity Federation and Access Management, O=MYIFAM, C=MY, DC=MYIFAM, DC=UPM, DC=MY 
+18:04:23:156 FINE Trusting now: CN=Two Factor CA 2013, OU=Certificate Authorities, O=National Center for Supercomputing Applications, C=US 
+18:04:23:159 FINE Trusting now: CN=CERN LCG IOTA Certification Authority, DC=cern, DC=ch 
+18:04:23:160 FINE Trusting now: CN=CA, OU=UNAM, O=UNAMgrid, C=MX 
+18:04:23:161 FINE Trusting now: CN=NERSC Online CA, OU=Certificate Authorities, DC=ES, DC=net 
+18:04:23:164 FINE Trusting now: CN=EG-GRID Certification Authority, O=EG-GRID, C=EG 
+18:04:23:165 FINE Trusting now: CN=Kerberized CA HSM, OU=Certificate Authorities, O=Fermilab, DC=fnal, DC=gov 
+18:04:23:168 FINE Trusting now: CN=KENET ROOT CA, OU=Research Services, O=Kenya Education Network Trust, DC=kenet, DC=ke 
+18:04:23:170 FINE Trusting now: CN=DigiCert Grid CA-1, O=DigiCert Grid, DC=DigiCert-Grid, DC=com 
+18:04:23:172 FINE Trusting now: CN=Polish Grid CA, O=GRID, C=PL 
+18:04:23:174 FINE Trusting now: CN=KENET ROOT CA, OU=Research Services, O=Kenya Education Network Trust, DC=kenet, DC=ke 
+18:04:23:176 FINE Trusting now: CN=SRCE CA, OU=srce, O=edu, C=HR 
+18:04:23:177 FINE Trusting now: CN=GRID2-FR, O=CNRS, C=FR 
+18:04:23:178 FINE Trusting now: CN=CESNET CA Root, O=CESNET CA, DC=cesnet-ca, DC=cz 
+18:04:23:180 FINE Trusting now: CN=QuoVadis Root CA 2 G3, O=QuoVadis Limited, C=BM 
+18:04:23:182 FINE Trusting now: CN=TERENA eScience Personal CA 3, O=TERENA, L=Amsterdam, ST=Noord-Holland, C=NL 
+18:04:23:182 INFO Loaded 202 certificates from /home/lyb/.j/trusts 
+18:04:23:186 SEVERE TRY USER CERT 

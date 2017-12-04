@@ -14,12 +14,17 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.net.UnknownHostException;
+import java.nio.file.FileSystem;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
+import java.util.Date;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Observable;
@@ -28,16 +33,25 @@ import java.util.Properties;
 import java.util.Set;
 import java.util.jar.JarEntry;
 import java.util.jar.JarFile;
+import java.util.logging.FileHandler;
+import java.util.logging.Filter;
+import java.util.logging.Formatter;
 import java.util.logging.Level;
 import java.util.logging.LogManager;
+import java.util.logging.LogRecord;
 import java.util.logging.Logger;
+import java.util.logging.SimpleFormatter;
+import java.util.stream.Collector;
+import java.util.stream.Collectors;
 
+import alien.log.DefaultLoggingFilter;
 import alien.user.LDAPHelper;
 import lazyj.DBFunctions;
 import lazyj.ExtProperties;
 import lazyj.cache.ExpirationCache;
 import lazyj.commands.SystemCommand;
 import lia.Monitor.monitor.AppConfig;
+import sun.util.resources.cldr.ts.CurrencyNames_ts;
 
 /**
  * @author costing
@@ -50,6 +64,9 @@ public class ConfigUtils {
 	 * Logger
 	 */
 	static transient final Logger logger;
+	
+	static transient Logger defaultLogger = null; 
+	static transient DefaultLoggingFilter defaultLoggerFilter;
 
 	private static final Map<String, ExtProperties> dbConfigFiles;
 
@@ -57,7 +74,11 @@ public class ConfigUtils {
 
 	private static final String CONFIG_FOLDER;
 
+	private static HashMap<String, FileHandler> serviceHandlersLookup;
+	
 	private static LoggingConfigurator logging = null;
+	
+	private static SimpleFormatter formatter;
 
 	private static final ExtProperties appConfig;
 
@@ -69,6 +90,8 @@ public class ConfigUtils {
 		final HashMap<String, ExtProperties> dbconfig = new HashMap<>();
 
 		final HashMap<String, ExtProperties> otherconfig = new HashMap<>();
+		
+		serviceHandlersLookup = new HashMap<>();
 
 		ExtProperties applicationConfig = null;
 
@@ -180,6 +203,16 @@ public class ConfigUtils {
 		// now let's configure the logging, if allowed to
 		if (appConfig.getb("jalien.configure.logging", true) && logConfig != null) {
 			logging = new LoggingConfigurator(logConfig);
+			formatter = new SimpleFormatter() {
+				
+				@Override
+				public String format(LogRecord record) {
+					Date date = new Date(record.getMillis());
+					DateFormat formatter = new SimpleDateFormat("HH:mm:ss:SSS");
+					String dateFormatted = formatter.format(date);
+					return String.join(" ", dateFormatted, record.getLevel().getLocalizedName(), record.getMessage(), "\n");
+				}
+			};
 
 			// tell ML not to configure its logger
 			System.setProperty("lia.Monitor.monitor.LoggerConfigClass.preconfiguredLogging", "true");
@@ -337,7 +370,7 @@ public class ConfigUtils {
 		 * Logging configuration content, usually loaded from "logging.properties"
 		 */
 		final ExtProperties prop;
-
+		
 		/**
 		 * Set the logging configuration
 		 *
@@ -345,7 +378,7 @@ public class ConfigUtils {
 		 */
 		LoggingConfigurator(final ExtProperties p) {
 			prop = p;
-
+			
 			prop.addObserver(this);
 
 			update(null, null);
@@ -354,7 +387,7 @@ public class ConfigUtils {
 		@Override
 		public void update(final Observable o, final Object arg) {
 			final ByteArrayOutputStream baos = new ByteArrayOutputStream();
-
+			
 			try {
 				prop.getProperties().store(baos, "AliEn Loggging Properties");
 			} catch (final Throwable t) {
@@ -373,6 +406,10 @@ public class ConfigUtils {
 				t.printStackTrace();
 			}
 		}
+		
+		public ExtProperties getProps() {
+			return prop;
+		}
 	}
 
 	/**
@@ -383,20 +420,212 @@ public class ConfigUtils {
 	 */
 	public static Logger getLogger(final String component) {
 		final Logger l = Logger.getLogger(component);
+		
+		// if we are responsible for the logging in this context, attach all
+		// required handlers and filters to the logger
+		
+		if(logging != null) {
+			
+			// prepare default logger
+			if(defaultLogger == null) {
+				defaultLogger = Logger.getLogger("DefaultLogger");
+				prepareDefaultHandler();
+			}
+			
+			// check if serviceLoggers have been prepared, if not so: prepare them.
+			if(serviceHandlersLookup.isEmpty()) {
+				prepareServiceHandlers();
+			}
+			for(String serviceKey: serviceHandlersLookup.keySet()) {
+				l.addHandler(serviceHandlersLookup.get(serviceKey));
+			}
 
-		if (logging != null) {
 			final String s = seenLoggers.get(component);
-
 			if (s == null)
 				seenLoggers.put(component, component, 60 * 1000);
 		}
-
+		
 		if (l.getFilter() == null)
 			l.setFilter(LoggingFilter.getInstance());
+		
 
 		return l;
 	}
+	
+	/**
+	 * Create the described service loggers, based on logging.properties file.
+	 * 
+	 */
+	private static void prepareServiceHandlers() {
+		// get the comma seperated list of loggers
+		String serviceNames = logging.getProps().gets("serviceLoggers");
+		String[] splittedServiceNames = serviceNames.split(",");
+		
+		for(String currServiceLoggerName: splittedServiceNames) {
+			// get rid of whitespaces in between service names
+			currServiceLoggerName = currServiceLoggerName.trim();
+			
+			try {
+				
+				// create the output file, based on logger.pattern. If no .pattern is provided
+				// use the default alien-logname.log instead
+				String outputFileName;
+				if(logging.prop.getProperties().keySet().contains(currServiceLoggerName + ".pattern") &&
+						logging.prop.gets(currServiceLoggerName + ".pattern").length() > 0) {
+					outputFileName = logging.prop.gets(currServiceLoggerName + ".pattern");
+				} else {
+					// create a logfile with default name then
+					outputFileName = currServiceLoggerName + ".log";
+				}
+				
+				File logFile = getLogFile(outputFileName);
+				FileHandler serviceFh = new FileHandler(outputFileName, true);
+				
+				// check if there are filter settings for this service
+				if(logging.prop.getProperties().keySet().contains(currServiceLoggerName + ".logrules")) {
 
+					String logrule = logging.prop.gets(currServiceLoggerName + ".logrules");
+					
+					// split and trim the logrules, also transform them to a collection for faster
+					// comparision with logging context within the filter.
+					List<String> trimmedLogRules = Arrays.stream(logrule.split(","))
+																.map(String::trim)
+																.collect(Collectors.toList());
+					
+					// attach a filter based on the required context properties, retreived from logging.properties
+					Filter serviceFilter = new Filter() {
+						
+						private final DefaultLoggingFilter defaultLoggerFilterRef = ConfigUtils.defaultLoggerFilter;
+						{
+							// register ourselves
+							defaultLoggerFilterRef.registerService();
+						}
+						
+						// trimmedLogRules will be out of scope in the next iteration. To preserve it, we need to 
+						// make it final or effectively final, so the keyword is not optional here
+						private final List<String> logConditions = trimmedLogRules;
+						
+						@Override
+						public boolean isLoggable(LogRecord record) {
+							// check the context 
+							String currLogContext = (String) Context.getLoggingContext();
+							if(currLogContext != null && currLogContext.length() > 0) {
+								// loggingContext is comma seperated, so split it up
+								String[] currLogContextItems = currLogContext.split(",");
+								if(Collections.indexOfSubList(Arrays.asList(currLogContextItems), logConditions) > -1) {
+									// all logrules were part of the current context!
+									defaultLoggerFilterRef.notifyRecordConsumed(record);
+									return true;
+								} else {
+									// one or more of the required logrules were missing in the context
+									defaultLoggerFilterRef.notifyRecordRejected(record);
+									return false;
+								}
+								
+							}
+							
+							// the thread context could not be found or was empty, do not log this record.
+							defaultLoggerFilterRef.notifyRecordRejected(record);
+							return false;
+						}
+					};
+					
+					serviceFh.setFormatter(formatter);
+					serviceFh.setFilter(serviceFilter);
+					// make sure to register at the default logger to not lose any records
+					
+				} else {
+				}
+				
+				
+				serviceHandlersLookup.put(currServiceLoggerName, serviceFh);
+			} catch (SecurityException | IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+			
+		}
+		
+	}
+	
+	/**
+	 * This special handler will make sure that no messages are lost. In case the threadContext does not meet the requirements from 
+	 * other loggers, they will notify the default logger, which preserves the log records until all other loggers have reported
+	 * back to him. If any of the service loggers decides to log the record, the record will be removed from the default logger.
+	 * 
+	 * TODO: add a property in logging.properties to change the pattern of default logging.
+	 *  
+	 */
+	private static void prepareDefaultHandler() {
+		FileHandler defaultFileHandler = null;
+		
+		// prepare the logger by removing any handlers
+		if(defaultLogger == null) {
+			System.err.println("Could not prepare the default logger!");
+			System.err.println("We are supposed to use contextual logging, but have problems creating the default logger instance.");
+
+			// what now? System exit? 
+	}
+		
+		try {
+			// remove all, but the default file handler from the logger
+			for(java.util.logging.Handler h: defaultLogger.getHandlers()) {
+				defaultLogger.removeHandler(h);
+			}
+			
+			defaultFileHandler = new FileHandler("jalien_default.log", true);
+			defaultLoggerFilter = new DefaultLoggingFilter(defaultLogger);
+			defaultFileHandler.setFormatter(formatter);
+			defaultLogger.addHandler(defaultFileHandler);
+			defaultLogger.setLevel(Level.ALL);
+			defaultFileHandler.setFilter(defaultLoggerFilter);
+			
+		} catch (SecurityException | IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+	}
+	
+	/**
+	 * 
+	 * Used by <code>prepareServiceHandlers</code> during pattern parsing/creating default log file.
+	 * This also checks/creates the folder structure provided.
+	 * The file path needs to be seperated by whatever value is present in file.seperator (by default
+	 * this is the same as <code>FileSystem.getDefault().getSeperator()</code>, but can be overwritten)
+	 * 
+	 * @param path - the relative file path
+	 */
+	private static File getLogFile(String path) throws IOException{
+		final String fileSeperator = System.getProperty("file.seperator") != null ? System.getProperty("file.seperator")  
+				: java.nio.file.FileSystems.getDefault().getSeparator();
+		
+		// seperate the filename from folder structure
+		List<String> pathFragments = new LinkedList<String>(Arrays.asList(path.split(fileSeperator)));
+		
+		// reduce the list to only contain the folder structure while preserving the file name
+		 String fileName = pathFragments.remove(pathFragments.size() - 1);
+		 
+		 File directory;
+		 if(pathFragments.size() > 0) {
+			// join the path fragments
+			 directory = new File(
+					 	pathFragments.stream()
+					 				 .collect(Collectors.joining(fileSeperator)));
+			 if(! directory.exists()) {
+				 // create the directory including subfolders if it doesn't exist
+				 directory.mkdirs();
+			 }
+		 } else {
+			 // use the current directory
+			 directory = new File(".");
+		 }
+		  
+		 // finally create the file itself (might throw IOException)
+	    File file = new File(directory.getName() + fileSeperator + fileName);    
+        return file;
+	}
+	
 	private static final String jAliEnVersion = "0.0.1";
 
 	/**

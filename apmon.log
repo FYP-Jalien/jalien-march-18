@@ -1,0 +1,14 @@
+Dec 04, 2017 5:37:30 PM apmon.ApMon initialize
+INFO: Initializing destination addresses & ports:
+Dec 04, 2017 5:37:30 PM apmon.ApMon arrayInit
+INFO: adding destination: 137.138.99.139:8884
+Dec 04, 2017 5:37:30 PM apmon.ApMon setJobMonitoring
+INFO: Disabling job monitoring...
+Dec 04, 2017 5:37:30 PM apmon.ApMon setSysMonitoring
+INFO: Disabling system monitoring...
+Dec 04, 2017 5:37:30 PM apmon.ApMon setGenMonitoring
+INFO: Setting general information monitoring to false
+Dec 04, 2017 5:37:30 PM apmon.ApMon setJobMonitoring
+INFO: Enabling job monitoring, time interval 30 s
+Dec 04, 2017 5:37:31 PM apmon.BkThread run
+INFO: [Starting background thread...]
