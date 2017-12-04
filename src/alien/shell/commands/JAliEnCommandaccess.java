@@ -133,15 +133,12 @@ public class JAliEnCommandaccess extends JAliEnBaseCommand {
 						else
 							out.setField("envelope", pfn.ticket.envelope.getSignedEnvelope());
 
-					out.setField("url", pfn.ticket.envelope.getTransactionURL());
-					out.setField("pfn", pfn.toString());
+					out.setField( "url", pfn.ticket.envelope.getTransactionURL());
+					out.setField( "pfn", pfn.toString());
 					out.setField("guid", pfn.getGuid().getName());
-					out.setField("se", pfn.getSE().getName());
-
-					if (accessRequest.equals(AccessType.WRITE))
-						out.setField("nSEs", "1");
-					else
-						out.setField("nSEs", " " + pfns.size());
+					out.setField(  "se", pfn.getSE().getName());
+					out.setField("tags", pfn.getSE().qos.toString());
+					out.setField("nSEs", String.valueOf(pfns.size()));
 					out.setField("user", commander.user.getName());
 				}
 		}

@@ -122,11 +122,6 @@ public class PlainWriter extends UIPrintWriter {
 	}
 
 	@Override
-	protected void degraded() {
-		// ignore
-	}
-
-	@Override
 	void nextResult() {
 		// ignored
 	}

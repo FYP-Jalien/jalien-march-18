@@ -1,6 +1,5 @@
 package alien.taskQueue;
 
-import java.security.cert.X509Certificate;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -14,7 +13,7 @@ import alien.api.aaa.TokenCertificateType;
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
-import alien.user.UserFactory;
+import alien.user.AliEnPrincipal;
 import lazyj.DBFunctions;
 
 /**
@@ -53,6 +52,12 @@ public class JobBroker {
 			HashMap<String, Object> waiting = new HashMap<>();
 
 			logger.log(Level.INFO, "We received parameters: " + matchRequest.toString());
+
+			if (!matchRequest.containsKey("AliEnPrincipal")) {
+				logger.log(Level.SEVERE, "getMatchJob: AliEnPrincipal field missing");
+				matchAnswer.put("Error", "AliEnPrincipal field missing");
+				matchAnswer.put("Code", Integer.valueOf(-1));
+			}
 
 			// Checking if the CE is open
 			final int openQueue = checkQueueOpen((String) matchRequest.get("CE"));
@@ -169,8 +174,8 @@ public class JobBroker {
 				}
 
 				if (resubmission >= 0) {
-					GetTokenCertificate gtc = new GetTokenCertificate(UserFactory.getByUsername(username), username, TokenCertificateType.JOB_TOKEN,
-							"queueid=" + queueId + "/resubmission=" + resubmission, 1, (X509Certificate) matchRequest.get("UserCertificate"));
+					GetTokenCertificate gtc = new GetTokenCertificate((AliEnPrincipal) matchRequest.get("AliEnPrincipal"), username, TokenCertificateType.JOB_TOKEN,
+							"queueid=" + queueId + "/resubmission=" + resubmission, 1);
 					try {
 						gtc.run();
 						matchAnswer.put("TokenCertificate", gtc.getCertificateAsString());
@@ -206,7 +211,6 @@ public class JobBroker {
 
 			return matchAnswer;
 		}
-
 	}
 
 	private static HashMap<String, Object> getWaitingJobForAgentId(final HashMap<String, Object> waiting) {

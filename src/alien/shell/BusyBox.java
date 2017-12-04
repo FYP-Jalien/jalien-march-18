@@ -278,10 +278,6 @@ public class BusyBox {
 					boolean signal = false;
 
 					while ((sLine = br.readLine()) != null) {
-						if (sLine.startsWith(JShPrintWriter.degradedSignal)) {
-							printJCentralConnError();
-							break;
-						}
 						signal = true;
 						if (sLine.startsWith(JShPrintWriter.outputterminator))
 							updateEnvironment(sLine);
@@ -331,10 +327,6 @@ public class BusyBox {
 					boolean signal = false;
 
 					while ((sLine = br.readLine()) != null) {
-						if (sLine.startsWith(JShPrintWriter.degradedSignal)) {
-							printJCentralConnError();
-							break;
-						}
 
 						signal = true;
 
@@ -587,9 +579,4 @@ public class BusyBox {
 	private static void printConnError() {
 		JSh.printErr("Connection to JBox interrupted.");
 	}
-
-	private static void printJCentralConnError() {
-		JSh.printErr("Connection error to JCentral.");
-	}
-
 }

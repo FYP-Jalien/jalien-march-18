@@ -20,7 +20,7 @@ cd ../build_eclipse
 
 cp ../trusted_authorities.jks .
 
-mkdir config
+mkdir -p config
 
 cp ../config/config.properties ../config/monitoring.properties config/
 

@@ -30,10 +30,6 @@ import lazyj.Format;
  */
 public class JAliEnCOMMander extends Thread {
 
-	private final static int maxTryConnect = 3;
-
-	private int triedConnects = 0;
-
 	/**
 	 * Logger
 	 */
@@ -53,10 +49,9 @@ public class JAliEnCOMMander extends Thread {
 	 * The commands that have a JAliEnCommand* implementation
 	 */
 	private static final String[] jAliEnCommandList = new String[] { "ls", "get", "cat", "whereis", "cp", "cd", "time", "mkdir", "find", "listFilesFromCollection", "scrlog", "submit", "motd",
-			"access", "commit", "packages", "pwd", "ps", "rmdir", "rm", "mv", "masterjob", "user", "touch", "type", "kill", "lfn2guid", "guid2lfn", "w", "uptime", "addFileToCollection",
-			"addMirror", "addTag", "addTagValue", "chgroup", "chown", "createCollection", "deleteMirror", "df", "du", "fquota", "jobinfo", "jquota", "killTransfer", "listSEDistance", "listTransfer",
-			"md5sum", "mirror", "queue", "queueinfo", "register", "registerOutput", "removeTag", "removeTagValue", "resubmit", "resubmitTransfer", "showTags", "showTagValue", "spy", "top", "groups",
-			"token" };
+			"access", "commit", "packages", "pwd", "ps", "rmdir", "rm", "mv", "masterjob", "user", "touch", "type", "kill", "lfn2guid", "guid2lfn", "w", "uptime", "addFileToCollection", "addMirror",
+			"addTag", "addTagValue", "chgroup", "chown", "createCollection", "deleteMirror", "df", "du", "fquota", "jobinfo", "jquota", "killTransfer", "listSEDistance", "listTransfer", "md5sum",
+			"mirror", "queue", "queueinfo", "register", "registerOutput", "removeTag", "removeTagValue", "resubmit", "resubmitTransfer", "showTags", "showTagValue", "spy", "top", "groups", "token" };
 
 	private static final String[] jAliEnAdminCommandList = new String[] { "addTrigger", "addHost", "queue", "register", "addSE", "addUser", "calculateFileQuota", "calculateJobQuota", "groupmembers" };
 
@@ -98,8 +93,6 @@ public class JAliEnCOMMander extends Thread {
 
 	private final HashMap<String, File> localFileCash;
 
-	private boolean degraded = false;
-
 	private static JAliEnCOMMander lastInstance = null;
 
 	/**
@@ -131,31 +124,28 @@ public class JAliEnCOMMander extends Thread {
 
 		this.user = (user != null) ? user : AuthorizationFactory.getDefaultUser();
 		this.site = (site != null) ? site : ConfigUtils.getConfig().gets("alice_close_site").trim();
-		myHome = UsersHelper.getHomeDir(this.user.getName());
 		localFileCash = new HashMap<>();
-
 		this.out = out;
-		degraded = false;
 
-		if (curDir == null)
-			initializeJCentralConnection();
-		else
+		if (this.user.isJobAgent()) {
+			// For job agents we do not care about directories
+			myHome = "";
 			this.curDir = curDir;
+		}
+		else {
+			// User directories must be set correctly
+			myHome = UsersHelper.getHomeDir(this.user.getName());
+			if (curDir == null)
+				try {
+					this.curDir = c_api.getLFN(myHome);
+				} catch (final Exception e) {
+					logger.log(Level.WARNING, "Exception initializing connection", e);
+				}
+			else
+				this.curDir = curDir;
+		}
 
 		setName("Commander");
-	}
-
-	private boolean initializeJCentralConnection() {
-		triedConnects++;
-
-		try {
-			curDir = c_api.getLFN(myHome);
-			degraded = false;
-		} catch (final Exception e) {
-			logger.log(Level.WARNING, "Exception initializing connection", e);
-			degraded = true;
-		}
-		return !degraded;
 	}
 
 	/**
@@ -245,10 +235,7 @@ public class JAliEnCOMMander extends Thread {
 	 * @return LFN of the current directory
 	 */
 	public LFN getCurrentDir() {
-		// if (curDir == null)
-		// curDir = c_api.getLFN(myHome);
 		return curDir;
-
 	}
 
 	/**
@@ -307,44 +294,22 @@ public class JAliEnCOMMander extends Thread {
 				if (kill)
 					break;
 
-				if (degraded) {
-					if (triedConnects < maxTryConnect) {
-						if (!initializeJCentralConnection())
-							flush();
-						if (triedConnects < maxTryConnect)
-							try {
-								Thread.sleep(triedConnects * maxTryConnect * 500);
-							} catch (final InterruptedException e) {
-								e.printStackTrace();
-							}
-					}
-					else {
-						System.out.println("Giving up...");
-						break;
-					}
-				}
-				else {
-					waitForCommand();
-					if (kill)
-						break;
+				try {
+					status.set(1);
 
-					try {
-						status.set(1);
+					setName("Commander: Executing: " + Arrays.toString(arg));
 
-						setName("Commander: Executing: " + Arrays.toString(arg));
+					execute();
+				} catch (final Exception e) {
+					logger.log(Level.WARNING, "Got exception", e);
+				} finally {
+					out = null;
 
-						execute();
-					} catch (final Exception e) {
-						logger.log(Level.WARNING, "Got exception", e);
-					}finally {
-						out = null;
+					setName("Commander: Idle");
 
-						setName("Commander: Idle");
-
-						status.set(0);
-						synchronized (status) {
-							status.notifyAll();
-						}
+					status.set(0);
+					synchronized (status) {
+						status.notifyAll();
 					}
 				}
 			}
@@ -484,12 +449,7 @@ public class JAliEnCOMMander extends Thread {
 	 * flush the buffer and produce status to be send to client
 	 */
 	public void flush() {
-		if (degraded) {
-			out.degraded();
-			out.setenv(UsersHelper.getHomeDir(user.getName()), getUsername());
-		}
-		else
-			out.setenv(getCurrentDirName(), getUsername());
+		out.setenv(getCurrentDirName(), getUsername());
 		out.flush();
 	}
 
@@ -528,8 +488,7 @@ public class JAliEnCOMMander extends Thread {
 		} catch (@SuppressWarnings("unused") final ClassNotFoundException e) {
 			// System.out.println("No such command or not implemented");
 			return null;
-		}
-		catch (final java.lang.reflect.InvocationTargetException e) {
+		} catch (final java.lang.reflect.InvocationTargetException e) {
 			logger.log(Level.SEVERE, "Exception running command", e);
 			return null;
 		}

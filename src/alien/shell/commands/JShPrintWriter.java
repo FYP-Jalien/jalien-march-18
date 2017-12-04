@@ -21,11 +21,6 @@ public class JShPrintWriter extends UIPrintWriter {
 	/**
 	 *
 	 */
-	public static final String degradedSignal = String.valueOf((char) 25);
-
-	/**
-	 *
-	 */
 	public static final String lineTerm = String.valueOf((char) 0);
 	/**
 	 *
@@ -129,11 +124,6 @@ public class JShPrintWriter extends UIPrintWriter {
 	@Override
 	protected void pending() {
 		print(pendingSignal + "\n");
-	}
-
-	@Override
-	protected void degraded() {
-		print(degradedSignal);
 	}
 
 	@Override

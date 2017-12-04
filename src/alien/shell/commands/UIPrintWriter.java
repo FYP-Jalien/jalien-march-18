@@ -89,11 +89,6 @@ public abstract class UIPrintWriter {
 	abstract protected void pending();
 
 	/**
-	 *
-	 */
-	abstract protected void degraded();
-
-	/**
 	 * identify the RootPrinter from above
 	 *
 	 * @return if it is a RootPrinter
@@ -108,7 +103,7 @@ public abstract class UIPrintWriter {
 	 *
 	 * @param args
 	 */
-	protected void setReturnArgs(@SuppressWarnings("unused") final String args) {
+	protected void setReturnArgs(final String args) {
 		// void
 	}
 
@@ -118,6 +113,12 @@ public abstract class UIPrintWriter {
 
 	abstract void setReturnCode(final int exitCode, final String errorMessage);
 
+	/**
+	 * Set metadata information
+	 * 
+	 * @param key
+	 * @param value
+	 */
 	abstract public void setMetaInfo(String key, String value);
 
 }

@@ -174,6 +174,9 @@ public class JobToken implements Comparable<JobToken> {
 
 		try {
 			// only the resubmission can change
+			db.setReadOnly(false);
+			db.setQueryTimeout(60);
+			
 			if (!db.query(REPLACE_QUERY, false, Long.valueOf(queueId), username, Integer.valueOf(resubmission_queue))) {
 				// wrong table name or what?
 				logger.log(Level.INFO, "Replace JobToken for queueId: " + queueId + " username: " + username + " resubmission: " + resubmission + " failed");
@@ -246,6 +249,9 @@ public class JobToken implements Comparable<JobToken> {
 	 */
 	boolean destroy(final DBFunctions db) {
 		try {
+			db.setReadOnly(false);
+			db.setQueryTimeout(60);
+
 			if (db.query(DESTROY_QUERY, false, Long.valueOf(queueId))) {
 				if (monitor != null)
 					monitor.incrementCounter("jobToken_db_delete");

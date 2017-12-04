@@ -2,6 +2,7 @@ package alien.shell.commands;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.LinkedHashMap;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,7 +32,7 @@ public class JSONPrintWriter extends UIPrintWriter {
 	private final JSONArray resultArray;
 	private final JSONObject metadataResult;
 
-	private JSONObject currentResult;
+	private LinkedHashMap<String, String> currentResult;
 
 	/**
 	 * @param os
@@ -107,12 +108,6 @@ public class JSONPrintWriter extends UIPrintWriter {
 
 	}
 
-	@Override
-	protected void degraded() {
-		// TODO Auto-generated method stub
-
-	}
-
 	@SuppressWarnings("unchecked")
 	@Override
 	void nextResult() {
@@ -122,11 +117,10 @@ public class JSONPrintWriter extends UIPrintWriter {
 		}
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	void setField(final String key, final String value) {
 		if (currentResult == null)
-			currentResult = new JSONObject();
+			currentResult = new LinkedHashMap<>();
 
 		currentResult.put(key, value);
 	}

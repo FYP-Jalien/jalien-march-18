@@ -80,10 +80,7 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 							out.setField("value ", tracelog);
 					out.setField("message: ", "not implemented yet");
 				}
-
 				else {
-					logger.log(Level.INFO, "bad getJDL, bad tracelog");
-
 					if (users.size() == 0)
 						users.add(commander.getUsername());
 
@@ -142,11 +139,11 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 
 				}
 				else {
-
 					if (users.size() == 0)
 						users.add(commander.getUsername());
 
 					final List<Job> ps = commander.q_api.getPS(states, users, sites, nodes, mjobs, jobid, orderByKey, limit);
+					logger.log(Level.INFO, "ps " + ps);
 
 					if (ps != null)
 						for (final Job j : ps) {

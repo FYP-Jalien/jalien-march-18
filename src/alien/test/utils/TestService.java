@@ -53,21 +53,12 @@ public class TestService extends Thread{
 	 * jCentral started successfully
 	 */
 	public void startJCentral(){
-		
-		
-		try {
-			JAKeyStore.loadServerKeyStorage();
-		} catch (Exception e1) {
-			e1.printStackTrace();
-			status = -1;
-		}
-		
-		
 	//	logger.setLevel(Level.WARNING);
 
 		try {
 //			SimpleCatalogueApiService catalogueAPIService = new SimpleCatalogueApiService();
 //			catalogueAPIService.start();
+			JAKeyStore.loadKeyStore();
 			DispatchSSLServer.runService();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -82,7 +73,7 @@ public class TestService extends Thread{
 	public void startJBox(){
 		
 		try {
-			JAKeyStore.loadClientKeyStorage(true);
+			JAKeyStore.loadKeyStore();
 			JBoxServer.startJBoxServer(0);
 		}
 		
