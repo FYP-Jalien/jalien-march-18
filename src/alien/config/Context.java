@@ -1,14 +1,36 @@
 package alien.config;
 
+import java.util.Arrays;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
+import java.util.Set;
+import java.util.Stack;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * @author costing
  */
 public class Context {
+	
+	/**
+	 * The context can be used in a purely-static way, so no need to expose the constructor
+	 */
+	private Context() {
+		
+	}
 
+	/**
+	 * The String that is used for the contextual logging tags. It should not collide
+	 * with any other used tags.
+	 */
+	final private static String loggingTag = "jalien::log::loggingContext";
+	
+	/**
+	 * The context history to return to previous logging contexts.
+	 * It gets updated when the context is overwritten.
+	 */
+	private static Stack<String> contextHistory = new Stack<>();
 	/**
 	 * Thread-tied contexts
 	 */
@@ -87,5 +109,129 @@ public class Context {
 	 */
 	public static Map<String, Object> resetContext() {
 		return context.remove(Thread.currentThread());
+	}
+	
+	/**
+	 * Make sure we can use the logging-shortcuts without worrying about non-existing thread context and floating null pointers.
+	 */
+	private static void assertThreadContextExists() {
+		if(getThreadContext() != null) {
+			return;
+		} else {
+			setThreadContext("", "");
+			resetLoggingContext();
+		}
+	}
+	
+	
+	/**
+	 * Sets the current logging context to the provided String value without checking it or preserving the current context in any form.
+	 * 
+	 * @param ctx the new context to use from now on.
+	 */
+	public static void overwriteLoggingContext(String ctx) {
+		assertThreadContextExists();
+		
+		// preserve the current context in order to be able to return to it
+		contextHistory.push(getLoggingContext());
+		
+		getThreadContext().put(loggingTag, ctx);
+	}
+	
+	/**
+	 * A combination of overwriteLoggingContext and appendContext that allows usage of the context-stack
+	 * 
+	 * -- deprecated. Use regular append mode with optional storing instead
+	 * 
+	 * @param ctx
+	 */
+	@Deprecated
+	public static void overwriteLoggingContextAppendMode(String ctx) {
+		assertThreadContextExists();
+		
+		// preserve current context
+		contextHistory.push(getLoggingContext());
+		
+		addToLoggingContext(ctx);
+	}
+	
+	/**
+	 * Returns to the most recent context stored in the contextHistory and removes the
+	 * entry from that history.
+	 * 
+	 * If no history entries can be found, this goes into the empty context ""
+	 */
+	public static void returnToPreviousLoggingContext() {
+		String ctx = contextHistory.pop();
+		
+		getThreadContext().put(loggingTag, ctx);
+	}
+	
+	/**
+	 * Adds a key (tag) to the current logging context. This method does not inspect the
+	 * logging context to avoid duplicates at the moment. 
+	 * 
+	 * @param tag - The tag to be added into the logging context
+	 */
+	public static void addToLoggingContext(String tag) {
+		assertThreadContextExists();
+		// check if there already is a logging context
+		Map<String, Object> currThreadContetxt = getThreadContext();
+		String currLogContext = (String) currThreadContetxt.get(loggingTag);						
+		
+		// update or create the logging context
+		if(currLogContext != null && currLogContext.length() > 0) {
+			currLogContext = String.join(",", currLogContext, tag);
+		} else {
+			currLogContext = tag;
+		}
+		
+		// update the thread context
+		currThreadContetxt.put(loggingTag, currLogContext);
+	}
+	
+	/**
+	 * Same as addToLoggingContext with the convenience of adding multiple tags at once.
+	 * 
+	 * @param tag
+	 */
+	public static void addToLoggingContext(String... tag) {
+		addToLoggingContext(String.join(",", tag));
+	}
+	
+	/**
+	 * Searches for `tags` in the current logging context and, if one or more were found, removes them.
+	 * This method has the side effect of removing duplicate tags from the logging context.
+	 * 
+	 * @param tags - the logging tags to be removed
+	 */
+	public static void removeFromLoggingContext(String... tags) {
+		assertThreadContextExists();
+		// check if there already is a logging context
+		Map<String, Object> currThreadContetxt = getThreadContext();
+		String currLogContext = (String) currThreadContetxt.get(loggingTag);
+		
+		// convert the array to a set, this also removed possible duplicate tags
+		Set<String> tagsAsSet = new HashSet<String>(Arrays.asList(currLogContext.split(",")));
+		if(tagsAsSet.removeAll(Arrays.asList(tags))) {
+			currThreadContetxt.put(loggingTag, String.join(",", tagsAsSet));
+		}
+		
+	};
+	
+	/**
+	 * Conveniance method. Shortcut for <code>getThreadContext("logging")</code>
+	 */
+	public static String getLoggingContext() {
+		assertThreadContextExists();
+		return (String) getThreadContext().get(loggingTag);
+	}
+		 
+	/**
+	 * Resets the logging context - effectively removing all tags at once from it.
+	 */
+	public static void resetLoggingContext() {
+		assertThreadContextExists();
+		getThreadContext().put(loggingTag, "");
 	}
 }
