@@ -3,7 +3,6 @@ package alien;
 import java.security.KeyStoreException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-import alien.config.Context;
 
 import alien.api.DispatchSSLServer;
 import alien.api.TomcatServer;
@@ -31,7 +30,6 @@ public class JCentral {
 	 */
 	public static void main(final String[] args) throws KeyStoreException {
 
-		Context.addToLoggingContext("JCentral");
 		logger.setLevel(Level.WARNING);
 
 		try {
