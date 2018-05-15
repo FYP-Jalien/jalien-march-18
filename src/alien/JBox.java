@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 import alien.api.JBoxServer;
 import alien.api.TomcatServer;
 import alien.config.ConfigUtils;
+import alien.config.Context;
 import alien.user.JAKeyStore;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -30,6 +31,7 @@ public class JBox {
 	 */
 	public static void main(final String[] args) throws KeyStoreException {
 
+		Context.addToLoggingContext("JBox");
 		System.out.println("Starting JBox");
 
 		logger.log(Level.FINE, "Starting JBox");

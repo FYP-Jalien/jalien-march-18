@@ -13,6 +13,7 @@ import java.util.concurrent.TimeUnit;
 
 import alien.api.JBoxServer;
 import alien.config.ConfigUtils;
+import alien.config.Context;
 import alien.config.JAliEnIAm;
 import alien.shell.BusyBox;
 import alien.shell.ShellColor;
@@ -72,6 +73,7 @@ public class JSh {
 	 * @throws Exception
 	 */
 	public static void main(final String[] args) throws Exception {
+		Context.addToLoggingContext("JSh");
 		osName = getOsName();
 
 		try {
