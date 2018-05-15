@@ -59,7 +59,7 @@ import sun.util.resources.cldr.ts.CurrencyNames_ts;
  */
 public class ConfigUtils {
 	private static ExpirationCache<String, String> seenLoggers = new ExpirationCache<>();
-
+ 
 	/**
 	 * Logger
 	 */
@@ -565,6 +565,16 @@ public class ConfigUtils {
 							return false;
 						}
 					};
+					
+					// try to parse the provided log level from logging.properties. Otherwise use Level=Finest as default
+					try {
+						logging.prop.reload();
+						serviceFh.setLevel(
+								Level.parse(logging.getProps().gets(currServiceLoggerName + ".level")));
+					} catch(Exception e) {
+						System.err.println("No logging level for " + currServiceLoggerName + " provided. Falling back to 'Finest'.");
+						serviceFh.setLevel(Level.FINEST);
+					}
 					
 					serviceFh.setFormatter(formatter);
 					serviceFh.setFilter(serviceFilter);
