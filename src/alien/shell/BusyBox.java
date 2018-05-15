@@ -10,9 +10,12 @@ import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.Arrays;
 import java.util.StringTokenizer;
+import java.util.logging.Logger;
 
 import alien.JSh;
 import alien.api.JBoxServer;
+import alien.config.ConfigUtils;
+import alien.config.Context;
 import alien.config.JAliEnIAm;
 import alien.shell.commands.JShPrintWriter;
 import jline.console.ConsoleReader;
@@ -31,6 +34,9 @@ public class BusyBox {
 	private int remainreconnect = tryreconnect;
 
 	private static final String noSignal = String.valueOf((char) 33);
+	
+	private transient final Logger logger = ConfigUtils.getLogger(BusyBox.class.getCanonicalName());
+
 
 	private static int pender = 0;
 	private static boolean pending = false;
@@ -103,6 +109,8 @@ public class BusyBox {
 
 	private void sendCommand(final String... commandAndArguments) throws IOException {
 		final String xml = toXML(commandAndArguments);
+		
+		logger.info(xml);
 
 		os.write(xml.getBytes());
 		os.flush();
@@ -190,6 +198,8 @@ public class BusyBox {
 
 		out = new PrintWriter(System.out);
 
+		Context.addToLoggingContext("BusyBox");
+		
 		if (startPrompt) {
 			this.username = username;
 			welcome();
@@ -399,6 +409,7 @@ public class BusyBox {
 
 		// String args[] = callLine.split(SpaceSep);
 		final String args[] = callLine.split(" ");
+		logger.info(callLine);
 
 		if (!"".equals(args[0]))
 			if (args[0].equals(".")) {
