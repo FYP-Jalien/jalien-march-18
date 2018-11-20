@@ -1,61 +1,69 @@
 package alien.websockets;
 import javax.websocket.Endpoint;
 import javax.websocket.Session;
+import javax.websocket.OnMessage;
+import javax.websocket.OnOpen;
+import javax.websocket.OnClose;
 
-import org.apache.catalina.startup.Tomcat;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
-import alien.api.TomcatServer;
-import alien.shell.commands.JAliEnCOMMander;
-import alien.shell.commands.UIPrintWriter;
-import alien.user.AliEnPrincipal;
 
 import java.io.IOException;
-import java.io.OutputStream;
 import java.io.StringReader;
-import java.security.Principal;
 import java.util.ArrayList;
-import java.util.Arrays;
 
+import javax.json.JsonObject;
 import javax.json.JsonString;
+import javax.websocket.ClientEndpoint;
 import javax.websocket.CloseReason;
+import javax.websocket.EncodeException;
 import javax.websocket.EndpointConfig;
 import javax.websocket.MessageHandler;
-import javax.websocket.OnMessage;
 import javax.websocket.RemoteEndpoint;
 
-import alien.shell.commands.JAliEnCOMMander;
-import alien.shell.commands.JSONPrintWriter;
-import alien.shell.commands.JShPrintWriter;
-import alien.shell.commands.UIPrintWriter;
-import alien.shell.commands.XMLPrintWriter;
-import alien.user.AliEnPrincipal;
 
-
+@ClientEndpoint
 public class WebSocketEndPoint extends Endpoint {
 	
 	public static boolean connected = false;
-
+	public Session session =null;
 	
-	@Override
+	@OnOpen
 	public void onOpen(Session session, EndpointConfig config)
 	{
-
+		this.session = session;
 		connected = true;
 		System.out.println("Connected to JCentral.");
-		RemoteEndpoint.Basic remoteEndpointBasic = session.getBasicRemote();
-		session.addMessageHandler(new EchoMessageHandlerText(remoteEndpointBasic));
+		//RemoteEndpoint.Basic remoteEndpointBasic = session.getBasicRemote();
+		//session.addMessageHandler(new EchoMessageHandlerText(remoteEndpointBasic));
 		
-
 	}
 	
-	@Override
-	public void onClose(Session session, CloseReason closereason)
+	@SuppressWarnings("unchecked")
+	@OnMessage
+	public void onMessage(String message) throws Exception
 	{
 
+		String cmd = message;
+		String[] tmp;
+		tmp = cmd.split(" ");
+		JSONObject fullCmd = new JSONObject();
+		fullCmd.put("command", tmp[0]);
+		for (int i=1; i<tmp.length;i++) {
+		fullCmd.put("options",tmp[i].toString());
+		}
+		System.out.println("Command is: "+fullCmd.toString());
+		this.session.getBasicRemote().sendObject(fullCmd);
+
+	}
+		
+	@OnClose
+	public void onClose(Session session, CloseReason closereason)
+	{
+		this.session = session;
 		try {
 			if (session != null)
 				session.close();
@@ -72,7 +80,7 @@ public class WebSocketEndPoint extends Endpoint {
 		
 	}
 	
-	private static class EchoMessageHandlerText implements MessageHandler.Partial<String> {
+/*	private static class EchoMessageHandlerText implements MessageHandler.Partial<String> {
 		
 		private final RemoteEndpoint.Basic remoteEndpointBasic;
 		EchoMessageHandlerText(RemoteEndpoint.Basic remoteEndpointBasic) {
@@ -95,23 +103,23 @@ public class WebSocketEndPoint extends Endpoint {
 						remoteEndpointBasic.sendText("Incoming JSON not ok", last);
 						return;
 					}
-/*
-					// Split JSONObject into strings
-					final ArrayList<String> fullCmd = new ArrayList<>();
-					fullCmd.add(jsonObject.get("command").toString());
-
-					JSONArray mArray = new JSONArray();
-					if (jsonObject.get("options") != null) {
-						mArray = (JSONArray) jsonObject.get("options");
-
-						for (int i = 0; i < mArray.size(); i++)
-							fullCmd.add(mArray.get(i).toString());
-					}
-					for(String m: fullCmd)
-					{
-						//session.getBasicRemote().sendText(fullCmd.toArray(new String[i]));
-						remoteEndpointBasic.sendText(m,last);
-					}*/
+//
+//					// Split JSONObject into strings
+//					final ArrayList<String> fullCmd = new ArrayList<>();
+//					fullCmd.add(jsonObject.get("command").toString());
+//
+//					JSONArray mArray = new JSONArray();
+//					if (jsonObject.get("options") != null) {
+//						mArray = (JSONArray) jsonObject.get("options");
+//
+//						for (int i = 0; i < mArray.size(); i++)
+//							fullCmd.add(mArray.get(i).toString());
+//					}
+//					for(String m: fullCmd)
+//					{
+//						//session.getBasicRemote().sendText(fullCmd.toArray(new String[i]));
+//						remoteEndpointBasic.sendText(m,last);
+//					}
 					
 					//Get JSONArray list
 					final JSONArray fullCmd = new JSONArray();
@@ -154,5 +162,9 @@ public class WebSocketEndPoint extends Endpoint {
 			}
 
 		}
-	}
+		public void Send(String message)
+		{
+			onMessage(message, true);
+		}
+	}*/
 }

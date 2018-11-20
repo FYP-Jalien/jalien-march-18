@@ -1,11 +1,14 @@
 package alien.shell;
 
 import alien.websockets.WebSocketConnection;
+import alien.websockets.WebSocketEndPoint;
 import jline.console.ConsoleReader;
 import jline.console.completer.ArgumentCompleter;
 import jline.console.completer.StringsCompleter;
 
 import javax.websocket.Session;
+
+import org.json.simple.JSONObject;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -24,12 +27,12 @@ public class WebsocketBox {
 
 	private OutputStream os;
 	
-	public void SendCommand(final String... commandAndArguments) throws IOException
+	/*public void SendCommand(final String... commandAndArguments) throws IOException
 	{
 		final String cmd = commandAndArguments.toString();
 		os.write(cmd.getBytes());
 		os.flush();
-	}
+	}*/
 
 	public boolean WebSocketConnect()
 	{
@@ -45,12 +48,15 @@ public class WebsocketBox {
 	return false;
 	}
 	
-	
-	public void Disconnect()
+	public void SendCommand(String message) throws Exception
 	{
-		if (WebSocketConnect()==true)
+		System.out.println("Start sending message");
+		WebSocketEndPoint wse = new WebSocketEndPoint();
+
+		while(true)
 		{
-		
+			wse.onMessage(message);
+			Thread.sleep(30000);
 		}
 	}
 	
