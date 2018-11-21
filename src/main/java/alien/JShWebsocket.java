@@ -14,7 +14,7 @@ public class JShWebsocket {
 		
 		WebsocketBox box = new WebsocketBox();
 		box.WebSocketConnect();
-		box.SendCommand("ls -la");
+		//box.SendCommand("ls");
 
 	}
 

@@ -55,7 +55,7 @@ public class WebsocketBox {
 
 		while(true)
 		{
-			wse.onMessage(message);
+			wse.SendCmd(message);
 			Thread.sleep(30000);
 		}
 	}

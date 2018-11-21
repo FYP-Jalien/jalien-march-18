@@ -25,42 +25,64 @@ import javax.websocket.MessageHandler;
 import javax.websocket.RemoteEndpoint;
 
 
-@ClientEndpoint
 public class WebSocketEndPoint extends Endpoint {
 	
-	public static boolean connected = false;
-	public Session session =null;
+	private long _startTime = 0L;
+	public long getUptime() {
+		return System.currentTimeMillis() - _startTime;
+	}
 	
-	@OnOpen
+	public Session session;
+	
+	@Override
 	public void onOpen(Session session, EndpointConfig config)
 	{
 		this.session = session;
-		connected = true;
 		System.out.println("Connected to JCentral.");
-		//RemoteEndpoint.Basic remoteEndpointBasic = session.getBasicRemote();
-		//session.addMessageHandler(new EchoMessageHandlerText(remoteEndpointBasic));
+		RemoteEndpoint.Basic remoteEndpointBasic = session.getBasicRemote();		
+		session.addMessageHandler(new CommandMessageHandler(remoteEndpointBasic));
 		
+		
+		try {
+			session.getBasicRemote().sendText("ls");
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		new Thread() {
+			@Override
+			public void run() {
+				try {
+					Thread.sleep(11 * 60 * 1000);
+				} catch (InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+				
+				if(getUptime()<600000)
+				onClose(session, new CloseReason(null, "Connection expired (run for more than 10 minutes)"));				
+				}
+		}.start();
+			
 	}
 	
-	@SuppressWarnings("unchecked")
 	@OnMessage
-	public void onMessage(String message) throws Exception
-	{
-
-		String cmd = message;
-		String[] tmp;
-		tmp = cmd.split(" ");
-		JSONObject fullCmd = new JSONObject();
-		fullCmd.put("command", tmp[0]);
-		for (int i=1; i<tmp.length;i++) {
-		fullCmd.put("options",tmp[i].toString());
+	public void Message(String msg, Session session) {
+		this.session=session;
+		try {
+			session.getBasicRemote().sendText(msg);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
 		}
-		System.out.println("Command is: "+fullCmd.toString());
-		this.session.getBasicRemote().sendObject(fullCmd);
-
 	}
-		
-	@OnClose
+	public void SendCmd(String Cmd) {
+		System.out.println("Trying to send: "+Cmd);
+		Message(Cmd,this.session);
+	}
+			
+	@Override
 	public void onClose(Session session, CloseReason closereason)
 	{
 		this.session = session;
@@ -72,99 +94,26 @@ public class WebSocketEndPoint extends Endpoint {
 			e.printStackTrace();
 		}
 
-	}
-	
+	}	
 	@Override
 	public void onError(Session session, Throwable error)
 	{
 		
 	}
 	
-/*	private static class EchoMessageHandlerText implements MessageHandler.Partial<String> {
+	public class CommandMessageHandler implements MessageHandler.Whole<String>{
 		
 		private final RemoteEndpoint.Basic remoteEndpointBasic;
-		EchoMessageHandlerText(RemoteEndpoint.Basic remoteEndpointBasic) {
+		
+		CommandMessageHandler(RemoteEndpoint.Basic remoteEndpointBasic){
 			this.remoteEndpointBasic = remoteEndpointBasic;
 		}
-		
+
 		@Override
-		public void onMessage(String message, boolean last) {
-			try {
-				if (remoteEndpointBasic != null) {
-					// Try to parse incoming JSON
-					Object pobj;
-					JSONObject jsonObject;
-					JSONParser parser = new JSONParser();
-
-					try {
-						pobj = parser.parse(new StringReader(message));
-						jsonObject = (JSONObject) pobj;
-					} catch (@SuppressWarnings("unused") ParseException e) {
-						remoteEndpointBasic.sendText("Incoming JSON not ok", last);
-						return;
-					}
-//
-//					// Split JSONObject into strings
-//					final ArrayList<String> fullCmd = new ArrayList<>();
-//					fullCmd.add(jsonObject.get("command").toString());
-//
-//					JSONArray mArray = new JSONArray();
-//					if (jsonObject.get("options") != null) {
-//						mArray = (JSONArray) jsonObject.get("options");
-//
-//						for (int i = 0; i < mArray.size(); i++)
-//							fullCmd.add(mArray.get(i).toString());
-//					}
-//					for(String m: fullCmd)
-//					{
-//						//session.getBasicRemote().sendText(fullCmd.toArray(new String[i]));
-//						remoteEndpointBasic.sendText(m,last);
-//					}
-					
-					//Get JSONArray list
-					final JSONArray fullCmd = new JSONArray();
-					fullCmd.add(jsonObject.get("command"));
-					
-					JSONArray mArray = new JSONArray();
-					if (jsonObject.get("options") != null) {
-						mArray = (JSONArray) jsonObject.get("options");
-
-						for (int i = 0; i < mArray.size(); i++)
-							fullCmd.add(mArray.get(i));
-					}
-					//Convert JSONArray to StringArray
-					final ArrayList<String> sendCommand = new ArrayList<>();
-					for (int i=0; i<fullCmd.size();i++)
-					{
-						sendCommand.add(fullCmd.get(i).toString());
-					}
-					//Convert StringArray to String
-					StringBuilder builder = new StringBuilder();
-					for (String s: sendCommand)
-					{
-						builder.append(s);
-					}
-					String finalCmd = builder.toString();
-					
-					//Send Command
-					if(connected == true)
-					{
-						System.out.println(finalCmd);
-						remoteEndpointBasic.sendText(finalCmd, last);
-					}
-				}
-
-			} catch (IOException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			} catch (Exception e) {
-				e.printStackTrace();
+		public void onMessage(String msg) {
+			if(remoteEndpointBasic!=null) {
+			System.out.println("Recieved message: "+msg);
 			}
-
 		}
-		public void Send(String message)
-		{
-			onMessage(message, true);
-		}
-	}*/
+	}
 }
