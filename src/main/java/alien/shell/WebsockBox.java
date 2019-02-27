@@ -2,12 +2,14 @@ package alien.shell;
 
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.io.Console;
 import java.net.URI;
 import java.security.SecureRandom;
 import java.security.Security;
 
 import org.apache.tomcat.websocket.Constants;
 import org.apache.tomcat.websocket.WsWebSocketContainer;
+import org.json.simple.JSONObject;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
@@ -25,7 +27,6 @@ public class WebsockBox {
 	
 	public boolean connect()
 	{
-		//ClientEndpointConfig config = ClientEndpointConfig.Builder.create().build();
 		Session session;
 		try {
 			// get factory
