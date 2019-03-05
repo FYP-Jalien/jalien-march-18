@@ -1,15 +1,12 @@
 package alien.websockets;
 
-import java.io.Console;
 import java.io.IOException;
-import java.io.PrintWriter;
 import java.util.ArrayList;
 
 import javax.websocket.CloseReason;
 import javax.websocket.Endpoint;
 import javax.websocket.EndpointConfig;
 import javax.websocket.MessageHandler;
-import javax.websocket.OnMessage;
 import javax.websocket.RemoteEndpoint;
 import javax.websocket.Session;
 
@@ -33,22 +30,19 @@ public class ClientEndPoint extends Endpoint{
 	public void onOpen(Session session, EndpointConfig config) {
 		// TODO Auto-generated method stub
 		this.session = session;
+		TextMessageHandler handler = new TextMessageHandler(this.session);
+		this.session.addMessageHandler(handler);
 		if (session.isOpen()) {
 			System.out.println("Connected to JCentral");
+			try {
+				this.session.getBasicRemote().sendText("{\"command\":\"whoami\"}");
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 		}
-		TextMessageHandler handler = new TextMessageHandler(this.session);
-		this.session.addMessageHandler(handler);	
-		
-		///Send command to server
-		new Thread() {
-			@Override
-			public void run() {
-			while(ClientEndPoint.this.session.isOpen()) {
-				SendCommand();
-			}
-			}
-		}.start();
-		///
+
+
 		new Thread() {
 			@Override
 			public void run() {
@@ -67,26 +61,9 @@ public class ClientEndPoint extends Endpoint{
 					if (System.currentTimeMillis() - _lastActivityTime > 3 * 60 * 60 * 1000) // 3 hours
 						onClose(session, new CloseReason(null, "Connection idle for more than 3 hours"));
 			}
-		}.start();
-
+		}.start();		
 	}
-		
-	@OnMessage
-	public void SendCommand()
-	{
-		String message;
-		Console c = System.console();
-		message = c.readLine();
-		try {
-			this.session.getBasicRemote().sendText("{\"command\":\""+message+"\"}");
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-		message=null;
-		c=null;
-	}
-	
+			
 	@Override
 	public void onClose(final Session session, final CloseReason closeReason) {
 		try {
@@ -105,35 +82,57 @@ public class ClientEndPoint extends Endpoint{
 	public static class TextMessageHandler implements MessageHandler.Whole<String>{
 
 		private final RemoteEndpoint.Basic endpointbasic;
-		public TextMessageHandler(Session session) {
-			this.endpointbasic = session.getBasicRemote();
-		}
+		public Session session;
 		public String textPrefix ="";
-		public boolean cmdrecieved = false;
 		public ArrayList<String> answer =null;
-		///
-		public void welcome()
-		{
-			
+		public TextMessageHandler(Session session) {
+			this.session = session;
+			this.endpointbasic = this.session.getBasicRemote();
 		}
 		///
-		public void Parsing(String message)
+		public void GetPrefix(String message)
+		{
+			if (endpointbasic !=null) {
+
+				try {
+					JSONParser p = new JSONParser();
+					String prefix = "";
+					Object o;
+					o = p.parse(message);
+					JSONObject j = new JSONObject();
+					j = (JSONObject) o;
+					if(j.get("metadata")!=null) {
+						prefix = j.get("metadata").toString();
+					}
+					//
+					Object pref;
+					JSONObject jprefix;
+					pref = p.parse(prefix);
+					jprefix = (JSONObject)pref;
+					
+					if (jprefix.get("currentdir")!=null) {
+						textPrefix = jprefix.get("currentdir").toString();
+					}
+				} catch (ParseException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+
+			}
+		}
+		///
+		public void GetCmd(String message)
 		{
 			//Parse incoming message
 			if(endpointbasic!=null) {
 				Object obj;
 				JSONObject tmpjsonObj;
 				JSONParser pr = new JSONParser();
-				String prefix = "";
 				ArrayList<String> arr = new ArrayList<>();
 				try {
 					obj = pr.parse(message);
 					tmpjsonObj = (JSONObject)obj;					
 					JSONArray mArray = new JSONArray();
-					
-					if(tmpjsonObj.get("metadata")!=null) {
-						prefix = tmpjsonObj.get("metadata").toString();
-					}
 					
 					if (tmpjsonObj.get("results") != null) {
 						mArray = (JSONArray) tmpjsonObj.get("results");
@@ -158,19 +157,10 @@ public class ClientEndPoint extends Endpoint{
 					for (int i=0;i<cmd.size();i++) {
 						answer.add(cmd.get(i).toString());
 					}
-					
-					//Create prefix
-					Object pref;
-					JSONObject jprefix;
-					pref = pr.parse(prefix);
-					jprefix = (JSONObject)pref;
-					if (jprefix.get("currentdir")!=null) {
-						textPrefix = jprefix.get("currentdir").toString();
-					}
 				} catch (ParseException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
 			}
 		}
 		
@@ -180,15 +170,15 @@ public class ClientEndPoint extends Endpoint{
 				System.out.println(textPrefix+"> "+answer.get(i));
 			}
 		}
-		
 		@Override
 		public void onMessage(String message) {
-			Parsing(message);
+			GetCmd(message);
+			GetPrefix(message);
 			Recieve();
 			_lastActivityTime = System.currentTimeMillis();
 
 		}
-		
+
 	}
 
 }

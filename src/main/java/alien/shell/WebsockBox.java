@@ -3,18 +3,21 @@ package alien.shell;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.io.Console;
+import java.io.IOException;
 import java.net.URI;
 import java.security.SecureRandom;
 import java.security.Security;
 
 import org.apache.tomcat.websocket.Constants;
 import org.apache.tomcat.websocket.WsWebSocketContainer;
+import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
 import javax.net.ssl.KeyManagerFactory;
 import javax.net.ssl.SSLContext;
 import javax.websocket.ClientEndpointConfig;
 import javax.websocket.ContainerProvider;
+import javax.websocket.OnMessage;
 import javax.websocket.Session;
 import javax.websocket.WebSocketContainer;
 
@@ -49,6 +52,16 @@ public class WebsockBox {
 			URI uri = URI.create("wss://alice-jcentral.cern.ch:8097/websocket/json");
 			WebSocketContainer container = ContainerProvider.getWebSocketContainer();
 			session = container.connectToServer(ClientEndPoint.class, config, uri);
+			
+			///Send command to server
+			new Thread() {
+				@Override
+				public void run() {
+				while(session.isOpen()) {
+					SendCommand(session);
+				}
+				}
+			}.start();
 
 		} catch (final Throwable e) {
 			logger.log(Level.SEVERE, "Could not initiate SSL connection to the server.", e);
@@ -58,4 +71,29 @@ public class WebsockBox {
 		return false;
 	}
 
+	@OnMessage
+	public void SendCommand(Session session)
+	{
+		String message;
+		Console c = System.console();
+		message = c.readLine();
+		String[] splitcmd = message.split(" ");
+		JSONObject jsoncmd = new JSONObject();
+		JSONArray Arroptions = new JSONArray();
+		if (splitcmd[0]!=null) {jsoncmd.put("command", splitcmd[0]);}
+		for (int i=1;i<splitcmd.length;i++) {
+			if (splitcmd[i]!=null) {
+				Arroptions.add(splitcmd[i]);}
+		}
+		if(Arroptions!=null) {jsoncmd.put("options", Arroptions);}
+		String fullcmd = jsoncmd.toString();
+		try {
+			session.getBasicRemote().sendText(fullcmd);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		message=null;
+		c=null;
+	}
 }
