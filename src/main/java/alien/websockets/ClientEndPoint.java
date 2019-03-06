@@ -21,7 +21,6 @@ public class ClientEndPoint extends Endpoint{
 	final Object stateObject = new Object();
 	public static long _lastActivityTime = 0L;
 	private long _startTime = 0L;
-	public boolean cmdsent = false;
 	public long getUptime() {
 		return System.currentTimeMillis() - _startTime;
 	}
@@ -35,6 +34,7 @@ public class ClientEndPoint extends Endpoint{
 		if (session.isOpen()) {
 			System.out.println("Connected to JCentral");
 			try {
+				System.out.print("Welcome ");
 				this.session.getBasicRemote().sendText("{\"command\":\"whoami\"}");
 			} catch (IOException e) {
 				// TODO Auto-generated catch block
@@ -83,26 +83,28 @@ public class ClientEndPoint extends Endpoint{
 
 		private final RemoteEndpoint.Basic endpointbasic;
 		public Session session;
-		public String textPrefix ="";
+		public String textPrefix;
 		public ArrayList<String> answer =null;
 		public TextMessageHandler(Session session) {
 			this.session = session;
 			this.endpointbasic = this.session.getBasicRemote();
 		}
-		///
-		public void GetPrefix(String message)
-		{
+		@Override
+		public void onMessage(String message) {
+			textPrefix =null;
 			if (endpointbasic !=null) {
 
 				try {
+					
+				// Get Prefix
 					JSONParser p = new JSONParser();
-					String prefix = "";
-					Object o;
-					o = p.parse(message);
-					JSONObject j = new JSONObject();
-					j = (JSONObject) o;
-					if(j.get("metadata")!=null) {
-						prefix = j.get("metadata").toString();
+					String prefix = null;
+					Object obj;
+					obj = p.parse(message);
+					JSONObject tmpjsonObj;
+					tmpjsonObj = (JSONObject)obj;
+					if(tmpjsonObj.get("metadata")!=null) {
+						prefix = tmpjsonObj.get("metadata").toString();
 					}
 					//
 					Object pref;
@@ -113,25 +115,9 @@ public class ClientEndPoint extends Endpoint{
 					if (jprefix.get("currentdir")!=null) {
 						textPrefix = jprefix.get("currentdir").toString();
 					}
-				} catch (ParseException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-
-			}
-		}
-		///
-		public void GetCmd(String message)
-		{
-			//Parse incoming message
-			if(endpointbasic!=null) {
-				Object obj;
-				JSONObject tmpjsonObj;
-				JSONParser pr = new JSONParser();
-				ArrayList<String> arr = new ArrayList<>();
-				try {
-					obj = pr.parse(message);
-					tmpjsonObj = (JSONObject)obj;					
+					
+					//Get Command
+					ArrayList<String> arr = new ArrayList<>();
 					JSONArray mArray = new JSONArray();
 					
 					if (tmpjsonObj.get("results") != null) {
@@ -148,7 +134,7 @@ public class ClientEndPoint extends Endpoint{
 					JSONArray cmd = new JSONArray();
 					answer = new ArrayList<>();
 					for (int i=0;i<arr.size();i++) {
-						object = pr.parse(arr.get(i));
+						object = p.parse(arr.get(i));
 						json = (JSONObject)object;
 						if(json.get("message")!=null) {
 						cmd.add(json.get("message"));
@@ -157,28 +143,23 @@ public class ClientEndPoint extends Endpoint{
 					for (int i=0;i<cmd.size();i++) {
 						answer.add(cmd.get(i).toString());
 					}
+					//
 				} catch (ParseException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-			}
-		}
-		
-		public void Recieve()
-		{	
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			
+			//Recieve message
 			for (int i=0;i<answer.size();i++) {
-				System.out.println(textPrefix+"> "+answer.get(i));
+				System.out.println(answer.get(i));
 			}
-		}
-		@Override
-		public void onMessage(String message) {
-			GetCmd(message);
-			GetPrefix(message);
-			Recieve();
+			System.out.print(textPrefix+"> ");
+			textPrefix = null;
 			_lastActivityTime = System.currentTimeMillis();
 
 		}
 
 	}
 
+}
 }
