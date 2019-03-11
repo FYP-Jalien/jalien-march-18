@@ -1,12 +1,14 @@
 package alien.shell.commands;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.StringTokenizer;
 
 import alien.catalogue.FileSystemUtils;
 import alien.catalogue.GUIDUtils;
+import alien.catalogue.LFN;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -79,7 +81,8 @@ public class JAliEnCommandmirror extends JAliEnBaseCommand {
 									}
 									else
 										throw new JAliEnCommandException("Number of replicas cannot be negative, in QoS string " + spec);
-								} catch (final Exception e) {
+								}
+								catch (final Exception e) {
 									throw new JAliEnCommandException("Exception parsing QoS string " + spec, e);
 								}
 							else
@@ -93,7 +96,8 @@ public class JAliEnCommandmirror extends JAliEnBaseCommand {
 					throw new JAliEnCommandException();
 				this.dstSE = lfns.get(1);
 			}
-		} catch (final OptionException e) {
+		}
+		catch (final OptionException e) {
 			printHelp();
 			throw e;
 		}
@@ -112,37 +116,54 @@ public class JAliEnCommandmirror extends JAliEnBaseCommand {
 		if (this.ses.size() != 0 || this.qos.size() != 0) {
 			HashMap<String, Long> results;
 			try {
-				String toMirror = this.lfn;
+				final List<String> toMirrorEntries;
 
-				if (!this.useLFNasGuid)
-					toMirror = FileSystemUtils.getAbsolutePath(commander.user.getName(), commander.getCurrentDirName(), this.lfn);
+				if (!this.useLFNasGuid) {
+					final LFN currentDir = commander.getCurrentDir();
 
-				results = commander.c_api.mirrorLFN(toMirror, this.ses, this.exses, this.qos, this.useLFNasGuid, this.attempts);
+					final String absolutePath = FileSystemUtils.getAbsolutePath(commander.user.getName(), currentDir != null ? currentDir.getCanonicalName() : null, this.lfn);
 
-				if (results == null && !this.useLFNasGuid && GUIDUtils.isValidGUID(this.lfn))
-					results = commander.c_api.mirrorLFN(this.lfn, this.ses, this.exses, this.qos, true, this.attempts);
+					toMirrorEntries = FileSystemUtils.expandPathWildCards(absolutePath, commander.user);
 
-				if (results != null) {
-					for (final String s : results.keySet()) {
-						String result_string;
-						final Long result = results.get(s);
+					if (toMirrorEntries.size() == 0) {
+						commander.printErrln("No such file: " + this.lfn);
 
-						if (result != null) {
-							if (result.longValue() > 0)
-								commander.printOutln(s + ": queued transfer ID " + result.longValue());
-							else {
-								result_string = JAliEnCommandmirror.Errcode2Text(result.intValue());
-								commander.printErrln(s + ": " + result_string);
-							}
-						}
-						else
-							commander.printErrln(s + ": unexpected error");
+						return;
 					}
 				}
 				else {
-					commander.printErrln("Couldn't execute the mirrror command, argument not found");
+					toMirrorEntries = Arrays.asList(this.lfn);
 				}
-			} catch (final IllegalArgumentException e) {
+
+				for (final String toMirror : toMirrorEntries) {
+					results = commander.c_api.mirrorLFN(toMirror, this.ses, this.exses, this.qos, this.useLFNasGuid, this.attempts);
+
+					if (results == null && !this.useLFNasGuid && GUIDUtils.isValidGUID(this.lfn))
+						results = commander.c_api.mirrorLFN(this.lfn, this.ses, this.exses, this.qos, true, this.attempts);
+
+					if (results != null) {
+						for (final String s : results.keySet()) {
+							String result_string;
+							final Long result = results.get(s);
+
+							if (result != null) {
+								if (result.longValue() > 0)
+									commander.printOutln(s + ": queued transfer ID " + result.longValue());
+								else {
+									result_string = JAliEnCommandmirror.Errcode2Text(result.intValue());
+									commander.printErrln(s + ": " + result_string);
+								}
+							}
+							else
+								commander.printErrln(s + ": unexpected error");
+						}
+					}
+					else {
+						commander.printErrln("Couldn't execute the mirrror command, argument not found");
+					}
+				}
+			}
+			catch (final IllegalArgumentException e) {
 				commander.printErrln(e.getMessage());
 			}
 		}
@@ -155,51 +176,51 @@ public class JAliEnCommandmirror extends JAliEnBaseCommand {
 	protected static String Errcode2Text(final int error) {
 		String text = null;
 		switch (error) {
-		case 0:
-			text = "file already exists on SE";
-			break;
-		case -256:
-			text = "problem getting LFN";
-			break;
-		case -320:
-			text = "LFN name empty";
-			break;
-		case -330:
-			text = "LFN name empty";
-			break;
-		case -350:
-			text = "other problem";
-			break;
-		case -255:
-			text = "no destination SE name";
-			break;
-		case -254:
-			text = "unable to connect to SE";
-			break;
-		case -253:
-			text = "empty SE list";
-			break;
-		case -1:
-			text = "wrong mirror parameters";
-			break;
-		case -2:
-			text = "database connection missing";
-			break;
-		case -3:
-			text = "cannot locate real pfns";
-			break;
-		case -4:
-			text = "DB query failed";
-			break;
-		case -5:
-			text = "DB query didn't generate a transfer ID";
-			break;
-		case -6:
-			text = "cannot locate the archive LFN to mirror";
-			break;
-		default:
-			text = "Unknown error code: " + error;
-			break;
+			case 0:
+				text = "file already exists on SE";
+				break;
+			case -256:
+				text = "problem getting LFN";
+				break;
+			case -320:
+				text = "LFN name empty";
+				break;
+			case -330:
+				text = "LFN name empty";
+				break;
+			case -350:
+				text = "other problem";
+				break;
+			case -255:
+				text = "no destination SE name";
+				break;
+			case -254:
+				text = "unable to connect to SE";
+				break;
+			case -253:
+				text = "empty SE list";
+				break;
+			case -1:
+				text = "wrong mirror parameters";
+				break;
+			case -2:
+				text = "database connection missing";
+				break;
+			case -3:
+				text = "cannot locate real pfns";
+				break;
+			case -4:
+				text = "DB query failed";
+				break;
+			case -5:
+				text = "DB query didn't generate a transfer ID";
+				break;
+			case -6:
+				text = "cannot locate the archive LFN to mirror";
+				break;
+			default:
+				text = "Unknown error code: " + error;
+				break;
 		}
 		return text;
 	}

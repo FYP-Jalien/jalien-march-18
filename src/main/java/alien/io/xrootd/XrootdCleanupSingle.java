@@ -128,6 +128,9 @@ public class XrootdCleanupSingle extends Thread {
 	}
 
 	private void fileCheck(final Collection<XrootdFile> files) {
+		if (files == null || files.size() == 0)
+			return;
+
 		final Map<UUID, XrootdFile> askUUIDs = new HashMap<>(files.size());
 
 		try {
@@ -156,7 +159,30 @@ public class XrootdCleanupSingle extends Thread {
 			e.printStackTrace();
 		}
 
-		final Collection<GUID> foundGUIDs = GUIDUtils.getGUIDs(askUUIDs.keySet().toArray(new UUID[0]));
+		Collection<GUID> foundGUIDs = null;
+
+		for (int i = 0; i < 10; i++) {
+			try {
+				foundGUIDs = GUIDUtils.getGUIDs(askUUIDs.keySet().toArray(new UUID[0]));
+
+				break;
+			}
+			catch (@SuppressWarnings("unused") final IllegalStateException e) {
+				try {
+					// retry the same query up to 10 times, 15s apart, in case of database maintenance operations
+					Thread.sleep(1000 * 15);
+				}
+				catch (@SuppressWarnings("unused") final InterruptedException e1) {
+					// nothing
+				}
+			}
+		}
+
+		if (foundGUIDs == null) {
+			// something is wrong with this chunk of work, skip over it
+			System.err.println("Could not process the list of " + files.size() + " files from " + currentPath);
+			return;
+		}
 
 		for (final GUID g : foundGUIDs)
 			if (g.hasReplica(se)) {

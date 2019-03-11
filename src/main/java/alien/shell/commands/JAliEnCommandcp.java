@@ -103,13 +103,13 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 		else {
 			commander.outNextResult();
 			if (!localFileSpec(source) && localFileSpec(target)) {
-
+				// download a file
 				localFile = new File(getLocalFileSpec(target));
 
 				if (!localFile.exists() || localFile.isDirectory())
 					copyGridToLocal(source, localFile);
 				else {
-					commander.printErrln("A local file already exists with this name.");
+					commander.printErrln("A local file already exists with this name: " + target);
 
 					if (isSilent()) {
 						final IOException ex = new IOException("A local file already exists with this name: " + target);
@@ -120,46 +120,130 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 			}
 			else
 				if (localFileSpec(source) && !localFileSpec(target)) {
+					// from the local disk to the Grid
 
 					final File sourceFile = new File(getLocalFileSpec(source));
-					if (!targetLFNExists(target))
-						if (sourceFile.exists())
-							copyLocalToGrid(sourceFile, target);
-						else {
-							commander.printErrln("A local file with this name does not exists.");
-							if (isSilent()) {
-								final IOException ex = new IOException("Local file " + target + " doesn't exist");
 
-								throw new IOError(ex);
-							}
-						}
-				}
-				else
-					if (!targetLFNExists(target)) {
+					if (!sourceFile.exists()) {
+						commander.printErrln("A local file with this name does not exists: " + source);
+						if (isSilent()) {
+							final IOException ex = new IOException("Local file " + source + " doesn't exist");
 
-						localFile = copyGridToLocal(source, null);
-						if (localFile != null && localFile.exists() && localFile.length() > 0) {
-							if (copyLocalToGrid(localFile, target)) {
-								commander.printOutln("Copy successful.");
-							}
-							else {
-								commander.printErrln("Could not copy to the target.");
-								if (isSilent()) {
-									final IOException ex = new IOException("Could not copy to the target: " + target);
-
-									throw new IOError(ex);
-								}
-							}
-						}
-						else {
-							commander.printErrln("Could not get the source.");
-							if (isSilent()) {
-								final IOException ex = new IOException("Could not get the source: " + source);
-
-								throw new IOError(ex);
-							}
+							throw new IOError(ex);
 						}
 					}
+
+					final LFN currentDir = commander.getCurrentDir();
+
+					LFN tLFN = commander.c_api.getLFN(FileSystemUtils.getAbsolutePath(commander.user.getName(), currentDir != null ? currentDir.getCanonicalName() : null, target));
+
+					if (tLFN != null) {
+						if (tLFN.isDirectory()) {
+							target = tLFN.getCanonicalName() + "/" + sourceFile.getName();
+
+							tLFN = commander.c_api.getLFN(target);
+						}
+					}
+
+					if (tLFN == null || !tLFN.exists) {
+						copyLocalToGrid(sourceFile, target);
+					}
+					else {
+						commander.printErrln("Target file already exists: " + tLFN.getCanonicalName());
+
+						if (isSilent())
+							throw new IOError(new IOException("Target file already exists: " + tLFN.getCanonicalName()));
+					}
+				}
+				else {
+					// copying between two Grid endpoints
+
+					final LFN currentDir = commander.getCurrentDir();
+
+					final LFN tLFN = commander.c_api.getLFN(FileSystemUtils.getAbsolutePath(commander.user.getName(), currentDir != null ? currentDir.getCanonicalName() : null, target));
+
+					if (tLFN != null && tLFN.exists && !tLFN.isDirectory()) {
+						commander.printErrln("Target file already exists: " + tLFN.getCanonicalName());
+						if (isSilent()) {
+							final IOException ex = new IOException("Target file already exists: " + tLFN.getCanonicalName());
+
+							throw new IOError(ex);
+						}
+
+						return;
+					}
+
+					final String absolutePath = FileSystemUtils.getAbsolutePath(commander.user.getName(), currentDir != null ? currentDir.getCanonicalName() : null, source);
+
+					final List<String> expandedPaths = FileSystemUtils.expandPathWildCards(absolutePath, commander.user);
+
+					if (expandedPaths.size() == 0) {
+						commander.printErrln("No such file: " + source);
+
+						return;
+					}
+
+					if (expandedPaths.size() > 1) {
+						// if more than one file then the target must be an existing directory
+
+						if (tLFN == null || !tLFN.exists || !tLFN.isDirectory()) {
+							commander.printErrln("Multiple sources can only be copied to a targe directory");
+							if (isSilent()) {
+								final IOException ex = new IOException("Multiple sources can only be copied to a targe directory");
+
+								throw new IOError(ex);
+							}
+
+							return;
+						}
+					}
+
+					String lastError = null;
+
+					for (final String sFile : expandedPaths) {
+						String actualTarget = target;
+
+						LFN actualLFN = null;
+
+						if (tLFN != null) {
+							// target is a directory, have to create the same file name inside
+							String fileName = sFile;
+
+							if (fileName.contains("/"))
+								fileName = fileName.substring(fileName.lastIndexOf('/') + 1);
+
+							actualTarget = tLFN.getCanonicalName() + fileName;
+
+							actualLFN = commander.c_api.getLFN(actualTarget);
+						}
+
+						if (actualLFN != null && actualLFN.exists) {
+							lastError = "Target already exists: " + actualTarget;
+							commander.printErrln(lastError);
+							continue;
+						}
+
+						localFile = copyGridToLocal(sFile, null);
+						if (localFile != null && localFile.exists() && localFile.length() > 0) {
+							if (copyLocalToGrid(localFile, actualTarget)) {
+								commander.printOutln("Copied " + sFile + " -> " + actualTarget);
+							}
+							else {
+								lastError = "Could not copy " + sFile + " -> " + actualTarget;
+								commander.printErrln(lastError);
+								continue;
+							}
+						}
+						else {
+							lastError = "Could not get the contents of " + sFile;
+							commander.printErrln(lastError);
+							continue;
+						}
+					}
+
+					if (lastError != null && isSilent())
+						throw new IOError(new IOException(lastError));
+				}
 		}
 	}
 
@@ -253,19 +337,6 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 		public Exception getLastException() {
 			return lastException;
 		}
-	}
-
-	private boolean targetLFNExists(final String targetLFN) {
-		final LFN currentDir = commander.getCurrentDir();
-
-		final LFN tLFN = commander.c_api.getLFN(FileSystemUtils.getAbsolutePath(commander.user.getName(), currentDir != null ? currentDir.getCanonicalName() : null, targetLFN));
-
-		if (tLFN != null) {
-			commander.printErrln("The target LFN already exists.");
-
-			return true;
-		}
-		return false;
 	}
 
 	private class GridToLocal implements Runnable {
@@ -534,7 +605,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 	private static final ExecutorService UPLOAD_THREAD_POOL = new CachedThreadPool(Integer.MAX_VALUE,
 			ConfigUtils.getConfig().getl("alien.shell.commands.JAliEnCommandcp.UPLOAD_THREAD_POOL.keepAliveTime", 2), TimeUnit.SECONDS, new ThreadFactory() {
 				@Override
-				public Thread newThread(Runnable r) {
+				public Thread newThread(final Runnable r) {
 					final Thread t = new Thread(r, "JAliEnCommandcp.UPLOAD_THREAD_POOL");
 
 					return t;
@@ -745,7 +816,8 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 				synchronized (lock) {
 					try {
 						lock.wait(100);
-					} catch (@SuppressWarnings("unused") final InterruptedException e) {
+					} catch (@SuppressWarnings("unused")
+					final InterruptedException e) {
 						return false;
 					}
 				}
@@ -759,9 +831,9 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 
 			return true;
 		}
-
-		if (bD)
-			sourceFile.delete();
+		else
+			if (bD)
+				sourceFile.delete();
 
 		return commit(envelopes, registerPFNs, guid, bD ? null : sourceFile, referenceCount, true);
 	}
@@ -769,14 +841,16 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 	private final class BackgroundUpload extends Thread {
 		private final GUID guid;
 		private final List<Future<UploadWork>> futures;
+		private final int originalNoOfCopies;
 		private final File fileToDeleteOnComplete;
 
 		public BackgroundUpload(final GUID guid, final List<Future<UploadWork>> futures, final File fileToDeleteOnComplete) {
-			super("alien.shell.commands.JAliEnCommandcp.BackgroundUpload (" + guid.guidId + ")");
+			super("alien.shell.commands.JAliEnCommandcp.BackgroundUpload (" + futures.size() + " x " + guid.guid + " )");
 
 			this.guid = guid;
 			this.futures = futures;
 			this.fileToDeleteOnComplete = fileToDeleteOnComplete;
+			this.originalNoOfCopies = futures.size();
 		}
 
 		@Override
@@ -785,6 +859,8 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 
 			while (futures.size() > 0) {
 				final Iterator<Future<UploadWork>> it = futures.iterator();
+
+				boolean anyChange = false;
 
 				while (it.hasNext()) {
 					final Future<UploadWork> f = it.next();
@@ -807,7 +883,20 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 							logger.log(Level.FINE, "Error getting the upload result of " + guid.guid, e);
 						} finally {
 							it.remove();
+							anyChange = true;
 						}
+					}
+				}
+
+				if (futures.size() > 0) {
+					if (anyChange)
+						setName("alien.shell.commands.JAliEnCommandcp.BackgroundUpload (" + futures.size() + " / " + originalNoOfCopies + " x " + guid.guid + ")");
+
+					try {
+						Thread.sleep(100);
+					} catch (@SuppressWarnings("unused")
+					final InterruptedException ie) {
+						break;
 					}
 				}
 			}
@@ -904,11 +993,13 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 
 					try {
 						targetPFNResult = protocol.put(pfn, sourceFile);
-					} catch (@SuppressWarnings("unused") final IOException ioe) {
+					} catch (@SuppressWarnings("unused")
+					final IOException ioe) {
 						// ignore, will try next protocol or fetch another
 						// replica to replace this one
 					}
-				} catch (@SuppressWarnings("unused") final Exception e) {
+				} catch (@SuppressWarnings("unused")
+				final Exception e) {
 					// e.printStackTrace();
 				}
 

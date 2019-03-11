@@ -343,7 +343,7 @@ public class Xrootd extends Protocol {
 
 				String path = url.getPath();
 
-				if (path.startsWith("//"))
+				if (path.startsWith("/"))
 					path = path.substring(1);
 
 				command.add(xrootd_default_path + "/bin/xrdfs");

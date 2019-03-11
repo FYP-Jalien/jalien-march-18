@@ -231,7 +231,9 @@ public class JsonWebsocketEndpoint extends Endpoint {
 
 					// Send back the result to the client
 					synchronized (remoteEndpointBasic) {
-						remoteEndpointBasic.sendText(((ByteArrayOutputStream) os).toString(), true);
+						final ByteArrayOutputStream baos = (ByteArrayOutputStream) os;
+						remoteEndpointBasic.sendText(baos.toString(), true);
+						baos.reset();
 					}
 					_lastActivityTime = System.currentTimeMillis();
 				}
