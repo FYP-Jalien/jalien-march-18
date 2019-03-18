@@ -550,7 +550,7 @@ public class JAliEnCOMMander extends Thread {
 	 * @param key
 	 * @param value
 	 */
-	public void printOut(String key, String value) {
+	public void printOut(final String key, final String value) {
 		if (!commandIsSilent())
 			if (out.isRootPrinter())
 				out.setField(key, value);
@@ -561,7 +561,7 @@ public class JAliEnCOMMander extends Thread {
 	 * 
 	 * @param value
 	 */
-	public void printOut(String value) {
+	public void printOut(final String value) {
 		if (!commandIsSilent())
 			out.printOut(value);
 	}
@@ -572,7 +572,7 @@ public class JAliEnCOMMander extends Thread {
 	 * @param key
 	 * @param value
 	 */
-	public void printOutln(String key, String value) {
+	public void printOutln(final String key, final String value) {
 		printOut(key, value + "\n");
 	}
 
@@ -581,7 +581,7 @@ public class JAliEnCOMMander extends Thread {
 	 * 
 	 * @param value
 	 */
-	public void printOutln(String value) {
+	public void printOutln(final String value) {
 		printOut(value + "\n");
 	}
 
@@ -597,7 +597,7 @@ public class JAliEnCOMMander extends Thread {
 	 * 
 	 * @param value
 	 */
-	public void printErr(String value) {
+	public void printErr(final String value) {
 		if (!commandIsSilent())
 			out.printErr(value);
 	}
@@ -607,7 +607,7 @@ public class JAliEnCOMMander extends Thread {
 	 * 
 	 * @param value
 	 */
-	public void printErrln(String value) {
+	public void printErrln(final String value) {
 		printErr(value + "\n");
 	}
 
@@ -617,7 +617,7 @@ public class JAliEnCOMMander extends Thread {
 	 * @param exitCode
 	 * @param errorMessage
 	 */
-	public void setReturnCode(int exitCode, String errorMessage) {
+	public void setReturnCode(final int exitCode, final String errorMessage) {
 		if (out != null)
 			out.setReturnCode(exitCode, errorMessage);
 	}
@@ -627,7 +627,7 @@ public class JAliEnCOMMander extends Thread {
 	 * 
 	 * @param args
 	 */
-	public void setReturnArgs(String args) {
+	public void setReturnArgs(final String args) {
 		if (out != null)
 			out.setReturnArgs(args);
 	}

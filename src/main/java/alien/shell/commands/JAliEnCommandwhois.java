@@ -132,11 +132,17 @@ public class JAliEnCommandwhois extends JAliEnBaseCommand {
 		super(commander, alArguments);
 		try {
 			final OptionParser parser = new OptionParser();
+
+			parser.accepts("h");
 			parser.accepts("s");
 			parser.accepts("f");
 
 			final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
 
+			if (options.has("h")) {
+				printHelp();
+				return;
+			}
 			search = options.has("s");
 			fullNameSearch = options.has("f");
 
@@ -144,8 +150,9 @@ public class JAliEnCommandwhois extends JAliEnBaseCommand {
 				searchFor.add(o.toString());
 
 			if (searchFor.size() == 0)
-				printHelp();
-		} catch (final OptionException e) {
+				throw new IllegalArgumentException();
+
+		} catch (final OptionException | IllegalArgumentException e) {
 			printHelp();
 			throw e;
 		}

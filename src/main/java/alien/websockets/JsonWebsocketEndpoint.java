@@ -166,6 +166,7 @@ public class JsonWebsocketEndpoint extends Endpoint {
 			// wait for the previous command to finish
 			if (commander == null)
 				return;
+
 			while (commander.status.get() == 1)
 				try {
 					synchronized (commander.status) {
@@ -220,13 +221,7 @@ public class JsonWebsocketEndpoint extends Endpoint {
 						commander.status.set(1);
 						commander.setLine(out, fullCmd.toArray(new String[0]));
 						commander.notifyAll();
-
-						// Set metadata
-						out.setMetaInfo("user", commander.getUser().getName());
-						out.setMetaInfo("currentdir", commander.getCurrentDirName());
-						out.setMetaInfo("site", commander.getSite());
 					}
-
 					waitCommandFinish();
 
 					// Send back the result to the client

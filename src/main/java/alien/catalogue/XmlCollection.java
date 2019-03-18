@@ -358,7 +358,7 @@ public class XmlCollection extends LinkedHashSet<LFN> {
 	private static String getXMLPortion(final LFN l) {
 		return "      <file name=\"" + Format.escHtml(l.getFileName()) + "\" " + "aclId=\"" + (l.aclId > 0 ? String.valueOf(l.aclId) : "") + "\" " + "broken=\"" + (l.broken ? 1 : 0) + "\" "
 				+ "ctime=\"" + formatTimestamp(l.ctime) + "\" " + "dir=\"" + l.dir + "\" " + "entryId=\"" + l.entryId + "\" " + "expiretime=\"" + formatTimestamp(l.expiretime) + "\" " + "gowner=\""
-				+ Format.escHtml(l.gowner) + "\" " + "guid=\"" + (l.isDirectory() ? "" : l.guid.toString()) + "\" " + "guidtime=\"\" " + "jobid=\"" + (l.jobid > 0 ? String.valueOf(l.jobid) : "")
+				+ Format.escHtml(l.gowner) + "\" " + "guid=\"" + (l.guid == null ? "" : l.guid.toString()) + "\" " + "guidtime=\"\" " + "jobid=\"" + (l.jobid > 0 ? String.valueOf(l.jobid) : "")
 				+ "\" " + "lfn=\"" + l.getCanonicalName() + "\" " + "md5=\"" + Format.escHtml(l.md5) + "\" " + "owner=\"" + Format.escHtml(l.owner) + "\" " + "perm=\"" + Format.escHtml(l.perm) + "\" "
 				+ "replicated=\"" + (l.replicated ? 1 : 0) + "\" " + "size=\"" + l.size + "\" " + "turl=\"alien://" + Format.escHtml(l.getCanonicalName()) + "\" " + "type=\"" + l.type + "\" />";
 	}

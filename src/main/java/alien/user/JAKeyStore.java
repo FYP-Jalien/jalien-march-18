@@ -46,7 +46,6 @@ import org.bouncycastle.openssl.PEMEncryptedKeyPair;
 import org.bouncycastle.openssl.PEMException;
 import org.bouncycastle.openssl.PEMKeyPair;
 import org.bouncycastle.openssl.PEMParser;
-import org.bouncycastle.openssl.PasswordFinder;
 import org.bouncycastle.openssl.jcajce.JcaPEMKeyConverter;
 import org.bouncycastle.openssl.jcajce.JceOpenSSLPKCS8DecryptorProviderBuilder;
 import org.bouncycastle.openssl.jcajce.JcePEMDecryptorProviderBuilder;
@@ -58,8 +57,6 @@ import org.bouncycastle.pkcs.PKCSException;
 import alien.catalogue.CatalogueUtils;
 import alien.config.ConfigUtils;
 import lazyj.ExtProperties;
-import lazyj.Utils;
-import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
 
 /**
@@ -123,7 +120,7 @@ public class JAKeyStore {
 			loadTrusts(trustStore);
 		}
 		catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
-			// TODO Auto-generated catch block
+			logger.log(Level.SEVERE, "Exception during loading trust stores (static block)", e);
 			e.printStackTrace();
 		}
 
@@ -188,7 +185,7 @@ public class JAKeyStore {
 			}
 		}
 		catch (final KeyStoreException | CertificateException | NoSuchAlgorithmException e) {
-			logger.log(Level.WARNING, "Exception loading trust stores", e);
+			logger.log(Level.WARNING, "Exception during loading trust stores", e);
 		}
 	}
 
@@ -223,56 +220,6 @@ public class JAKeyStore {
 		}
 		catch (final IOException e) {
 			logger.log(Level.WARNING, "Error checking or modifying permissions on " + user_key, e);
-		}
-
-		return false;
-	}
-
-	/**
-	 * Check file permissions of certificate and key
-	 *
-	 * @param name
-	 *            type of file (cert|key)
-	 * @param file
-	 *            path to file
-	 * @param chmod
-	 *            numeric code for permissions
-	 * @param force
-	 *            force change permissions (set to false to ask for confirmation)
-	 */
-	private static boolean changeMod(final String name, final File file, final int chmod, final boolean force) {
-		try {
-			if (!force) {
-				String ack = "";
-				final Console cons = System.console();
-
-				if (cons == null)
-					return false;
-
-				System.out.println("Your Grid " + name + " file has wrong permissions.");
-				System.out.println("The file [ " + file.getCanonicalPath() + " ] should have permissions [ " + chmod + " ].");
-
-				if ((ack = cons.readLine("%s", "Would you correct this now [Yes/no]?")) != null)
-					if (Utils.stringToBool(ack, true)) {
-						final CommandOutput co = SystemCommand.bash("chmod " + chmod + " " + file.getCanonicalPath(), false);
-
-						if (co.exitCode != 0)
-							System.err.println("Could not change permissions: " + co.stderr);
-
-						return co.exitCode == 0;
-					}
-			}
-			else {
-				final CommandOutput co = SystemCommand.bash("chmod " + chmod + " " + file.getCanonicalPath(), false);
-
-				if (co.exitCode != 0)
-					System.err.println("Could not change permissions: " + co.stderr);
-
-				return co.exitCode == 0;
-			}
-		}
-		catch (@SuppressWarnings("unused") final IOException e) {
-			// ignore
 		}
 
 		return false;
@@ -617,7 +564,7 @@ public class JAKeyStore {
 		}
 	}
 
-	private static void addKeyPairToKeyStore(final KeyStore ks, final String entryBaseName, final String privKeyLocation, final String pubKeyLocation, final PasswordFinder pFinder) throws Exception {
+	private static void addKeyPairToKeyStore(final KeyStore ks, final String entryBaseName, final String privKeyLocation, final String pubKeyLocation, final JPasswordFinder pFinder) throws Exception {
 		ks.setEntry(entryBaseName, new KeyStore.PrivateKeyEntry(loadPrivX509(privKeyLocation, pFinder != null ? pFinder.getPassword() : null), loadPubX509(pubKeyLocation, true)),
 				new KeyStore.PasswordProtection(pass));
 	}
@@ -787,7 +734,7 @@ public class JAKeyStore {
 		return null;
 	}
 
-	private static class JPasswordFinder implements PasswordFinder {
+	private static class JPasswordFinder {
 
 		private final char[] password;
 
@@ -795,7 +742,6 @@ public class JAKeyStore {
 			this.password = password;
 		}
 
-		@Override
 		public char[] getPassword() {
 			return Arrays.copyOf(password, password.length);
 		}
@@ -914,7 +860,7 @@ public class JAKeyStore {
 				}
 			}
 			catch (final KeyStoreException e) {
-				// TODO Auto-generated catch block
+				logger.log(Level.SEVERE, "Exception during loading client cert");
 				e.printStackTrace();
 			}
 			return JAKeyStore.clientCert;
@@ -926,7 +872,7 @@ public class JAKeyStore {
 						loadKeyStore();
 				}
 				catch (final KeyStoreException e) {
-					// TODO Auto-generated catch block
+					logger.log(Level.SEVERE, "Exception during loading host cert");
 					e.printStackTrace();
 				}
 				return JAKeyStore.hostCert;
@@ -938,7 +884,7 @@ public class JAKeyStore {
 							loadKeyStore();
 					}
 					catch (final KeyStoreException e) {
-						// TODO Auto-generated catch block
+						logger.log(Level.SEVERE, "Exception during loading token cert");
 						e.printStackTrace();
 					}
 					return JAKeyStore.tokenCert;

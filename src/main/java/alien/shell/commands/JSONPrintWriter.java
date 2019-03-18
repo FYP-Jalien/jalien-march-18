@@ -80,8 +80,8 @@ public class JSONPrintWriter extends UIPrintWriter {
 
 	@Override
 	protected void setenv(final String cDir, final String user) {
-		// TODO Auto-generated method stub
-
+		setMetaInfo("user", user);
+		setMetaInfo("currentdir", cDir);
 	}
 
 	/**
