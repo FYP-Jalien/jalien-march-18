@@ -87,7 +87,7 @@ public class JAKeyStore {
 	public static KeyStore tokenCert = null;
 
 	/**
-	 *
+	 * Token can be stored as a string in environment
 	 */
 	private static String tokenCertString = null;
 	private static String tokenKeyString = null;
@@ -118,8 +118,7 @@ public class JAKeyStore {
 			trustStore = KeyStore.getInstance("JKS");
 			trustStore.load(null, pass);
 			loadTrusts(trustStore);
-		}
-		catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
+		} catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
 			logger.log(Level.SEVERE, "Exception during loading trust stores (static block)", e);
 			e.printStackTrace();
 		}
@@ -157,8 +156,7 @@ public class JAKeyStore {
 								keystore.setEntry(trust.getName().substring(0, trust.getName().lastIndexOf('.')), new KeyStore.TrustedCertificateEntry(c), null);
 
 								iLoaded++;
-							}
-							catch (final Exception e) {
+							} catch (final Exception e) {
 								e.printStackTrace();
 							}
 
@@ -173,8 +171,7 @@ public class JAKeyStore {
 				try (InputStream classpathTrusts = JAKeyStore.class.getClassLoader().getResourceAsStream("trusted_authorities.jks")) {
 					keystore.load(classpathTrusts, "castore".toCharArray());
 					logger.log(Level.WARNING, "Found " + keystore.size() + " default trusted CAs in classpath");
-				}
-				catch (final Throwable t) {
+				} catch (final Throwable t) {
 					logger.log(Level.SEVERE, "Cannot load the default trust keystore from classpath", t);
 				}
 
@@ -183,8 +180,7 @@ public class JAKeyStore {
 				tmf.init(trustStore);
 				trusts = tmf.getTrustManagers();
 			}
-		}
-		catch (final KeyStoreException | CertificateException | NoSuchAlgorithmException e) {
+		} catch (final KeyStoreException | CertificateException | NoSuchAlgorithmException e) {
 			logger.log(Level.WARNING, "Exception during loading trust stores", e);
 		}
 	}
@@ -217,8 +213,7 @@ public class JAKeyStore {
 
 				return true;
 			}
-		}
-		catch (final IOException e) {
+		} catch (final IOException e) {
 			logger.log(Level.WARNING, "Error checking or modifying permissions on " + user_key, e);
 		}
 
@@ -269,7 +264,7 @@ public class JAKeyStore {
 			// public static List<?> readPemObjects(InputStream is, final String pphrase)
 			public List<Object> readPemObjects(final InputStream is, final String pphrase) throws IOException {
 				final List<Object> list = new LinkedList<>();
-				try (PEMParser pr2 = new PEMParser(new InputStreamReader(is))) {
+				try (final PEMParser pr2 = new PEMParser(new InputStreamReader(is))) {
 					final JcaPEMKeyConverter converter = new JcaPEMKeyConverter().setProvider("BC");
 					final JcaX509CertificateConverter certconv = new JcaX509CertificateConverter().setProvider("BC");
 
@@ -296,16 +291,14 @@ public class JAKeyStore {
 							final InputDecryptorProvider pkcs8decoder = new JceOpenSSLPKCS8DecryptorProviderBuilder().build(pphrase.toCharArray());
 							o = converter.getPrivateKey(((PKCS8EncryptedPrivateKeyInfo) o).decryptPrivateKeyInfo(pkcs8decoder));
 						}
-				}
-				catch (final Throwable t) {
+				} catch (final Throwable t) {
 					throw new RuntimeException("Failed to decode private key", t);
 				}
 
 				if (o instanceof PEMKeyPair) {
 					try {
 						return converter.getKeyPair((PEMKeyPair) o);
-					}
-					catch (final PEMException e) {
+					} catch (final PEMException e) {
 						throw new RuntimeException("Failed to construct public/private key pair", e);
 					}
 				}
@@ -319,8 +312,7 @@ public class JAKeyStore {
 					if (o instanceof X509CertificateHolder) {
 						try {
 							return certconv.getCertificate((X509CertificateHolder) o);
-						}
-						catch (final Exception e) {
+						} catch (final Exception e) {
 							throw new RuntimeException("Failed to read X509 certificate", e);
 						}
 					}
@@ -335,12 +327,11 @@ public class JAKeyStore {
 		clientCert = KeyStore.getInstance("JKS");
 		try {
 			clientCert.load(null, pass);
-		}
-		catch (final Exception e) {
+		} catch (final Exception e) {
 			// ignore
 		}
 
-		try (FileInputStream proxyIS = new FileInputStream(proxyLocation)) {
+		try (final FileInputStream proxyIS = new FileInputStream(proxyLocation)) {
 			final List<Object> l = (new PkiUtils()).readPemObjects(proxyIS, "");
 			final KeyPair kp = (KeyPair) l.get(1);
 			final ArrayList<X509Certificate> x509l = new ArrayList<>();
@@ -351,11 +342,9 @@ public class JAKeyStore {
 				}
 			}
 			addKeyPairToKeyStore(clientCert, "User.cert", kp, x509l);
-		}
-		catch (final FileNotFoundException e) {
+		} catch (final FileNotFoundException e) {
 			System.err.println("Proxy file not found");
-		}
-		catch (final IOException e) {
+		} catch (final IOException e) {
 			System.err.println("Error while reading proxy file: " + e);
 		}
 		// get pair
@@ -419,6 +408,14 @@ public class JAKeyStore {
 	 */
 	public static boolean loadTokenKeyStorage() throws Exception {
 		final ExtProperties config = ConfigUtils.getConfig();
+		final String sUserId = UserFactory.getUserID();
+
+		if (sUserId == null) {
+			logger.log(Level.SEVERE, "Cannot get the current user's ID");
+			return false;
+		}
+
+		final int iUserId = Integer.parseInt(sUserId.trim());
 
 		final String token_key;
 		if (tokenKeyString != null)
@@ -427,7 +424,7 @@ public class JAKeyStore {
 			if (System.getenv("JALIEN_TOKEN_KEY") != null)
 				token_key = System.getenv("JALIEN_TOKEN_KEY");
 			else
-				token_key = config.gets("tokenkey.path", System.getProperty("java.io.tmpdir") + System.getProperty("file.separator") + "tokenkey.pem");
+				token_key = config.gets("tokenkey.path", System.getProperty("java.io.tmpdir") + System.getProperty("file.separator") + "tokenkey_" + iUserId + ".pem");
 
 		final String token_cert;
 		if (tokenCertString != null)
@@ -436,7 +433,7 @@ public class JAKeyStore {
 			if (System.getenv("JALIEN_TOKEN_CERT") != null)
 				token_cert = System.getenv("JALIEN_TOKEN_CERT");
 			else
-				token_cert = config.gets("tokencert.path", System.getProperty("java.io.tmpdir") + System.getProperty("file.separator") + "tokencert.pem");
+				token_cert = config.gets("tokencert.path", System.getProperty("java.io.tmpdir") + System.getProperty("file.separator") + "tokencert_" + iUserId + ".pem");
 
 		tokenCert = KeyStore.getInstance("JKS");
 
@@ -445,8 +442,7 @@ public class JAKeyStore {
 			loadTrusts(tokenCert);
 
 			addKeyPairToKeyStore(tokenCert, "User.cert", token_key, token_cert, null);
-		}
-		catch (@SuppressWarnings("unused") final Exception e) {
+		} catch (@SuppressWarnings("unused") final Exception e) {
 			return false;
 		}
 		return true;
@@ -505,8 +501,7 @@ public class JAKeyStore {
 			loadTrusts(hostCert);
 
 			addKeyPairToKeyStore(hostCert, "User.cert", hostkey, hostcert, null);
-		}
-		catch (@SuppressWarnings("unused") final Exception e) {
+		} catch (@SuppressWarnings("unused") final Exception e) {
 			return false;
 		}
 
@@ -532,8 +527,7 @@ public class JAKeyStore {
 
 			if (line != null && line.length() > 0)
 				return new JPasswordFinder(line.toCharArray());
-		}
-		catch (final IOException e) {
+		} catch (final IOException e) {
 			logger.log(Level.WARNING, "Could not read passwd from System.in .", e);
 		}
 
@@ -545,21 +539,17 @@ public class JAKeyStore {
 
 		// pass = getRandomString();
 
-		try (FileInputStream f = new FileInputStream(keyStoreName)) {
+		try (final FileInputStream f = new FileInputStream(keyStoreName)) {
 			try {
 				ks.load(null, pass);
-			}
-			catch (final NoSuchAlgorithmException e) {
+			} catch (final NoSuchAlgorithmException e) {
+				e.printStackTrace();
+			} catch (final CertificateException e) {
+				e.printStackTrace();
+			} catch (final IOException e) {
 				e.printStackTrace();
 			}
-			catch (final CertificateException e) {
-				e.printStackTrace();
-			}
-			catch (final IOException e) {
-				e.printStackTrace();
-			}
-		}
-		catch (final IOException e) {
+		} catch (final IOException e) {
 			logger.log(Level.WARNING, "Exception creating key store", e);
 		}
 	}
@@ -582,24 +572,19 @@ public class JAKeyStore {
 	 * @param password
 	 */
 	public static void saveKeyStore(final KeyStore ks, final String filename, final char[] password) {
-		try (FileOutputStream fo = new FileOutputStream(filename)) {
+		try (final FileOutputStream fo = new FileOutputStream(filename)) {
 			try {
 				ks.store(fo, password);
-			}
-			catch (final KeyStoreException e) {
+			} catch (final KeyStoreException e) {
+				e.printStackTrace();
+			} catch (final NoSuchAlgorithmException e) {
+				e.printStackTrace();
+			} catch (final CertificateException e) {
+				e.printStackTrace();
+			} catch (final IOException e) {
 				e.printStackTrace();
 			}
-			catch (final NoSuchAlgorithmException e) {
-				e.printStackTrace();
-			}
-			catch (final CertificateException e) {
-				e.printStackTrace();
-			}
-			catch (final IOException e) {
-				e.printStackTrace();
-			}
-		}
-		catch (final IOException e1) {
+		} catch (final IOException e1) {
 			logger.log(Level.WARNING, "Exception saving key store", e1);
 		}
 	}
@@ -621,12 +606,11 @@ public class JAKeyStore {
 		Reader source = null;
 		try {
 			source = new FileReader(keyFileLocation);
-		}
-		catch (@SuppressWarnings("unused") final Exception e) {
+		} catch (@SuppressWarnings("unused") final Exception e) {
 			source = new StringReader(keyFileLocation);
 		}
 
-		try (PEMParser reader = new PEMParser(new BufferedReader(source))) {
+		try (final PEMParser reader = new PEMParser(new BufferedReader(source))) {
 			Object obj;
 			while ((obj = reader.readObject()) != null) {
 				if (obj instanceof PEMEncryptedKeyPair) {
@@ -680,12 +664,11 @@ public class JAKeyStore {
 		Reader source = null;
 		try {
 			source = new FileReader(certFileLocation);
-		}
-		catch (@SuppressWarnings("unused") final Exception e) {
+		} catch (@SuppressWarnings("unused") final Exception e) {
 			source = new StringReader(certFileLocation);
 		}
 
-		try (PEMParser reader = new PEMParser(new BufferedReader(source))) {
+		try (final PEMParser reader = new PEMParser(new BufferedReader(source))) {
 			Object obj;
 
 			final ArrayList<X509Certificate> chain = new ArrayList<>();
@@ -694,8 +677,7 @@ public class JAKeyStore {
 				if (obj instanceof X509Certificate) {
 					try {
 						((X509Certificate) obj).checkValidity();
-					}
-					catch (final CertificateException e) {
+					} catch (final CertificateException e) {
 						logger.log(Level.SEVERE, "Your certificate has expired or is invalid!", e);
 						System.err.println("Your certificate has expired or is invalid:\n  " + e.getMessage());
 						reader.close();
@@ -714,8 +696,7 @@ public class JAKeyStore {
 								c.checkValidity();
 
 							chain.add(c);
-						}
-						catch (final CertificateException ce) {
+						} catch (final CertificateException ce) {
 							logger.log(Level.SEVERE, "Exception loading certificate", ce);
 						}
 					}
@@ -726,8 +707,7 @@ public class JAKeyStore {
 				return chain.toArray(new X509Certificate[0]);
 
 			return null;
-		}
-		catch (final IOException e) {
+		} catch (final IOException e) {
 			e.printStackTrace();
 		}
 
@@ -780,8 +760,7 @@ public class JAKeyStore {
 					keystore_loaded = true;
 					return true;
 				}
-			}
-			catch (final Exception e) {
+			} catch (final Exception e) {
 				logger.log(Level.SEVERE, "Error loading token", e);
 				System.err.println("Error loading token");
 			}
@@ -796,13 +775,11 @@ public class JAKeyStore {
 					return true;
 				}
 				break;
-			}
-			catch (final org.bouncycastle.openssl.EncryptionException | org.bouncycastle.pkcs.PKCSException | javax.crypto.BadPaddingException e) {
+			} catch (final org.bouncycastle.openssl.EncryptionException | org.bouncycastle.pkcs.PKCSException | javax.crypto.BadPaddingException e) {
 				logger.log(Level.SEVERE, "Wrong password! Try again", e);
 				System.err.println("Wrong password! Try again");
 				continue;
-			}
-			catch (final Exception e) {
+			} catch (final Exception e) {
 				logger.log(Level.SEVERE, "Error loading the key", e);
 				System.err.println("Error loading the key");
 				break;
@@ -816,8 +793,7 @@ public class JAKeyStore {
 				keystore_loaded = true;
 				return true;
 			}
-		}
-		catch (final Exception e) {
+		} catch (final Exception e) {
 			logger.log(Level.SEVERE, "Error loading hostcert", e);
 			System.err.println("Error loading hostcert");
 		}
@@ -830,8 +806,7 @@ public class JAKeyStore {
 				keystore_loaded = true;
 				return true;
 			}
-		}
-		catch (final Exception e) {
+		} catch (final Exception e) {
 			logger.log(Level.SEVERE, "Error loading token", e);
 			System.err.println("Error loading token");
 		}
@@ -858,8 +833,7 @@ public class JAKeyStore {
 				if (clientCert.getCertificateChain("User.cert") == null) {
 					loadKeyStore();
 				}
-			}
-			catch (final KeyStoreException e) {
+			} catch (final KeyStoreException e) {
 				logger.log(Level.SEVERE, "Exception during loading client cert");
 				e.printStackTrace();
 			}
@@ -870,8 +844,7 @@ public class JAKeyStore {
 				try {
 					if (hostCert.getCertificateChain("User.cert") == null)
 						loadKeyStore();
-				}
-				catch (final KeyStoreException e) {
+				} catch (final KeyStoreException e) {
 					logger.log(Level.SEVERE, "Exception during loading host cert");
 					e.printStackTrace();
 				}
@@ -882,8 +855,7 @@ public class JAKeyStore {
 					try {
 						if (tokenCert.getCertificateChain("User.cert") == null)
 							loadKeyStore();
-					}
-					catch (final KeyStoreException e) {
+					} catch (final KeyStoreException e) {
 						logger.log(Level.SEVERE, "Exception during loading token cert");
 						e.printStackTrace();
 					}

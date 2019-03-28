@@ -809,9 +809,11 @@ public class TaskQueueUtils {
 				values.add(Integer.valueOf(newStatus.getAliEnLevel()));
 
 				apmon.sendParameters("TaskQueue_Jobs_ALICE", String.valueOf(execHost), parameters.size(), parameters, values);
-			} catch (final Exception e) {
+			}
+			catch (final Exception e) {
 				logger.log(Level.WARNING, "Could not initialize apmon (" + execHost + ")", e);
-			} finally {
+			}
+			finally {
 				if (apmon != null)
 					apmon.stopIt();
 			}
@@ -899,7 +901,8 @@ public class TaskQueueUtils {
 
 										content = baos.toString();
 									}
-								} catch (@SuppressWarnings("unused") final IOException e) {
+								}
+								catch (@SuppressWarnings("unused") final IOException e) {
 									// ignore
 								}
 							}
@@ -1359,7 +1362,8 @@ public class TaskQueueUtils {
 							found = true;
 							jdl.set(jdlTag, l.getCanonicalName());
 						}
-			} catch (final ServerException se) {
+			}
+			catch (final ServerException se) {
 				throw new IOException(se.getMessage(), se);
 			}
 
@@ -1694,7 +1698,8 @@ public class TaskQueueUtils {
 							try {
 								id = Integer.parseInt(s);
 								break;
-							} catch (@SuppressWarnings("unused") final Throwable t) {
+							}
+							catch (@SuppressWarnings("unused") final Throwable t) {
 								// ignore
 							}
 
@@ -2200,7 +2205,7 @@ public class TaskQueueUtils {
 	 */
 	public static JobToken insertJobToken(final long jobId, final String username) {
 		try (DBFunctions db = getQueueDB()) {
-			JobToken jb = new JobToken(jobId, username);
+			final JobToken jb = new JobToken(jobId, username);
 			if (!jb.updateOrInsert(db)) {
 				logger.info("Cannot insert (or update) token for job: " + jobId);
 				return null;
@@ -2941,7 +2946,7 @@ public class TaskQueueUtils {
 	 * @param queueId
 	 * @return resubmission field for the job
 	 */
-	public static int getResubmission(Long queueId) {
+	public static int getResubmission(final Long queueId) {
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
 				return -1;
@@ -2962,12 +2967,12 @@ public class TaskQueueUtils {
 
 	/**
 	 * Resubmit a job
-	 * 
+	 *
 	 * @param user
 	 * @param queueId
 	 * @return 0 if resubmitted correctly, >0 error
 	 */
-	public static Entry<Integer, String> resubmitJob(AliEnPrincipal user, long queueId) {
+	public static Entry<Integer, String> resubmitJob(final AliEnPrincipal user, final long queueId) {
 		final Job j = getJob(queueId, true);
 		final JobStatus js = j.status();
 
@@ -2975,11 +2980,12 @@ public class TaskQueueUtils {
 			logger.info("Resubmit (authorized) for  [" + queueId + "] by user/role [" + user.getName() + "]");
 
 			// check job quotas to see if we are allowed to submit
-			Entry<Integer, String> quota = QuotaUtilities.checkJobQuota(user.getName(), 1);
-			Integer code = quota.getKey();
+			final Entry<Integer, String> quota = QuotaUtilities.checkJobQuota(user.getName(), 1);
+			final Integer code = quota.getKey();
 			if (code.intValue() != 0) {
 				return new AbstractMap.SimpleEntry<>(Integer.valueOf(1), "Resubmit: job quota problem: " + quota.getValue());
 			}
+
 			logger.info("Resubmit: quotas approved: " + queueId);
 
 			// cleanup active jobtoken
@@ -2991,29 +2997,46 @@ public class TaskQueueUtils {
 			logger.info("Resubmit: token deleted for: " + queueId);
 
 			// get the Path (folder of stored files) to cleanup if necessary
-			JDL jdl = null;
+			JDL jdl;
 			try {
 				jdl = new JDL(j.getJDL());
-			} catch (IOException e) {
+			}
+			catch (final IOException e) {
 				logger.severe("Resubmit: cannot create JDL for job: " + queueId + " Exception: " + e);
 				return new AbstractMap.SimpleEntry<>(Integer.valueOf(2), "Resubmit: cannot create JDL for job: " + queueId);
 			}
-			String path = (String) jdl.get("Path");
+
+			JobStatus targetStatus = JobStatus.WAITING;
+
+			if (j.masterjob) {
+				if (j.status().isERROR_()) {
+					// If the masterjob could not be split previously then it's worth trying again
+					targetStatus = JobStatus.INSERTING;
+				}
+				else {
+					// Cannot resubmit a masterjob if it has already split, what has to happen is resubmitting its subjobs
+					// but that's a different command that would iterate through the subjobs and act on each of them
+
+					return new AbstractMap.SimpleEntry<>(Integer.valueOf(6), "Resubmit: masterjob is not in an error state itself, will not split it again: " + queueId + " / " + j.status().name());
+				}
+			}
+
+			final String path = jdl.gets("Path");
 
 			if (!clearPathAndResultsJDL(queueId)) {
 				logger.info("Cannot cleanup path and resultsJdl: " + queueId);
 				return new AbstractMap.SimpleEntry<>(Integer.valueOf(3), "Resubmit: cannot cleanup path and resultsJdl: " + queueId);
 			}
+
 			logger.info("Resubmit: cleanup of path and resultsJdl done: " + queueId);
 
-			String status = "WAITING";
-			int unassignedId = getSiteId("unassigned::site");
+			if (j.status().equals(JobStatus.ERROR_I)) {
+				// If it could not be inserted before, retry that operation, otherwise go directly to WAITING
 
-			if (j.masterjob)
-				status = "INSERTING";
+				targetStatus = JobStatus.INSERTING;
+			}
 
-			if (j.getStatusName().equals("ERROR_I"))
-				status = "INSERTING";
+			final int unassignedId = getSiteId("unassigned::site");
 
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
@@ -3026,7 +3049,7 @@ public class TaskQueueUtils {
 
 				// job back to resubmitted status, restore fields
 				if (!db.query("UPDATE QUEUE SET statusId=?, resubmission=resubmission+1, started=null, finished=null, exechostid=null, siteid=? where queueId=?", false,
-						Integer.valueOf(JobStatus.getStatus(status).getAliEnLevel()), Integer.valueOf(unassignedId), Long.valueOf(queueId))) {
+						Integer.valueOf(targetStatus.getAliEnLevel()), Integer.valueOf(unassignedId), Long.valueOf(queueId))) {
 					logger.severe("Resubmit: cannot update job to WAITING: " + queueId);
 					return new AbstractMap.SimpleEntry<>(Integer.valueOf(5), "Resubmit: cannot update job to WAITING: " + queueId);
 				}
@@ -3034,8 +3057,8 @@ public class TaskQueueUtils {
 				logger.info("Resubmit: update SITEQUEUES");
 
 				// update queue counters
-				db.query("UPDATE SITEQUEUES set " + j.getStatusName() + "=" + j.getStatusName() + "-1 where siteid=?", false, Integer.valueOf(j.siteid));
-				db.query("UPDATE SITEQUEUES set " + status + "=" + status + "+1 where siteid=?", false, Integer.valueOf(unassignedId));
+				db.query("UPDATE SITEQUEUES set " + j.getStatusName() + "=" + j.getStatusName() + "-1, " + targetStatus.name() + "=" + targetStatus.name() + "+1 where siteid=?", false,
+						Integer.valueOf(j.siteid));
 
 				// if the job was attached to a node, we tell him to hara-kiri
 				if (j.node != null && (js == JobStatus.STARTED || js == JobStatus.RUNNING || js == JobStatus.ASSIGNED || js == JobStatus.ZOMBIE || js == JobStatus.SAVING)) {
@@ -3051,8 +3074,8 @@ public class TaskQueueUtils {
 				logger.info("Resubmit: update or insert JOBAGENT");
 
 				// update the jobagent entry
-				if (status.equals("WAITING")) {
-					int agentId = updateOrInsertJobAgent(j, jdl);
+				if (targetStatus == JobStatus.WAITING) {
+					final int agentId = updateOrInsertJobAgent(j, jdl);
 					if (agentId == 0) {
 						logger.severe("Resubmit: could not update jobagent: " + queueId);
 						return new AbstractMap.SimpleEntry<>(Integer.valueOf(6), "Resubmit: cannot updateOrInsert jobagent: " + queueId);
@@ -3062,7 +3085,7 @@ public class TaskQueueUtils {
 							db.setReadOnly(false);
 							db.setQueryTimeout(60);
 							logger.info("Resubmit: update agentId and statusId in QUEUE");
-							if (!db.query("update QUEUE set agentId=?, statusId=" + JobStatus.WAITING.getAliEnLevel() + " where queueid=?", false, Integer.valueOf(agentId), Long.valueOf(j.queueId))
+							if (!db.query("update QUEUE set agentId=?, statusId=" + targetStatus.getAliEnLevel() + " where queueid=?", false, Integer.valueOf(agentId), Long.valueOf(j.queueId))
 									|| db.getUpdateCount() == 0) {
 								logger.severe("Resubmit: could not update QUEUE to update status and agentId: " + queueId + " - " + agentId);
 								return new AbstractMap.SimpleEntry<>(Integer.valueOf(4), "Resubmit: cannot update status and agentId of job: " + queueId + " - " + agentId);
@@ -3072,7 +3095,8 @@ public class TaskQueueUtils {
 					// if is a subjob, the master goes to SPLIT
 					if (j.split > 0) {
 						logger.info("Resubmit: put masterjob of the resubmited subjob to SPLIT");
-						if (!db.query("UPDATE QUEUE set statusId=? where queueId=?", false, Integer.valueOf(JobStatus.SPLIT.getAliEnLevel()), Long.valueOf(j.split))) {
+						if (!db.query("UPDATE QUEUE set statusId=? where queueId=? and statusId!=?", false, Integer.valueOf(JobStatus.SPLIT.getAliEnLevel()), Long.valueOf(j.split),
+								Integer.valueOf(JobStatus.SPLIT.getAliEnLevel()))) {
 							logger.severe("Resubmit: cannot put masterjob back to SPLIT: " + queueId);
 							return new AbstractMap.SimpleEntry<>(Integer.valueOf(4), "Resubmit: cannot put masterjob back to SPLIT: " + queueId);
 						}
@@ -3080,8 +3104,8 @@ public class TaskQueueUtils {
 
 					// we need to clean up the previous output
 					if (j.path != null) {
-						Collection<LFN> list = LFNUtils.find(path, "*", LFNUtils.FIND_FILTER_JOBID, null, "", Long.valueOf(queueId));
-						for (LFN l : list) {
+						final Collection<LFN> list = LFNUtils.find(path, "*", LFNUtils.FIND_FILTER_JOBID, null, "", Long.valueOf(queueId));
+						for (final LFN l : list) {
 							if (l.jobid == queueId) {
 								logger.info("Resubmit: removing output file: " + l.getCanonicalName());
 								putJobLog(queueId, "trace", "Resubmit: removing output file: " + l.getCanonicalName(), null);
@@ -3099,7 +3123,7 @@ public class TaskQueueUtils {
 					}
 
 					logger.info("Resubmit: putting joblog and returning");
-					putJobLog(queueId, "state", "Job resubmitted (back to WAITING", null);
+					putJobLog(queueId, "state", "Job resubmitted (back to WAITING)", null);
 					return new AbstractMap.SimpleEntry<>(Integer.valueOf(0), "Resubmit: back to WAITING: " + queueId);
 				}
 
@@ -3112,7 +3136,7 @@ public class TaskQueueUtils {
 
 	}
 
-	private static int updateOrInsertJobAgent(Job j, JDL jdl) {
+	private static int updateOrInsertJobAgent(final Job j, final JDL jdl) {
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
 				return 0;
@@ -3128,8 +3152,8 @@ public class TaskQueueUtils {
 			// the jobagent doesn't exist anymore, reinsert
 			if (db.getUpdateCount() == 0) {
 				logger.info("updateOrInsertJobAgent: the jobagent doesn't exist anymore, going to extract params for : " + j.queueId);
-				HashMap<String, Object> params = extractJAParametersFromJDL(jdl);
-				int agentId = insertJobAgent(params);
+				final HashMap<String, Object> params = extractJAParametersFromJDL(jdl);
+				final int agentId = insertJobAgent(params);
 				logger.info("updateOrInsertJobAgent: inserted agentId: " + agentId);
 				if (agentId == 0) {
 					logger.info("updateOrInsertJobAgent: couldn't insertJobAgent : " + j.queueId);
@@ -3141,11 +3165,11 @@ public class TaskQueueUtils {
 		}
 	}
 
-	private static int insertJobAgent(HashMap<String, Object> params) {
+	private static int insertJobAgent(final HashMap<String, Object> params) {
 		String reqs = "1=1 ";
 
-		ArrayList<Object> bind = new ArrayList<>();
-		for (String key : params.keySet()) {
+		final ArrayList<Object> bind = new ArrayList<>();
+		for (final String key : params.keySet()) {
 			if (key.equals("counter"))
 				continue;
 
@@ -3188,7 +3212,7 @@ public class TaskQueueUtils {
 				String insert_values = " VALUES (";
 
 				bind.clear();
-				for (String key : params.keySet()) {
+				for (final String key : params.keySet()) {
 					insert_fields += key + ",";
 					insert_values += "?,";
 					bind.add(params.get(key));
@@ -3225,17 +3249,17 @@ public class TaskQueueUtils {
 	 * @param jdl
 	 * @return parameters needed for jobagent
 	 */
-	public static HashMap<String, Object> extractJAParametersFromJDL(JDL jdl) {
+	public static HashMap<String, Object> extractJAParametersFromJDL(final JDL jdl) {
 		logger.info("Going to extractJAParamentersFromJDL");
 
 		if (jdl == null)
 			return null;
 
-		String reqs = jdl.gets("Requirements");
+		final String reqs = jdl.gets("Requirements");
 		if (reqs == null)
 			return null;
 
-		HashMap<String, Object> params = new HashMap<>();
+		final HashMap<String, Object> params = new HashMap<>();
 		params.put("counter", Integer.valueOf(1));
 		params.put("ttl", Integer.valueOf(18000));
 		params.put("disk", Integer.valueOf(0));
@@ -3255,7 +3279,7 @@ public class TaskQueueUtils {
 		pat = Pattern.compile("\\s*member\\(other.CloseSE,\"\\w+::(\\w+)::\\w+\"\\)");
 		m = pat.matcher(reqs);
 		while (m.find()) {
-			String tmpsite = m.group(1);
+			final String tmpsite = m.group(1);
 			if (!noses.contains(tmpsite))
 				site += "," + tmpsite;
 		}
@@ -3296,7 +3320,7 @@ public class TaskQueueUtils {
 
 		if (packages.size() > 0) {
 			String packs = "%,";
-			for (String pkg : packages) {
+			for (final String pkg : packages) {
 				packs += pkg + ",%,";
 			}
 			packs = packs.substring(0, packs.length() - 1);
@@ -3311,7 +3335,7 @@ public class TaskQueueUtils {
 			params.put("ttl", Integer.valueOf(m.group(1)));
 
 		// get user
-		String user = jdl.getUser();
+		final String user = jdl.getUser();
 		if (user != null)
 			params.put("userid", getUserId(user));
 
@@ -3344,7 +3368,7 @@ public class TaskQueueUtils {
 		return params;
 	}
 
-	private static boolean clearPathAndResultsJDL(long queueId) {
+	private static boolean clearPathAndResultsJDL(final long queueId) {
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
 				return false;

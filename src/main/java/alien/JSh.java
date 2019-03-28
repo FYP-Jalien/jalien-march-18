@@ -104,10 +104,11 @@ public class JSh {
 		if (args.length > 0 && (("-h".equals(args[0])) || ("-help".equals(args[0])) || ("--h".equals(args[0])) || ("--help".equals(args[0])) || ("help".equals(args[0]))))
 			printHelp();
 		else
-			if (args.length > 0 && ("-k".equals(args[0])))
+			if (args.length > 0 && ("-k".equals(args[0]))) {
 				JSh.killJBox();
+				return;
+			}
 			else {
-
 				if (!JSh.JBoxRunning())
 					if (runJBox())
 						try {
@@ -209,9 +210,9 @@ public class JSh {
 
 			if (!memorySettings) {
 				// memory limiting parameters, either inherited from the current process' environment or (for developers essentially) set to some sane default values
-				jboxCmdLine.add("-client");
-				jboxCmdLine.add("-Xmx64m");
+				jboxCmdLine.add("-server");
 				jboxCmdLine.add("-Xms64m");
+				jboxCmdLine.add("-Xmx512m");
 			}
 
 			if (tmpDir != null && tmpDir.length() > 0)

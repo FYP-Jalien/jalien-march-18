@@ -113,12 +113,12 @@ public class TomcatServer {
 		if (alUser == null || alUser.getName() == null)
 			throw new Exception("Could not get your username. FATAL!");
 
-		if (!writeTokenFile(websocketPort)) {
+		if (!writeJClientTokenFile(websocketPort)) {
 			tomcat.stop();
 			throw new Exception("Could not write the token file! No application can connect to JBox");
 		}
 
-		if (!writeEnvFile(tomcat.getHost().getName(), websocketPort, alUser.getName())) {
+		if (!writeJClientEnvFile(tomcat.getHost().getName(), websocketPort, alUser.getName())) {
 			tomcat.stop();
 			throw new Exception("Could not write the env file! JSh/JRoot will not be able to connect to JBox");
 		}
@@ -204,7 +204,7 @@ public class TomcatServer {
 	 * @param iDebug
 	 *            the debug level received from the command line
 	 */
-	private static boolean writeTokenFile(final int iWSPort) {
+	private static boolean writeJClientTokenFile(final int iWSPort) {
 		String sUserId = System.getProperty("userid");
 
 		if (sUserId == null || sUserId.length() == 0) {
@@ -275,7 +275,7 @@ public class TomcatServer {
 	 * @param sUser
 	 * @return <code>true</code> if everything went fine, <code>false</code> if there was an error writing the env file
 	 */
-	private static boolean writeEnvFile(final String sHost, final int iPort, final String sUser) {
+	private static boolean writeJClientEnvFile(final String sHost, final int iPort, final String sUser) {
 		final String sUserId = System.getProperty("userid");
 
 		if (sUserId == null || sUserId.length() == 0) {
@@ -365,10 +365,19 @@ public class TomcatServer {
 			return false;
 		}
 
+		final String sUserId = UserFactory.getUserID();
+
+		if (sUserId == null) {
+			logger.log(Level.SEVERE, "Cannot get the current user's ID");
+			return false;
+		}
+
+		final int iUserId = Integer.parseInt(sUserId.trim());
+
 		// Two files will be the result of this command
 		// Check if their location is set by env variables or in config, otherwise put default location in $TMPDIR/
-		final String tokencertpath = ConfigUtils.getConfig().gets("tokencert.path", System.getProperty("java.io.tmpdir") + System.getProperty("file.separator") + "tokencert.pem");
-		final String tokenkeypath = ConfigUtils.getConfig().gets("tokenkey.path", System.getProperty("java.io.tmpdir") + System.getProperty("file.separator") + "tokenkey.pem");
+		final String tokencertpath = ConfigUtils.getConfig().gets("tokencert.path", System.getProperty("java.io.tmpdir") + System.getProperty("file.separator") + "tokencert_" + iUserId + ".pem");
+		final String tokenkeypath = ConfigUtils.getConfig().gets("tokenkey.path", System.getProperty("java.io.tmpdir") + System.getProperty("file.separator") + "tokenkey_" + iUserId + ".pem");
 
 		final File tokencertfile = new File(tokencertpath);
 		final File tokenkeyfile = new File(tokenkeypath);

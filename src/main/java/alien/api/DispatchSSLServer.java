@@ -27,6 +27,8 @@ import javax.net.ssl.TrustManagerFactory;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import alien.api.taskQueue.GetMatchJob;
+import alien.api.taskQueue.SetJobStatus;
+import alien.api.taskQueue.PutJobLog;
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
@@ -159,9 +161,18 @@ public class DispatchSSLServer extends Thread {
 							boolean shouldRun = true;
 
 							if (r.getEffectiveRequester().isJobAgent() && !(r instanceof GetMatchJob)) {
-								// TODO : add above all commands that a JobAgent should run (setting job status, uploading traces)
-								r.setException(new ServerException("You are not allowed to call " + r.getClass().getName() + " as job agent", null));
-								shouldRun = false;
+
+								//Allowing the JobAgent to change the job status enables it to act on possible JobWrapper terminations/faults
+								if(r instanceof SetJobStatus)
+									shouldRun = true;
+								//Enables the JobAgent to report its progress/the resources it allocates for the JobWrapper sandbox
+								else if(r instanceof PutJobLog)
+									shouldRun = true;
+								else {
+									// TODO : add above all commands that a JobAgent should run (setting job status, uploading traces)
+									r.setException(new ServerException("You are not allowed to call " + r.getClass().getName() + " as job agent", null));
+									shouldRun = false;
+								}
 							}
 
 							if (r.getEffectiveRequester().isJob()) {
@@ -201,8 +212,8 @@ public class DispatchSSLServer extends Thread {
 						lSerialization += serializationDuration;
 
 						logger.log(Level.INFO, "Got request from " + r.getRequesterIdentity() + " : " + r.getClass().getCanonicalName()); // +
-																																			// ":
-																																			// "+r.toString());
+						// ":
+						// "+r.toString());
 
 						monitor.addMeasurement("request_processing", requestProcessingDuration);
 						monitor.addMeasurement("serialization", serializationDuration);
@@ -217,7 +228,7 @@ public class DispatchSSLServer extends Thread {
 					+ Format.toInterval(lSerialization) + " to serialize");
 		} catch (final Throwable e) {
 			logger.log(Level.WARNING, "Main thread for " + getName() + " threw an error after sending " + requestCount + " requests that took in total " + Format.toInterval(lLasted)
-					+ " to process and " + Format.toInterval(lSerialization) + " to serialize", e);
+			+ " to process and " + Format.toInterval(lSerialization) + " to serialize", e);
 		} finally {
 			if (ois != null)
 				try {
@@ -380,7 +391,7 @@ public class DispatchSSLServer extends Thread {
 
 		} catch (
 
-		final Throwable e) {
+				final Throwable e) {
 			logger.log(Level.SEVERE, "Could not initiate SSL Server Socket.", e);
 		}
 	}
@@ -395,8 +406,8 @@ public class DispatchSSLServer extends Thread {
 	 */
 	private static String printClientInfo(final X509Certificate cert) {
 		return "Peer Certificate Information:\n" + "- Subject: " + cert.getSubjectDN().getName() + "- Issuer: \n" + cert.getIssuerDN().getName() + "- Version: \n" + cert.getVersion()
-				+ "- Start Time: \n" + cert.getNotBefore().toString() + "\n" + "- End Time: " + cert.getNotAfter().toString() + "\n" + "- Signature Algorithm: " + cert.getSigAlgName() + "\n"
-				+ "- Serial Number: " + cert.getSerialNumber();
+		+ "- Start Time: \n" + cert.getNotBefore().toString() + "\n" + "- End Time: " + cert.getNotAfter().toString() + "\n" + "- Signature Algorithm: " + cert.getSigAlgName() + "\n"
+		+ "- Serial Number: " + cert.getSerialNumber();
 	}
 
 	/**
