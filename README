@@ -1,0 +1,5 @@
+To Run Websocket Client for JAliEn:
+
+Change directory to JAliEn client and execute following commang:
+
+./run.sh alien.WebSockShell

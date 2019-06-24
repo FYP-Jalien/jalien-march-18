@@ -15,6 +15,8 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+
+//EndPoint for Websocket Client
 public class ClientEndPoint extends Endpoint{
 
 	private Session session;
