@@ -27,8 +27,16 @@ if [[ -z "${JARFILE}" ]]; then
   export CLASSPATH="${JAR_LIST_MAIN}:${JAR_LIST_LIB}"
 fi
 
-JALIEN_OPTS_DEFAULT="-server -Xms64m -Xmx512m -XX:+UseG1GC -XX:+DisableExplicitGC -XX:+UseCompressedOops -XX:+AggressiveOpts \
+JALIEN_OPTS_DEFAULT="-server -Xms64m -Xmx512m -XX:+UseG1GC -XX:+DisableExplicitGC -XX:+UseCompressedOops \
 -XX:+OptimizeStringConcat -XX:MaxTrivialSize=1K -XX:CompileThreshold=20000 -Duserid=$(id -u) -Dcom.sun.jndi.ldap.connect.pool=false"
+
+JAVA_VERSION=`java -version 2>&1 | sed -e 's/.*version "\([[:digit:]]*\)\(.*\)/\1/; 1q'`
+
+if [ -z "$JAVA_VERSION" ]; then
+    export JDK_JAVA_OPTIONS="--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.transport=ALL-UNNAMED"
+elif [ "$JAVA_VERSION" -ge 11 ]; then
+    JALIEN_OPTS_DEFAULT="$JALIEN_OPTS_DEFAULT --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.transport=ALL-UNNAMED"
+fi
 
 if [ ! -z "$TMPDIR" ]; then
   JALIEN_OPTS_DEFAULT="$JALIEN_OPTS_DEFAULT -Djava.io.tmpdir=$TMPDIR"

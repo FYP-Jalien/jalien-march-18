@@ -212,6 +212,17 @@ public class Monitor implements Runnable {
 	}
 
 	/**
+	 * Add a timing result, in milliseconds
+	 * 
+	 * @param key
+	 * @param timing the duration of a measurement, converted to milliseconds
+	 * @return accumulated so far, or <code>-1</code> if there was any error
+	 */
+	public double addMeasurement(final String key, final Timing timing) {
+		return addMeasurement(key, timing.getMillis());
+	}
+
+	/**
 	 * Get the CacheMonitor for this key.
 	 *
 	 * @param key
@@ -291,7 +302,8 @@ public class Monitor implements Runnable {
 
 			try {
 				o = module.doProcess();
-			} catch (final Throwable t) {
+			}
+			catch (final Throwable t) {
 				logger.log(Level.WARNING, "Exception running module " + module + " for component " + component, t);
 
 				continue;
@@ -389,7 +401,8 @@ public class Monitor implements Runnable {
 			synchronized (apmon) {
 				apmon.sendParameters(clusterName, nodeName, paramNames.size(), paramNames, paramValues);
 			}
-		} catch (final Throwable t) {
+		}
+		catch (final Throwable t) {
 			logger.log(Level.SEVERE, "Cannot send ApMon datagram", t);
 		}
 	}

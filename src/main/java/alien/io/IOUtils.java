@@ -165,7 +165,7 @@ public class IOUtils {
 				realPFNsSet.add(realPFN);
 		}
 
-		final String site = ConfigUtils.getConfig().gets("alice_close_site", "CERN").trim();
+		final String site = ConfigUtils.getCloseSite();
 
 		File f = null;
 
@@ -564,7 +564,7 @@ public class IOUtils {
 	public static void upload(final File localFile, final String toLFN, final AliEnPrincipal owner, final OutputStream progressReport, final String... args) throws IOException {
 		final UIPrintWriter out = progressReport != null ? new PlainWriter(progressReport) : null;
 
-		final JAliEnCOMMander cmd = new JAliEnCOMMander(owner, null, ConfigUtils.getConfig().gets("alice_close_site", "CERN").trim(), out);
+		final JAliEnCOMMander cmd = new JAliEnCOMMander(owner, null, ConfigUtils.getCloseSite(), out);
 
 		final LFN l = cmd.c_api.getLFN(toLFN, true);
 

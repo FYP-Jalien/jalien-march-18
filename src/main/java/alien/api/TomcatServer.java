@@ -12,6 +12,8 @@ import java.security.KeyStoreException;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.util.ArrayList;
+import java.util.concurrent.Executor;
+import java.util.concurrent.ThreadPoolExecutor;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -30,6 +32,8 @@ import org.json.simple.parser.JSONParser;
 
 import alien.catalogue.access.AuthorizationFactory;
 import alien.config.ConfigUtils;
+import alien.monitoring.Monitor;
+import alien.monitoring.MonitorFactory;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.shell.commands.JSONPrintWriter;
 import alien.shell.commands.UIPrintWriter;
@@ -51,10 +55,12 @@ public class TomcatServer {
 	 */
 	static transient final Logger logger = ConfigUtils.getLogger(JBoxServer.class.getCanonicalName());
 
+	static transient final Monitor monitor = MonitorFactory.getMonitor(TomcatServer.class.getCanonicalName());
+
 	/**
 	 * Web server instance
 	 */
-	Tomcat tomcat;
+	final Tomcat tomcat;
 
 	private final int websocketPort;
 
@@ -67,6 +73,7 @@ public class TomcatServer {
 		this.websocketPort = tomcatPort;
 
 		tomcat = new Tomcat();
+		tomcat.setBaseDir(System.getProperty("java.io.tmpdir"));
 		tomcat.setPort(tomcatPort);
 		final Service service = tomcat.getService();
 		tomcat.getService().removeConnector(tomcat.getConnector()); // remove default connector
@@ -123,6 +130,22 @@ public class TomcatServer {
 			throw new Exception("Could not write the env file! JSh/JRoot will not be able to connect to JBox");
 		}
 
+		final Executor executor = tomcat.getConnector().getProtocolHandler().getExecutor();
+
+		if (executor instanceof ThreadPoolExecutor) {
+			final ThreadPoolExecutor tpe = (ThreadPoolExecutor) executor;
+
+			monitor.addMonitoring("server_status", (names, values) -> {
+				names.add("active_threads");
+				values.add(Double.valueOf(tpe.getActiveCount()));
+
+				names.add("max_threads");
+				values.add(Double.valueOf(tpe.getMaximumPoolSize()));
+			});
+		}
+		else
+			logger.log(Level.SEVERE, "Cannot monitor Tomcat executor of type " + executor.getClass().getCanonicalName());
+
 		// Let Tomcat run in another thread so it will keep on waiting forever
 		new Thread() {
 			@Override
@@ -141,7 +164,8 @@ public class TomcatServer {
 							sleep(2 * 60 * 60 * 1000);
 							requestTokenCert();
 						}
-					} catch (final InterruptedException e) {
+					}
+					catch (final InterruptedException e) {
 						// TODO Auto-generated catch block
 						e.printStackTrace();
 					}
@@ -249,11 +273,13 @@ public class TomcatServer {
 
 				return true;
 
-			} catch (final Exception e1) {
+			}
+			catch (final Exception e1) {
 				logger.log(Level.SEVERE, "Could not open file " + tokenFile + " to write", e1);
 				return false;
 			}
-		} catch (final Throwable e) {
+		}
+		catch (final Throwable e) {
 			logger.log(Level.SEVERE, "Could not get user id! The token file could not be created ", e);
 
 			return false;
@@ -308,11 +334,13 @@ public class TomcatServer {
 
 				return true;
 
-			} catch (final Exception e1) {
+			}
+			catch (final Exception e1) {
 				logger.log(Level.SEVERE, "Could not open file " + envFile.getAbsolutePath() + " to write", e1);
 				return false;
 			}
-		} catch (final Exception e) {
+		}
+		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Could not get user id! The env file could not be created ", e);
 			return false;
 		}
@@ -331,7 +359,8 @@ public class TomcatServer {
 
 				return co.exitCode == 0;
 
-			} catch (@SuppressWarnings("unused") final IOException e) {
+			}
+			catch (@SuppressWarnings("unused") final IOException e) {
 				// ignore
 			}
 		return false;
@@ -352,7 +381,8 @@ public class TomcatServer {
 				logger.log(Level.SEVERE, "Failed to load certificate");
 				return false;
 			}
-		} catch (final KeyStoreException e) {
+		}
+		catch (final KeyStoreException e) {
 			e.printStackTrace();
 		}
 
@@ -413,7 +443,8 @@ public class TomcatServer {
 					synchronized (commander.status) {
 						commander.status.wait(1000);
 					}
-				} catch (@SuppressWarnings("unused") final InterruptedException ie) {
+				}
+				catch (@SuppressWarnings("unused") final InterruptedException ie) {
 					// ignore
 				}
 
@@ -437,7 +468,8 @@ public class TomcatServer {
 			commander.kill = true;
 			return true;
 
-		} catch (final Exception e) {
+		}
+		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Token request failed", e);
 			return false;
 		}
@@ -469,7 +501,8 @@ public class TomcatServer {
 					System.err.println("Exiting...");
 					return;
 				}
-			} catch (final Exception e) {
+			}
+			catch (final Exception e) {
 				logger.log(Level.SEVERE, "Error loading token", e);
 				System.err.println("Error loading token");
 				return;
@@ -492,7 +525,8 @@ public class TomcatServer {
 			System.out.println("Tomcat is listening on port " + port);
 			return; // Everything's ok, exit
 
-		} catch (final Exception ioe) {
+		}
+		catch (final Exception ioe) {
 			// Port is already in use, maybe there's another user on the machine...
 			logger.log(Level.FINE, "Tomcat: Could not listen on port " + port, ioe);
 		}
@@ -508,7 +542,8 @@ public class TomcatServer {
 				logger.log(Level.INFO, "Tomcat listening on port " + port);
 				System.out.println("Tomcat is listening on port " + port);
 				break;
-			} catch (final Exception ioe) {
+			}
+			catch (final Exception ioe) {
 				// Try next one
 				logger.log(Level.FINE, "Tomcat: Could not listen on port " + port, ioe);
 			}

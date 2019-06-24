@@ -140,11 +140,6 @@ public class LdapCertificateRealm extends RealmBase {
 	}
 
 	@Override
-	protected String getName() {
-		return "LdapCertificateRealm";
-	}
-
-	@Override
 	protected String getPassword(final String arg0) {
 		return null;
 	}

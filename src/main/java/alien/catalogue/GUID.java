@@ -343,7 +343,8 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 
 				return true;
 			}
-		} finally {
+		}
+		finally {
 			db.close();
 			db.setLastGeneratedKey(previouslySet);
 		}
@@ -369,7 +370,8 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 		while (st.hasMoreTokens())
 			try {
 				ret.add(Integer.valueOf(st.nextToken()));
-			} catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
+			}
+			catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
 				// ignore
 			}
 
@@ -640,12 +642,14 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 						synchronized (queue) {
 							try {
 								queue.wait(1000);
-							} catch (@SuppressWarnings("unused") final InterruptedException ie) {
+							}
+							catch (@SuppressWarnings("unused") final InterruptedException ie) {
 								// ignore
 							}
 						}
 					}
-				} catch (final Throwable t) {
+				}
+				catch (final Throwable t) {
 					logger.log(Level.WARNING, "Caught an exception while executing the cleanup for " + tableSuffix, t);
 				}
 		}
@@ -863,7 +867,10 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 	}
 
 	/**
-	 * @return the LFNs associated to this GUID
+	 * This method is _not_ authoritative, if you want to do the actual lookup to see which LFNs point to this GUID then use {@link LFNUtils#getLFN(GUID)}.
+	 * Should only be called when the previous code has filled the cache with known LFN objects.
+	 * 
+	 * @return the <b>cached</b> LFNs associated to this GUID, from either the internal cache or the G*L_REF tables.
 	 */
 	public Set<LFN> getLFNs() {
 		if (lfnCache != null)

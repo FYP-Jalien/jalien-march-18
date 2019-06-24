@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
+import alien.api.Cacheable;
 import alien.api.Request;
 import alien.catalogue.LFN;
 import alien.catalogue.LFNUtils;
@@ -14,7 +15,7 @@ import alien.user.AliEnPrincipal;
  * @author ron
  * @since Jun 06, 2011
  */
-public class FindfromString extends Request {
+public class FindfromString extends Request implements Cacheable {
 
 	/**
 	 *
@@ -92,7 +93,7 @@ public class FindfromString extends Request {
 
 	@Override
 	public String toString() {
-		return "Asked for : path (" + this.path + "), pattern (" + this.pattern + "), flags (" + this.flags + ") reply is:\n" + this.lfns;
+		return "Asked for : path (" + this.path + "), pattern (" + this.pattern + "), flags (" + this.flags + ") reply " + (this.lfns != null ? "contains " + this.lfns.size() + " LFNs" : "is null");
 	}
 
 	/**
@@ -111,5 +112,18 @@ public class FindfromString extends Request {
 			ret.add(l.getFileName());
 
 		return ret;
+	}
+
+	@Override
+	public String getKey() {
+		return path + "|" + pattern + "|" + query + "|" + flags + "|" + queueid;
+	}
+
+	@Override
+	public long getTimeout() {
+		// small find results, typically the result of OCDB queries, can be cached for longer time
+		// larger ones, results of job finds that have to be iterated over, can only be cached for a short period
+
+		return (this.lfns != null || this.lfns.size() < 500) ? 300000 : 60000;
 	}
 }

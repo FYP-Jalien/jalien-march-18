@@ -20,7 +20,7 @@ public class GetJob extends Request {
 
 	private Job job;
 
-	private final int queueId;
+	private final long queueId;
 	private final boolean loadJDL;
 
 	/**
@@ -28,7 +28,7 @@ public class GetJob extends Request {
 	 * @param queueId
 	 * @param loadJDL
 	 */
-	public GetJob(final AliEnPrincipal user, final int queueId, final boolean loadJDL) {
+	public GetJob(final AliEnPrincipal user, final long queueId, final boolean loadJDL) {
 		setRequestUser(user);
 		this.queueId = queueId;
 		this.loadJDL = loadJDL;
@@ -38,7 +38,7 @@ public class GetJob extends Request {
 	 * @param user
 	 * @param queueId
 	 */
-	public GetJob(final AliEnPrincipal user, final int queueId) {
+	public GetJob(final AliEnPrincipal user, final long queueId) {
 		setRequestUser(user);
 		this.queueId = queueId;
 		this.loadJDL = false;

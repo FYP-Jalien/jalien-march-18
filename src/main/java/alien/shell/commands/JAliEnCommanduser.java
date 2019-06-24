@@ -12,7 +12,7 @@ import joptsimple.OptionException;
  */
 public class JAliEnCommanduser extends JAliEnBaseCommand {
 
-	private final String user;
+	private String user = null;
 
 	@Override
 	public void run() {
@@ -70,7 +70,7 @@ public class JAliEnCommanduser extends JAliEnBaseCommand {
 		if (alArguments.size() == 1)
 			user = alArguments.get(0);
 		else
-			throw new JAliEnCommandException();
+			setArgumentsOk(false);
 
 	}
 }

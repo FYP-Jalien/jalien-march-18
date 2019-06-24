@@ -26,6 +26,7 @@ import alien.io.protocols.TargetException;
 import alien.io.protocols.TempFileManager;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
+import alien.monitoring.Timing;
 import alien.se.SE;
 import alien.se.SEUtils;
 import lazyj.DBFunctions;
@@ -251,7 +252,7 @@ public class Transfer implements Serializable, Runnable {
 	@Override
 	public void run() {
 		for (final PFN target : targets) {
-			final long started = System.currentTimeMillis();
+			final Timing timing = new Timing();
 
 			doWork(target);
 
@@ -260,10 +261,10 @@ public class Transfer implements Serializable, Runnable {
 			else
 				failedTransfers.add(target);
 
-			final long ended = System.currentTimeMillis();
+			timing.endTiming();
 
 			if (monitor != null) {
-				monitor.addMeasurement("transfer_time", ended - started);
+				monitor.addMeasurement("transfer_time", timing);
 
 				monitor.incrementCounter("transfer_status_" + exitCode);
 

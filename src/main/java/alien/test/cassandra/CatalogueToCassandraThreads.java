@@ -33,6 +33,7 @@ import alien.catalogue.LFN_CSD;
 import alien.catalogue.PFN;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
+import alien.monitoring.Timing;
 import alien.test.JobDiscoverer;
 
 /**
@@ -718,7 +719,7 @@ public class CatalogueToCassandraThreads {
 								lfnc.pfns = pfnset;
 							}
 
-							final long start = System.nanoTime();
+							final Timing timing = new Timing();
 							if (!lfnc.insert(null, clevel)) {
 								final String msg = "Error inserting file: " + l.getCanonicalName() + " Time: " + new Date();
 								System.err.println(msg);
@@ -726,7 +727,7 @@ public class CatalogueToCassandraThreads {
 								failed_files.flush();
 							}
 							else {
-								final long duration_ns = System.nanoTime() - start;
+								final long duration_ns = timing.getNanos();
 								ns_count.addAndGet(duration_ns);
 								timing_count.incrementAndGet();
 

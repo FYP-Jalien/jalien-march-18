@@ -54,15 +54,19 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 	private boolean bJ = false;
 
 	/**
-	 * marker for -l argument : long format, optionally human readable file sizes
+	 * marker for -w argument : wide format, optionally human readable file sizes
 	 */
-	private boolean bL = false;
+	private boolean bW = false;
 
 	private List<String> alPaths = null;
 
 	private Collection<LFN> lfns = null;
 
 	private Long queueid = Long.valueOf(0);
+
+	private long limit = Long.MAX_VALUE;
+
+	private long offset = 0;
 
 	/**
 	 * returns the LFNs that were the result of the find
@@ -108,16 +112,25 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 
 		lfns = commander.c_api.find(FileSystemUtils.getAbsolutePath(commander.user.getName(), commander.getCurrentDirName(), alPaths.get(0)), alPaths.get(1), query, flags, xmlCollectionPath, queueid);
 
+		if (offset >= lfns.size())
+			return;
+			
 		if (lfns != null) {
 			if (bX) {
 				return;
 			}
 
 			for (final LFN lfn : lfns) {
+				if (--offset >= 0)
+					continue;
+
+				if (--limit < 0)
+					break;
+
 				commander.outNextResult();
 				commander.printOut("lfn", lfn.getCanonicalName());
 
-				if (bL) {
+				if (bW) {
 					commander.printOut("permissions", FileSystemUtils.getFormatedTypeAndPerm(lfn));
 					commander.printOut("user", lfn.owner);
 					commander.printOut("group", lfn.gowner);
@@ -132,7 +145,6 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 					commander.printOutln(lfn.getCanonicalName());
 			}
 		}
-
 	}
 
 	private static final DateFormat formatter = new SimpleDateFormat("MMM dd HH:mm");
@@ -158,8 +170,10 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 		commander.printOutln(helpOption("-y", "(FOR THE OCDB) return only the biggest version of each file"));
 		commander.printOutln(helpOption("-x", "xml collection name (return the LFN list through XmlCollection)"));
 		commander.printOutln(helpOption("-d", "return also the directories"));
-		commander.printOutln(helpOption("-l[h]", "long format, optionally human readable file sizes"));
+		commander.printOutln(helpOption("-w[h]", "long format, optionally human readable file sizes"));
 		commander.printOutln(helpOption("-j <queueid>", "filter files created by a certain job"));
+		commander.printOutln(helpOption("-l <count>", "limit the number of returned entries to at most the indicated value"));
+		commander.printOutln(helpOption("-o <offset>", "skip over the first /offset/ results"));
 		commander.printOutln();
 	}
 
@@ -190,7 +204,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 
 			final OptionParser parser = new OptionParser();
 
-			parser.accepts("l");
+			parser.accepts("w");
 			parser.accepts("s");
 			parser.accepts("x").withRequiredArg();
 			parser.accepts("a");
@@ -198,6 +212,8 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			parser.accepts("d");
 			parser.accepts("y");
 			parser.accepts("j").withRequiredArg().ofType(Long.class);
+			parser.accepts("l").withRequiredArg().ofType(Long.class);
+			parser.accepts("o").withRequiredArg().ofType(Long.class);
 
 			final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
 
@@ -213,13 +229,32 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 
 			alPaths = optionToString(options.nonOptionArguments());
 
-			bL = options.has("l");
+			bW = options.has("w");
 			bS = options.has("s");
 			bA = options.has("a");
 			bD = options.has("d");
 			bH = options.has("h");
 			bY = options.has("y");
-		} catch (final OptionException e) {
+
+			if (options.has("l")) {
+				limit = ((Long) options.valueOf("l")).longValue();
+
+				if (limit <= 0) {
+					commander.printErrln("Limit value has to be strictly positive, ignoring indicated value (" + limit + ")");
+					limit = Long.MAX_VALUE;
+				}
+			}
+
+			if (options.has("o")) {
+				offset = ((Long) options.valueOf("o")).longValue();
+
+				if (offset < 0) {
+					commander.printErrln("Offset value cannot be negative, ignoring indicated value (" + offset + ")");
+					offset = 0;
+				}
+			}
+		}
+		catch (final OptionException e) {
 			printHelp();
 			throw e;
 		}
@@ -232,8 +267,8 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 		sb.append("\n { JAliEnCommandfind received\n");
 		sb.append("Arguments: ");
 
-		if (bL)
-			sb.append(" -l ");
+		if (bW)
+			sb.append(" -w ");
 		if (bA)
 			sb.append(" -a ");
 		if (bS)

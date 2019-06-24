@@ -28,9 +28,9 @@ public class JAliEnCommandmasterjob extends JAliEnBaseCommand {
 	 */
 	private boolean bPrintSite = false;
 
-	private final int jobId;
+	private long jobId = 0;
 
-	private final List<Integer> id = new ArrayList<>();
+	private final List<Long> id = new ArrayList<>();
 
 	private Set<JobStatus> status = new HashSet<>();
 
@@ -205,7 +205,8 @@ public class JAliEnCommandmasterjob extends JAliEnBaseCommand {
 			if (alArguments.size() > 0) {
 				try {
 					jobId = Integer.parseInt(alArguments.get(0));
-				} catch (final NumberFormatException e) {
+				}
+				catch (final NumberFormatException e) {
 					throw new JAliEnCommandException("Invalid job ID " + alArguments.get(0), e);
 				}
 
@@ -238,8 +239,9 @@ public class JAliEnCommandmasterjob extends JAliEnBaseCommand {
 					final StringTokenizer st = new StringTokenizer((String) options.valueOf("id"), ",");
 					while (st.hasMoreTokens())
 						try {
-							id.add(Integer.valueOf(st.nextToken()));
-						} catch (@SuppressWarnings("unused") final NumberFormatException e) {
+							id.add(Long.valueOf(st.nextToken()));
+						}
+						catch (@SuppressWarnings("unused") final NumberFormatException e) {
 							// ignore
 						}
 				}
@@ -255,10 +257,10 @@ public class JAliEnCommandmasterjob extends JAliEnBaseCommand {
 
 			}
 			else
-				throw new JAliEnCommandException();
-		} catch (final OptionException e) {
-			printHelp();
-			throw e;
+				setArgumentsOk(false);
+		}
+		catch (@SuppressWarnings("unused") final OptionException e) {
+			setArgumentsOk(false);
 		}
 
 	}

@@ -39,6 +39,7 @@ import javax.servlet.http.HttpServletResponse;
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
+import alien.monitoring.Timing;
 import lazyj.Format;
 import lazyj.LRUMap;
 import lazyj.RequestWrapper;
@@ -67,10 +68,12 @@ public class TextCache extends HttpServlet {
 		try {
 			try {
 				nsDefault = Integer.parseInt(System.getProperty("alien.servlets.TextCache.ttl_" + namespace));
-			} catch (@SuppressWarnings("unused") final Throwable t1) {
+			}
+			catch (@SuppressWarnings("unused") final Throwable t1) {
 				nsDefault = Integer.parseInt(System.getProperty("alien.servlets.TextCache.ttl"));
 			}
-		} catch (@SuppressWarnings("unused") final Throwable t) {
+		}
+		catch (@SuppressWarnings("unused") final Throwable t) {
 			// ignore
 		}
 
@@ -172,7 +175,8 @@ public class TextCache extends HttpServlet {
 
 					if (monitor != null)
 						monitor.sendParameters(parameters, values);
-				} catch (@SuppressWarnings("unused") final Throwable t) {
+				}
+				catch (@SuppressWarnings("unused") final Throwable t) {
 					// ignore
 				}
 		}
@@ -256,7 +260,8 @@ public class TextCache extends HttpServlet {
 		if (requestLogger == null)
 			try {
 				requestLogger = new PrintWriter(new OutputStreamWriter(new MyGZIPOutputStream("cache.log-" + System.currentTimeMillis() + ".gz")));
-			} catch (final IOException e) {
+			}
+			catch (final IOException e) {
 				System.err.println("Could not write to cache.log: " + e.getMessage());
 				return;
 			}
@@ -322,10 +327,12 @@ public class TextCache extends HttpServlet {
 			try {
 				try {
 					size = Integer.parseInt(System.getProperty("alien.servlets.TextCache.size_" + name));
-				} catch (@SuppressWarnings("unused") final Throwable t1) {
+				}
+				catch (@SuppressWarnings("unused") final Throwable t1) {
 					size = Integer.parseInt(System.getProperty("alien.servlets.TextCache.size"));
 				}
-			} catch (@SuppressWarnings("unused") final Throwable t) {
+			}
+			catch (@SuppressWarnings("unused") final Throwable t) {
 				size = 50000;
 			}
 
@@ -358,7 +365,7 @@ public class TextCache extends HttpServlet {
 
 	private static synchronized long getSlowQueryThreshold() {
 		if (System.currentTimeMillis() - slowQueryThresholdCheck > 1000 * 60) {
-			slowQueryThreshold = ConfigUtils.getConfig().getl("alien.servlets.TextCache.logSlowQueries", 0) * 1000000;
+			slowQueryThreshold = ConfigUtils.getConfig().getl("alien.servlets.TextCache.logSlowQueries", 0);
 
 			slowQueryThresholdCheck = System.currentTimeMillis();
 		}
@@ -368,21 +375,21 @@ public class TextCache extends HttpServlet {
 
 	@Override
 	protected void doGet(final HttpServletRequest request, final HttpServletResponse response) throws ServletException, IOException {
-		final long start = System.nanoTime();
+		final Timing timing = new Timing();
 
 		try (PrintWriter pwOut = response.getWriter()) {
 			execRealGet(new RequestWrapper(request), response, pwOut);
 		}
 
-		final long duration = System.nanoTime() - start;
-
+		final double duration = timing.getMillis();
+		
 		if (monitor != null)
-			monitor.addMeasurement("ms_to_answer", duration / 1000000d);
+			monitor.addMeasurement("ms_to_answer", duration);
 
 		final long logSlowQueries = getSlowQueryThreshold();
 
 		if (logSlowQueries > 0 && duration > logSlowQueries)
-			System.err.println("Slow query : " + Format.point(duration / 1000000d) + "ms : " + request.getRemoteAddr() + " : " + request.getQueryString());
+			System.err.println("Slow query : " + Format.point(duration) + "ms : " + request.getRemoteAddr() + " : " + request.getQueryString());
 
 		logRequest(request);
 	}
@@ -576,7 +583,8 @@ public class TextCache extends HttpServlet {
 
 				try {
 					p = Pattern.compile("^" + keyValue + "$");
-				} catch (final PatternSyntaxException e) {
+				}
+				catch (final PatternSyntaxException e) {
 					pwOut.println("ERR: invalid pattern syntax: " + keyValue + " : " + e.getMessage());
 					return;
 				}
@@ -664,9 +672,10 @@ public class TextCache extends HttpServlet {
 	 */
 	public static void invalidateLFN(final String lfn) {
 		try {
-			invalidateCache("whereis", "(irtc|irc)_" + lfn);
-			invalidateCache("access", lfn + ".*");
-		} catch (@SuppressWarnings("unused") final Throwable t) {
+			invalidateCache("whereis", "irtc_" + lfn, "irc_" + lfn);
+			invalidateCache("access", lfn);
+		}
+		catch (@SuppressWarnings("unused") final Throwable t) {
 			// ignore
 		}
 	}
@@ -725,7 +734,8 @@ public class TextCache extends HttpServlet {
 			if (ConfigUtils.getConfig().getb("alien.servlets.TextCache.web_log", false))
 				try {
 					pwLogOut = new PrintWriter(new FileWriter("access_log", true));
-				} catch (final IOException ioe) {
+				}
+				catch (final IOException ioe) {
 					System.err.println("Cannot open access_log: " + ioe.getMessage());
 				}
 
@@ -767,7 +777,8 @@ public class TextCache extends HttpServlet {
 				final String sURL = request.getMethod() + " " + getCurrentPage(request) + " HTTP/1.1";
 
 				pw.println(sIP + " [" + sDate + "] \"" + sURL + "\"");
-			} catch (@SuppressWarnings("unused") final Throwable t) {
+			}
+			catch (@SuppressWarnings("unused") final Throwable t) {
 				// ignore
 			}
 	}

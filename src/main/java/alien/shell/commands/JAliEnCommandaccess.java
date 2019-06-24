@@ -135,6 +135,9 @@ public class JAliEnCommandaccess extends JAliEnBaseCommand {
 						commander.printOut("tags", pfn.getSE().qos.toString());
 						commander.printOut("nSEs", String.valueOf(pfns.size()));
 						commander.printOut("user", commander.user.getName());
+						commander.printOut("md5", lfn.md5);
+						commander.printOut("size", String.valueOf(lfn.getSize()));
+						commander.printOut("exists", String.valueOf(lfn.exists));
 						commander.printOutln();
 					}
 				}
@@ -148,7 +151,9 @@ public class JAliEnCommandaccess extends JAliEnBaseCommand {
 	 */
 	@Override
 	public void printHelp() {
-		// ignore
+		commander.printOutln();
+		commander.printOutln(helpUsage("access", "<read|write> <lfn> [<specs>]"));
+		commander.printOutln();
 	}
 
 	/**
@@ -237,8 +242,5 @@ public class JAliEnCommandaccess extends JAliEnBaseCommand {
 				commander.printErrln("Illegal Request type specified [error in request].");
 
 		}
-		else
-			commander.printErrln("No Request type specified [error in request].");
-
 	}
 }

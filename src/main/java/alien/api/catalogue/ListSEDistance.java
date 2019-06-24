@@ -44,7 +44,7 @@ public class ListSEDistance extends Request {
 		this.qos = qos;
 
 		if (sitename == null || sitename.length() == 0)
-			this.site = ConfigUtils.getConfig().gets("alice_close_site", "CERN").trim();
+			this.site = ConfigUtils.getCloseSite();
 		else
 			this.site = sitename;
 	}

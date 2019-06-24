@@ -57,6 +57,14 @@ public class FileEditor {
 	}
 
 	/**
+	 * @param editorname
+	 * @return <code>true</code> if this editor is available
+	 */
+	public static boolean isEditorCommand(final String editorname) {
+		return editorCommands.containsKey(editorname);
+	}
+	
+	/**
 	 * @param filename
 	 * @return exit code from the executed application
 	 */

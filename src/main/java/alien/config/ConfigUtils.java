@@ -312,7 +312,8 @@ public class ConfigUtils {
 
 			try {
 				prop.getProperties().store(baos, "AliEn Loggging Properties");
-			} catch (final Throwable t) {
+			}
+			catch (final Throwable t) {
 				System.err.println("Cannot store default props");
 				t.printStackTrace();
 			}
@@ -323,7 +324,8 @@ public class ConfigUtils {
 
 			try {
 				LogManager.getLogManager().readConfiguration(bais);
-			} catch (final Throwable t) {
+			}
+			catch (final Throwable t) {
 				System.err.println("Cannot load default props into LogManager");
 				t.printStackTrace();
 			}
@@ -399,7 +401,8 @@ public class ConfigUtils {
 			hostName = hostName.replace("/.$/", "");
 			hostName = hostName.replace("dyndns.cern.ch", "cern.ch");
 			domain = hostName.substring(hostName.indexOf(".") + 1, hostName.length());
-		} catch (final UnknownHostException e) {
+		}
+		catch (final UnknownHostException e) {
 			logger.severe("Error: couldn't get hostname: " + e.toString());
 			return null;
 		}
@@ -501,7 +504,8 @@ public class ConfigUtils {
 					if (!created)
 						logger.severe("Directory for " + folder + "can't be created: " + folderpath);
 				}
-			} catch (final Exception e) {
+			}
+			catch (final Exception e) {
 				logger.severe("Exception on directory creation: " + e.toString());
 			}
 		}
@@ -535,5 +539,26 @@ public class ConfigUtils {
 
 		for (final String key : p.stringPropertyNames())
 			System.out.println("    " + key + " : " + p.getProperty(key));
+	}
+
+	/**
+	 * Get the closest site mapped to current location of the client.
+	 * 
+	 * @return the close site (or where the job runs), as pointed by the env variable <code>ALIEN_SITE</code>, or, if not defined, the configuration key <code>alice_close_site</code>
+	 */
+	public static String getCloseSite() {
+		final String envSite = ConfigUtils.getConfig().gets("ALIEN_SITE");
+
+		if (envSite.length() > 0)
+			return envSite;
+
+		// TODO: actual mapping of the client to a site, no default configuration key for end users
+
+		final String configKey = ConfigUtils.getConfig().gets("alice_close_site");
+
+		if (configKey.length() > 0)
+			return configKey;
+
+		return "CERN";
 	}
 }

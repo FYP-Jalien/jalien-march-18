@@ -65,11 +65,12 @@ public class JAliEnCommandguid2lfn extends JAliEnBaseCommand {
 	public JAliEnCommandguid2lfn(final JAliEnCOMMander commander, final List<String> alArguments) throws OptionException {
 		super(commander, alArguments);
 
-		if (alArguments.size() != 1)
-			throw new JAliEnCommandException();
+		if (alArguments.size() != 1) {
+			// help will be printed by the commander anyway since canRunWithoutArguments=false
+			return;
+		}
 
 		guidName = alArguments.get(0);
-
 	}
 
 }

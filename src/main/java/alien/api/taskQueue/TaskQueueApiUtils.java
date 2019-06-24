@@ -80,7 +80,7 @@ public class TaskQueueApiUtils {
 	 * @param site
 	 * @return a PS listing
 	 */
-	public List<Job> getMasterJobStatus(final long jobId, final Set<JobStatus> status, final List<Integer> id, final List<String> site) {
+	public List<Job> getMasterJobStatus(final long jobId, final Set<JobStatus> status, final List<Long> id, final List<String> site) {
 
 		try {
 			final GetMasterjob mj = Dispatcher.execute(new GetMasterjob(commander.getUser(), jobId, status, id, site));
@@ -136,7 +136,7 @@ public class TaskQueueApiUtils {
 	 * @param queueId
 	 * @return a Job
 	 */
-	public Job getJob(final int queueId) {
+	public Job getJob(final long queueId) {
 
 		try {
 			final GetJob job = Dispatcher.execute(new GetJob(commander.getUser(), queueId));

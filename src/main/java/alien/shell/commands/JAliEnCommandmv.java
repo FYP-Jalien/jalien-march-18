@@ -100,7 +100,7 @@ public class JAliEnCommandmv extends JAliEnBaseCommand {
 	@Override
 	public void printHelp() {
 		commander.printOutln();
-		commander.printOutln(helpUsage("mv", " <LFN>  <newLFN> > " + ""));
+		commander.printOutln(helpUsage("mv", " <LFN>  <newLFN>"));
 		commander.printOutln();
 	}
 
@@ -130,13 +130,17 @@ public class JAliEnCommandmv extends JAliEnBaseCommand {
 			final List<String> nonOptionArguments = optionToString(options.nonOptionArguments());
 
 			size = nonOptionArguments.size();
-			sources = new String[size - 1];
-			for (int i = 0; i <= (size - 2); i++)
-				sources[i] = nonOptionArguments.get(i);
 
-			target = nonOptionArguments.get(size - 1);
+			// need at least one source and one target
+			if (size > 1) {
+				sources = new String[size - 1];
+				for (int i = 0; i <= (size - 2); i++)
+					sources[i] = nonOptionArguments.get(i);
 
-		} catch (final OptionException e) {
+				target = nonOptionArguments.get(size - 1);
+			}
+		}
+		catch (final OptionException e) {
 			printHelp();
 			throw e;
 		}

@@ -32,7 +32,7 @@ public class JAliEnCOMMander extends Thread {
 
 	/**
 	 * Atomic status update of the command execution
-	 * 
+	 *
 	 * @author costing
 	 * @since 2018-09-11
 	 */
@@ -48,7 +48,7 @@ public class JAliEnCOMMander extends Thread {
 
 		/**
 		 * Set the new status code
-		 * 
+		 *
 		 * @param newValue
 		 * @return the old value
 		 */
@@ -79,14 +79,12 @@ public class JAliEnCOMMander extends Thread {
 	/**
 	 * The commands that have a JAliEnCommand* implementation
 	 */
-	private static final String[] jAliEnCommandList = new String[] { "ls", "ls_csd", "get", "cat", "cat_csd", "whereis", "whereis_csd", "cp", "cp_csd", "cd", "cd_csd", "time", "mkdir", "mkdir_csd",
-			"find", "find_csd", "listFilesFromCollection", "scrlog", "submit", "motd", "access", "commit", "packages", "pwd", "ps", "rmdir", "rm", "rm_csd", "mv", "mv_csd", "masterjob", "user",
-			"touch", "touch_csd", "type", "kill", "lfn2guid", "guid2lfn", "guid2lfn_csd", "w", "uptime", "addFileToCollection", "addMirror", "addTag", "addTagValue", "chgroup", "chown", "chown_csd",
-			"createCollection", "deleteMirror", "df", "du", "fquota", "jobinfo", "jquota", "killTransfer", "listSEDistance", "listTransfer", "md5sum", "mirror", "queue", "queueinfo", "register",
-			"registerOutput", "removeTag", "removeTagValue", "resubmit", "resubmitTransfer", "showTags", "showTagValue", "spy", "top", "groups", "token", "uuid", "stat", "listSEs", "xrdstat",
-			"whois" };
+	private static final String[] jAliEnCommandList = new String[] { "ls", "ls_csd", "cat", "cat_csd", "whereis", "whereis_csd", "cp", "cp_csd", "cd", "cd_csd", "time", "mkdir", "mkdir_csd",
+			"find", "find_csd", "listFilesFromCollection", "submit", "motd", "access", "commit", "packages", "pwd", "ps", "rmdir", "rm", "rm_csd", "mv", "mv_csd", "masterjob", "user",
+			"touch", "touch_csd", "type", "kill", "lfn2guid", "guid2lfn", "guid2lfn_csd", "w", "uptime", "addFileToCollection", "chgroup", "chown", "chown_csd", "deleteMirror", "df", "du", "fquota",
+			"jquota", "listSEDistance", "listTransfer", "md5sum", "mirror", "resubmit", "top", "groups", "token", "uuid", "stat", "listSEs", "xrdstat", "whois", "ping" };
 
-	private static final String[] jAliEnAdminCommandList = new String[] { "addTrigger", "addHost", "queue", "register", "addSE", "addUser", "calculateFileQuota", "calculateJobQuota", "groupmembers" };
+	private static final String[] jAliEnAdminCommandList = new String[] { "queue", "register", "groupmembers" };
 
 	/**
 	 * The commands that are advertised on the shell, e.g. by tab+tab
@@ -96,7 +94,6 @@ public class JAliEnCOMMander extends Thread {
 	static {
 		final List<String> comm_set = new ArrayList<>(Arrays.asList(jAliEnCommandList));
 		final List<String> comms = comm_set;
-		comms.addAll(Arrays.asList(jAliEnAdminCommandList));
 		comms.add("shutdown");
 
 		comms.addAll(FileEditor.getAvailableEditorCommands());
@@ -161,7 +158,7 @@ public class JAliEnCOMMander extends Thread {
 		q_api = new TaskQueueApiUtils(this);
 
 		this.user = (user != null) ? user : AuthorizationFactory.getDefaultUser();
-		this.site = (site != null) ? site : ConfigUtils.getConfig().gets("alice_close_site").trim();
+		this.site = (site != null) ? site : ConfigUtils.getCloseSite();
 		localFileCash = new HashMap<>();
 		this.out = out;
 		this.bColour = out != null ? out.colour() : false;
@@ -177,7 +174,8 @@ public class JAliEnCOMMander extends Thread {
 			if (curDir == null)
 				try {
 					this.curDir = c_api.getLFN(myHome);
-				} catch (final Exception e) {
+				}
+				catch (final Exception e) {
 					logger.log(Level.WARNING, "Exception initializing connection", e);
 				}
 			else
@@ -236,11 +234,11 @@ public class JAliEnCOMMander extends Thread {
 		}
 
 		if (AliEnPrincipal.roleIsAdmin(AliEnPrincipal.userRole()))
-			for (int i = 0; i < commandList.length; i++) {
+			for (int i = 0; i < jAliEnAdminCommandList.length; i++) {
 				if (i > 0)
 					commands.append(' ');
 
-				commands.append(commandList[i]);
+				commands.append(jAliEnAdminCommandList[i]);
 			}
 
 		return commands.toString();
@@ -331,7 +329,8 @@ public class JAliEnCOMMander extends Thread {
 			synchronized (this) {
 				try {
 					wait(1000);
-				} catch (@SuppressWarnings("unused") final InterruptedException e) {
+				}
+				catch (@SuppressWarnings("unused") final InterruptedException e) {
 					// ignore
 				}
 			}
@@ -353,9 +352,11 @@ public class JAliEnCOMMander extends Thread {
 					setName("Commander: Executing: " + Arrays.toString(arg));
 
 					execute();
-				} catch (final Exception e) {
+				}
+				catch (final Exception e) {
 					logger.log(Level.WARNING, "Got exception", e);
-				} finally {
+				}
+				finally {
 					out = null;
 
 					setName("Commander: Idle");
@@ -366,7 +367,8 @@ public class JAliEnCOMMander extends Thread {
 					}
 				}
 			}
-		} catch (final Exception e) {
+		}
+		catch (final Exception e) {
 			logger.log(Level.WARNING, "Got exception", e);
 		}
 	}
@@ -416,7 +418,8 @@ public class JAliEnCOMMander extends Thread {
 				if (arg[i].startsWith("-debug=")) {
 					try {
 						debug = Integer.parseInt(arg[i].substring(arg[i].indexOf('=') + 1));
-					} catch (@SuppressWarnings("unused") final NumberFormatException n) {
+					}
+					catch (@SuppressWarnings("unused") final NumberFormatException n) {
 						// ignore
 					}
 					args.remove(arg[i]);
@@ -427,7 +430,7 @@ public class JAliEnCOMMander extends Thread {
 						args.remove(arg[i]);
 					}
 					else
-						if ("-h".equals(arg[i]) || "--h".equals(arg[i]) || "-help".equals(arg[i]) || "--help".equals(arg[i])) {
+						if (("-h".equals(arg[i]) && !comm.equals("du")) || "--h".equals(arg[i]) || "-help".equals(arg[i]) || "--help".equals(arg[i])) {
 							help = true;
 							args.remove(arg[i]);
 						}
@@ -461,7 +464,8 @@ public class JAliEnCOMMander extends Thread {
 
 			try {
 				jcommand = getCommand(comm, param);
-			} catch (final Exception e) {
+			}
+			catch (final Exception e) {
 
 				if (e.getCause() instanceof OptionException || e.getCause() instanceof NumberFormatException)
 					out.setReturnCode(-2, "Illegal command options\n");
@@ -477,14 +481,21 @@ public class JAliEnCOMMander extends Thread {
 			try {
 				if (jcommand == null)
 					out.setReturnCode(-6, "No such command or not implemented yet. ");
-				else
-					if (!help && (args.size() != 0 || jcommand.canRunWithoutArguments()))
-						jcommand.run();
-					else {
-						out.setReturnCode(-4, "Command requires an argument");
+				else {
+					if (help) {
 						jcommand.printHelp();
 					}
-			} catch (final Exception e) {
+					else
+						if (jcommand.areArgumentsOk() && (args.size() != 0 || jcommand.canRunWithoutArguments())) {
+							jcommand.run();
+						}
+						else {
+							out.setReturnCode(-4, "Command requires an argument");
+							jcommand.printHelp();
+						}
+				}
+			}
+			catch (final Exception e) {
 				e.printStackTrace();
 
 				out.setReturnCode(-5, "Error executing the command [" + comm + "]: \n" + Format.stackTraceToString(e));
@@ -520,10 +531,12 @@ public class JAliEnCOMMander extends Thread {
 			@SuppressWarnings({ "rawtypes", "unchecked" })
 			final java.lang.reflect.Constructor co = cl.getConstructor(new Class[] { JAliEnCOMMander.class, List.class });
 			return (JAliEnBaseCommand) co.newInstance(objectParm);
-		} catch (@SuppressWarnings("unused") final ClassNotFoundException e) {
+		}
+		catch (@SuppressWarnings("unused") final ClassNotFoundException e) {
 			// System.out.println("No such command or not implemented");
 			return null;
-		} catch (final java.lang.reflect.InvocationTargetException e) {
+		}
+		catch (final java.lang.reflect.InvocationTargetException e) {
 			logger.log(Level.SEVERE, "Exception running command", e);
 			return null;
 		}
@@ -546,7 +559,7 @@ public class JAliEnCOMMander extends Thread {
 
 	/**
 	 * Print a key-value pair to the output stream
-	 * 
+	 *
 	 * @param key
 	 * @param value
 	 */
@@ -558,7 +571,7 @@ public class JAliEnCOMMander extends Thread {
 
 	/**
 	 * Print the string to the output stream
-	 * 
+	 *
 	 * @param value
 	 */
 	public void printOut(final String value) {
@@ -568,7 +581,7 @@ public class JAliEnCOMMander extends Thread {
 
 	/**
 	 * Print a key-value (+"\n") pair to the output stream
-	 * 
+	 *
 	 * @param key
 	 * @param value
 	 */
@@ -578,7 +591,7 @@ public class JAliEnCOMMander extends Thread {
 
 	/**
 	 * Print the line to the output stream
-	 * 
+	 *
 	 * @param value
 	 */
 	public void printOutln(final String value) {
@@ -594,7 +607,7 @@ public class JAliEnCOMMander extends Thread {
 
 	/**
 	 * Print an error message to the output stream
-	 * 
+	 *
 	 * @param value
 	 */
 	public void printErr(final String value) {
@@ -604,7 +617,7 @@ public class JAliEnCOMMander extends Thread {
 
 	/**
 	 * Print an error message line to the output stream
-	 * 
+	 *
 	 * @param value
 	 */
 	public void printErrln(final String value) {
@@ -613,7 +626,7 @@ public class JAliEnCOMMander extends Thread {
 
 	/**
 	 * Set the command's return code and print an error message to the output stream
-	 * 
+	 *
 	 * @param exitCode
 	 * @param errorMessage
 	 */
@@ -624,7 +637,7 @@ public class JAliEnCOMMander extends Thread {
 
 	/**
 	 * Set the command's return arguments (for RootPrinter)
-	 * 
+	 *
 	 * @param args
 	 */
 	public void setReturnArgs(final String args) {
@@ -633,7 +646,7 @@ public class JAliEnCOMMander extends Thread {
 	}
 
 	/**
-	 * 
+	 *
 	 */
 	public void pending() {
 		if (!commandIsSilent())
@@ -642,7 +655,7 @@ public class JAliEnCOMMander extends Thread {
 
 	/**
 	 * Get commander's output stream writer
-	 * 
+	 *
 	 * @return UIPrintWriter
 	 */
 	public UIPrintWriter getPrintWriter() {

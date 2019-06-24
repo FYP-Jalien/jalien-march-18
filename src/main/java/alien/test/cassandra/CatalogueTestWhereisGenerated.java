@@ -27,6 +27,7 @@ import alien.catalogue.LFN_CSD;
 import alien.catalogue.PFN;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
+import alien.monitoring.Timing;
 import alien.test.cassandra.tomcat.EmbeddedTomcat;
 import alien.test.cassandra.tomcat.servlet.LocalCache;
 
@@ -350,7 +351,7 @@ public class CatalogueTestWhereisGenerated {
 				}
 
 				boolean error = false;
-				final long start = System.nanoTime();
+				final Timing timing = new Timing();
 				switch (type) {
 				case 0: // LFN
 					final LFN temp = LFNUtils.getLFN(lfn);
@@ -386,7 +387,7 @@ public class CatalogueTestWhereisGenerated {
 				if (error)
 					continue;
 
-				final long duration_ns = System.nanoTime() - start;
+				final long duration_ns = timing.getNanos();
 				ns_count.addAndGet(duration_ns);
 				final long counter2 = timing_count.incrementAndGet();
 

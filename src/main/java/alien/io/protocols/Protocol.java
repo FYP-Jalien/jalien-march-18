@@ -7,6 +7,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,6 +18,7 @@ import alien.catalogue.LFN;
 import alien.catalogue.PFN;
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
+import lazyj.Format;
 import lia.util.process.ExternalProcess.ExitStatus;
 
 /**
@@ -111,7 +113,8 @@ public abstract class Protocol implements Serializable, Comparable<Protocol>, Cl
 					return false;
 				}
 
-			} catch (final IOException e) {
+			}
+			catch (final IOException e) {
 				logger.log(Level.SEVERE, "Error during MD5 check of " + f.getAbsolutePath());
 				logger.log(Level.SEVERE, e.getMessage());
 				return false;
@@ -133,7 +136,8 @@ public abstract class Protocol implements Serializable, Comparable<Protocol>, Cl
 							}
 
 							return true;
-						} catch (final IOException e) {
+						}
+						catch (final IOException e) {
 							logger.log(Level.SEVERE, "Error during MD5 check of " + f.getAbsolutePath());
 							logger.log(Level.SEVERE, e.getMessage());
 							return false;
@@ -216,6 +220,60 @@ public abstract class Protocol implements Serializable, Comparable<Protocol>, Cl
 		this.lastCommand = cmd;
 	}
 
+	private Map<String, String> lastCommandEnv = null;
+
+	/**
+	 * Get the environment of the last executed command
+	 *
+	 * @return last set environment variable set
+	 */
+	public Map<String, String> getLastCommandEnv() {
+		return lastCommandEnv;
+	}
+
+	/**
+	 * Inform about the last execution environment
+	 *
+	 * @param env
+	 */
+	protected void setLastCommandEnv(final Map<String, String> env) {
+		this.lastCommandEnv = env;
+	}
+
+	/**
+	 * Get the shell-formatted last executed command
+	 *
+	 * @return the last command and all the necessary env variables to reproduce it
+	 */
+	public String getFormattedLastCommand() {
+		final StringBuilder sb = new StringBuilder();
+
+		final Map<String, String> env = getLastCommandEnv();
+
+		if (env != null)
+			for (final Map.Entry<String, String> entry : env.entrySet())
+				sb.append("export ").append(entry.getKey()).append("=\"").append(Format.replace(entry.getValue(), "\"", "\\\"")).append("\"\n");
+
+		boolean first = true;
+
+		final List<String> lastCmd = getLastCommand();
+
+		if (lastCmd != null) {
+			for (String cmdToken : lastCmd) {
+				if (!first)
+					sb.append(' ');
+
+				if (cmdToken.contains(" ") || cmdToken.contains("\n") || cmdToken.contains("\t"))
+					cmdToken = "'" + Format.replace(cmdToken, "'", "\\'") + "'";
+
+				sb.append(cmdToken);
+				first = false;
+			}
+		}
+
+		return sb.toString();
+	}
+
 	/**
 	 * Add a parameter to an existing URL. It assumes the parameter is already formatted (usual "key=value" syntax)
 	 *
@@ -234,7 +292,8 @@ public abstract class Protocol implements Serializable, Comparable<Protocol>, Cl
 	public Object clone() {
 		try {
 			return super.clone();
-		} catch (final CloneNotSupportedException e) {
+		}
+		catch (final CloneNotSupportedException e) {
 			logger.log(Level.SEVERE, "Some Protocol doesn't support cloning", e);
 		}
 
@@ -242,7 +301,7 @@ public abstract class Protocol implements Serializable, Comparable<Protocol>, Cl
 	}
 
 	@Override
-	public boolean equals(Object obj) {
+	public boolean equals(final Object obj) {
 		return protocolID() == ((Protocol) obj).protocolID();
 	}
 

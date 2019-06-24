@@ -6,6 +6,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.StringTokenizer;
@@ -22,6 +23,7 @@ import alien.io.protocols.Xrootd;
 import alien.se.SE;
 import alien.se.SEUtils;
 import alien.shell.ShellColor;
+import alien.taskQueue.JDL;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -32,7 +34,9 @@ import lazyj.Format;
  * @since 2018-08-21
  */
 public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
-	private ArrayList<String> alPaths = null;
+	private LinkedHashSet<String> alPaths = null;
+
+	private ArrayList<Long> jobIDs = null;
 
 	private boolean bDownload = false;
 
@@ -47,6 +51,31 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 	@Override
 	public void run() {
 		Xrootd xrootd = null;
+
+		if (jobIDs != null) {
+			for (final Long jobID : jobIDs) {
+				final String jdl = commander.q_api.getJDL(jobID.longValue());
+
+				if (jdl == null) {
+					commander.printErrln("Cannot retrieve JDL of job ID " + jobID);
+				}
+				else {
+					try {
+						final JDL j = new JDL(jdl);
+
+						final List<String> dataFiles = j.getInputData(true);
+
+						if (dataFiles != null && dataFiles.size() > 0)
+							this.alPaths.addAll(dataFiles);
+						else
+							commander.printErrln("Job ID " + jobID + " doesn't have input data, nothing to check for it");
+					}
+					catch (final IOException ioe) {
+						commander.printErrln("Cannot parse the JDL of job ID " + jobID + " : " + ioe.getMessage());
+					}
+				}
+			}
+		}
 
 		for (final String lfnName : this.alPaths) {
 			final LFN lfn = commander.c_api.getRealLFN(FileSystemUtils.getAbsolutePath(commander.user.getName(), commander.getCurrentDirName(), lfnName));
@@ -68,9 +97,9 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 					if (lfnName.startsWith("root://")) {
 						// is it a GUID-based PFN?
 
-						int idx = lfnName.lastIndexOf('/');
+						final int idx = lfnName.lastIndexOf('/');
 
-						String lastToken = lfnName.substring(idx + 1);
+						final String lastToken = lfnName.substring(idx + 1);
 
 						if (GUIDUtils.isValidGUID(lastToken))
 							referenceGUID = commander.c_api.getGUID(lastToken, true, false);
@@ -78,7 +107,7 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 							referenceGUID = GUIDUtils.createGuid();
 
 						if (referenceGUID.exists()) {
-							for (PFN p : referenceGUID.getPFNs())
+							for (final PFN p : referenceGUID.getPFNs())
 								if (p.pfn.equals(lfnName)) {
 									onePfnToCheck = p;
 									break;
@@ -179,7 +208,8 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 										throw new IOException("The MD5 checksum of the downloaded file is not the expected one (" + fileMD5 + " vs " + referenceGUID.md5 + ")");
 								}
 							}
-						} finally {
+						}
+						finally {
 							if (f != null) {
 								TempFileManager.release(f);
 
@@ -204,16 +234,21 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 						if (verbose && status != null)
 							commander.printOutln(status);
 					}
-				} catch (final Throwable t) {
+				}
+				catch (final Throwable t) {
 					final String error = t.getMessage();
 
 					commander.printOutln(ShellColor.jobStateRed() + "ERR" + ShellColor.reset());
-					
+
 					if (verbose)
 						commander.printOutln(error);
 
-					if (printCommand && !error.contains(xrootd.getLastCommand().toString()))
-						commander.printOutln("\t\t" + xrootd.getLastCommand());
+					if (printCommand) {
+						final String cmd = xrootd.getFormattedLastCommand();
+
+						if (!error.contains(cmd))
+							commander.printOutln(cmd);
+					}
 				}
 			}
 		}
@@ -223,13 +258,14 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 	@Override
 	public void printHelp() {
 		commander.printOutln();
-		commander.printOutln(helpUsage("xrdstat", "[-d [-i]] [-s SE1,SE2,...] [-c]<filename1> [<or UUID>] ..."));
+		commander.printOutln(helpUsage("xrdstat", "[-d [-i]] [-v] [-p PID,PID,...] [-s SE1,SE2,...] [-c] <filename1> [<or UUID>] ..."));
 		commander.printOutln(helpStartOptions());
 		commander.printOutln(helpOption("-d", "Check by physically downloading each replica and checking its content. Without this a stat (metadata) check is done only."));
 		commander.printOutln(helpOption("-i", "When downloading each replica, ignore `stat` calls and directly try to fetch the content."));
 		commander.printOutln(helpOption("-s", "Comma-separated list of SE names to restrict the checking to. Default is to check all replicas."));
 		commander.printOutln(helpOption("-c", "Print the full command line in case of errors."));
 		commander.printOutln(helpOption("-v", "More details on the status."));
+		commander.printOutln(helpOption("-p", "Comma-separated list of job IDs to check the input data of"));
 		commander.printOutln();
 	}
 
@@ -256,6 +292,7 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 			parser.accepts("c");
 			parser.accepts("i");
 			parser.accepts("v");
+			parser.accepts("p").withRequiredArg().withValuesSeparatedBy(",").describedAs("Comma-separated list of job IDs to check the input data of");
 
 			final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
 			bDownload = options.has("d");
@@ -276,15 +313,30 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 							ses.add(se);
 						else
 							commander.printOutln("The SE you have indicated doesn't exist: " + tok);
-					} catch (final Throwable t) {
+					}
+					catch (final Throwable t) {
 						commander.printOutln("What's this? " + tok + " : " + t.getMessage());
 					}
 				}
 			}
 
-			alPaths = new ArrayList<>(options.nonOptionArguments().size());
+			if (options.has("p")) {
+				jobIDs = new ArrayList<>();
+
+				for (final Object o : options.valuesOf("p")) {
+					try {
+						jobIDs.add(Long.valueOf(o.toString()));
+					}
+					catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
+						commander.printOutln("Invalid job ID: " + o);
+					}
+				}
+			}
+
+			alPaths = new LinkedHashSet<>(options.nonOptionArguments().size());
 			alPaths.addAll(optionToString(options.nonOptionArguments()));
-		} catch (final OptionException e) {
+		}
+		catch (final OptionException e) {
 			printHelp();
 			throw e;
 		}

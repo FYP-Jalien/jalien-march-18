@@ -42,6 +42,7 @@ import alien.config.ConfigUtils;
 import alien.io.IOUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
+import alien.monitoring.Timing;
 import alien.quotas.FileQuota;
 import alien.quotas.QuotaUtilities;
 import alien.user.AliEnPrincipal;
@@ -176,7 +177,7 @@ public class TaskQueueUtils {
 				monitor.incrementCounter("TQ_jobdetails");
 			}
 
-			final long lQueryStart = System.currentTimeMillis();
+			final Timing timing = new Timing();
 
 			final String q;
 
@@ -204,7 +205,7 @@ public class TaskQueueUtils {
 			if (!db.query(q, false, Long.valueOf(queueId)))
 				return null;
 
-			monitor.addMeasurement("TQ_jobdetails_time", (System.currentTimeMillis() - lQueryStart) / 1000d);
+			monitor.addMeasurement("TQ_jobdetails_ms", timing);
 
 			if (!db.moveNext())
 				return null;
@@ -289,7 +290,7 @@ public class TaskQueueUtils {
 
 			q += " AND received>UNIX_TIMESTAMP(now())-60*60*24*14 ORDER BY queueId ASC;";
 
-			final long lQueryStart = System.currentTimeMillis();
+			final Timing timing = new Timing();
 
 			db.setReadOnly(true);
 			db.setQueryTimeout(600);
@@ -297,7 +298,7 @@ public class TaskQueueUtils {
 			db.query(q);
 
 			if (monitor != null)
-				monitor.addMeasurement("TQ_getmasterjobs_time", (System.currentTimeMillis() - lQueryStart) / 1000d);
+				monitor.addMeasurement("TQ_getmasterjobs_ms", timing);
 
 			while (db.moveNext())
 				ret.add(new Job(db, loadJDL));
@@ -367,7 +368,7 @@ public class TaskQueueUtils {
 				monitor.incrementCounter("TQ_getmasterjob_stats");
 			}
 
-			final long lQueryStart = System.currentTimeMillis();
+			final Timing timing = new Timing();
 
 			final String q;
 
@@ -382,7 +383,7 @@ public class TaskQueueUtils {
 			db.query(q);
 
 			if (monitor != null)
-				monitor.addMeasurement("TQ_getmasterjob_stats_time", (System.currentTimeMillis() - lQueryStart) / 1000d);
+				monitor.addMeasurement("TQ_getmasterjob_stats_ms", timing);
 
 			Map<JobStatus, Integer> m = null;
 			long oldJobID = -1;
@@ -486,7 +487,7 @@ public class TaskQueueUtils {
 				else
 					q = "SELECT " + (loadJDL ? "*" : ALL_BUT_JDL) + " FROM QUEUEARCHIVE" + archiveYear + " WHERE split=? AND status!='KILLED' ORDER BY queueId ASC;";
 
-			final long lQueryStart = System.currentTimeMillis();
+			final Timing timing = new Timing();
 
 			db.setReadOnly(true);
 			db.setQueryTimeout(300);
@@ -494,7 +495,7 @@ public class TaskQueueUtils {
 			db.query(q, false, Long.valueOf(queueId));
 
 			if (monitor != null)
-				monitor.addMeasurement("TQ_getsubjobs_time", (System.currentTimeMillis() - lQueryStart) / 1000d);
+				monitor.addMeasurement("TQ_getsubjobs_ms", timing);
 
 			while (db.moveNext())
 				ret.add(new Job(db, loadJDL));
@@ -513,7 +514,7 @@ public class TaskQueueUtils {
 	 * @param limit
 	 * @return the subjobs, if any
 	 */
-	public static List<Job> getMasterJobStat(final long queueId, final Set<JobStatus> status, final List<Integer> id, final List<String> site, final int limit) {
+	public static List<Job> getMasterJobStat(final long queueId, final Set<JobStatus> status, final List<Long> id, final List<String> site, final int limit) {
 
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
@@ -554,7 +555,7 @@ public class TaskQueueUtils {
 
 				boolean first = true;
 
-				for (final int i : id) {
+				for (final long i : id) {
 					if (!first)
 						whe.append(',');
 					else
@@ -1580,7 +1581,7 @@ public class TaskQueueUtils {
 		final InetAddress addr = account.getRemoteEndpoint();
 
 		if (addr != null)
-			clientAddress = addr.getCanonicalHostName();
+			clientAddress = Utils.getHostName(addr.getHostAddress());
 		else
 			clientAddress = MonitorFactory.getSelfHostname();
 

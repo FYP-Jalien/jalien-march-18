@@ -129,7 +129,8 @@ public class BusyBox {
 					return false;
 
 				return (!noSignal.equals(callJBoxGetString("setshell jaliensh")));
-			} catch (@SuppressWarnings("unused") final IOException e) {
+			}
+			catch (@SuppressWarnings("unused") final IOException e) {
 				return false;
 			}
 		return false;
@@ -204,16 +205,17 @@ public class BusyBox {
 
 		if (startPrompt)
 			new Thread() {
-			@Override
-			public void run() {
-				try {
-					prompt();
-				} catch (final IOException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
+				@Override
+				public void run() {
+					try {
+						prompt();
+					}
+					catch (final IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
 				}
-			}
-		}.start();
+			}.start();
 	}
 
 	private static String genPromptPrefix() {
@@ -296,7 +298,8 @@ public class BusyBox {
 						return ret.toString();
 				}
 
-			} catch (@SuppressWarnings("unused") final Exception e) {
+			}
+			catch (@SuppressWarnings("unused") final Exception e) {
 				// e.printStackTrace();
 			}
 		while (reconnect());
@@ -369,7 +372,8 @@ public class BusyBox {
 						return true;
 				}
 
-			} catch (@SuppressWarnings("unused") final Exception e) {
+			}
+			catch (@SuppressWarnings("unused") final Exception e) {
 				// ignore
 				// e.printStackTrace();
 			}
@@ -401,9 +405,9 @@ public class BusyBox {
 	public void executeCommand(final String callLine) {
 
 		// String args[] = callLine.split(SpaceSep);
-		final String args[] = callLine.split(" ");
+		final String args[] = callLine.split("\\s+");
 
-		if (!"".equals(args[0]))
+		if (args[0].length() > 0)
 			if (args[0].equals(".")) {
 				final StringBuilder command = new StringBuilder();
 
@@ -421,11 +425,13 @@ public class BusyBox {
 					syscall(command.toString());
 				}
 				else
-					if (isEditCommand(args[0])) {
+					if (FileEditor.isEditorCommand(args[0])) {
 						if (args.length == 2)
 							editCatalogueFile(args[0], args[1]);
-						else
-							out.println("help for the editor is....");
+						else {
+							out.println(args[0] + " requires an LFN argument");
+							out.flush();
+						}
 					}
 					else
 						if (args[0].equals("shutdown"))
@@ -466,7 +472,8 @@ public class BusyBox {
 				while ((line = brCleanUp.readLine()) != null)
 					System.out.println(line);
 			}
-		} catch (final Exception e) {
+		}
+		catch (final Exception e) {
 			System.out.println(e);
 		}
 	}
@@ -507,16 +514,12 @@ public class BusyBox {
 				// System.out.println("JBox might still be running.");
 				// }
 			}
-		} catch (@SuppressWarnings("unused") final Exception e) {
+		}
+		catch (@SuppressWarnings("unused") final Exception e) {
 			// e.printStackTrace();
 		}
 		JSh.printGoodBye();
 		System.exit(0);
-	}
-
-	private static boolean isEditCommand(final String command) {
-
-		return Arrays.asList(FileEditor.editors).contains(command);
 	}
 
 	private void editCatalogueFile(final String editcmd, final String LFNName) {
@@ -545,7 +548,8 @@ public class BusyBox {
 
 		try {
 			editor = new FileEditor(editcmd);
-		} catch (@SuppressWarnings("unused") final IOException e) {
+		}
+		catch (@SuppressWarnings("unused") final IOException e) {
 			JSh.printErr("The editor [" + editcmd + "] was not found on your system.");
 			return;
 		}

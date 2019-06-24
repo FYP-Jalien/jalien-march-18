@@ -159,7 +159,5 @@ public class JAliEnCommandcommit extends JAliEnBaseCommand {
 				md5 = arg.next();
 
 		}
-		else
-			commander.printErrln("No envelope to register passed.");
 	}
 }

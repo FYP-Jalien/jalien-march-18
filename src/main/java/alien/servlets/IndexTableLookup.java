@@ -12,6 +12,7 @@ import alien.catalogue.CatalogueUtils;
 import alien.catalogue.IndexTableEntry;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
+import alien.monitoring.Timing;
 
 /**
  * IndexTable lookups, based on cached indextable content
@@ -33,7 +34,7 @@ public class IndexTableLookup extends HttpServlet {
 
 	@Override
 	protected void doGet(final HttpServletRequest req, final HttpServletResponse resp) throws ServletException, IOException {
-		final long start = System.nanoTime();
+		final Timing timing = new Timing();
 
 		final String lfn = req.getParameter("lfn");
 
@@ -58,9 +59,7 @@ public class IndexTableLookup extends HttpServlet {
 			}
 		}
 
-		if (monitor != null) {
-			final long duration = System.nanoTime() - start;
-			monitor.addMeasurement("ms_to_answer", duration / 1000000d);
-		}
+		if (monitor != null)
+			monitor.addMeasurement("ms_to_answer", timing);
 	}
 }

@@ -17,6 +17,14 @@ JALIEN_MAIN=${JALIEN_MAIN:-alien.JSh}
 
 JAVA_OPTS=${JAVA_OPTS:--client -Xms16M -Xmx64M}
 
+JAVA_VERSION=`java -version 2>&1 | sed -e 's/.*version "\([[:digit:]]*\)\(.*\)/\1/; 1q'`
+
+if [ -z "$JAVA_VERSION" ]; then
+    export JDK_JAVA_OPTIONS="--add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.transport=ALL-UNNAMED"
+elif [ "$JAVA_VERSION" -ge 11 ]; then
+    JAVA_OPTS="$JAVA_OPTS --add-opens=java.base/java.lang=ALL-UNNAMED --add-opens=java.base/java.io=ALL-UNNAMED --add-opens=java.rmi/sun.rmi.transport=ALL-UNNAMED"
+fi
+
 if [ ! -z "$TMPDIR" ]; then
     JAVA_OPTS="$JAVA_OPTS -Djava.io.tmpdir=$TMPDIR"
 fi

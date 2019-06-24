@@ -692,7 +692,7 @@ public class LFNCSDUtils {
 			return null;
 
 		// find closest SE
-		final String site = ConfigUtils.getConfig().gets("alice_close_site", "CERN").trim();
+		final String site = ConfigUtils.getCloseSite();
 
 		for (Integer seNumber : lfnc.pfns.keySet()) {
 			exses.add(SEUtils.getSE(seNumber).getName());

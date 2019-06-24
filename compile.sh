@@ -34,7 +34,7 @@ cp ${JALIEN_HOME}/trusted_authorities.jks ${BUILDDIR}/
 cp ${JALIEN_HOME}/config/config.properties ${JALIEN_HOME}/config/monitoring.properties ${BUILDDIR}/config/
 
 # always generate alien.jar
-find ${JALIEN_HOME}/src/main -name "*.java" | xargs javac -source 8 -target 8 -O -g -d ${BUILDDIR} || { echo "javac of src/*.java failed" ; exit 1; }
+find ${JALIEN_HOME}/src/main -name "*.java" | xargs javac -Xlint:-options -source 8 -target 8 -O -g -d ${BUILDDIR} || { echo "javac of src/*.java failed" ; exit 1; }
 
 # Clean up all previous jar generated files
 rm -rf ${JALIEN_HOME}/alien.jar
@@ -46,7 +46,7 @@ generate_users () {
   echo "Preparing alien-users.jar"
   cd "${BUILDDIR}"
   # extract all specified java classes
-  for dependency in ${JALIEN_HOME}/lib/{FarmMonitor.jar,apmon.jar,bcp*.jar,catalina.jar,javax.json-api-*.jar,jline-*.jar,jopt-simple-*.jar,json-simple-*.jar,lazyj.jar,servlet-api.jar,tomcat-*.jar,ca-api*.jar,java-ca-lib*.jar,annotations-api.jar}; do
+  for dependency in ${JALIEN_HOME}/lib/{FarmMonitor.jar,apmon.jar,bcp*.jar,catalina.jar,javax.json-api-*.jar,jline-*.jar,jopt-simple-*.jar,json-simple-*.jar,lazyj.jar,servlet-api.jar,tomcat-*.jar,ca-api*.jar,java-ca-lib*.jar,annotations-api.jar,jaspic-api.jar}; do
     jar xf ${dependency}
   done
   rm -rf META-INF
@@ -77,8 +77,8 @@ generate_cs () {
 
 
 if [[ "${ARG}" == "all" ]]; then
-  generate_cs
   generate_users
+  generate_cs
 elif [[ "${ARG}" == "cs" ]]; then
   generate_cs
 elif [[ "${ARG}" == "users" ]]; then

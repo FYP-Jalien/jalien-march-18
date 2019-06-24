@@ -6,6 +6,12 @@ import java.io.OutputStream;
 import java.io.StringReader;
 import java.security.Principal;
 import java.util.ArrayList;
+import java.util.Iterator;
+import java.util.concurrent.DelayQueue;
+import java.util.concurrent.Delayed;
+import java.util.concurrent.TimeUnit;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import javax.websocket.CloseReason;
 import javax.websocket.Endpoint;
@@ -20,6 +26,9 @@ import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
 
+import alien.config.ConfigUtils;
+import alien.monitoring.Monitor;
+import alien.monitoring.MonitorFactory;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.shell.commands.JSONPrintWriter;
 import alien.shell.commands.JShPrintWriter;
@@ -33,6 +42,10 @@ import alien.user.AliEnPrincipal;
  *         Implementation of websocket endpoint, that parses JSON commands
  */
 public class JsonWebsocketEndpoint extends Endpoint {
+	static transient final Logger logger = ConfigUtils.getLogger(JsonWebsocketEndpoint.class.getCanonicalName());
+
+	static transient final Monitor monitor = MonitorFactory.getMonitor(JsonWebsocketEndpoint.class.getCanonicalName());
+
 	AliEnPrincipal userIdentity = null;
 
 	/**
@@ -53,20 +66,90 @@ public class JsonWebsocketEndpoint extends Endpoint {
 				out = new XMLPrintWriter(os);
 	}
 
-	private long _startTime = 0L;
+	static final DelayQueue<SessionContext> sessionQueue = new DelayQueue<>();
 
-	/**
-	 * Time with no activity coming from the client
-	 */
-	public static long _lastActivityTime = 0L;
+	private static final class SessionContext implements Delayed {
+		final Session session;
+		final JsonWebsocketEndpoint endpoint;
 
-	/**
-	 * Get websocket connection uptime
-	 * 
-	 * @return uptime in ms
-	 */
-	public long getUptime() {
-		return System.currentTimeMillis() - _startTime;
+		final long startTime = System.currentTimeMillis();
+		long lastActivityTime = System.currentTimeMillis();
+
+		final long absoluteRunningDeadline;
+
+		public SessionContext(final JsonWebsocketEndpoint endpoint, final Session session, final long userCertExpiring) {
+			this.endpoint = endpoint;
+			this.session = session;
+
+			absoluteRunningDeadline = Math.min(startTime + 2 * 24 * 60 * 60 * 1000L, userCertExpiring);
+		}
+
+		@Override
+		public int compareTo(final Delayed other) {
+			final long delta = getRunningDeadline() - ((SessionContext) other).getRunningDeadline();
+
+			if (delta < 0)
+				return -1;
+
+			if (delta > 0)
+				return 1;
+
+			return 0;
+		}
+
+		final long getRunningDeadline() {
+			return Math.min(absoluteRunningDeadline, lastActivityTime + 3 * 60 * 60 * 1000L);
+		}
+
+		@Override
+		public long getDelay(TimeUnit unit) {
+			final long delay = getRunningDeadline() - System.currentTimeMillis();
+
+			return unit.convert(delay, TimeUnit.MILLISECONDS);
+		}
+
+		public void touch() {
+			this.lastActivityTime = System.currentTimeMillis();
+		}
+	}
+
+	static final Thread sessionCheckingThread = new Thread() {
+		@Override
+		public void run() {
+			while (true) {
+				try {
+					SessionContext context = sessionQueue.take();
+
+					if (context != null) {
+						if (context.getRunningDeadline() <= System.currentTimeMillis()) {
+							logger.log(Level.FINE, "Closing one idle / too long running session");
+							context.endpoint.onClose(context.session, new CloseReason(null, "Session timed out"));
+
+							monitor.incrementCounter("timedout_sessions");
+						}
+						else {
+							logger.log(Level.SEVERE, "Session should still be kept in fact, deadline = " + context.getRunningDeadline() + " while now = " + System.currentTimeMillis());
+							sessionQueue.add(context);
+						}
+					}
+				}
+				catch (@SuppressWarnings("unused") InterruptedException e) {
+					// was told to exit
+					return;
+				}
+			}
+		}
+	};
+
+	static {
+		sessionCheckingThread.setName("JsonWebsocketEndpoint.timeoutChecker");
+		sessionCheckingThread.setDaemon(true);
+		sessionCheckingThread.start();
+
+		monitor.addMonitoring("sessions", (names, values) -> {
+			names.add("active_sessions");
+			values.add(Double.valueOf(sessionQueue.size()));
+		});
 	}
 
 	/**
@@ -88,51 +171,48 @@ public class JsonWebsocketEndpoint extends Endpoint {
 
 		commander = new JAliEnCOMMander(userIdentity, null, null, out);
 
-		session.addMessageHandler(new EchoMessageHandlerText(session, commander, out, os));
-		_startTime = System.currentTimeMillis();
-		_lastActivityTime = System.currentTimeMillis();
+		final SessionContext context = new SessionContext(this, session, commander.getUser().getUserCert()[0].getNotAfter().getTime());
 
-		new Thread() {
-			@Override
-			public void run() {
-				while (!commander.kill) {
-					synchronized (stateObject) {
-						try {
-							stateObject.wait(3 * 60 * 60 * 1000L);
-						} catch (InterruptedException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-					}
+		session.addMessageHandler(new EchoMessageHandlerText(context, commander, out, os));
 
-					if (getUptime() > 172800000 || commander.getUser().getUserCert()[0].getNotAfter().getTime() > System.currentTimeMillis()) // 2 days
-						onClose(session, new CloseReason(null, "Connection expired (run for more than 2 days)"));
+		sessionQueue.add(context);
 
-					if (System.currentTimeMillis() - _lastActivityTime > 3 * 60 * 60 * 1000) // 3 hours
-						onClose(session, new CloseReason(null, "Connection idle for more than 3 hours"));
-				}
-			}
-		}.start();
+		monitor.incrementCounter("new_sessions");
 	}
 
 	@Override
 	public void onClose(final Session session, final CloseReason closeReason) {
+		monitor.incrementCounter("closed_sessions");
+
 		commander.kill = true;
 
 		out = null;
 		try {
 			if (os != null)
 				os.close();
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
 		os = null;
 		userIdentity = null;
+
 		try {
-			if (session != null)
+			if (session != null) {
+				final Iterator<SessionContext> it = sessionQueue.iterator();
+
+				while (it.hasNext()) {
+					final SessionContext sc = it.next();
+
+					if (sc.session.equals(session))
+						it.remove();
+				}
+
 				session.close();
-		} catch (IOException e) {
+			}
+		}
+		catch (IOException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
@@ -155,8 +235,11 @@ public class JsonWebsocketEndpoint extends Endpoint {
 		private UIPrintWriter out = null;
 		private OutputStream os = null;
 
-		EchoMessageHandlerText(final Session session, final JAliEnCOMMander commander, final UIPrintWriter out, OutputStream os) {
-			this.remoteEndpointBasic = session.getBasicRemote();
+		private final SessionContext context;
+
+		EchoMessageHandlerText(final SessionContext context, final JAliEnCOMMander commander, final UIPrintWriter out, OutputStream os) {
+			this.context = context;
+			this.remoteEndpointBasic = context.session.getBasicRemote();
 			this.commander = commander;
 			this.out = out;
 			this.os = os;
@@ -172,13 +255,16 @@ public class JsonWebsocketEndpoint extends Endpoint {
 					synchronized (commander.status) {
 						commander.status.wait(1000);
 					}
-				} catch (@SuppressWarnings("unused") final InterruptedException ie) {
+				}
+				catch (@SuppressWarnings("unused") final InterruptedException ie) {
 					// ignore
 				}
 		}
 
 		@Override
 		public void onMessage(final String message, final boolean last) {
+			monitor.incrementCounter("commands");
+
 			try {
 				if (remoteEndpointBasic != null) {
 					// Try to parse incoming JSON
@@ -189,7 +275,8 @@ public class JsonWebsocketEndpoint extends Endpoint {
 					try {
 						pobj = parser.parse(new StringReader(message));
 						jsonObject = (JSONObject) pobj;
-					} catch (@SuppressWarnings("unused") ParseException e) {
+					}
+					catch (@SuppressWarnings("unused") ParseException e) {
 						synchronized (remoteEndpointBasic) {
 							remoteEndpointBasic.sendText("Incoming JSON not ok", true);
 						}
@@ -230,12 +317,15 @@ public class JsonWebsocketEndpoint extends Endpoint {
 						remoteEndpointBasic.sendText(baos.toString(), true);
 						baos.reset();
 					}
-					_lastActivityTime = System.currentTimeMillis();
+
+					context.touch();
 				}
-			} catch (final IOException e) {
+			}
+			catch (final IOException e) {
 				// TODO Auto-generated catch block
 				e.printStackTrace();
-			} catch (final Exception e) {
+			}
+			catch (final Exception e) {
 				e.printStackTrace();
 			}
 		}

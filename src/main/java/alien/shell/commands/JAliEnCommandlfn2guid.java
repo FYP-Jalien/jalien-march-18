@@ -71,7 +71,7 @@ public class JAliEnCommandlfn2guid extends JAliEnBaseCommand {
 		super(commander, alArguments);
 
 		if (alArguments.size() != 1)
-			throw new JAliEnCommandException();
+			return;
 
 		lfnName = alArguments.get(0);
 

@@ -57,7 +57,8 @@ public class JAliEnCommandlistFilesFromCollection extends JAliEnBaseCommand {
 			final LFNListCollectionFromString ret = Dispatcher.execute(new LFNListCollectionFromString(commander.getUser(), collectionPath, bX));
 
 			lfns = ret.getLFNs();
-		} catch (final ServerException e) {
+		}
+		catch (final ServerException e) {
 			final Throwable cause = e.getCause();
 
 			errorMessage = cause.getMessage();
@@ -68,7 +69,6 @@ public class JAliEnCommandlistFilesFromCollection extends JAliEnBaseCommand {
 
 			return;
 		}
-
 
 		final StringBuilder sb = new StringBuilder();
 		for (final LFN lfn : lfns) {
@@ -139,8 +139,10 @@ public class JAliEnCommandlistFilesFromCollection extends JAliEnBaseCommand {
 		bZ = options.has("z");
 		bX = options.has("x");
 
-		if (options.nonOptionArguments().size() != 1)
-			throw new JAliEnCommandException();
+		if (options.nonOptionArguments().size() != 1) {
+			setArgumentsOk(false);
+			return;
+		}
 
 		sPath = options.nonOptionArguments().get(0).toString();
 	}

@@ -32,6 +32,8 @@ public abstract class JAliEnBaseCommand implements Runnable {
 
 	private final static int padHelpOption = 21;
 
+	private boolean argumentsOk = true;
+
 	/**
 	 * Constructor based on the array received from the request
 	 *
@@ -62,6 +64,20 @@ public abstract class JAliEnBaseCommand implements Runnable {
 	 */
 	public static String helpUsage(final String name) {
 		return helpUsage(name, "");
+	}
+
+	/**
+	 * @return <code>true</code> if the arguments are ok and the command can be executed
+	 */
+	public boolean areArgumentsOk() {
+		return argumentsOk;
+	}
+
+	/**
+	 * @param allOk set the flag
+	 */
+	protected void setArgumentsOk(boolean allOk) {
+		argumentsOk = allOk;
 	}
 
 	/**

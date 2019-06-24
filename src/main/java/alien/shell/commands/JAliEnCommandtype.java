@@ -95,8 +95,10 @@ public class JAliEnCommandtype extends JAliEnBaseCommand {
 		if (options.has("s"))
 			silent();
 
-		if (options.nonOptionArguments().size() != 1)
-			throw new JAliEnCommandException();
+		if (options.nonOptionArguments().size() != 1) {
+			setArgumentsOk(false);
+			return;
+		}
 
 		sPath = options.nonOptionArguments().get(0).toString();
 

@@ -41,7 +41,7 @@ public class GetMasterjob extends Request {
 
 	private final Set<JobStatus> status;
 
-	private final List<Integer> id;
+	private final List<Long> id;
 
 	private final List<String> site;
 
@@ -52,7 +52,7 @@ public class GetMasterjob extends Request {
 	 * @param id
 	 * @param site
 	 */
-	public GetMasterjob(final AliEnPrincipal user, final long jobId, final Set<JobStatus> status, final List<Integer> id, final List<String> site) {
+	public GetMasterjob(final AliEnPrincipal user, final long jobId, final Set<JobStatus> status, final List<Long> id, final List<String> site) {
 		setRequestUser(user);
 		this.jobId = jobId;
 		this.status = status;

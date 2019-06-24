@@ -13,8 +13,11 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -45,8 +48,6 @@ public class Xrootd extends Protocol {
 	 */
 	static transient final Logger logger = ConfigUtils.getLogger(Xrootd.class.getCanonicalName());
 
-	private static String xrdcpdebug = "-d";
-
 	/**
 	 * Debug level to pass to xrdcp commands
 	 */
@@ -63,6 +64,8 @@ public class Xrootd extends Protocol {
 	 * Statically filled variable, <code>true</code> when
 	 */
 	protected static boolean xrootdNewerThan4 = false;
+
+	private Map<String, String> extraEnvVariables = new HashMap<>();
 
 	static {
 		try {
@@ -152,13 +155,13 @@ public class Xrootd extends Protocol {
 		}
 	}
 
-	private static String DIFirstConnectMaxCnt = "2";
+	private static String DIConnectionWindow = "3"; // Xrootd default is 2 minutes, which is too long to give up on non-working IPv6 sockets (* number of IPs in the alias)
 
 	private int timeout = 60;
 
 	// last value must be 0 for a clean exit
 	private static final int statRetryTimesXrootd[] = { 1, 5, 10, 0 };
-	private static final int statRetryTimesDCache[] = { 5, 10, 15, 20, 20, 20, 30, 30, 30, 30, 0 };
+	private static final int statRetryTimesDCache[] = { 5, 10, 15, 20, 30, 0 };
 
 	/**
 	 * package protected
@@ -377,6 +380,7 @@ public class Xrootd extends Protocol {
 			final ProcessBuilder pBuilder = new ProcessBuilder(command);
 
 			checkLibraryPath(pBuilder);
+			setCommonEnv(pBuilder, null);
 
 			pBuilder.redirectErrorStream(true);
 
@@ -393,7 +397,7 @@ public class Xrootd extends Protocol {
 			}
 			catch (final InterruptedException ie) {
 				setLastExitStatus(null);
-				throw new IOException("Interrupted while waiting for the following command to finish : " + command.toString(), ie);
+				throw new IOException("Interrupted while waiting for the following command to finish:" + getFormattedLastCommand(), ie);
 			}
 			finally {
 				if (fAuthz != null)
@@ -415,9 +419,9 @@ public class Xrootd extends Protocol {
 				}
 				else
 					if (exitStatus.getExtProcExitStatus() < 0)
-						sMessage = "The following command has timed out and was killed after 1m: " + command.toString();
+						sMessage = "The following command has timed out and was killed after 1m: " + getFormattedLastCommand();
 					else
-						sMessage = "Exit code was " + exitStatus.getExtProcExitStatus() + " for command : " + command.toString();
+						sMessage = "Exit code was " + exitStatus.getExtProcExitStatus() + " for command : " + getFormattedLastCommand();
 
 				throw new TargetException(sMessage);
 			}
@@ -554,6 +558,7 @@ public class Xrootd extends Protocol {
 			final ProcessBuilder pBuilder = new ProcessBuilder(command);
 
 			checkLibraryPath(pBuilder);
+			setCommonEnv(pBuilder, applicationName);
 
 			// 20KB/s should be available to anybody
 			long maxTime = guid.size / 20000;
@@ -583,7 +588,7 @@ public class Xrootd extends Protocol {
 
 				p.destroy();
 
-				throw new SourceException("Interrupted while waiting for the following command to finish : " + command.toString(), ie);
+				throw new SourceException("Interrupted while waiting for the following command to finish:\n" + getFormattedLastCommand(), ie);
 			}
 
 			if (exitStatus.getExtProcExitStatus() != 0) {
@@ -599,9 +604,9 @@ public class Xrootd extends Protocol {
 				}
 				else
 					if (exitStatus.getExtProcExitStatus() < 0)
-						sMessage = "The following command has timed out and was killed after " + maxTime + "s: " + command.toString();
+						sMessage = "The following command has timed out and was killed after " + maxTime + "s:\n" + getFormattedLastCommand();
 					else
-						sMessage = "Exit code was " + exitStatus.getExtProcExitStatus() + " for command : " + command.toString();
+						sMessage = "Exit code was " + exitStatus.getExtProcExitStatus() + " for command:\n" + getFormattedLastCommand();
 
 				throw new SourceException(sMessage);
 			}
@@ -690,17 +695,17 @@ public class Xrootd extends Protocol {
 
 			// no progress bar
 			if (xrootdNewerThan4)
-				command.add("-N");
+				command.add("--nopbar");
 			else
 				command.add("-np");
 
 			// explicitly ask to create intermediate paths
 			if (xrootdNewerThan4)
-				command.add("-p");
+				command.add("--path");
 
-			command.add("-v"); // display summary output
-			command.add("-f"); // re-create a file if already present
-			command.add("-P"); // request POSC (persist-on-successful-close) processing to create a new file
+			command.add("--verbose"); // display summary output
+			command.add("--force"); // re-create a file if already present
+			command.add("--posc"); // request POSC (persist-on-successful-close) processing to create a new file
 
 			/*
 			 * TODO: enable when storages support checksum queries, at the moment most don't if (xrootdNewerThan4 && guid.md5!=null && guid.md5.length()>0){ command.add("-C");
@@ -736,6 +741,7 @@ public class Xrootd extends Protocol {
 			final ProcessBuilder pBuilder = new ProcessBuilder(command);
 
 			checkLibraryPath(pBuilder);
+			setCommonEnv(pBuilder, applicationName);
 
 			// 20KB/s should be available to anybody
 			final long maxTime = timeout + guid.size / 20000;
@@ -758,7 +764,7 @@ public class Xrootd extends Protocol {
 			}
 			catch (final InterruptedException ie) {
 				setLastExitStatus(null);
-				throw new TargetException("Interrupted while waiting for the following command to finish : " + command.toString(), ie);
+				throw new TargetException("Interrupted while waiting for the following command to finish:\n" + getFormattedLastCommand(), ie);
 			}
 
 			if (exitStatus.getExtProcExitStatus() != 0) {
@@ -775,9 +781,9 @@ public class Xrootd extends Protocol {
 				}
 				else
 					if (exitStatus.getExtProcExitStatus() < 0)
-						sMessage = "The following command had timed out and was killed after " + maxTime + "s: " + command.toString();
+						sMessage = "The following command had timed out and was killed after " + maxTime + "s:\n" + getFormattedLastCommand();
 					else
-						sMessage = "Exit code was " + exitStatus.getExtProcExitStatus() + " for command : " + command.toString();
+						sMessage = "Exit code was " + exitStatus.getExtProcExitStatus() + " for command:\n" + getFormattedLastCommand();
 
 				throw new TargetException(sMessage);
 			}
@@ -800,34 +806,56 @@ public class Xrootd extends Protocol {
 		}
 	}
 
-	private final List<String> getCommonArguments(final String defaultApplicationName) {
-		final List<String> ret = new ArrayList<>();
+	private static final String[] XRD_LOGLEVEL = { "Error", "Warning", "Info", "Debug", "Dump" };
 
-		ret.add("-DIFirstConnectMaxCnt");
-		ret.add(DIFirstConnectMaxCnt);
+	/**
+	 * Set some extra environment variable. See the xrdcp manual for all the options.
+	 * 
+	 * @param key environment variable name
+	 * @param value value to set, can be <code>null</code> to remove any existing value
+	 * @return the previously set value for this key
+	 */
+	public String setEnvVariable(final String key, final String value) {
+		return extraEnvVariables.put(key, value);
+	}
 
-		if (xrdcpdebuglevel > 0) {
-			ret.add(xrdcpdebug);
-			ret.add(String.valueOf(xrdcpdebuglevel));
-		}
+	private void setCommonEnv(final ProcessBuilder pBuilder, final String defaultApplicationName) {
+		final Map<String, String> env = new LinkedHashMap<>();
 
-		if (timeout > 0) {
-			ret.add("-DITransactionTimeout");
-			ret.add(String.valueOf(timeout));
+		env.put("XRD_CONNECTIONWINDOW", DIConnectionWindow);
+		env.put("XRD_CONNECTIONRETRY", "1");
+		env.put("XRD_TIMEOUTRESOLUTION", "1");
+		env.put("XRD_PREFERIPV4", "1");
 
-			ret.add("-DIRequestTimeout");
-			ret.add(String.valueOf(timeout));
-		}
-
-		ret.add("-DIReadCacheSize");
-		ret.add("0");
+		if (xrdcpdebuglevel > 0)
+			env.put("XRD_LOGLEVEL", XRD_LOGLEVEL[Math.min(xrdcpdebuglevel, XRD_LOGLEVEL.length) - 1]);
 
 		final String appName = ConfigUtils.getApplicationName(defaultApplicationName);
 
-		if (appName != null) {
-			ret.add("-ODeos.app=" + appName);
-			ret.add("-DSAppName=" + appName);
+		if (appName != null)
+			env.put("XRD_APPNAME", appName);
+
+		if (timeout > 0)
+			env.put("XRD_REQUESTTIMEOUT", String.valueOf(timeout));
+
+		for (final Map.Entry<String, String> entry : extraEnvVariables.entrySet()) {
+			if (entry.getValue() != null)
+				env.put(entry.getKey(), entry.getValue());
+			else
+				env.remove(entry.getKey());
 		}
+
+		setLastCommandEnv(env);
+		pBuilder.environment().putAll(env);
+	}
+
+	private static final List<String> getCommonArguments(final String defaultApplicationName) {
+		final List<String> ret = new ArrayList<>();
+
+		final String appName = ConfigUtils.getApplicationName(defaultApplicationName);
+
+		if (appName != null)
+			ret.add("-ODeos.app=" + appName);
 
 		return ret;
 	}
@@ -962,11 +990,12 @@ public class Xrootd extends Protocol {
 
 		command.add(path);
 
-		setLastCommand(command);
-
 		final ProcessBuilder pBuilder = new ProcessBuilder(command);
 
+		setLastCommand(command);
+
 		checkLibraryPath(pBuilder);
+		setCommonEnv(pBuilder, null);
 
 		pBuilder.redirectErrorStream(true);
 
@@ -982,18 +1011,19 @@ public class Xrootd extends Protocol {
 				setLastExitStatus(exitStatus);
 			}
 			else
-				throw new IOException("Cannot start process " + command.toString());
+				throw new IOException("Cannot execute this command:\n" + getFormattedLastCommand());
 		}
 		catch (final InterruptedException ie) {
 			setLastExitStatus(null);
-			throw new IOException("Interrupted while waiting for the following command to finish : " + command.toString(), ie);
+			throw new IOException("Interrupted while waiting for the following command to finish:\n" + getFormattedLastCommand(), ie);
 		}
 
 		if (exitStatus.getExtProcExitStatus() < 0)
-			throw new IOException("Prepare command has timed out and was killed after 15s:\n" + command + "\n" + exitStatus.getStdOut());
+			throw new IOException("Prepare command has timed out and was killed after 15s:\n" + getFormattedLastCommand() + "\n\nOutput so far was:\n" + exitStatus.getStdOut());
 
 		if (exitStatus.getExtProcExitStatus() > 0)
-			throw new IOException("Prepare command exited with exit code: " + exitStatus.getExtProcExitStatus() + ", full command and output is below:\n" + command + "\n" + exitStatus.getStdOut());
+			throw new IOException("Prepare command exited with exit code: " + exitStatus.getExtProcExitStatus() + ", full command and output is below:\n" + getFormattedLastCommand() + "\n"
+					+ exitStatus.getStdOut());
 	}
 
 	/**
@@ -1055,35 +1085,39 @@ public class Xrootd extends Protocol {
 				final ProcessBuilder pBuilder = new ProcessBuilder(command);
 
 				checkLibraryPath(pBuilder);
+				setCommonEnv(pBuilder, null);
 
 				pBuilder.redirectErrorStream(true);
 
 				ExitStatus exitStatus;
+
+				final int sleep = statRetryTimes[statRetryCounter];
+
+				final int processTimeout = (sleep == 0 || !retryWithDelay) ? 30 : 15;
 
 				try {
 					final Process p = pBuilder.start();
 
 					if (p != null) {
 						final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
-						pTimeout.waitFor(15, TimeUnit.SECONDS);
+						pTimeout.waitFor(processTimeout, TimeUnit.SECONDS);
 						exitStatus = pTimeout.getExitStatus();
 						setLastExitStatus(exitStatus);
 					}
 					else
-						throw new IOException("Cannot execute command: " + command);
+						throw new IOException("Cannot execute command:\n" + getFormattedLastCommand());
 				}
 				catch (final InterruptedException ie) {
 					setLastExitStatus(null);
-					throw new IOException("Interrupted while waiting for the following command to finish : " + command.toString(), ie);
+					throw new IOException("Interrupted while waiting for the following command to finish:\n" + getFormattedLastCommand(), ie);
 				}
-
-				final int sleep = statRetryTimes[statRetryCounter];
 
 				if (exitStatus.getExtProcExitStatus() != 0) {
 					if (sleep == 0 || !retryWithDelay) {
-						final String message = exitStatus.getExtProcExitStatus() > 0 ? "Exit code was " + exitStatus.getExtProcExitStatus() : "Command has timed out and was killed after 15s";
+						final String message = exitStatus.getExtProcExitStatus() > 0 ? "Exit code was " + exitStatus.getExtProcExitStatus()
+								: "Command has timed out and was killed after " + processTimeout + "s";
 						throw new IOException(
-								message + ", retry #" + (statRetryCounter + 1) + ", output was " + cleanupXrdOutput(exitStatus.getStdOut()) + ", " + "for command : " + command.toString());
+								message + ", retry #" + (statRetryCounter + 1) + ", output was " + cleanupXrdOutput(exitStatus.getStdOut()) + ", " + "for command:\n" + getFormattedLastCommand());
 					}
 
 					Thread.sleep(sleep * 1000);
@@ -1173,10 +1207,10 @@ public class Xrootd extends Protocol {
 
 		try {
 			if (source.ticket == null || source.ticket.type != AccessType.READ)
-				throw new IOException("The ticket for source PFN " + source.toString() + " could not be found or is not a READ one.");
+				throw new IOException("The ticket for source PFN " + source.toString() + " " + (source.ticket == null ? "could not be found" : "is not a READ one (" + source.ticket.type + ")"));
 
 			if (target.ticket == null || target.ticket.type != AccessType.WRITE)
-				throw new IOException("The ticket for target PFN " + target.toString() + " could not be found or is not a WRITE one.");
+				throw new IOException("The ticket for target PFN " + target.toString() + " " + (target.ticket == null ? "could not be found" : "is not a WRITE one (" + target.ticket.type + ")"));
 
 			final List<String> command = new LinkedList<>();
 			command.add(xrootd_default_path + "/bin/xrdcp");
@@ -1191,10 +1225,7 @@ public class Xrootd extends Protocol {
 			command.add("--posc");
 			command.add("--nopbar");
 
-			final String appName = ConfigUtils.getApplicationName("transfer-3rd");
-
-			if (appName != null)
-				command.add("-ODeos.app=" + appName);
+			command.addAll(getCommonArguments("transfer-3rd"));
 
 			final boolean sourceEnvelope = source.ticket != null && source.ticket.envelope != null;
 
@@ -1239,6 +1270,7 @@ public class Xrootd extends Protocol {
 			final ProcessBuilder pBuilder = new ProcessBuilder(command);
 
 			checkLibraryPath(pBuilder);
+			setCommonEnv(pBuilder, null);
 
 			long seconds = source.getGuid().size / 200000; // average target
 			// speed: 200KB/s
@@ -1259,11 +1291,11 @@ public class Xrootd extends Protocol {
 					setLastExitStatus(exitStatus);
 				}
 				else
-					throw new IOException("Cannot execute command: " + command);
+					throw new IOException("Cannot execute command:\n" + getFormattedLastCommand());
 			}
 			catch (final InterruptedException ie) {
 				setLastExitStatus(null);
-				throw new IOException("Interrupted while waiting for the following command to finish : " + command.toString(), ie);
+				throw new IOException("Interrupted while waiting for the following command to finish:\n" + getFormattedLastCommand(), ie);
 			}
 
 			if (exitStatus.getExtProcExitStatus() != 0) {
@@ -1279,9 +1311,9 @@ public class Xrootd extends Protocol {
 				}
 				else
 					if (exitStatus.getExtProcExitStatus() < 0)
-						sMessage = "The following command has timed out and was killed after " + seconds + "s: " + command.toString();
+						sMessage = "The following command has timed out and was killed after " + seconds + "s:\n" + getFormattedLastCommand();
 					else
-						sMessage = "Exit code was " + exitStatus.getExtProcExitStatus() + " for command : " + command.toString();
+						sMessage = "Exit code was " + exitStatus.getExtProcExitStatus() + " for command:\n" + getFormattedLastCommand();
 
 				if (exitStatus.getExtProcExitStatus() == 5 && exitStatus.getStdOut().indexOf("source or destination has 0 size") >= 0) {
 					logger.log(Level.WARNING, "Retrying xrdstat, maybe the file shows up with the correct size in a few seconds");
@@ -1480,6 +1512,7 @@ public class Xrootd extends Protocol {
 			pBuilder = new ProcessBuilder(command);
 
 			checkLibraryPath(pBuilder);
+			setCommonEnv(pBuilder, null);
 
 			pBuilder.redirectErrorStream(true);
 
@@ -1493,7 +1526,7 @@ public class Xrootd extends Protocol {
 					setLastExitStatus(exitStatus);
 				}
 				else
-					throw new IOException("Cannot execute command: " + command);
+					throw new IOException("Cannot execute command:\n" + getFormattedLastCommand());
 
 				try (BufferedReader br = new BufferedReader(new StringReader(exitStatus.getStdOut()))) {
 					String line;
@@ -1544,7 +1577,7 @@ public class Xrootd extends Protocol {
 			}
 			catch (final InterruptedException ie) {
 				setLastExitStatus(null);
-				throw new IOException("Interrupted while waiting for the following command to finish : " + command.toString(), ie);
+				throw new IOException("Interrupted while waiting for the following command to finish:\n" + getFormattedLastCommand(), ie);
 			}
 		}
 
@@ -1603,6 +1636,7 @@ public class Xrootd extends Protocol {
 			pBuilder = new ProcessBuilder(command);
 
 			checkLibraryPath(pBuilder);
+			setCommonEnv(pBuilder, null);
 
 			pBuilder.redirectErrorStream(true);
 
@@ -1616,7 +1650,7 @@ public class Xrootd extends Protocol {
 					setLastExitStatus(exitStatus);
 				}
 				else
-					throw new IOException("Cannot execute command: " + command);
+					throw new IOException("Cannot execute command:\n" + getFormattedLastCommand());
 
 				try (BufferedReader br = new BufferedReader(new StringReader(exitStatus.getStdOut()))) {
 					String line;
@@ -1666,7 +1700,7 @@ public class Xrootd extends Protocol {
 			}
 			catch (final InterruptedException ie) {
 				setLastExitStatus(null);
-				throw new IOException("Interrupted while waiting for the following command to finish : " + command.toString(), ie);
+				throw new IOException("Interrupted while waiting for the following command to finish:\n" + getFormattedLastCommand(), ie);
 			}
 		}
 
@@ -1688,6 +1722,7 @@ public class Xrootd extends Protocol {
 		pBuilder = new ProcessBuilder(command);
 
 		checkLibraryPath(pBuilder);
+		setCommonEnv(pBuilder, null);
 
 		pBuilder.redirectErrorStream(true);
 
@@ -1701,7 +1736,7 @@ public class Xrootd extends Protocol {
 				setLastExitStatus(exitStatus);
 			}
 			else
-				throw new IOException("Cannot execute command: " + command);
+				throw new IOException("Cannot execute command:\n" + getFormattedLastCommand());
 
 			try (BufferedReader br = new BufferedReader(new StringReader(exitStatus.getStdOut()))) {
 				String line = br.readLine();
@@ -1721,9 +1756,18 @@ public class Xrootd extends Protocol {
 		}
 		catch (final InterruptedException ie) {
 			setLastExitStatus(null);
-			throw new IOException("Interrupted while waiting for the following command to finish : " + command.toString(), ie);
+			throw new IOException("Interrupted while waiting for the following command to finish:\n" + getFormattedLastCommand(), ie);
 		}
 
 		return ret;
+	}
+	
+	@Override
+	public Object clone() {
+		final Xrootd theClone = (Xrootd) super.clone();
+		
+		theClone.extraEnvVariables = new HashMap<>(this.extraEnvVariables);
+		
+		return theClone;
 	}
 }
