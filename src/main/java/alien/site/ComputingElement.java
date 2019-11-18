@@ -2,6 +2,7 @@ package alien.site;
 
 import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.UnsupportedEncodingException;
@@ -70,6 +71,13 @@ public class ComputingElement extends Thread {
 			logger = LogUtils.redirectToCustomHandler(logger, host_logdir_resolved + "/CE");
 
 			queue = getBatchQueue((String) config.get("ce_type"));
+
+			if (config.containsKey("proxy_cache_file")) {
+				int ttl = ((Integer) siteMap.get("TTL")).intValue();
+				TokenFileGenerationThread tk = new TokenFileGenerationThread((String) config.get("proxy_cache_file"),
+						this.logger, ttl);
+				tk.start();
+			}
 
 		}
 		catch (final Exception e) {
@@ -260,6 +268,16 @@ public class ComputingElement extends Thread {
 
 		// prepare the jobagent token certificate
 		before += "export JALIEN_TOKEN_CERT=\"" + token_cert_str + "\";\n" + "export JALIEN_TOKEN_KEY=\"" + token_key_str + "\";\n";
+		if (config.containsKey("proxy_cache_file")) {
+			String resolvedPath = Functions.resolvePathWithEnv((String) (config.get("proxy_cache_file")));
+			before += "if test -f \'"
+				+ resolvedPath
+				+ "\' ; then\n";
+			before += "source "
+				+ resolvedPath
+				+ "\n";
+			before += "fi\n";
+		}
 
 		// pass environment variables
 		if (config.containsKey("host_logdir") || config.containsKey("site_logdir"))
@@ -334,6 +352,51 @@ public class ComputingElement extends Thread {
 		}
 
 		return null;
+	}
+
+	final class TokenFileGenerationThread extends Thread {
+		File tokenFile;
+		String resolvedPath;
+		Logger log;
+		final int ttlDays;
+
+		public TokenFileGenerationThread(String tokenFilePath, Logger logr, int ttl) {
+			this.resolvedPath = Functions.resolvePathWithEnv(tokenFilePath);
+			ttl = ttl / 3600 / 24 + 1;
+			this.ttlDays = ttl;
+			this.log = logr;
+		}
+
+		public void run() {
+			tokenFile = new File(resolvedPath);
+			try {
+				log.info("Starting");
+				if (tokenFile.createNewFile() == false) {
+					log.info("Could not create, already exists");
+				}
+
+				setName("Token file generation thread");
+				while (true) {
+					log.info("Starting loop");
+					try (FileOutputStream writer = new FileOutputStream(tokenFile)) {
+						String[] certs = getTokenCertificate(ttlDays);
+						String certCmd = "export JALIEN_TOKEN_CERT=\""
+								+ certs[0].trim() + "\";\n";
+						String keyCmd = "export JALIEN_TOKEN_KEY=\""
+								+ certs[1].trim() + "\";\n";
+						writer.write((certCmd + keyCmd).getBytes());
+						log.info("Sleep");
+						Thread.sleep(5 * 60 * 1000);
+					} catch (Exception e) {
+						e.printStackTrace();
+						break;
+					}
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+				return;
+			}
+		}
 	}
 
 	private static String runFromCVMFS() {
