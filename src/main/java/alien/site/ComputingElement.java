@@ -355,7 +355,6 @@ public class ComputingElement extends Thread {
 	}
 
 	final class TokenFileGenerationThread extends Thread {
-		File tokenFile;
 		String resolvedPath;
 		Logger log;
 		final int ttlDays;
@@ -368,33 +367,30 @@ public class ComputingElement extends Thread {
 		}
 
 		public void run() {
-			tokenFile = new File(resolvedPath);
-			try {
-				log.info("Starting");
-				if (tokenFile.createNewFile() == false) {
-					log.info("Could not create, already exists");
-				}
+			log.info("Starting");
 
-				setName("Token file generation thread");
-				while (true) {
-					log.info("Starting loop");
-					try (FileOutputStream writer = new FileOutputStream(tokenFile)) {
-						String[] certs = getTokenCertificate(ttlDays);
+			setName("Token file generation thread");
+			while (true) {
+				log.info("Starting loop");
+				String[] certs = getTokenCertificate(ttlDays);
+				if (certs != null) {
+					try (FileOutputStream writer = new FileOutputStream(resolvedPath)) {
 						String certCmd = "export JALIEN_TOKEN_CERT=\""
 								+ certs[0].trim() + "\";\n";
 						String keyCmd = "export JALIEN_TOKEN_KEY=\""
 								+ certs[1].trim() + "\";\n";
 						writer.write((certCmd + keyCmd).getBytes());
-						log.info("Sleep");
-						Thread.sleep(5 * 60 * 1000);
 					} catch (Exception e) {
 						e.printStackTrace();
 						break;
 					}
 				}
-			} catch (IOException e) {
-				e.printStackTrace();
-				return;
+				try {
+					log.info("Sleep");
+					Thread.sleep(5 * 60 * 1000);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
 			}
 		}
 	}
