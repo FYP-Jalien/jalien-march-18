@@ -6,7 +6,6 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.io.StringReader;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -19,15 +18,11 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
-import java.util.concurrent.TimeUnit;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import alien.test.utils.Functions;
-import lia.util.process.ExternalProcess.ExitStatus;
-import utils.ProcessWithTimeout;
 
 /**
  * @author mmmartin
@@ -70,6 +65,8 @@ public class HTCONDOR extends BatchQueue {
 		}
 
 		this.killCmd = (config.get("CE_KILLCMD") != null ? (String) config.get("CE_KILLCMD") : "condor_rm");
+
+		this.additional_env_vars.put("X509_USER_PROXY", System.getenv("X509_USER_PROXY"));
 	}
 
 	/**
@@ -425,51 +422,4 @@ public class HTCONDOR extends BatchQueue {
 		}
 		return 0;
 	}
-
-	// Previously named "_system" in perl
-	private ArrayList<String> executeCommand(String cmd) {
-		ArrayList<String> proc_output = new ArrayList<>();
-		try {
-			ArrayList<String> cmd_full = new ArrayList<>();
-			cmd_full.add("/bin/bash");
-			cmd_full.add("-c");
-			cmd_full.add(cmd);
-			final ProcessBuilder proc_builder = new ProcessBuilder(cmd_full);
-
-			Map<String, String> env = proc_builder.environment();
-			env.clear();
-
-			final HashMap<String, String> additional_env_vars = new HashMap<>();
-			additional_env_vars.put("X509_USER_PROXY", System.getenv("X509_USER_PROXY"));
-			additional_env_vars.put("LD_LIBRARY_PATH", System.getenv("LD_LIBRARY_PATH"));
-			additional_env_vars.put("PATH", System.getenv("PATH"));
-			env.putAll(additional_env_vars);
-
-			proc_builder.redirectErrorStream(false);
-
-			final Process proc = proc_builder.start();
-
-			final ProcessWithTimeout pTimeout = new ProcessWithTimeout(proc, proc_builder);
-
-			pTimeout.waitFor(60, TimeUnit.SECONDS);
-
-			final ExitStatus exitStatus = pTimeout.getExitStatus();
-			logger.info("Process exit status: " + exitStatus.getExecutorFinishStatus());
-
-			if (exitStatus.getExtProcExitStatus() == 0) {
-				final BufferedReader reader = new BufferedReader(new StringReader(exitStatus.getStdOut()));
-
-				String output_str;
-
-				while ((output_str = reader.readLine()) != null)
-					proc_output.add(output_str.trim());
-			}
-		}
-		catch (final Throwable t) {
-			logger.log(Level.WARNING, "Exception executing command: " + cmd, t);
-		}
-		this.logger.info("[HTCONDOR] Command output: " + proc_output);
-		return proc_output;
-	}
-
 }

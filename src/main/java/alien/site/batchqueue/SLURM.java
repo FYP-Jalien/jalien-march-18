@@ -8,9 +8,6 @@ import java.util.logging.Logger;
 import java.util.TreeSet;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
-import java.io.StringReader;
-import java.util.logging.Level;
 import java.sql.Timestamp;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
@@ -21,10 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.FileNotFoundException;
-
 import alien.test.utils.Functions;
-import lia.util.process.ExternalProcess.ExitStatus;
-import utils.ProcessWithTimeout;
 
 public class SLURM extends BatchQueue {
 
@@ -103,8 +97,6 @@ public class SLURM extends BatchQueue {
 	public void submit(final String script) {
 
 		this.logger.info("Submit SLURM");
-
-		String cm = String.format("%s:%s", this.config.get("host_host"), this.config.get("host_port"));
 
 		DateFormat date_format = new SimpleDateFormat("yyyy-MM-dd");
 		String current_date_str = date_format.format(new Date());
@@ -283,49 +275,4 @@ public class SLURM extends BatchQueue {
 		}
 		return 0;
 	}
-
-	private ArrayList<String> executeCommand(String cmd) {
-		ArrayList<String> proc_output = new ArrayList<>();
-		try {
-			ArrayList<String> cmd_full = new ArrayList<>();
-			cmd_full.add("/bin/bash");
-			cmd_full.add("-c");
-			cmd_full.add(cmd);
-			final ProcessBuilder proc_builder = new ProcessBuilder(cmd_full);
-
-			Map<String, String> env = proc_builder.environment();
-			env.clear();
-
-			final HashMap<String, String> additional_env_vars = new HashMap<>();
-			additional_env_vars.put("LD_LIBRARY_PATH", System.getenv("LD_LIBRARY_PATH"));
-			additional_env_vars.put("PATH", System.getenv("PATH"));
-			env.putAll(additional_env_vars);
-
-			proc_builder.redirectErrorStream(false);
-
-			final Process proc = proc_builder.start();
-
-			final ProcessWithTimeout pTimeout = new ProcessWithTimeout(proc, proc_builder);
-
-			pTimeout.waitFor(60, TimeUnit.SECONDS);
-
-			final ExitStatus exitStatus = pTimeout.getExitStatus();
-			logger.info("Process exit status: " + exitStatus.getExecutorFinishStatus());
-
-			if (exitStatus.getExtProcExitStatus() == 0) {
-				final BufferedReader reader = new BufferedReader(new StringReader(exitStatus.getStdOut()));
-
-				String output_str;
-
-				while ((output_str = reader.readLine()) != null)
-					proc_output.add(output_str.trim());
-			}
-		}
-		catch (final Throwable t) {
-			logger.log(Level.WARNING, "Exception executing command: " + cmd, t);
-		}
-		this.logger.info("[SLURM] Command output: " + proc_output);
-		return proc_output;
-	}
-
 }
