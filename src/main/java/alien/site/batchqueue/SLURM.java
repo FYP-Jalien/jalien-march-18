@@ -145,11 +145,6 @@ public class SLURM extends BatchQueue {
 
 		submit_cmd += String.format("#SBATCH -J %s\n", name);
 		submit_cmd += String.format("#SBATCH -D %s\n", workdir_path_resolved);
-		if (((String) config.get("host_host")).contains("cori")) {
-			submit_cmd += "#SBATCH -C haswell\n";
-		} else {
-			submit_cmd += "#SBATCH --reservation=Zach\n";
-		}
 		submit_cmd += "#SBATCH -N 1\n";
 		submit_cmd += "#SBATCH -n 1\n";
 		submit_cmd += "#SBATCH --no-requeue\n";
