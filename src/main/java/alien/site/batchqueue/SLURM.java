@@ -8,7 +8,6 @@ import java.util.logging.Logger;
 import java.util.TreeSet;
 import java.util.ArrayList;
 import java.util.List;
-import java.sql.Timestamp;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
@@ -115,16 +114,16 @@ public class SLURM extends BatchQueue {
 		}
 
 		// Generate name for SLURM output files
-		Timestamp timestamp = new Timestamp(System.currentTimeMillis());
+		Long timestamp = System.currentTimeMillis();
 		String file_base_name = String.format("%s/jobagent_%s_%d",
 				Functions.resolvePathWithEnv(log_folder_path), config.get("host_host"),
-				Long.valueOf(timestamp.getTime()));
+				timestamp);
 
 		// Put generate output options
 		String out_cmd = "";
 		String err_cmd = "";
 		String name = String.format("jobagent_%s_%d", this.config.get("host_host"),
-				Long.valueOf(timestamp.getTime()));
+				timestamp);
 		File enable_sandbox_file = new File(environment.get("TMP") + "/enable-sandbox");
 		if (enable_sandbox_file.exists() || (this.logger.getLevel() != null)) {
 			out_cmd = String.format("#SBATCH -o %s.out", file_base_name);
@@ -139,7 +138,7 @@ public class SLURM extends BatchQueue {
 
 		// Create JobAgent workdir
 		String workdir_path = String.format("%s/jobagent_%s_%d", config.get("host_workdir"),
-				config.get("host_host"), Long.valueOf(timestamp.getTime()));
+				config.get("host_host"), timestamp);
 		final String workdir_path_resolved = Functions.resolvePathWithEnv(workdir_path);
 		File workdir_file = new File(workdir_path_resolved);
 		workdir_file.mkdir();
