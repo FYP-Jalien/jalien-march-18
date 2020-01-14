@@ -98,4 +98,11 @@ public abstract class BatchQueue {
 		this.logger.info("[BatchQueue] Command output: " + proc_output);
 		return proc_output;
 	}
+
+	public final String getValue(final String keyValue, final String key, final String defaultValue){
+		if (keyValue.startsWith(key+'='))
+			return keyValue.substring(key.length()+1).trim();
+
+		return defaultValue;
+	}
 }

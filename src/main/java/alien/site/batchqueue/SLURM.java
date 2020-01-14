@@ -51,35 +51,32 @@ public class SLURM extends BatchQueue {
 		this.temp_file = null;
 
 		// Get SLURM
-		this.submitCmd = (config.get("CE_SUBMITCMD") != null ? (String) config.get("CE_SUBMITCMD") : "sbatch");
-		this.killCmd = (config.get("CE_KILLCMD") != null ? (String) config.get("CE_KILLCMD") : "scancel");
-		this.statusCmd = (config.get("CE_STATUSCMD") != null ? (String) config.get("CE_STATUSCMD") : "squeue");
+		this.submitCmd = (String) config.getOrDefault("CE_SUBMITCMD", "sbatch");
+		this.killCmd = (String) config.getOrDefault("CE_KILLCMD", "scancel");
+		this.statusCmd = (String) config.getOrDefault("CE_STATUSCMD", "squeue");
 
 		// Get args from the environment
 		if (envFromConfig != null) {
 			for (String env_field : envFromConfig) {
 				if (env_field.contains("SUBMIT_ARGS")) {
-					this.submitArgs = env_field.split("=")[1];
+					this.submitArgs = getValue(env_field, "SUBMIT_ARGS", this.submitArgs);
 				}
 				if (env_field.contains("STATUS_ARGS")) {
-					this.statusArgs = env_field.split("=")[1];
+					this.statusArgs = getValue(env_field, "STATUS_ARGS", this.statusArgs);
 				}
 				if (env_field.contains("RUN_ARGS")) {
-					this.runArgs = env_field.split("=")[1];
+					this.runArgs = getValue(env_field, "RUN_ARGS", this.runArgs);
 				}
 				if (env_field.contains("KILL_ARGS")) {
-					this.runArgs = env_field.split("=")[1];
+					this.killArgs = getValue(env_field, "KILL_ARGS", this.killArgs);
 				}
 			}
 		}
-		if (environment.get("SUBMIT_ARGS") != null)
-			this.submitArgs = environment.get("SUBMIT_ARGS");
-		if (environment.get("STATUS_ARGS") != null)
-			this.statusArgs = environment.get("STATUS_ARGS");
-		if (environment.get("RUN_ARGS") != null)
-			this.runArgs = environment.get("RUN_ARGS");
-		if (environment.get("KILL_ARGS") != null)
-			this.killArgs = environment.get("RUN_ARGS");
+
+		this.submitArgs = environment.getOrDefault("SUBMIT_ARGS", submitArgs);
+		this.statusArgs = environment.getOrDefault("STATUS_ARGS", this.statusArgs);
+		this.runArgs = environment.getOrDefault("RUN_ARGS", this.runArgs);
+		this.killArgs = environment.getOrDefault("RUN_ARGS", this.killArgs);
 
 		user = environment.get("USER");
 
