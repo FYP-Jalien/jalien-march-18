@@ -371,7 +371,6 @@ public class ComputingElement extends Thread {
 
 			setName("Token file generation thread");
 			while (true) {
-				log.info("Starting loop");
 				String[] certs = getTokenCertificate(ttlDays);
 				if (certs != null) {
 					try (FileOutputStream writer = new FileOutputStream(resolvedPath)) {
@@ -381,15 +380,14 @@ public class ComputingElement extends Thread {
 								+ certs[1].trim() + "\";\n";
 						writer.write((certCmd + keyCmd).getBytes());
 					} catch (Exception e) {
-						e.printStackTrace();
+						log.log(Level.WARNING, "Exception writing token to "+resolvedPath, e);
 						break;
 					}
 				}
 				try {
-					log.info("Sleep");
 					Thread.sleep(5 * 60 * 1000);
-				} catch (Exception e) {
-					e.printStackTrace();
+				} catch (InterruptedException e) {
+					logger.log(Level.WARNING, "Getting JobAgent TokenCertificate failed", e);
 				}
 			}
 		}
