@@ -55,6 +55,11 @@ public class SLURM extends BatchQueue {
 		this.killCmd = (String) config.getOrDefault("CE_KILLCMD", "scancel");
 		this.statusCmd = (String) config.getOrDefault("CE_STATUSCMD", "squeue");
 
+		this.submitArgs = (String) config.getOrDefault("CE_SUBMITARG", "");
+		this.killArgs = (String) config.getOrDefault("CE_KILLARG", "");
+		this.runArgs = (String) config.getOrDefault("CE_RUNARG", "");
+		this.statusArgs = (String) config.getOrDefault("CE_STATUSARG", "");
+
 		// Get args from the environment
 		if (envFromConfig != null) {
 			for (String env_field : envFromConfig) {
