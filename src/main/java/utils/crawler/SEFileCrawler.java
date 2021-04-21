@@ -12,6 +12,7 @@ import static utils.crawler.CrawlingStatusCode.E_UNEXPECTED_ERROR;
 import static utils.crawler.CrawlingStatusCode.S_FILE_CHECKSUM_MATCH;
 import static utils.crawler.CrawlingStatusCode.S_FILE_CHECKSUM_MISMATCH;
 import alien.catalogue.GUID;
+import alien.catalogue.GUIDUtils;
 import alien.catalogue.PFN;
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
@@ -429,11 +430,11 @@ public class SEFileCrawler {
 					if (Long.valueOf(0).equals(catalogueFileSize))
 						status = new CrawlingStatus(E_FILE_EMPTY, "Catalogue file size is 0");
 					else if (catalogueMD5 == null) {
-//						GUIDUtils.updateMd5(guid.guid, observedMD5);
+						GUIDUtils.updateMd5(guid.guid, observedMD5);
 						status = new CrawlingStatus(E_CATALOGUE_MD5_IS_NULL, "Catalogue MD5 is null");
 					}
 					else if (catalogueMD5.isBlank()) {
-//						GUIDUtils.updateMd5(guid.guid, observedMD5);
+						GUIDUtils.updateMd5(guid.guid, observedMD5);
 						status = new CrawlingStatus(E_CATALOGUE_MD5_IS_BLANK, "Catalogue MD5 is blank");
 					}
 					else if (!catalogueMD5.equalsIgnoreCase(observedMD5))
