@@ -116,7 +116,7 @@ public final class CatalogueUtils {
 	 */
 	public static final long CACHE_TIMEOUT = 1000 * 60 * 5;
 
-	private static final void updateGuidIndexCache() {
+	private static void updateGuidIndexCache() {
 		guidIndexReadLock.lock();
 
 		try {
@@ -465,9 +465,9 @@ public final class CatalogueUtils {
 					do {
 						read = 0;
 
-						final String q = "select guid,size from G" + idx.tableName + "L LIMIT " + LIMIT + " OFFSET " + offset + ";";
+						final String q = "select guid,size from G" + idx.tableName + "L LIMIT ? OFFSET ?;";
 
-						while (!gdb.query(q))
+						while (!gdb.query(q, false, Long.valueOf(LIMIT), Long.valueOf(offset)))
 							System.err.println("Retrying query " + q);
 
 						while (gdb.moveNext()) {

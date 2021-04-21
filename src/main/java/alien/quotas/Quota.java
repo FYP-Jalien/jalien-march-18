@@ -4,8 +4,7 @@
 package alien.quotas;
 
 import java.io.Serializable;
-import java.util.ArrayList;
-import java.util.Arrays;
+import java.util.Set;
 import java.util.logging.Logger;
 
 import alien.config.ConfigUtils;
@@ -111,7 +110,7 @@ public class Quota implements Serializable, Comparable<Quota> {
 	/**
 	 * Fields allowed to modify via jquota set command
 	 */
-	private final static ArrayList<String> allowed_to_update = new ArrayList<>(Arrays.asList("maxUnfinishedJobs", "maxTotalCpuCost", "maxTotalRunningTime"));
+	private final static Set<String> allowed_to_update = Set.of("maxUnfinishedJobs", "maxTotalCpuCost", "maxTotalRunningTime");
 
 	/**
 	 * @param db

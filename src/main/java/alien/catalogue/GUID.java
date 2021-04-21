@@ -270,8 +270,8 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 			}
 
 			// only the SE list can change, and the size for a collection, and md5 when it was missing
-			if (!db.query("UPDATE G" + tableName + "L SET seStringlist=" + setToString(seStringList) + ", size=" + size + ", md5='" + Format.escSQL(md5) + "', owner='" + Format.escSQL(owner)
-					+ "', gowner='" + Format.escSQL(gowner) + "',perm='" + Format.escSQL(perm) + "' WHERE guidId=" + guidId))
+			if (!db.query("UPDATE G" + tableName + "L SET seStringlist=?, size=?, md5=?, owner=?, gowner=?,perm=? WHERE guidId=?", false, setToString(seStringList),
+					Long.valueOf(size), md5, owner, gowner, perm, Integer.valueOf(guidId)))
 				// wrong table name or what?
 				return false;
 
@@ -537,21 +537,12 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 
 			guidIDs.drainTo(toExecute);
 
-			final StringBuilder sb = new StringBuilder(guidIDs.size() * 10);
-
-			for (final Integer id : toExecute) {
-				if (sb.length() > 0)
-					sb.append(",");
-
-				sb.append(id.toString());
-			}
-
 			if (monitor != null)
 				monitor.incrementCounter("GUID_flush");
 
-			if (sb.length() > 0)
+			if (toExecute.size() > 0)
 				try (DBFunctions db = host.getDB()) {
-					db.query("DELETE FROM G" + tableName + "L" + tableSuffix + " WHERE guidId IN (" + sb.toString() + ")");
+					db.query("DELETE FROM G" + tableName + "L" + tableSuffix + " WHERE guidId IN (" + Format.toCommaList(toExecute) + ")");
 				}
 
 			return true;
@@ -787,7 +778,7 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 
 					final SE se = SEUtils.getSE(pfn.seNumber);
 
-					if (se != null && !(se.getName().equalsIgnoreCase("no_se"))) {
+					if (se != null && !("no_se".equalsIgnoreCase(se.getName()))) {
 						final GUID g = pfn.getGuid();
 
 						if (g != null && g.guid != null) {
@@ -874,7 +865,7 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 	/**
 	 * This method is _not_ authoritative, if you want to do the actual lookup to see which LFNs point to this GUID then use {@link LFNUtils#getLFN(GUID)}.
 	 * Should only be called when the previous code has filled the cache with known LFN objects.
-	 * 
+	 *
 	 * @return the <b>cached</b> LFNs associated to this GUID, from either the internal cache or the G*L_REF tables.
 	 */
 	public Set<LFN> getLFNs() {
@@ -1020,7 +1011,7 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 
 	/**
 	 * Change the access permissions on this LFN
-	 * 
+	 *
 	 * @param newPermissions
 	 * @return the previous permissions, if anything changed and the change was successfully propagated to the database, or <code>null</code> if nothing was touched
 	 */
@@ -1065,7 +1056,7 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 
 	/**
 	 * Get the two digit hash (first level of folders in a storage)
-	 * 
+	 *
 	 * @param guid
 	 * @return chash
 	 */
@@ -1152,7 +1143,7 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 
 	/**
 	 * Get the replica from a particular SE
-	 * 
+	 *
 	 * @param seNumber
 	 * @return the PFN to the replica on this storage element, if it exists
 	 */

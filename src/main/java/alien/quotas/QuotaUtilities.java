@@ -178,13 +178,13 @@ public final class QuotaUtilities {
 	public static boolean saveJobQuota(final String username, final String fld, final String val) {
 		if (!Quota.canUpdateField(fld))
 			return false;
+
 		try (DBFunctions db = ConfigUtils.getDB("processes")) {
-			final String query = "UPDATE PRIORITY p LEFT JOIN QUEUE_USER qu " + "ON qu.user='" + Format.escSQL(username) + "' SET p." + Format.escSQL(fld) + "=" + Format.escSQL(val)
-					+ " WHERE qu.userid=p.userid";
+			final String query = "UPDATE PRIORITY p LEFT JOIN QUEUE_USER qu ON qu.user=? SET p." + Format.escSQL(fld) + "=? WHERE qu.userid=p.userid";
 
 			db.setQueryTimeout(120);
 
-			if (db.query(query)) {
+			if (db.query(query, false, username, val)) {
 				jobQuotasLastUpdated = 0;
 				updateJobQuotasCache();
 			}
@@ -226,11 +226,11 @@ public final class QuotaUtilities {
 			return false;
 
 		try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
-			final String query = "UPDATE FQUOTAS SET " + Format.escSQL(fld) + "='" + Format.escSQL(val) + "'" + " WHERE user='" + Format.escSQL(username) + "'";
+			final String query = "UPDATE FQUOTAS SET " + Format.escSQL(fld) + "=? WHERE user=?";
 
 			db.setQueryTimeout(120);
 
-			if (db.query(query)) {
+			if (db.query(query, false, val, username)) {
 				fileQuotasLastUpdated = 0;
 				updateFileQuotasCache();
 			}
@@ -246,7 +246,7 @@ public final class QuotaUtilities {
 	 *
 	 * @return file quota for all accounts, sorted by username
 	 */
-	public static final List<Quota> getJobQuotas() {
+	public static List<Quota> getJobQuotas() {
 		updateJobQuotasCache();
 
 		if (jobQuotas == null)
@@ -264,7 +264,7 @@ public final class QuotaUtilities {
 	 *
 	 * @return file quota for all accounts, sorted by username
 	 */
-	public static final List<FileQuota> getFileQuotas() {
+	public static List<FileQuota> getFileQuotas() {
 		updateFileQuotasCache();
 
 		if (fileQuotas == null)
@@ -279,13 +279,13 @@ public final class QuotaUtilities {
 
 	/**
 	 * Check job quota authorization for a user, for n jobs
-	 * 
+	 *
 	 * @param account
 	 * @param numberOfJobsToSubmit
 	 * @return allowed or not
 	 */
-	public static final Map.Entry<Integer, String> checkJobQuota(String account, int numberOfJobsToSubmit) {
-		Quota q = getJobQuota(account);
+	public static Map.Entry<Integer, String> checkJobQuota(final String account, final int numberOfJobsToSubmit) {
+		final Quota q = getJobQuota(account);
 
 		if (q == null)
 			return new AbstractMap.SimpleEntry<>(Integer.valueOf(1), "Error: couldn't get quotas for user: " + account);

@@ -20,7 +20,7 @@ public class FindOrphanFoldersOutput {
 	/**
 	 * @param args
 	 */
-	public static void main(String[] args) {
+	public static void main(final String[] args) {
 		final int nargs = args.length;
 
 		if (nargs < 1) {
@@ -29,27 +29,27 @@ public class FindOrphanFoldersOutput {
 		}
 
 		for (int i = 0; i < nargs; i++) {
-			long jobid = Long.parseLong(args[i]);
+			final long jobid = Long.parseLong(args[i]);
 			JDL jobjdl = null;
 
 			try {
 				jobjdl = new JDL(jobid);
 			}
-			catch (IOException e) {
+			catch (final IOException e) {
 				System.err.println("Can't get job JDL: " + e);
 				return;
 			}
 
-			String outputdir = jobjdl.getOutputDir();
+			final String outputdir = jobjdl.getOutputDir();
 
-			IndexTableEntry ite = CatalogueUtils.getClosestMatch(outputdir);
+			final IndexTableEntry ite = CatalogueUtils.getClosestMatch(outputdir);
 
 			if (ite == null) {
 				System.err.println("Can't find indextable for output: " + outputdir);
 				return;
 			}
 
-			String dblfn = outputdir.replaceAll(ite.lfn, "");
+			final String dblfn = outputdir.replaceAll(ite.lfn, "");
 
 			System.out.println("db pattern: " + dblfn);
 
@@ -58,11 +58,11 @@ public class FindOrphanFoldersOutput {
 
 				System.out.println("Going to select distinct dir");
 
-				if (!db.query("select distinct dir as dir from L" + ite.tableName + "L where type='d' and lfn like '" + dblfn + "/%/' order by 1 asc")) {
+				if (!db.query("select distinct dir as dir from L" + ite.tableName + "L where type='d' and lfn like ? order by 1 asc", false, dblfn + "/%/")) {
 					System.err.println("Can't get distinct dirs");
 					System.exit(-1);
 				}
-				int count = db.count();
+				final int count = db.count();
 
 				if (count <= 1) {
 					System.out.println("Only 1 dir found");
@@ -72,11 +72,11 @@ public class FindOrphanFoldersOutput {
 				System.out.println("Found several folders: " + count);
 
 				db.moveNext();
-				int mindir = db.geti("dir");
+				final int mindir = db.geti("dir");
 
 				System.out.println("select lfn from L" + ite.tableName + "L where type='d' and dir=" + mindir + " order by 1 asc");
 
-				if (!db.query("select lfn from L" + ite.tableName + "L where type='d' and dir=" + mindir + " order by 1 asc")) {
+				if (!db.query("select lfn from L" + ite.tableName + "L where type='d' and dir=? order by 1 asc", false, Integer.valueOf(mindir))) {
 					System.err.println("Can't get distinct dirs");
 					System.exit(-1);
 				}
@@ -87,7 +87,7 @@ public class FindOrphanFoldersOutput {
 						outfile.println(ite.lfn + db.gets("lfn"));
 					}
 				}
-				catch (FileNotFoundException e) {
+				catch (final FileNotFoundException e) {
 					System.err.println("Could not write to file for: " + jobid + " :" + e);
 					return;
 				}

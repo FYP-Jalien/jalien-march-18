@@ -133,7 +133,7 @@ public final class TransferUtils {
 			final String orderClause = (orderAsc ? " ORDER BY transferId ASC" : " ORDER BY transferId DESC");
 			final String limitClause = (count != null ? " LIMIT " + count.toString() : "");
 
-			String query = "SELECT * FROM TRANSFERS_DIRECT WHERE " + "(? IS NULL OR user=?) AND (? IS NULL OR destination=?)" + " AND (? IS NULL OR status=?)";
+			String query = "SELECT * FROM TRANSFERS_DIRECT WHERE (? IS NULL OR user=?) AND (? IS NULL OR destination=?) AND (? IS NULL OR status=?)";
 			// db.query("SELECT * FROM TRANSFERS_DIRECT ORDER BY transferId", false);
 			query += orderClause + limitClause;
 			db.query(query, false, user, user, targetSE, targetSE, status, status);
@@ -601,7 +601,7 @@ public final class TransferUtils {
 	 * @param exitCode
 	 * @param failureReason
 	 */
-	static final void logAttempt(final Protocol p, final PFN source, final PFN target, final int exitCode, final String failureReason) {
+	static void logAttempt(final Protocol p, final PFN source, final PFN target, final int exitCode, final String failureReason) {
 		try (DBFunctions db = getDB()) {
 			if (db != null)
 				if (ConfigUtils.getConfig().getb("alien.io.TransferUtils.logReason", false))
