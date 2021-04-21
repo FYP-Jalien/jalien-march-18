@@ -1,5 +1,16 @@
 package alien.catalogue;
 
+import alien.api.Dispatcher;
+import alien.api.ServerException;
+import alien.api.catalogue.UpdateGUIDMD5;
+import alien.catalogue.access.AccessType;
+import alien.catalogue.access.AuthorizationFactory;
+import alien.config.ConfigUtils;
+import alien.io.IOUtils;
+import alien.io.protocols.TempFileManager;
+import alien.monitoring.Monitor;
+import alien.monitoring.MonitorFactory;
+import alien.user.AliEnPrincipal;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -19,16 +30,8 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import alien.catalogue.access.AccessType;
-import alien.catalogue.access.AuthorizationFactory;
-import alien.config.ConfigUtils;
-import alien.io.IOUtils;
-import alien.io.protocols.TempFileManager;
-import alien.monitoring.Monitor;
-import alien.monitoring.MonitorFactory;
-import alien.user.AliEnPrincipal;
 import lazyj.DBFunctions;
+import lazyj.Format;
 import lia.util.process.ExternalProcesses;
 
 /**
@@ -701,6 +704,62 @@ public final class GUIDUtils {
 			logger.log(Level.WARNING, "Could not download " + g.guid);
 
 			return false;
+		}
+
+		return true;
+	}
+
+	/**
+	 * @param guid
+	 * @param md5
+	 * @return <code>true</code> if the MD5 was already set or if it could be now set, <code>false</code> if there was any error setting it
+	 */
+	public static boolean updateMd5(UUID guid, String md5) {
+
+		if (guid == null || md5 == null)
+			return false;
+
+		if (!ConfigUtils.isCentralService())
+			try {
+				final UpdateGUIDMD5 request = new UpdateGUIDMD5(null, guid, md5);
+				return Dispatcher.execute(request).isUpdateSuccessful();
+			}
+			catch (@SuppressWarnings("unused") final ServerException se) {
+				return false;
+			}
+
+		final int host = getGUIDHost(guid);
+
+		if (host < 0)
+			return false;
+
+		final Host h = CatalogueUtils.getHost(host);
+
+		if (h == null)
+			return false;
+
+		try (DBFunctions db = h.getDB()) {
+			if (db == null)
+				return false;
+
+			final int tableName = GUIDUtils.getTableNameForGUID(guid);
+
+			if (tableName < 0)
+				return false;
+
+			if (!db.query("UPDATE G" + tableName + "L SET md5='" + Format.escSQL(md5) + "' WHERE guid=string2binary('" + Format.escSQL(guid.toString()) + "') AND (md5 is null OR length(md5) = 0)"))
+				return false;
+
+			if (db.getUpdateCount() == 0)
+				return false;
+
+			List<LFN> lfns = LFNUtils.getLFNsFromUUIDs(Set.of(guid));
+
+			for(LFN lfn : lfns) {
+				String guidMD5 = GUIDUtils.getGUID(lfn).getMD5();
+				if (guidMD5 != null && guidMD5.length() > 0)
+					GUIDUtils.checkMD5(lfn);
+			}
 		}
 
 		return true;
