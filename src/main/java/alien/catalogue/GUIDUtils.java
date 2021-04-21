@@ -1,16 +1,5 @@
 package alien.catalogue;
 
-import alien.api.Dispatcher;
-import alien.api.ServerException;
-import alien.api.catalogue.UpdateGUIDMD5;
-import alien.catalogue.access.AccessType;
-import alien.catalogue.access.AuthorizationFactory;
-import alien.config.ConfigUtils;
-import alien.io.IOUtils;
-import alien.io.protocols.TempFileManager;
-import alien.monitoring.Monitor;
-import alien.monitoring.MonitorFactory;
-import alien.user.AliEnPrincipal;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
@@ -30,8 +19,19 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import alien.api.Dispatcher;
+import alien.api.ServerException;
+import alien.api.catalogue.UpdateGUIDMD5;
+import alien.catalogue.access.AccessType;
+import alien.catalogue.access.AuthorizationFactory;
+import alien.config.ConfigUtils;
+import alien.io.IOUtils;
+import alien.io.protocols.TempFileManager;
+import alien.monitoring.Monitor;
+import alien.monitoring.MonitorFactory;
+import alien.user.AliEnPrincipal;
 import lazyj.DBFunctions;
-import lazyj.Format;
 import lia.util.process.ExternalProcesses;
 
 /**
@@ -505,7 +505,7 @@ public final class GUIDUtils {
 					for (final String dev : devices) {
 						final String addr = lazyj.Utils.readFile(SYS_ENTRY + "/" + dev + "/address");
 
-						if (addr != null && !addr.equals("00:00:00:00:00:00")) {
+						if (addr != null && !"00:00:00:00:00:00".equals(addr)) {
 							sMac = addr;
 							break;
 						}
@@ -523,7 +523,7 @@ public final class GUIDUtils {
 						while (st.hasMoreTokens()) {
 							final String tok = st.nextToken();
 
-							if (tok.equals("HWaddr") && st.hasMoreTokens()) {
+							if ("HWaddr".equals(tok) && st.hasMoreTokens()) {
 								sMac = st.nextToken();
 								break;
 							}
@@ -616,7 +616,7 @@ public final class GUIDUtils {
 	 * @param uuid
 	 * @return epoch time of this uuid
 	 */
-	public static final long epochTime(final UUID uuid) {
+	public static long epochTime(final UUID uuid) {
 		return (uuid.timestamp() - 0x01b21dd213814000L) / 10000;
 	}
 
@@ -624,7 +624,7 @@ public final class GUIDUtils {
 	 * @param uuid
 	 * @return AliEn guidtime-compatible value
 	 */
-	public static final long indexTime(final UUID uuid) {
+	public static long indexTime(final UUID uuid) {
 		final long msg = uuid.getMostSignificantBits() & 0x00000000FFFFFFFFL;
 
 		long ret = (msg >>> 16);
@@ -637,7 +637,7 @@ public final class GUIDUtils {
 	 * @param uuid
 	 * @return index time as string
 	 */
-	public static final String getIndexTime(final UUID uuid) {
+	public static String getIndexTime(final UUID uuid) {
 		return Long.toHexString(indexTime(uuid)).toUpperCase();
 	}
 
@@ -714,7 +714,7 @@ public final class GUIDUtils {
 	 * @param md5
 	 * @return <code>true</code> if the MD5 was already set or if it could be now set, <code>false</code> if there was any error setting it
 	 */
-	public static boolean updateMd5(UUID guid, String md5) {
+	public static boolean updateMd5(final UUID guid, final String md5) {
 
 		if (guid == null || md5 == null)
 			return false;
@@ -747,16 +747,16 @@ public final class GUIDUtils {
 			if (tableName < 0)
 				return false;
 
-			if (!db.query("UPDATE G" + tableName + "L SET md5='" + Format.escSQL(md5) + "' WHERE guid=string2binary('" + Format.escSQL(guid.toString()) + "') AND (md5 is null OR length(md5) = 0)"))
+			if (!db.query("UPDATE G" + tableName + "L SET md5=? WHERE guid=string2binary(?) AND (md5 is null OR length(md5) = 0)", true, md5, guid.toString()))
 				return false;
 
 			if (db.getUpdateCount() == 0)
 				return false;
 
-			List<LFN> lfns = LFNUtils.getLFNsFromUUIDs(Set.of(guid));
+			final List<LFN> lfns = LFNUtils.getLFNsFromUUIDs(Set.of(guid));
 
-			for(LFN lfn : lfns) {
-				String guidMD5 = GUIDUtils.getGUID(lfn).getMD5();
+			for (final LFN lfn : lfns) {
+				final String guidMD5 = GUIDUtils.getGUID(lfn).getMD5();
 				if (guidMD5 != null && guidMD5.length() > 0)
 					GUIDUtils.checkMD5(lfn);
 			}
