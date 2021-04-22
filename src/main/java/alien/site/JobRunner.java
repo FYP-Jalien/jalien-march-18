@@ -1,15 +1,11 @@
 package alien.site;
 
-import java.io.File;
-import java.io.IOException;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
-import utils.ProcessWithTimeout;
 
 /**
  * @author sweisz
@@ -56,8 +52,6 @@ public class JobRunner extends JobAgent {
 
 		final int maxRetries = Integer.parseInt(System.getenv().getOrDefault("MAX_RETRIES", "5"));
 
-		collectSystemInformation();
-
 		while (timestamp < ttlEnd) {
 			synchronized (JobAgent.requestSync) {
 				try {
@@ -99,31 +93,6 @@ public class JobRunner extends JobAgent {
 			}
 		}
 		System.out.println("JobRunner Exiting");
-	}
-
-	private static final String SITESONAR = "/cvmfs/alice.cern.ch/sitesonar/sitesonar.sh";
-
-	private static void collectSystemInformation() {
-		final File f = new File(SITESONAR);
-
-		if (f.exists() && f.canExecute()) {
-			final ProcessBuilder pBuilder = new ProcessBuilder(SITESONAR);
-
-			try {
-				final Process p = pBuilder.start();
-
-				if (p != null) {
-					final ProcessWithTimeout ptimeout = new ProcessWithTimeout(p, pBuilder);
-					ptimeout.waitFor(5, TimeUnit.MINUTES);
-
-					if (!ptimeout.exitedOk())
-						logger.log(Level.WARNING, "Sitesonar didn't finish in due time");
-				}
-			}
-			catch (@SuppressWarnings("unused") final IOException | InterruptedException e) {
-				// ignore
-			}
-		}
 	}
 
 	public static void main(final String[] args) {
