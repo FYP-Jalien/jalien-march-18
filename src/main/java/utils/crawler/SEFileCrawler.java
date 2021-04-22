@@ -11,6 +11,23 @@ import static utils.crawler.CrawlingStatusCode.E_PFN_XRDSTAT_FAILED;
 import static utils.crawler.CrawlingStatusCode.E_UNEXPECTED_ERROR;
 import static utils.crawler.CrawlingStatusCode.S_FILE_CHECKSUM_MATCH;
 import static utils.crawler.CrawlingStatusCode.S_FILE_CHECKSUM_MISMATCH;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+
 import alien.catalogue.GUID;
 import alien.catalogue.GUIDUtils;
 import alien.catalogue.PFN;
@@ -24,20 +41,6 @@ import alien.se.SE;
 import alien.se.SEUtils;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.user.JAKeyStore;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.List;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
 import utils.StatusType;
 
 /**
@@ -430,11 +433,13 @@ public class SEFileCrawler {
 					if (Long.valueOf(0).equals(catalogueFileSize))
 						status = new CrawlingStatus(E_FILE_EMPTY, "Catalogue file size is 0");
 					else if (catalogueMD5 == null) {
-						GUIDUtils.updateMd5(guid.guid, observedMD5);
+						if (guid != null)
+							GUIDUtils.updateMd5(guid.guid, observedMD5);
 						status = new CrawlingStatus(E_CATALOGUE_MD5_IS_NULL, "Catalogue MD5 is null");
 					}
 					else if (catalogueMD5.isBlank()) {
-						GUIDUtils.updateMd5(guid.guid, observedMD5);
+						if (guid != null)
+							GUIDUtils.updateMd5(guid.guid, observedMD5);
 						status = new CrawlingStatus(E_CATALOGUE_MD5_IS_BLANK, "Catalogue MD5 is blank");
 					}
 					else if (!catalogueMD5.equalsIgnoreCase(observedMD5))
@@ -488,9 +493,9 @@ public class SEFileCrawler {
 	 * @return String
 	 */
 	private static String formatError(final String error) {
-		if (outputFileType.equals(OUTPUT_FORMAT_CSV)) {
+		if (OUTPUT_FORMAT_CSV.equals(outputFileType)) {
 			final String errorNew = error.replaceAll("\\R", " ");
-			return errorNew.replaceAll(",", " ");
+			return errorNew.replace(",", " ");
 		}
 
 		return error;
@@ -538,7 +543,7 @@ public class SEFileCrawler {
 			logger.info("Getting job output from data list of size " + dataList.size());
 			logger.info("Values " + dataList);
 
-			if (fileType.toLowerCase().equals(OUTPUT_FORMAT_JSON))
+			if (OUTPUT_FORMAT_JSON.equals(fileType.toLowerCase()))
 				jobOutput = getOutputAsJSON(dataList);
 			else
 				jobOutput = getOutputAsCSV(dataList);
