@@ -2379,6 +2379,8 @@ public class TaskQueueUtils {
 		}
 	}
 
+	private static final String JOBMESSAGES_INSERT = "INSERT INTO JOBMESSAGES (timestamp, jobId, procinfo, tag) VALUES (?, ?, ?, ?);";
+
 	/**
 	 * @param queueId
 	 * @param action
@@ -2398,22 +2400,15 @@ public class TaskQueueUtils {
 				monitor.incrementCounter("TQ_JOBMESSAGES_insert");
 			}
 
-			final Map<String, Object> insertValues = new HashMap<>(4);
+			final Long now = Long.valueOf(System.currentTimeMillis() / 1000);
+			final Long qid = Long.valueOf(queueId);
 
-			insertValues.put("timestamp", Long.valueOf(System.currentTimeMillis() / 1000));
-			insertValues.put("jobId", Long.valueOf(queueId));
-			insertValues.put("procinfo", message);
-			insertValues.put("tag", action);
-
-			if (!db.query(DBFunctions.composeInsert("JOBMESSAGES", insertValues)))
+			if (!db.query(JOBMESSAGES_INSERT, false, now, qid, message, action))
 				return false;
 
 			if (joblogtags != null && joblogtags.size() > 0)
 				for (final Map.Entry<String, String> entry : joblogtags.entrySet()) {
-					insertValues.put("tag", entry.getKey());
-					insertValues.put("procinfo", entry.getValue());
-
-					if (!db.query(DBFunctions.composeInsert("JOBMESSAGES", insertValues)))
+					if (!db.query(JOBMESSAGES_INSERT, false, now, qid, entry.getValue(), entry.getKey()))
 						return false;
 				}
 		}
