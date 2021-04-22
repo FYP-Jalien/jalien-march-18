@@ -118,15 +118,20 @@ public final class ComputingElement extends Thread {
 				logger.info("Time to sync with LDAP");
 				logger.info("Building new SiteMap.");
 
-				config = ConfigUtils.getConfigFromLdap();
-				site = (String) config.get("site_accountname");
-				getSiteMap();
+				try {
+					config = ConfigUtils.getConfigFromLdap();
+					site = (String) config.get("site_accountname");
+					getSiteMap();
 
-				logger.info("New sitemap: ");
+					logger.info("New sitemap: ");
 
-				siteMap.forEach((field, entry) -> {
-					logger.info("[" + field + ": " + entry + "]");
-				});
+					siteMap.forEach((field, entry) -> {
+						logger.info("[" + field + ": " + entry + "]");
+					});
+				}
+				catch (Exception ex) {
+					logger.log(Level.WARNING, "Error syncing with LDAP: ", ex);
+				}
 
 				lastLdapRefresh = System.currentTimeMillis();
 			}
