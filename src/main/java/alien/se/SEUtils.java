@@ -1120,7 +1120,7 @@ public final class SEUtils {
 							}
 						}
 						else {
-							gdb.query("select distinct binary2string(guid),size,md5 from G" + idx.tableName + "L INNER JOIN G" + idx.tableName + "L_PFN using(guidId) where seNumber=?", true,
+							gdb.query("select distinct binary2string(guid),size,md5 from G" + idx.tableName + "L INNER JOIN G" + idx.tableName + "L_PFN using(guidId) where seNumber=?", false,
 									Integer.valueOf(se.seNumber));
 
 							while (gdb.moveNext()) {
