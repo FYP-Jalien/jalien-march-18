@@ -161,9 +161,6 @@ public class GUIDIndex implements Serializable, Comparable<GUIDIndex> {
 			monitor.incrementCounter("GUID_seUsageStats");
 
 		try (DBFunctions db = h.getDB()) {
-			if (db == null)
-				return ret;
-
 			db.setReadOnly(true);
 
 			db.query("select seNumber, sum(size),count(1) from G" + tableName + "L INNER JOIN G" + tableName + "L_PFN USING(guidId) GROUP BY seNumber;");

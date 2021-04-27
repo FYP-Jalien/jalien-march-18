@@ -678,8 +678,8 @@ public class CatalogueToCassandraThreads {
 						continue;
 
 					final List<LFN> zip_members = getZipMembers(whereis, l);
-					final boolean isArchive = zip_members != null && !zip_members.isEmpty();
-					final boolean isMember = zip_members != null && zip_members.contains(l);
+					final boolean isArchive = !zip_members.isEmpty();
+					final boolean isMember = zip_members.contains(l);
 
 					// create json file in the hierarchy
 					final LFN_CSD lfnc = new LFN_CSD(l, false, true);

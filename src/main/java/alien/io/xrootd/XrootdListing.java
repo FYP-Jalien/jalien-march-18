@@ -144,13 +144,9 @@ public class XrootdListing {
 		try {
 			final Process p = pBuilder.start();
 
-			if (p != null) {
-				final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
-				pTimeout.waitFor(1, TimeUnit.HOURS);
-				exitStatus = pTimeout.getExitStatus();
-			}
-			else
-				throw new IOException("Cannot execute command: " + command);
+			final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
+			pTimeout.waitFor(1, TimeUnit.HOURS);
+			exitStatus = pTimeout.getExitStatus();
 		}
 		catch (final InterruptedException ie) {
 			throw new IOException("Interrupted while waiting for the following command to finish : " + command.toString(), ie);

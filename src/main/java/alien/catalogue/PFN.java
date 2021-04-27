@@ -18,14 +18,14 @@ import lazyj.StringFactory;
 
 /**
  * Wrapper around a G*L_PFN row
- * 
+ *
  * @author costing
- * 
+ *
  */
 public class PFN implements Serializable, Comparable<PFN> {
 
 	/**
-	 * 
+	 *
 	 */
 	private static final long serialVersionUID = 3854116042004576123L;
 
@@ -71,7 +71,7 @@ public class PFN implements Serializable, Comparable<PFN> {
 
 	/**
 	 * GUID
-	 * 
+	 *
 	 * @see #getGuid()
 	 */
 	private GUID guid;
@@ -137,7 +137,7 @@ public class PFN implements Serializable, Comparable<PFN> {
 
 	/**
 	 * Generate a new PFN
-	 * 
+	 *
 	 * @param guid
 	 * @param se
 	 */
@@ -154,7 +154,7 @@ public class PFN implements Serializable, Comparable<PFN> {
 
 	/**
 	 * Load a PFN Object from String
-	 * 
+	 *
 	 * @param pfn
 	 * @param guid
 	 * @param se
@@ -176,7 +176,7 @@ public class PFN implements Serializable, Comparable<PFN> {
 
 	/**
 	 * Create PFN from LFN_CSD
-	 * 
+	 *
 	 * @param senumber
 	 * @param pfn
 	 * @param id
@@ -316,7 +316,7 @@ public class PFN implements Serializable, Comparable<PFN> {
 
 	/**
 	 * Set the UUID, when known, to avoid reading from database
-	 * 
+	 *
 	 * @param uid
 	 */
 	void setUUID(final UUID uid) {
@@ -325,7 +325,7 @@ public class PFN implements Serializable, Comparable<PFN> {
 
 	/**
 	 * Set the GUID, when known, to avoid reading from database
-	 * 
+	 *
 	 * @param guid
 	 */
 	void setGUID(final GUID guid) {
@@ -359,9 +359,6 @@ public class PFN implements Serializable, Comparable<PFN> {
 					return null;
 
 				try (DBFunctions db = h.getDB()) {
-					if (db == null)
-						return null;
-
 					if (monitor != null)
 						monitor.incrementCounter("GUID_db_lookup");
 

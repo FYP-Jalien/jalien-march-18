@@ -5,6 +5,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -768,8 +769,7 @@ public class CatalogueApiUtils {
 		cpArgs.add(lfnAbsolutePath);
 
 		if (args != null)
-			for (final String arg : args)
-				cpArgs.add(arg);
+			Collections.addAll(cpArgs, args);
 
 		final JAliEnCommandcp cp = new JAliEnCommandcp(commander, cpArgs);
 
@@ -798,8 +798,7 @@ public class CatalogueApiUtils {
 		cpArgs.add("file:" + localFile.getAbsolutePath());
 
 		if (args != null)
-			for (final String arg : args)
-				cpArgs.add(arg);
+			Collections.addAll(cpArgs, args);
 
 		final JAliEnCommandcp cp = new JAliEnCommandcp(commander, cpArgs);
 
@@ -919,9 +918,7 @@ public class CatalogueApiUtils {
 	public LFN_CSD getLFNCSD(final String lfn_path) {
 		final ArrayList<String> slfn = new ArrayList<>();
 		slfn.add(lfn_path);
-		Collection<LFN_CSD> slfn_res = new ArrayList<>();
-
-		slfn_res = getLFNCSD(slfn, false);
+		final Collection<LFN_CSD> slfn_res = getLFNCSD(slfn, false);
 
 		if (slfn_res != null && slfn_res.iterator().hasNext())
 			return slfn_res.iterator().next();
@@ -1077,11 +1074,11 @@ public class CatalogueApiUtils {
 	 * @param expireTime an ExppireTime object specifying the expire time to add
 	 * @param extend specify if the given expire time should extend or replace the current one
 	 */
-	public void setLFNExpireTime(final List<String> paths, ExpireTime expireTime, boolean extend) {
+	public void setLFNExpireTime(final List<String> paths, final ExpireTime expireTime, final boolean extend) {
 		try {
 			Dispatcher.execute(new LFNExpireTime(commander.getUser(), paths, expireTime, extend));
 		}
-		catch (ServerException e) {
+		catch (final ServerException e) {
 			e.printStackTrace();
 		}
 

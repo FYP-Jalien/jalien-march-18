@@ -69,7 +69,7 @@ public class ListSEDistance extends Request {
 				this.ses = new ArrayList<>();
 
 				LFN lfn = null;
-				if (this.lfn_name != null && this.lfn_name.length() != 0)
+				if (this.lfn_name.length() != 0)
 					lfn = LFNUtils.getLFN(this.lfn_name);
 
 				if (lfn == null)

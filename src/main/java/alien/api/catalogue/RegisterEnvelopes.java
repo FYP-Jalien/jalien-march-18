@@ -27,7 +27,7 @@ import alien.user.AliEnPrincipal;
  */
 public class RegisterEnvelopes extends Request {
 	/**
-	 * 
+	 *
 	 */
 	private static final long serialVersionUID = 6927727456767661381L;
 
@@ -146,7 +146,7 @@ public class RegisterEnvelopes extends Request {
 		}
 		else if (encryptedEnvelope != null) {
 			pfns = new ArrayList<>(1);
-			XrootDEnvelope xenv = null;
+			final XrootDEnvelope xenv;
 			try {
 				xenv = XrootDEnvelopeSigner.decryptEnvelope(encryptedEnvelope);
 			}
@@ -155,43 +155,39 @@ public class RegisterEnvelopes extends Request {
 				return;
 			}
 
-			if (xenv != null) {
-				PFN bookedpfn = null;
+			PFN bookedpfn = null;
+
+			try {
+				bookedpfn = BookingTable.getBookedPFN(xenv.pfn.pfn);
+			}
+			catch (final Exception e) {
+				logger.log(Level.WARNING, "Error getting the PFN: ", e);
+				return;
+			}
+
+			if (bookedpfn != null) {
+				if (size != 0)
+					bookedpfn.getGuid().size = size;
+
+				if (md5 != null && md5.length() > 0 && !"0".equals(md5))
+					bookedpfn.getGuid().md5 = md5;
 
 				try {
-					bookedpfn = BookingTable.getBookedPFN(xenv.pfn.pfn);
+					if (flagEntry(bookedpfn)) {
+						if (logger.isLoggable(Level.FINE))
+							logger.log(Level.FINE, "Successfully moved " + xenv.pfn.pfn + " to the Catalogue");
+
+						pfns.add(bookedpfn);
+					}
+					else
+						logger.log(Level.WARNING, "Unable to register " + xenv.pfn.pfn + " in the Catalogue");
 				}
 				catch (final Exception e) {
-					logger.log(Level.WARNING, "Error getting the PFN: ", e);
-					return;
+					logger.log(Level.WARNING, "Error registering pfn", e);
 				}
-
-				if (bookedpfn != null) {
-					if (size != 0)
-						bookedpfn.getGuid().size = size;
-
-					if (md5 != null && md5.length() > 0 && !md5.equals("0"))
-						bookedpfn.getGuid().md5 = md5;
-
-					try {
-						if (flagEntry(bookedpfn)) {
-							if (logger.isLoggable(Level.FINE))
-								logger.log(Level.FINE, "Successfully moved " + xenv.pfn.pfn + " to the Catalogue");
-
-							pfns.add(bookedpfn);
-						}
-						else
-							logger.log(Level.WARNING, "Unable to register " + xenv.pfn.pfn + " in the Catalogue");
-					}
-					catch (final Exception e) {
-						logger.log(Level.WARNING, "Error registering pfn", e);
-					}
-				}
-				else
-					logger.log(Level.WARNING, "Could not find this booked pfn: " + xenv.pfn.pfn);
 			}
 			else
-				logger.log(Level.WARNING, "Null decrypted envelope");
+				logger.log(Level.WARNING, "Could not find this booked pfn: " + xenv.pfn.pfn);
 		}
 	}
 

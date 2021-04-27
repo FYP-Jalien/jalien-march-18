@@ -257,9 +257,6 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 			return false;
 
 		try (DBFunctions db = h.getDB()) {
-			if (db == null)
-				return false;
-
 			if (!exists) {
 				final boolean insertOK = insert(db);
 
@@ -422,9 +419,6 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 			boolean tainted = false;
 
 			try (DBFunctions db = h.getDB()) {
-				if (db == null)
-					return null;
-
 				if (monitor != null)
 					monitor.incrementCounter("PFN_db_lookup");
 
@@ -474,9 +468,6 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 			return false;
 
 		try (DBFunctions db = h.getDB()) {
-			if (db == null)
-				return false;
-
 			if (monitor != null)
 				monitor.incrementCounter("PFN_db_insert");
 
@@ -678,11 +669,6 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 		boolean removed;
 
 		try (DBFunctions db = h.getDB()) {
-			if (db == null) {
-				logger.log(Level.WARNING, "Host DB is null for: " + h);
-				return false;
-			}
-
 			if (monitor != null)
 				monitor.incrementCounter("GUID_db_delete");
 
@@ -755,11 +741,6 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 		final Integer seNo = Integer.valueOf(pfn.seNumber);
 
 		try (DBFunctions db = h.getDB()) {
-			if (db == null) {
-				logger.log(Level.WARNING, "Host DB is null for: " + h);
-				return false;
-			}
-
 			if (monitor != null)
 				monitor.incrementCounter("PFN_db_delete");
 
@@ -913,9 +894,6 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 				}
 
 				try (DBFunctions db2 = h.getDB()) {
-					if (db2 == null)
-						continue;
-
 					db2.setReadOnly(true);
 
 					if (monitor != null)

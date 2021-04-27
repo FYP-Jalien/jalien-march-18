@@ -82,7 +82,6 @@ public class PFNforReadOrDelCsd extends Request {
 		final LFN_CSD lfnc = (LFN_CSD) entity;
 		final Set<PFN> pfns_lfnc = lfnc.getPFNs(); // TODO resolve whereis recursively
 
-		if (pfns_lfnc != null) {
 			try {
 				for (final PFN pfn : pfns_lfnc) {
 					// final UUID archiveLinkedTo = pfn.retrieveArchiveLinkedGUID();
@@ -139,9 +138,6 @@ public class PFNforReadOrDelCsd extends Request {
 			}
 			else
 				logger.log(Level.WARNING, "Sorry ... No PFN to make an envelope for!");
-		}
-		else
-			logger.log(Level.WARNING, "Sorry ... No PFNs for the file's GUID!");
 
 		if (pfns.size() < 1)
 			logger.log(Level.WARNING, "Sorry ... No PFNs for the file's GUID!");

@@ -172,9 +172,6 @@ public final class GUIDUtils {
 			return null;
 
 		try (DBFunctions db = h.getDB()) {
-			if (db == null)
-				return null;
-
 			db.setReadOnly(true);
 
 			final int tableName = GUIDUtils.getTableNameForGUID(guid);
@@ -264,9 +261,6 @@ public final class GUIDUtils {
 			final Map<Integer, Set<UUID>> hostMapping = entry.getValue();
 
 			try (DBFunctions db = h.getDB()) {
-				if (db == null)
-					continue;
-
 				db.setReadOnly(true);
 				db.setQueryTimeout(600); // in normal conditions it cannot take 10 minutes to ask for up to 100 guids from a table
 
@@ -331,9 +325,6 @@ public final class GUIDUtils {
 			return null;
 
 		try (DBFunctions db = h.getDB()) {
-			if (db == null)
-				return null;
-
 			final int tableName = GUIDUtils.getTableNameForGUID(guid);
 
 			if (tableName < 0)
@@ -739,9 +730,6 @@ public final class GUIDUtils {
 			return false;
 
 		try (DBFunctions db = h.getDB()) {
-			if (db == null)
-				return false;
-
 			final int tableName = GUIDUtils.getTableNameForGUID(guid);
 
 			if (tableName < 0)

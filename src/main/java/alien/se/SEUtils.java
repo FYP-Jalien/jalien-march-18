@@ -960,13 +960,15 @@ public final class SEUtils {
 
 		System.err.println("Renumbering " + source.seNumber + " to " + dest.seNumber);
 
-		for (final GUIDIndex idx : CatalogueUtils.getAllGUIDIndexes())
-			try (DBFunctions db = CatalogueUtils.getHost(idx.hostIndex).getDB()) {
-				if (db == null) {
-					System.err.println("Cannot get DB for " + idx);
-					continue;
-				}
+		for (final GUIDIndex idx : CatalogueUtils.getAllGUIDIndexes()) {
+			final Host h = CatalogueUtils.getHost(idx.hostIndex);
 
+			if (h == null) {
+				logger.log(Level.SEVERE, "Null host for " + idx);
+				continue;
+			}
+
+			try (DBFunctions db = h.getDB()) {
 				String q1 = "UPDATE G" + idx.tableName + "L_PFN SET seNumber=" + dest.seNumber;
 
 				if (!source.seStoragePath.equals(dest.seStoragePath))
@@ -993,6 +995,7 @@ public final class SEUtils {
 					System.err.println(q2 + " : " + ok + " : " + db.getUpdateCount());
 				}
 			}
+		}
 	}
 
 	private static final class SECounterUpdate {
