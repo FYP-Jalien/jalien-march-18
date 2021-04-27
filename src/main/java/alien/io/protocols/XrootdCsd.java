@@ -25,7 +25,6 @@ import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.StringTokenizer;
@@ -39,9 +38,7 @@ import alien.catalogue.access.AccessType;
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
 import alien.se.SE;
-import alien.user.UserFactory;
 import lia.util.process.ExternalProcess.ExitStatus;
-import utils.ExternalCalls;
 import utils.ProcessWithTimeout;
 
 /**
@@ -69,102 +66,14 @@ public class XrootdCsd extends Protocol {
 	/**
 	 * Path to the Xrootd command line binaries
 	 */
-	protected static String xrootd_default_path = null;
+	protected static final String xrootd_default_path = Xrootd.getXrootdDefaultPath();
 
-	private static String xrdcpPath = null;
+	private static final String xrdcpPath = Xrootd.getXrdcpPath();
 
 	/**
 	 * Statically filled variable, <code>true</code> when
 	 */
-	protected static boolean xrootdNewerThan4 = false;
-
-	static {
-		try {
-			org.apache.catalina.webresources.TomcatURLStreamHandlerFactory.getInstance().addUserFactory(new ROOTURLStreamHandlerFactory());
-		}
-		catch (final Throwable t) {
-			logger.log(Level.WARNING, "Tomcat URL handler is not available", t);
-
-			try {
-				URL.setURLStreamHandlerFactory(new ROOTURLStreamHandlerFactory());
-			}
-			catch (final Throwable t2) {
-				logger.log(Level.WARNING, "Cannot set ROOT URL stream handler factory", t2);
-			}
-		}
-
-		if (ConfigUtils.getConfig() != null) {
-			xrootd_default_path = ConfigUtils.getConfig().gets("xrootd.location", null);
-
-			if (xrootd_default_path != null)
-				for (final String command : new String[] { "xrdcpapmon", "xrdcp" }) {
-					xrdcpPath = ExternalCalls.programExistsInFolders(command, xrootd_default_path, xrootd_default_path + "/bin");
-
-					if (xrdcpPath != null)
-						break;
-				}
-		}
-
-		if (xrdcpPath == null)
-			for (final String command : new String[] { "xrdcpapmon", "xrdcp" }) {
-				xrdcpPath = ExternalCalls.programExistsInPath(command);
-
-				if (xrdcpPath != null)
-					break;
-			}
-
-		if (xrdcpPath == null)
-			for (final String command : new String[] { "xrdcpapmon", "xrdcp" }) {
-				xrdcpPath = ExternalCalls.programExistsInFolders(command, UserFactory.getUserHome() + "/bin", UserFactory.getUserHome() + "/xrootd/bin", "/opt/xrootd/bin");
-
-				if (xrdcpPath != null)
-					break;
-			}
-
-		if (xrdcpPath != null) {
-			int idx = xrdcpPath.lastIndexOf('/');
-
-			if (idx > 0) {
-				idx = xrdcpPath.lastIndexOf('/', idx - 1);
-
-				if (idx >= 0)
-					xrootd_default_path = xrdcpPath.substring(0, idx);
-			}
-
-			final ProcessBuilder pBuilder = new ProcessBuilder(Arrays.asList(xrdcpPath, "--version"));
-
-			checkLibraryPath(pBuilder);
-
-			pBuilder.redirectErrorStream(true);
-
-			Process p = null;
-
-			try {
-				p = pBuilder.start();
-
-				if (p != null) {
-					final ProcessWithTimeout timeout = new ProcessWithTimeout(p, pBuilder);
-
-					if (timeout.waitFor(15, TimeUnit.SECONDS) && timeout.exitValue() == 0) {
-						final String version = timeout.getStdout().toString();
-
-						logger.log(Level.FINE, "Local Xrootd version is " + version);
-
-						if (version.indexOf('.') > 0)
-							xrootdNewerThan4 = version.substring(0, version.indexOf('.')).compareTo("v4") >= 0;
-					}
-				}
-				else
-					logger.log(Level.WARNING, "Cannot execute " + xrdcpPath);
-			}
-			catch (final IOException | InterruptedException ie) {
-				if (p != null)
-					p.destroy();
-
-				logger.log(Level.WARNING, "Interrupted while waiting for `" + xrdcpPath + " --version` to finish", ie);
-			}
-		}
-	}
+	protected static final boolean xrootdNewerThan4 = Xrootd.xrootdNewerThan4;
 
 	private static String DIFirstConnectMaxCnt = "2";
 
@@ -983,14 +892,10 @@ public class XrootdCsd extends Protocol {
 		try {
 			final Process p = pBuilder.start();
 
-			if (p != null) {
-				final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
-				pTimeout.waitFor(15, TimeUnit.SECONDS);
-				exitStatus = pTimeout.getExitStatus();
-				setLastExitStatus(exitStatus);
-			}
-			else
-				throw new IOException("Cannot start process " + command.toString());
+			final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
+			pTimeout.waitFor(15, TimeUnit.SECONDS);
+			exitStatus = pTimeout.getExitStatus();
+			setLastExitStatus(exitStatus);
 		}
 		catch (final InterruptedException ie) {
 			setLastExitStatus(null);
@@ -1070,14 +975,10 @@ public class XrootdCsd extends Protocol {
 				try {
 					final Process p = pBuilder.start();
 
-					if (p != null) {
-						final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
-						pTimeout.waitFor(15, TimeUnit.SECONDS);
-						exitStatus = pTimeout.getExitStatus();
-						setLastExitStatus(exitStatus);
-					}
-					else
-						throw new IOException("Cannot execute command: " + command);
+					final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
+					pTimeout.waitFor(15, TimeUnit.SECONDS);
+					exitStatus = pTimeout.getExitStatus();
+					setLastExitStatus(exitStatus);
 				}
 				catch (final InterruptedException ie) {
 					setLastExitStatus(null);
@@ -1203,9 +1104,9 @@ public class XrootdCsd extends Protocol {
 			if (appName != null)
 				command.add("-ODeos.app=" + appName);
 
-			final boolean sourceEnvelope = source.ticket != null && source.ticket.envelope != null;
+			final boolean sourceEnvelope = source.ticket.envelope != null;
 
-			final boolean targetEnvelope = target.ticket != null && target.ticket.envelope != null;
+			final boolean targetEnvelope = target.ticket.envelope != null;
 
 			String sourcePath;
 
@@ -1257,14 +1158,10 @@ public class XrootdCsd extends Protocol {
 			try {
 				final Process p = pBuilder.start();
 
-				if (p != null) {
-					final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
-					pTimeout.waitFor(seconds, TimeUnit.SECONDS);
-					exitStatus = pTimeout.getExitStatus();
-					setLastExitStatus(exitStatus);
-				}
-				else
-					throw new IOException("Cannot execute command: " + command);
+				final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
+				pTimeout.waitFor(seconds, TimeUnit.SECONDS);
+				exitStatus = pTimeout.getExitStatus();
+				setLastExitStatus(exitStatus);
 			}
 			catch (final InterruptedException ie) {
 				setLastExitStatus(null);
@@ -1491,14 +1388,10 @@ public class XrootdCsd extends Protocol {
 			try {
 				final Process p = pBuilder.start();
 
-				if (p != null) {
-					final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
-					pTimeout.waitFor(2, TimeUnit.MINUTES);
-					exitStatus = pTimeout.getExitStatus();
-					setLastExitStatus(exitStatus);
-				}
-				else
-					throw new IOException("Cannot execute command: " + command);
+				final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
+				pTimeout.waitFor(2, TimeUnit.MINUTES);
+				exitStatus = pTimeout.getExitStatus();
+				setLastExitStatus(exitStatus);
 
 				try (BufferedReader br = new BufferedReader(new StringReader(exitStatus.getStdOut()))) {
 					String line;
@@ -1614,14 +1507,10 @@ public class XrootdCsd extends Protocol {
 			try {
 				final Process p = pBuilder.start();
 
-				if (p != null) {
-					final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
-					pTimeout.waitFor(2, TimeUnit.MINUTES);
-					exitStatus = pTimeout.getExitStatus();
-					setLastExitStatus(exitStatus);
-				}
-				else
-					throw new IOException("Cannot execute command: " + command);
+				final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
+				pTimeout.waitFor(2, TimeUnit.MINUTES);
+				exitStatus = pTimeout.getExitStatus();
+				setLastExitStatus(exitStatus);
 
 				try (BufferedReader br = new BufferedReader(new StringReader(exitStatus.getStdOut()))) {
 					String line;
@@ -1699,14 +1588,10 @@ public class XrootdCsd extends Protocol {
 		try {
 			final Process p = pBuilder.start();
 
-			if (p != null) {
-				final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
-				pTimeout.waitFor(15, TimeUnit.SECONDS);
-				exitStatus = pTimeout.getExitStatus();
-				setLastExitStatus(exitStatus);
-			}
-			else
-				throw new IOException("Cannot execute command: " + command);
+			final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
+			pTimeout.waitFor(15, TimeUnit.SECONDS);
+			exitStatus = pTimeout.getExitStatus();
+			setLastExitStatus(exitStatus);
 
 			try (BufferedReader br = new BufferedReader(new StringReader(exitStatus.getStdOut()))) {
 				String line = br.readLine();

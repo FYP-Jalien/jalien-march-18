@@ -713,14 +713,14 @@ public class ConfigUtils {
 		else if (configuration.containsKey("site_logdir"))
 			folders_config.put("logdir", (String) configuration.get("site_logdir"));
 
-		for (final String folder : folders_config.keySet()) {
-			final String folderpath = folders_config.get(folder);
+		for (final Map.Entry<String, String> entry : folders_config.entrySet()) {
+			final String folderpath = entry.getValue();
 			try {
 				final File folderf = new File(folderpath);
 				if (!folderf.exists()) {
 					final boolean created = folderf.mkdirs();
 					if (!created)
-						logger.severe("Directory for " + folder + "can't be created: " + folderpath);
+						logger.severe("Directory for " + entry.getKey() + "can't be created: " + folderpath);
 				}
 			}
 			catch (final Exception e) {
@@ -746,9 +746,9 @@ public class ConfigUtils {
 		return siteConfig;
 	}
 
-	/** 
-	 * @param checkContent 
-	 * @param site 
+	/**
+	 * @param checkContent
+	 * @param site
 	 * @param cename
 	 * @return CE information based on the site and ce name for the host
 	 */
@@ -761,6 +761,7 @@ public class ConfigUtils {
 		}
 		return ceConfig;
 	}
+
 	/**
 	 * 
 	 * @param cename

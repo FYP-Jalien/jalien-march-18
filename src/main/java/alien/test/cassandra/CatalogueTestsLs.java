@@ -160,11 +160,11 @@ public class CatalogueTestsLs {
 		if (global_count.get() > 0) {
 			if (limit_reached) {
 				System.out.println("Limit reached!");
-				ms_per_ls = ms_count.get() / limit;
+				ms_per_ls = ms_count.get() / (double) limit;
 			}
 			else {
 				System.out.println("Limit not reached!");
-				ms_per_ls = ms_count.get() / global_count.get();
+				ms_per_ls = ms_count.get() / (double) global_count.get();
 			}
 		}
 		else

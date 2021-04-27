@@ -42,22 +42,22 @@ public class JShPrintWriter extends UIPrintWriter {
 	/**
 	 * String tag to mark the last line of an output
 	 */
-	public static String outputterminator = String.valueOf((char) 7);
+	public static final String outputterminator = String.valueOf((char) 7);
 
 	/**
 	 * String tag to mark the last line of an transaction stream
 	 */
-	public static String streamend = String.valueOf((char) 0);
+	public static final String streamend = String.valueOf((char) 0);
 
 	/**
 	 * String tag to mark separated fields
 	 */
-	public static String fieldseparator = String.valueOf((char) 1);
+	public static final String fieldseparator = String.valueOf((char) 1);
 
 	/**
 	 * String tag to signal pending action
 	 */
-	public static String pendingSignal = String.valueOf((char) 9);
+	public static final String pendingSignal = String.valueOf((char) 9);
 
 	/**
 	 * marker for -Colour argument
@@ -158,7 +158,7 @@ public class JShPrintWriter extends UIPrintWriter {
 			if (value != null)
 				metadataResult.put(key, value);
 			else
-				metadataResult.remove(value);
+				metadataResult.remove(key);
 	}
 
 	@Override

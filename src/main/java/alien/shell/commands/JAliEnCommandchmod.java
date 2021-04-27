@@ -2,6 +2,7 @@ package alien.shell.commands;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import alien.catalogue.FileSystemUtils;
 import alien.catalogue.LFN;
@@ -47,11 +48,11 @@ public class JAliEnCommandchmod extends JAliEnBaseCommand {
 					continue;
 				}
 
-				for (final String filename : results.keySet()) {
-					final Boolean b = results.get(filename);
+				for (final Map.Entry<String, Boolean> entry : results.entrySet()) {
+					final Boolean b = entry.getValue();
 
 					if (b == null || !b.booleanValue()) {
-						commander.setReturnCode(ErrNo.EIO, filename + ": unable to chmod");
+						commander.setReturnCode(ErrNo.EIO, entry.getKey() + ": unable to chmod");
 					}
 				}
 			}

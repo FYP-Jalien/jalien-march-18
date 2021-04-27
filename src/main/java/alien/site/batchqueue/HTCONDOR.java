@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Logger;
@@ -109,8 +110,9 @@ public class HTCONDOR extends BatchQueue {
 		String use_job_router_tmp = "0";
 		String use_external_cloud_tmp = "0";
 
-		for (String var : environment.keySet()) {
-			String val = environment.get(var);
+		for (final Map.Entry<String, String> entry : environment.entrySet()) {
+			final String var = entry.getKey();
+			String val = entry.getValue();
 
 			if (var.equals("CE_LCGCE")) {
 				double tot = 0;
@@ -330,15 +332,15 @@ public class HTCONDOR extends BatchQueue {
 		}
 
 		String file_base_name = String.format("%s/jobagent_%d", log_folder_path, Long.valueOf(System.currentTimeMillis()));
-		String log_cmd = String.format("log = %s.log\n", file_base_name);
+		String log_cmd = String.format("log = %s.log%n", file_base_name);
 		String out_cmd = "";
 		String err_cmd = "";
 
 		File enable_sandbox_file = new File(environment.get("HOME") + "/enable-sandbox");
 
 		if (enable_sandbox_file.exists()) {
-			out_cmd = String.format("output = %s.out\n", file_base_name);
-			err_cmd = String.format("error = %s.err\n", file_base_name);
+			out_cmd = String.format("output = %s.out%n", file_base_name);
+			err_cmd = String.format("error = %s.err%n", file_base_name);
 		}
 
 		String submit_jdl = "cmd = " + script + "\n" +
@@ -409,7 +411,7 @@ public class HTCONDOR extends BatchQueue {
 
 		String cm = config.get("host_host") + ":" + config.get("host_port");
 		String env_cmd = String.format("ALIEN_CM_AS_LDAP_PROXY='%s'", cm);
-		submit_jdl += String.format("environment = \"%s\"\n", env_cmd);
+		submit_jdl += String.format("environment = \"%s\"%n", env_cmd);
 
 		//
 		// allow preceding attributes to be overridden and others added if needed

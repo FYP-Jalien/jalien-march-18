@@ -41,10 +41,11 @@ public class FORK extends BatchQueue {
 			proc_builder.redirectErrorStream(false);
 
 			final Process proc = proc_builder.start();
-			BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()));
-			String output_str;
-			while ((output_str = reader.readLine()) != null) {
-				proc_output.add(output_str);
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()))) {
+				String output_str;
+				while ((output_str = reader.readLine()) != null) {
+					proc_output.add(output_str);
+				}
 			}
 		}
 		catch (final Throwable t) {

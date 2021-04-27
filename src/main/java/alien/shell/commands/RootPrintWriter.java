@@ -16,35 +16,35 @@ public class RootPrintWriter extends UIPrintWriter {
 	/**
 	 *
 	 */
-	public static String streamend = String.valueOf((char) 0);
+	public static final String streamend = String.valueOf((char) 0);
 	/**
 	 *
 	 */
-	public static String fieldseparator = String.valueOf((char) 1);
+	public static final String fieldseparator = String.valueOf((char) 1);
 	/**
 	 *
 	 */
-	public static String fielddescriptor = String.valueOf((char) 2);
+	public static final String fielddescriptor = String.valueOf((char) 2);
 	/**
 	 *
 	 */
-	public static String columnseparator = String.valueOf((char) 3);
+	public static final String columnseparator = String.valueOf((char) 3);
 	/**
 	 *
 	 */
-	public static String stdoutindicator = String.valueOf((char) 4);
+	public static final String stdoutindicator = String.valueOf((char) 4);
 	/**
 	 *
 	 */
-	public static String stderrindicator = String.valueOf((char) 5);
+	public static final String stderrindicator = String.valueOf((char) 5);
 	/**
 	 *
 	 */
-	public static String outputindicator = String.valueOf((char) 6);
+	public static final String outputindicator = String.valueOf((char) 6);
 	/**
 	 *
 	 */
-	public static String outputterminator = String.valueOf((char) 7);
+	public static final String outputterminator = String.valueOf((char) 7);
 
 	private String clientenv = "";
 

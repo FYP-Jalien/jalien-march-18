@@ -68,11 +68,11 @@ public class LFNCSDUtils {
 	/**
 	 * Cassandra table suffix
 	 */
-	static public String append_table = "";
+	public static final String append_table = "";
 	/**
 	 * Cassandra consistency
 	 */
-	static public ConsistencyLevel clevel = ConsistencyLevel.QUORUM;
+	public static final ConsistencyLevel clevel = ConsistencyLevel.QUORUM;
 
 	/**
 	 * the "-s" flag of AliEn `find`
@@ -406,8 +406,8 @@ public class LFNCSDUtils {
 
 				}
 
-				for (String lfnc_str : lfn_to_csd.keySet())
-					if (!operation.callback(lfn_to_csd.get(lfnc_str))) {
+				for (final LFN_CSD lfn : lfn_to_csd.values())
+					if (!operation.callback(lfn)) {
 						parent.critical_errors = true;
 					}
 

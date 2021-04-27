@@ -82,7 +82,9 @@ public class TextCache extends HttpServlet {
 		return nsDefault;
 	}
 
-	private static final class CacheValue {
+	private static final class CacheValue implements Serializable {
+		private static final long serialVersionUID = 1L;
+
 		public final String value;
 
 		public final long expires;
@@ -313,7 +315,9 @@ public class TextCache extends HttpServlet {
 
 	}
 
-	private static final class Namespace {
+	private static final class Namespace implements Serializable {
+		private static final long serialVersionUID = 1L;
+
 		public final Map<String, CacheValue> cache;
 		public final Set<String> keys;
 		public final String name;

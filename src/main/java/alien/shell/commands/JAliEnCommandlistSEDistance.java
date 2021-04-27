@@ -2,6 +2,7 @@ package alien.shell.commands;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import alien.catalogue.FileSystemUtils;
@@ -41,14 +42,14 @@ public class JAliEnCommandlistSEDistance extends JAliEnBaseCommand {
 		}
 
 		for (final HashMap<SE, Double> smap : results) {
-			final Set<SE> selist = smap.keySet();
+			for (final Map.Entry<SE, Double> entry : smap.entrySet()) {
+				final SE s = entry.getKey();
 
-			for (final SE s : selist) {
 				if (!s.seName.contains("::"))
 					continue;
 
 				commander.printOutln(String.format("%1$" + 40 + "s", s.seName) + "\t(read: " + String.format("% .3f", Double.valueOf(s.demoteRead)) + ",  write: "
-						+ String.format("% .3f", Double.valueOf(s.demoteWrite)) + ",  distance: " + String.format("% .3f", smap.get(s)) + ")");
+						+ String.format("% .3f", Double.valueOf(s.demoteWrite)) + ",  distance: " + String.format("% .3f", entry.getValue()) + ")");
 			}
 		}
 

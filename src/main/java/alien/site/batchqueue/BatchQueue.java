@@ -79,14 +79,15 @@ public abstract class BatchQueue {
 			HashMap<String, String> cleaned_env_vars = new HashMap<>();
 			Pattern p = Pattern.compile(".*PATH$");
 
-			for (String var : env.keySet()) {
+			for (final Map.Entry<String, String> entry : env.entrySet()) {
+				final String var = entry.getKey();
 				Matcher m = p.matcher(var);
 
 				if (!m.matches()) {
 					continue;
 				}
 
-				String val = env.get(var);
+				String val = entry.getValue();
 
 				//
 				// remove any traces of (J)AliEn...

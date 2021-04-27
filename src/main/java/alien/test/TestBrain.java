@@ -11,7 +11,7 @@ public class TestBrain {
 	/**
 	 * location of the bash binary
 	 */
-	public static String cBash = "";
+	static String cBash = "";
 
 	/**
 	 * location of the nohup binary

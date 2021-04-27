@@ -296,11 +296,11 @@ public class CatalogueToCVMFSThreads {
 			final String lfn_guid = lfn.guid.toString();
 			final String lfn_guid_start = "guid:";
 
-			for (final GUID g : whereis.keySet()) {
-				final Set<PFN> pfns = g.getPFNs();
+			for (final Map.Entry<GUID, LFN> entry : whereis.entrySet()) {
+				final Set<PFN> pfns = entry.getKey().getPFNs();
 				for (final PFN pf : pfns)
 					if (pf.pfn.startsWith(lfn_guid_start) && pf.pfn.contains(lfn_guid))
-						members.add(whereis.get(g));
+						members.add(entry.getValue());
 			}
 
 			return members;
@@ -479,9 +479,9 @@ public class CatalogueToCVMFSThreads {
 
 						Set<PFN> pfns = null;
 						// we have the pfns in the map
-						for (final GUID guidmap : whereis.keySet())
-							if (whereis.get(guidmap).equals(l))
-								pfns = guidmap.getPFNs();
+						for (final Map.Entry<GUID, LFN> entry : whereis.entrySet())
+							if (entry.getValue().equals(l))
+								pfns = entry.getKey().getPFNs();
 
 						if (pfns != null) {
 							final JSONArray pfnsjson = new JSONArray();

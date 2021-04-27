@@ -105,7 +105,7 @@ public class JAKeyStore {
 	/**
 	 *
 	 */
-	public static KeyStore trustStore;
+	public static final KeyStore trustStore;
 
 	private static final String charString = "!0123456789abcdefghijklmnopqrstuvwxyz@#$%^&*()-+=_{}[]:;|?/>.,<";
 
@@ -123,16 +123,20 @@ public class JAKeyStore {
 
 	static {
 		Security.addProvider(new BouncyCastleProvider());
+		
+		KeyStore ktmp = null;
+		
 		try {
-			trustStore = KeyStore.getInstance("JKS");
-			trustStore.load(null, pass);
-			loadTrusts(trustStore);
+			ktmp = KeyStore.getInstance("JKS");
+			ktmp.load(null, pass);
+			loadTrusts(ktmp);
 		}
 		catch (final KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
 			logger.log(Level.SEVERE, "Exception during loading trust stores (static block)", e);
 			e.printStackTrace();
 		}
-
+		
+		trustStore = ktmp;
 	}
 
 	private static void loadTrusts(final KeyStore keystore) {

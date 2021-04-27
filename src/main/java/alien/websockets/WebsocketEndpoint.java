@@ -119,6 +119,16 @@ public class WebsocketEndpoint extends Endpoint {
 			return 0;
 		}
 
+		@Override
+		public boolean equals(Object obj) {
+			return super.equals(obj);
+		}
+
+		@Override
+		public int hashCode() {
+			return endpoint.hashCode() + session.hashCode();
+		}
+
 		final long getRunningDeadline() {
 			return Math.min(absoluteRunningDeadline, lastActivityTime + 15 * 60 * 1000L);
 		}

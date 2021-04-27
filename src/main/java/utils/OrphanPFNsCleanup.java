@@ -245,7 +245,7 @@ public class OrphanPFNsCleanup {
 		try (PrintWriter pw = new PrintWriter("OrphanPFNsCleanup.progress")) {
 			while (true) {
 				try {
-					if (System.currentTimeMillis() - lastCheck > ConfigUtils.getConfig().geti("utils.OrphanPFNsCleanup.SE_list_check_interval", 60 * 2) * 1000 * 60) {
+					if (System.currentTimeMillis() - lastCheck > ConfigUtils.getConfig().geti("utils.OrphanPFNsCleanup.SE_list_check_interval", 60 * 2) * 1000L * 60) {
 						logger.log(Level.INFO, "Waking up the cleanup threads");
 
 						startSEThread(null);

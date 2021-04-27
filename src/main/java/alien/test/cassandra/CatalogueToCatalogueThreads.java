@@ -236,7 +236,7 @@ public class CatalogueToCatalogueThreads {
 				final int counted = global_count.incrementAndGet();
 				if (counted % 5000 == 0) {
 					// out.println("LFN: " + lfn + " - Count: " + counted + " Time: " + new Date());
-					out.println("LFN: " + lfn + "Estimation: " + (ns_count.get() / counted) / 1000000. + " - Count: " + counted + " Time: " + new Date());
+					out.println("LFN: " + lfn + "Estimation: " + (ns_count.get() / (double) counted) / 1000000. + " - Count: " + counted + " Time: " + new Date());
 					out.flush();
 				}
 

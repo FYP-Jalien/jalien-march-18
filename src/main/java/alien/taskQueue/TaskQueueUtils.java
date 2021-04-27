@@ -2627,9 +2627,9 @@ public class TaskQueueUtils {
 			String sql = " update SITEQUEUES left join (select siteid, sum(cost) REALCOST, ";
 			String set = " Group by statusId, siteid) dd group by siteid) bb using (siteid) set cost=REALCOST, ";
 
-			for (final String st : status.keySet()) {
-				sql += " max(if(statusId=" + status.get(st) + ", count, 0)) REAL" + st + ",";
-				set += " " + st + "=REAL" + st + ",";
+			for (final Map.Entry<String, Integer> entry : status.entrySet()) {
+				sql += " max(if(statusId=" + entry.getValue() + ", count, 0)) REAL" + entry.getKey() + ",";
+				set += " " + entry.getKey() + "=REAL" + entry.getKey() + ",";
 			}
 			sql = sql.substring(0, sql.length() - 1);
 			sql = set.substring(0, set.length() - 1);
@@ -3385,12 +3385,14 @@ public class TaskQueueUtils {
 		String reqs = "1=1 ";
 
 		final ArrayList<Object> bind = new ArrayList<>();
-		for (final String key : params.keySet()) {
+		for (final Map.Entry<String, Object> entry : params.entrySet()) {
+			final String key = entry.getKey();
+
 			if ("counter".equals(key))
 				continue;
 
 			reqs += " and " + key + " = ?";
-			bind.add(params.get(key));
+			bind.add(entry.getValue());
 		}
 
 		try (DBFunctions db = getQueueDB()) {
@@ -3429,10 +3431,10 @@ public class TaskQueueUtils {
 				String insert_values = " VALUES (";
 
 				bind.clear();
-				for (final String key : params.keySet()) {
-					insert_fields += key + ",";
+				for (final Map.Entry<String, Object> entry : params.entrySet()) {
+					insert_fields += entry.getKey() + ",";
 					insert_values += "?,";
-					bind.add(params.get(key));
+					bind.add(entry.getValue());
 				}
 				insert_fields = insert_fields.substring(0, insert_fields.length() - 1);
 				insert_values = insert_values.substring(0, insert_values.length() - 1);

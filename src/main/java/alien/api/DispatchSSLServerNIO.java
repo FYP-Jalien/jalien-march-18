@@ -663,7 +663,14 @@ public class DispatchSSLServerNIO implements Runnable {
 	/**
 	 * Total amount of time (in milliseconds) spent in writing objects to the socket.
 	 */
-	public static double lSerialization = 0;
+	private static double lSerialization = 0;
+
+	/**
+	 * @return total time in milliseconds spent in serializing objects
+	 */
+	public static double getSerializationTime() {
+		return lSerialization;
+	}
 
 	/**
 	 * Print client info on SSL partner

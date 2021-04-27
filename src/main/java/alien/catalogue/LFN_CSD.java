@@ -1,12 +1,11 @@
 package alien.catalogue;
 
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
@@ -51,7 +50,7 @@ public class LFN_CSD implements Comparable<LFN_CSD>, CatalogEntity {
 	/**
 	 * Root UUID
 	 */
-	public static final UUID root_uuid = UUID.nameUUIDFromBytes("root".getBytes()); // 63a9f0ea-7bb9-3050-b96b-649e85481845
+	static final UUID root_uuid = UUID.nameUUIDFromBytes("root".getBytes()); // 63a9f0ea-7bb9-3050-b96b-649e85481845
 
 	/**
 	 * Pool of PreparedStatements
@@ -66,25 +65,17 @@ public class LFN_CSD implements Comparable<LFN_CSD>, CatalogEntity {
 	/**
 	 * dirCache stats
 	 */
-	public static int dirCache_get_hit = 0;
+	static int dirCache_get_hit = 0;
 	/**
 	 * dirCache stats
 	 */
-	public static int dirCache_put = 0;
+	static int dirCache_put = 0;
 
 	/**
 	 * Unique Ctime for auto insertion
 	 */
-	public static Date ctime_fixed = null;
-	static {
-		try {
-			ctime_fixed = new SimpleDateFormat("yyyy-mm-dd hh:mm:ss").parse("2017-01-01 00:00:00");
-		}
-		catch (ParseException e) {
-			System.err.println(e);
-			System.exit(-1);
-		}
-	}
+	public static final Date ctime_fixed = new Date(1483225200000L);
+
 	/**
 	 * Modulo of seNumber to partition balance
 	 */
@@ -447,7 +438,7 @@ public class LFN_CSD implements Comparable<LFN_CSD>, CatalogEntity {
 
 					path_id = results.one().getUUID("child_id");
 					if (path_id == null) {
-						logger.severe("Error getting parent id for path_id: " + path_id + " path: " + (i == 0 ? "/" : path_chunks[i - 1]));
+						logger.severe("Error getting parent id for path_id for path: " + (i == 0 ? "/" : path_chunks[i - 1]));
 						return null;
 					}
 
@@ -1360,8 +1351,8 @@ public class LFN_CSD implements Comparable<LFN_CSD>, CatalogEntity {
 		if (monitor != null)
 			monitor.incrementCounter("PFN_CSD_db_lookup");
 
-		for (Integer senumber : this.pfns.keySet()) {
-			final PFN pfn = new PFN(senumber, this.pfns.get(senumber), this.id, this.size);
+		for (final Map.Entry<Integer, String> entry : this.pfns.entrySet()) {
+			final PFN pfn = new PFN(entry.getKey(), entry.getValue(), this.id, this.size);
 			pfnCache.add(pfn);
 		}
 

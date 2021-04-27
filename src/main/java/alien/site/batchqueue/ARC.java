@@ -115,8 +115,9 @@ public class ARC extends BatchQueue {
 
 		logger.info("temp directory: " + tmpDir);
 
-		for (String var : environment.keySet()) {
-			String val = environment.get(var);
+		for (Map.Entry<String, String> entry : environment.entrySet()) {
+			final String var = entry.getKey();
+			String val = entry.getValue();
 
 			if (var.equals("CE_LCGCE")) {
 				double tot = 0;
@@ -541,8 +542,8 @@ public class ARC extends BatchQueue {
 				Attribute r = attrs.get("GLUE2ComputingShareRunningJobs");
 				Attribute w = attrs.get("GLUE2ComputingShareWaitingJobs");
 
-				running_on_share.put(share_v, r == null ? r : r.get());
-				waiting_on_share.put(share_v, w == null ? w : w.get());
+				running_on_share.put(share_v, r == null ? null : r.get());
+				waiting_on_share.put(share_v, w == null ? null : w.get());
 			}
 
 		}

@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import alien.catalogue.FileSystemUtils;
@@ -86,11 +87,12 @@ public class JAliEnCommandwhereis_csd extends JAliEnBaseCommand {
 				}
 				else {
 					// PFNs for physical files with senumber-pfn map
-					for (final Integer senumber : wi.keySet()) {
+					for (final Map.Entry<Integer, String> entry : wi.entrySet()) {
 						String seName = "no_se (link or zip member)";
+						final Integer senumber = entry.getKey();
 						if (senumber.intValue() != 0)
 							seName = commander.c_api.getSE(senumber.intValue()).seName;
-						commander.printOutln("\t The entry is in SE: " + seName + "\t with PFN: " + wi.get(senumber));
+						commander.printOutln("\t The entry is in SE: " + seName + "\t with PFN: " + entry.getValue());
 					}
 				}
 

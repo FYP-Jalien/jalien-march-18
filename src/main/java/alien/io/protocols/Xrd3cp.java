@@ -51,7 +51,7 @@ public class Xrd3cp extends Xrootd {
 
 		cachedPath = true;
 
-		for (final String path : new String[] { xrootd_default_path, ConfigUtils.getConfig().gets("xrd3cp.location", null), UserFactory.getUserHome() + "/alien/api", "/opt/alien/api" })
+		for (final String path : new String[] { getXrootdDefaultPath(), ConfigUtils.getConfig().gets("xrd3cp.location", null), UserFactory.getUserHome() + "/alien/api", "/opt/alien/api" })
 			if (path != null) {
 				final File test = new File(path + "/bin/xrd3cp");
 
@@ -110,9 +110,9 @@ public class Xrd3cp extends Xrootd {
 
 			command.add("-S");
 
-			final boolean sourceEnvelope = source.ticket != null && source.ticket.envelope != null;
+			final boolean sourceEnvelope = source.ticket.envelope != null;
 
-			final boolean targetEnvelope = target.ticket != null && target.ticket.envelope != null;
+			final boolean targetEnvelope = target.ticket.envelope != null;
 
 			if (sourceEnvelope)
 				command.add(source.ticket.envelope.getTransactionURL());
@@ -165,14 +165,10 @@ public class Xrd3cp extends Xrootd {
 			try {
 				final Process p = pBuilder.start();
 
-				if (p != null) {
-					final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
-					pTimeout.waitFor(seconds, TimeUnit.SECONDS);
-					exitStatus = pTimeout.getExitStatus();
-					setLastExitStatus(exitStatus);
-				}
-				else
-					throw new IOException("Cannot execute command: " + command);
+				final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
+				pTimeout.waitFor(seconds, TimeUnit.SECONDS);
+				exitStatus = pTimeout.getExitStatus();
+				setLastExitStatus(exitStatus);
 			}
 			catch (final InterruptedException ie) {
 				setLastExitStatus(null);

@@ -50,7 +50,7 @@ public class JAliEnCommandrm extends JAliEnBaseCommand {
 
 		for (final String path : alPaths) {
 			if (path == null) {
-				logger.log(Level.WARNING, "Could not get LFN: " + path);
+				logger.log(Level.WARNING, "Could not get an LFN");
 				return;
 			}
 

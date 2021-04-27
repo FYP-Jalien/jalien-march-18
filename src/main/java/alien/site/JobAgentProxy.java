@@ -763,7 +763,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 		}
 
 		// System.err.println("Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
-		return new String(fExe.getAbsolutePath() + argString);
+		return fExe.getAbsolutePath() + argString;
 	}
 	// end EXPERIMENTAL
 
@@ -1286,8 +1286,8 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 		HashMap<String, String> envmap = new HashMap<>();
 
 		if (packs != null) {
-			for (final String pack : packs.keySet())
-				packagestring += voalice + pack + "::" + packs.get(pack) + ",";
+			for (final Map.Entry<String, String> entry : packs.entrySet())
+				packagestring += voalice + entry.getKey() + "::" + packs.get(entry.getValue()) + ",";
 
 			if (!packs.containsKey("APISCONFIG"))
 				packagestring += voalice + "APISCONFIG,";

@@ -104,12 +104,13 @@ public class TitanBatchInfo {
 		final ProcessBuilder pb = new ProcessBuilder("/bin/bash", "-c", "qstat " + pbsJobId + " 2>/dev/null | tail -n 1 | awk '{print $5}'");
 		try {
 			final Process p = pb.start();
-			final BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-			String line = null;
-			while ((line = reader.readLine()) != null) {
-				System.out.println("Qstat line: '" + line + "'");
-				if (line.equals("R"))
-					return true;
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+				String line = null;
+				while ((line = reader.readLine()) != null) {
+					System.out.println("Qstat line: '" + line + "'");
+					if (line.equals("R"))
+						return true;
+				}
 			}
 		}
 		catch (final Exception e) {

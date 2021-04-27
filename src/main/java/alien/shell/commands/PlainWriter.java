@@ -42,7 +42,7 @@ public class PlainWriter extends UIPrintWriter {
 	/**
 	 * String tag to mark the last line of an transaction stream
 	 */
-	public static String streamend = String.valueOf((char) 0);
+	public static final String streamend = String.valueOf((char) 0);
 
 	/**
 	 * String tag to mark separated fields

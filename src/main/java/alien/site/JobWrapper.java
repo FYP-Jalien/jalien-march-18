@@ -622,8 +622,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		logger.log(Level.INFO, "Preparing to install packages");
 		if (packs != null) {
-			for (final String pack : packs.keySet())
-				packagestring += voalice + pack + "::" + packs.get(pack) + ",";
+			for (final Map.Entry<String, String> entry : packs.entrySet())
+				packagestring += voalice + entry.getKey() + "::" + packs.get(entry.getValue()) + ",";
 
 			if (!packs.containsKey("APISCONFIG"))
 				packagestring += voalice + "APISCONFIG,";

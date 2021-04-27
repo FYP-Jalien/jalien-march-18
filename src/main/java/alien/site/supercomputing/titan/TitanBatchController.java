@@ -47,26 +47,28 @@ public class TitanBatchController {
 		int dbcount = 0;
 		try {
 			final Process p = pb.start();
-			final BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()));
-			String line = null;
-			while ((line = reader.readLine()) != null)
-				// if(batchesInfo.get(line) == null)
-				try {
-					final TitanBatchInfo bi = batchesInfo.get(line);
-					if (bi == null)
-						tmpBatchesInfo.put(line, new TitanBatchInfo(Long.valueOf(line), globalWorkdir + "/" + line));
-					else
-						tmpBatchesInfo.put(line, bi);
-					dbcount++;
-					System.out.println("Now controlling batch: " + line);
-				}
-				catch (@SuppressWarnings("unused") final InvalidParameterException e) {
-					System.err.println("Not a batch folder at " + globalWorkdir + "/" + line + " , skipping....");
-				}
-				catch (final Exception e) {
-					System.err.println(e.getMessage());
-					System.err.println("Unable to initialize batch folder at " + globalWorkdir + "/" + line + " , skipping....");
-				}
+			try (BufferedReader reader = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+				String line = null;
+				while ((line = reader.readLine()) != null)
+					// if(batchesInfo.get(line) == null)
+					try {
+						final TitanBatchInfo bi = batchesInfo.get(line);
+						if (bi == null)
+							tmpBatchesInfo.put(line, new TitanBatchInfo(Long.valueOf(line), globalWorkdir + "/" + line));
+						else
+							tmpBatchesInfo.put(line, bi);
+						dbcount++;
+						System.out.println("Now controlling batch: " + line);
+					}
+					catch (@SuppressWarnings("unused") final InvalidParameterException e) {
+						System.err.println("Not a batch folder at " + globalWorkdir + "/" + line + " , skipping....");
+					}
+					catch (final Exception e) {
+						System.err.println(e.getMessage());
+						System.err.println("Unable to initialize batch folder at " + globalWorkdir + "/" + line + " , skipping....");
+					}
+			}
+			
 			batchesInfo = tmpBatchesInfo;
 		}
 		catch (final IOException e) {

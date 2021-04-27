@@ -290,27 +290,28 @@ public class JobDownloader extends Thread {
 				// Connection connection = DriverManager.getConnection(dbname);
 				final Connection connection = DriverManager.getConnection(js.batch.dbName);
 				((SQLiteConnection) connection).setBusyTimeout(3000);
-				final Statement statement = connection.createStatement();
-				// setting variables
-				final HashMap<String, String> alice_environment_packages = loadJDLEnvironmentVariables();
+				try (Statement statement = connection.createStatement()) {
+					// setting variables
+					final HashMap<String, String> alice_environment_packages = loadJDLEnvironmentVariables();
 
-				// setting variables for packages
-				final HashMap<String, String> environment_packages = getJobPackagesEnvironment();
+					// setting variables for packages
+					final HashMap<String, String> environment_packages = getJobPackagesEnvironment();
 
-				// try(PrintWriter out = new PrintWriter(tempDir + "/environment")){
-				try (PrintWriter out = new PrintWriter(tempDir + "/environment")) {
-					for (final Entry<String, String> e : alice_environment_packages.entrySet())
-						out.println(String.format("export %s=%s", e.getKey(), e.getValue()));
+					// try(PrintWriter out = new PrintWriter(tempDir + "/environment")){
+					try (PrintWriter out = new PrintWriter(tempDir + "/environment")) {
+						for (final Entry<String, String> e : alice_environment_packages.entrySet())
+							out.println(String.format("export %s=%s", e.getKey(), e.getValue()));
 
-					for (final Entry<String, String> e : environment_packages.entrySet())
-						out.println(String.format(" export %s=%s", e.getKey(), e.getValue()));
+						for (final Entry<String, String> e : environment_packages.entrySet())
+							out.println(String.format(" export %s=%s", e.getKey(), e.getValue()));
+					}
+
+					final String validationCommand = jdl.gets("ValidationCommand");
+					statement.executeUpdate(String.format(
+							"UPDATE alien_jobs SET queue_id=%d, job_folder='%s', status='%s', executable='%s', validation='%s', environment='%s',user='%s', masterjob_id='%s' WHERE rank=%d",
+							queueId, tempDir, "Q", getLocalCommand(jdl.gets("Executable"), jdl.getArguments()), validationCommand != null ? getLocalCommand(validationCommand, null) : "", "", username,
+							masterJobId, Integer.valueOf(current_rank)));
 				}
-
-				final String validationCommand = jdl.gets("ValidationCommand");
-				statement.executeUpdate(String.format(
-						"UPDATE alien_jobs SET queue_id=%d, job_folder='%s', status='%s', executable='%s', validation='%s', environment='%s',user='%s', masterjob_id='%s' WHERE rank=%d",
-						queueId, tempDir, "Q", getLocalCommand(jdl.gets("Executable"), jdl.getArguments()), validationCommand != null ? getLocalCommand(validationCommand, null) : "", "", username,
-						masterJobId, Integer.valueOf(current_rank)));
 
 				// String.format("%d, %d, '%s', '%s', '%s', '%s', '%s','%s', '%s', %d, %d", Integer.valueOf(current_rank), queueId, "", "", tempDir, "Q",
 				// getLocalCommand(jdl.gets("Executable"), jdl.getArguments()), validationCommand != null ? getLocalCommand(validationCommand, null) : "", "", Integer.valueOf(-1),
@@ -739,8 +740,8 @@ public class JobDownloader extends Thread {
 		HashMap<String, String> envmap = new HashMap<>();
 
 		if (packs != null) {
-			for (final String pack : packs.keySet())
-				packagestring += voalice + pack + "::" + packs.get(pack) + ",";
+			for (final Map.Entry<String, String> entry : packs.entrySet())
+				packagestring += voalice + entry.getKey() + "::" + packs.get(entry.getValue()) + ",";
 
 			if (!packs.containsKey("APISCONFIG"))
 				packagestring += voalice + "APISCONFIG,";

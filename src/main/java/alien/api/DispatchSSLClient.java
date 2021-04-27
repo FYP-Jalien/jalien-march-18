@@ -388,7 +388,7 @@ public class DispatchSSLClient {
 	/**
 	 * Total amount of time (in milliseconds) spent in writing objects to the socket.
 	 */
-	public static long lSerialization = 0;
+	private static long lSerialization = 0;
 
 	private static synchronized void initializeSocketInfo() {
 		addr = ConfigUtils.getConfig().gets(serviceName).trim();
@@ -499,6 +499,13 @@ public class DispatchSSLClient {
 			throw ex;
 
 		return reply;
+	}
+
+	/**
+	 * @return total time in milliseconds spent in serializing objects
+	 */
+	public static long getSerializationTime() {
+		return lSerialization;
 	}
 
 	private static void printSocketInfo(final SSLSocket s, final Level level) {

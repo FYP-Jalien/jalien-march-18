@@ -113,42 +113,42 @@ public class TestConfig {
 	/**
 	 * the user's private key
 	 */
-	public static String user_key = tvo_certs + "/userkey.pem";
+	public static final String user_key = tvo_certs + "/userkey.pem";
 
 	/**
 	 * the user's cert
 	 */
-	public static String user_cert = tvo_certs + "/usercert.pem";
+	public static final String user_cert = tvo_certs + "/usercert.pem";
 
 	/**
 	 * the ca's private key
 	 */
-	public static String ca_key = tvo_certs + "/cakey.pem";
+	public static final String ca_key = tvo_certs + "/cakey.pem";
 
 	/**
 	 * the ca's cert
 	 */
-	public static String ca_cert = tvo_certs + "/cacert.pem";
+	public static final String ca_cert = tvo_certs + "/cacert.pem";
 
 	/**
 	 * the host's private key
 	 */
-	public static String host_key = tvo_certs + "/hostkey.pem";
+	public static final String host_key = tvo_certs + "/hostkey.pem";
 
 	/**
 	 * the host's cert
 	 */
-	public static String host_cert = tvo_certs + "/hostcert.pem";
+	public static final String host_cert = tvo_certs + "/hostcert.pem";
 
 	/**
 	 * central jAuthZ private key for storage
 	 */
-	public static String jAuth_priv = tvo_certs + "/AuthZ_priv.pem";
+	public static final String jAuth_priv = tvo_certs + "/AuthZ_priv.pem";
 
 	/**
 	 * central jAuthZ public key for storage
 	 */
-	public static String jAuth_pub = tvo_certs + "/AuthZ_pub.pem";
+	public static final String jAuth_pub = tvo_certs + "/AuthZ_pub.pem";
 
 	/**
 	 * central jAuthZ's subject
@@ -158,12 +158,12 @@ public class TestConfig {
 	/**
 	 * SE's private key for storage
 	 */
-	public static String SE_priv = tvo_certs + "/SE_priv.pem";
+	public static final String SE_priv = tvo_certs + "/SE_priv.pem";
 
 	/**
 	 * SE's public key for storage
 	 */
-	public static String SE_pub = tvo_certs + "/SE_pub.pem";
+	public static final String SE_pub = tvo_certs + "/SE_pub.pem";
 
 	/**
 	 * central SE's subject
@@ -219,7 +219,7 @@ public class TestConfig {
 	 * the LDAP pass string
 	 */
 	// public static String ldap_pass = UUID.randomUUID().toString();
-	public static String ldap_pass = "pass";
+	public static final String ldap_pass = "pass";
 
 	/**
 	 * the user base directory in the catalogue
@@ -240,7 +240,7 @@ public class TestConfig {
 	 * the LDAP pass string
 	 */
 	// public static String mysql_pass = UUID.randomUUID().toString();
-	public static String sql_pass = "pass";
+	public static final String sql_pass = "pass";
 
 	/**
 	 * the test SEs' home directories

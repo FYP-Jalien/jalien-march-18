@@ -10,6 +10,7 @@ import java.net.UnknownHostException;
 import java.security.GeneralSecurityException;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
+import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -38,25 +39,25 @@ public class Envelope {
 	 * @since Nov 9, 2010
 	 */
 	public static enum FilePerm {
-	/**
-	 * Read envelope
-	 */
-	READ("read"),
+		/**
+		 * Read envelope
+		 */
+		READ("read"),
 
-	/**
-	 * Write once envelope
-	 */
-	WRITE_ONCE("write-once"),
+		/**
+		 * Write once envelope
+		 */
+		WRITE_ONCE("write-once"),
 
-	/**
-	 * Write envelope
-	 */
-	WRITE("write"),
+		/**
+		 * Write envelope
+		 */
+		WRITE("write"),
 
-	/**
-	 * Delete envelope
-	 */
-	DELETE("delete");
+		/**
+		 * Delete envelope
+		 */
+		DELETE("delete");
 
 		private final String _xmlText;
 
@@ -289,10 +290,14 @@ public class Envelope {
 	 * build a lookup table for the string (XML) representations of the file permissions from the enum. This will help in mapping from the string values in the authorization XML to the ordinal values
 	 * associated with the enum entries. It is preferred to have the strings tied to the enum for consistency.
 	 */
-	public static final Map<String, FilePerm> filePermissions = new HashMap<>();
+	public static final Map<String, FilePerm> filePermissions;
 	static {
+		final Map<String, FilePerm> tmp = new HashMap<>();
+
 		for (final FilePerm fp : FilePerm.values())
-			filePermissions.put(fp.xmlText(), fp);
+			tmp.put(fp.xmlText(), fp);
+
+		filePermissions = Collections.unmodifiableMap(tmp);
 	}
 
 	// time frame to determine whether creatin time is still valid

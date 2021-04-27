@@ -42,27 +42,27 @@ public class CreateLDAP {
 	/**
 	 * the LDAP args file
 	 */
-	public static String ldap_args_file = "/tmp/jalien-slapd.args";
+	public static final String ldap_args_file = "/tmp/jalien-slapd.args";
 
 	/**
 	 * the LDAP pid file
 	 */
-	public static String ldap_pid_file = "/tmp/jalien-slapd.pid";
+	public static final String ldap_pid_file = "/tmp/jalien-slapd.pid";
 
 	/**
 	 * the LDAP starter file
 	 */
-	public static String ldap_starter = TestConfig.tvo_bin + "/LDAP_starter";
+	public static final String ldap_starter = TestConfig.tvo_bin + "/LDAP_starter";
 
 	/**
 	 * the LDAP pid
 	 */
-	public static String ldap_pid = null;
+	static String ldap_pid = null;
 
 	/**
 	 * the LDAP context
 	 */
-	public static DirContext context;
+	static DirContext context;
 
 	/**
 	 * @return state of rampUp

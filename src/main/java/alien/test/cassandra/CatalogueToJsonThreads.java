@@ -103,15 +103,14 @@ public class CatalogueToJsonThreads {
 	 * @throws IOException
 	 */
 	public static void checkJsonReadable(final String[] args) throws IOException {
+		if (args.length == 0 || args[0] == null) {
+			System.err.println("You need to pass an AliEn path to a file as first argument.");
+			System.exit(-3);
+		}
 
 		final JSONParser parser = new JSONParser();
 
 		try (FileReader reader = new FileReader(args[0])) {
-			if (args[0] == null) {
-				System.err.println("You need to pass an AliEn path to a file as first argument.");
-				System.exit(-3);
-			}
-
 			final Object obj = parser.parse(reader);
 
 			final JSONObject jsonObject = (JSONObject) obj;
@@ -319,11 +318,11 @@ public class CatalogueToJsonThreads {
 			final String lfn_guid = lfn.guid.toString();
 			final String lfn_guid_start = "guid:";
 
-			for (final GUID g : whereis.keySet()) {
-				final Set<PFN> pfns = g.getPFNs();
+			for (final Map.Entry<GUID, LFN> entry : whereis.entrySet()) {
+				final Set<PFN> pfns = entry.getKey().getPFNs();
 				for (final PFN pf : pfns)
 					if (pf.pfn.startsWith(lfn_guid_start) && pf.pfn.contains(lfn_guid))
-						members.add(whereis.get(g));
+						members.add(entry.getValue());
 			}
 
 			return members;
@@ -470,9 +469,9 @@ public class CatalogueToJsonThreads {
 
 					Set<PFN> pfns = null;
 					// we have the pfns in the map
-					for (final GUID guidmap : whereis.keySet())
-						if (whereis.get(guidmap).equals(l))
-							pfns = guidmap.getPFNs();
+					for (final Map.Entry<GUID, LFN> entry : whereis.entrySet())
+						if (entry.getValue().equals(l))
+							pfns = entry.getKey().getPFNs();
 
 					if (pfns != null) {
 						final JSONArray pfnsjson = new JSONArray();

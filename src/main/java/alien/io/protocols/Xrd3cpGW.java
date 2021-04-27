@@ -105,16 +105,16 @@ public class Xrd3cpGW extends Xrootd {
 				throw new IOException("The ticket for target PFN " + target.toString() + " could not be found or is not a WRITE one.");
 
 			final List<String> command = new LinkedList<>();
-			command.add(xrootd_default_path + "/bin/xrdcp");
+			command.add(getXrootdDefaultPath() + "/bin/xrdcp");
 			command.add("--tpc");
 			command.add("only");
 			command.add("--force");
 			command.add("--path");
 			command.add("--posc");
 
-			final boolean sourceEnvelope = source.ticket != null && source.ticket.envelope != null;
+			final boolean sourceEnvelope = source.ticket.envelope != null;
 
-			final boolean targetEnvelope = target.ticket != null && target.ticket.envelope != null;
+			final boolean targetEnvelope = target.ticket.envelope != null;
 
 			final String serverInstance = getTransferServerInstance();
 
@@ -172,14 +172,10 @@ public class Xrd3cpGW extends Xrootd {
 			try {
 				final Process p = pBuilder.start();
 
-				if (p != null) {
-					final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
-					pTimeout.waitFor(seconds, TimeUnit.SECONDS);
-					exitStatus = pTimeout.getExitStatus();
-					setLastExitStatus(exitStatus);
-				}
-				else
-					throw new IOException("Cannot execute command: " + command);
+				final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
+				pTimeout.waitFor(seconds, TimeUnit.SECONDS);
+				exitStatus = pTimeout.getExitStatus();
+				setLastExitStatus(exitStatus);
 			}
 			catch (final InterruptedException ie) {
 				setLastExitStatus(null);

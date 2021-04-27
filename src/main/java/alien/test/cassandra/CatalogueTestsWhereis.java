@@ -173,7 +173,7 @@ public class CatalogueTestsWhereis {
 			else
 				System.out.println("Limit not reached!");
 
-			ms_per_ls = ns_count.get() / cnt;
+			ms_per_ls = ns_count.get() / (double) cnt;
 			System.out.println("Final ns/w: " + ms_per_ls);
 			ms_per_ls = ms_per_ls / 1000000.;
 		}
@@ -257,7 +257,7 @@ public class CatalogueTestsWhereis {
 
 						if (counter2 % 5000 == 0) {
 							// out.println("LFN: " + dir.getCanonicalName() + " - Count: " + counter2 + " Time: " + new Date());
-							out.println("LFN: " + dir.getCanonicalName() + " Estimation: " + (ns_count.get() / counter2) / 1000000. + " - Count: " + counter2 + " Time: " + new Date());
+							out.println("LFN: " + dir.getCanonicalName() + " Estimation: " + (ns_count.get() / (double) counter2) / 1000000. + " - Count: " + counter2 + " Time: " + new Date());
 							out.flush();
 						}
 					}

@@ -128,7 +128,7 @@ public class JAliEnCommandping extends JAliEnBaseCommand {
 
 			commander.printOut("rtt min/avg/max/mdev = ");
 			commander.printOut(Format.point(min / NANO_TO_MS) + "/");
-			commander.printOut(Format.point((sum / count) / NANO_TO_MS) + "/");
+			commander.printOut(Format.point((sum / (double)count) / NANO_TO_MS) + "/");
 			commander.printOut(Format.point(max / NANO_TO_MS) + "/");
 			commander.printOutln(Format.point(mdev / NANO_TO_MS) + " ms");
 

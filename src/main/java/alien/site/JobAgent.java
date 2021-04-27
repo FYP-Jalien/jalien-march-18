@@ -169,28 +169,28 @@ public class JobAgent implements Runnable {
 	/**
 	 * TTL for the slot
 	 */
-	protected static int origTtl;
+	static int origTtl;
 	private static final long jobAgentStartTime = System.currentTimeMillis();
 
 	/**
 	 * Number of remaining CPU cores to advertise
 	 */
-	protected static Long RUNNING_CPU;
+	static Long RUNNING_CPU;
 
 	/**
 	 * Amount of free disk space in the scratch area to advertise
 	 */
-	protected static Long RUNNING_DISK;
+	static Long RUNNING_DISK;
 
 	/**
 	 * Number of CPU cores assigned to this slot
 	 */
-	protected static Long MAX_CPU;
+	static Long MAX_CPU;
 
 	/**
 	 * Number of currently active JobAgent instances
 	 */
-	protected static long RUNNING_JOBAGENTS;
+	static long RUNNING_JOBAGENTS;
 
 	private Long reqCPU = Long.valueOf(0);
 	private Long reqDisk = Long.valueOf(0);
@@ -205,7 +205,7 @@ public class JobAgent implements Runnable {
 	/**
 	 * How many consecutive answers of "no job for you" we got from the broker
 	 */
-	protected static AtomicInteger retries = new AtomicInteger(0);
+	protected static final AtomicInteger retries = new AtomicInteger(0);
 
 	/**
 	 */
@@ -985,11 +985,11 @@ public class JobAgent implements Runnable {
 				RES_WORKDIR_SIZE = diskinfo.get(ApMonMonitoringConstants.LJOB_WORKDIR_SIZE);
 
 			if (jobinfo != null) {
-				RES_RMEM = Double.valueOf(jobinfo.get(ApMonMonitoringConstants.LJOB_PSS).doubleValue());
+				RES_RMEM = jobinfo.get(ApMonMonitoringConstants.LJOB_PSS);
 				RES_VMEM = Double.valueOf(jobinfo.get(ApMonMonitoringConstants.LJOB_SWAPPSS).doubleValue() + RES_RMEM.doubleValue());
 
 				RES_CPUTIME = jobinfo.get(ApMonMonitoringConstants.LJOB_CPU_TIME);
-				RES_CPUUSAGE = Double.valueOf(jobinfo.get(ApMonMonitoringConstants.LJOB_CPU_USAGE).doubleValue());
+				RES_CPUUSAGE = jobinfo.get(ApMonMonitoringConstants.LJOB_CPU_USAGE);
 				RES_RUNTIME = Long.valueOf(jobinfo.get(ApMonMonitoringConstants.LJOB_RUN_TIME).longValue());
 				RES_MEMUSAGE = jobinfo.get(ApMonMonitoringConstants.LJOB_MEM_USAGE);
 			}
@@ -1008,7 +1008,7 @@ public class JobAgent implements Runnable {
 
 			// formatted runtime
 			if (RES_RUNTIME.longValue() < 60)
-				RES_FRUNTIME = String.format("00:00:%02d", Long.valueOf(RES_RUNTIME.longValue()));
+				RES_FRUNTIME = String.format("00:00:%02d", RES_RUNTIME);
 			else if (RES_RUNTIME.longValue() < 3600)
 				RES_FRUNTIME = String.format("00:%02d:%02d", Long.valueOf(RES_RUNTIME.longValue() / 60), Long.valueOf(RES_RUNTIME.longValue() % 60));
 			else

@@ -563,7 +563,7 @@ public class DispatchSSLServer extends Thread {
 	/**
 	 * Total amount of time (in milliseconds) spent in writing objects to the socket.
 	 */
-	public static double lSerialization = 0;
+	private static double lSerialization = 0;
 
 	/**
 	 * Print client info on SSL partner

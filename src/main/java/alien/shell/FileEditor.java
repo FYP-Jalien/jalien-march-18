@@ -19,7 +19,7 @@ public class FileEditor {
 	/**
 	 * Available editors
 	 */
-	public static final String[] editors = { "sensible-editor", "edit", "mcedit", "vim", "joe", "emacs", "more", "less", "nano" };
+	private static final String[] editors = { "sensible-editor", "edit", "mcedit", "vim", "joe", "emacs", "more", "less", "nano" };
 
 	private static final Map<String, String> editorCommands = new TreeMap<>();
 

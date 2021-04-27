@@ -3,8 +3,6 @@ package alien.test.cassandra;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
-import java.text.ParseException;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -54,16 +52,7 @@ public class CatalogueToCassandraThreads {
 	/**
 	 * Unique Ctime for auto insertion
 	 */
-	public static Date ctime_fixed = null;
-	static {
-		try {
-			ctime_fixed = new SimpleDateFormat("yyyy-mm-dd hh:mm:ss").parse("2017-01-01 00:00:00");
-		}
-		catch (final ParseException e) {
-			System.err.println(e);
-			System.exit(-1);
-		}
-	}
+	public static final Date ctime_fixed = new Date(1483225200000L);
 
 	/**
 	 * limit
@@ -286,7 +275,7 @@ public class CatalogueToCassandraThreads {
 		final int cnt = timing_count.get();
 
 		if (cnt > 0) {
-			ms_per_i = ns_count.get() / cnt;
+			ms_per_i = ns_count.get() / (double) cnt;
 			System.out.println("Final ns/i: " + ms_per_i);
 			ms_per_i = ms_per_i / 1000000.;
 		}
@@ -297,7 +286,7 @@ public class CatalogueToCassandraThreads {
 		final int cnt_dirs = timing_count_dirs.get();
 
 		if (cnt_dirs > 0) {
-			ms_per_i_dirs = ns_count_dirs.get() / cnt_dirs;
+			ms_per_i_dirs = ns_count_dirs.get() / (double) cnt_dirs;
 			System.out.println("Final ns/createDir: " + ms_per_i_dirs);
 			ms_per_i_dirs = ms_per_i_dirs / 1000000.;
 		}
@@ -413,7 +402,7 @@ public class CatalogueToCassandraThreads {
 		final int cnt = timing_count.get();
 
 		if (cnt > 0) {
-			ms_per_i = ns_count.get() / cnt;
+			ms_per_i = ns_count.get() / (double) cnt;
 			System.out.println("Final ns/i: " + ms_per_i);
 			ms_per_i = ms_per_i / 1000000.;
 		}
@@ -468,7 +457,7 @@ public class CatalogueToCassandraThreads {
 
 				final int counted = global_count.incrementAndGet();
 				if (counted % 5000 == 0) {
-					out.println("LFN: " + lfnparent + lfn + " Estimation: " + (ns_count.get() / counted) / 1000000. + " - Count: " + counted + " Time: " + new Date());
+					out.println("LFN: " + lfnparent + lfn + " Estimation: " + (ns_count.get() / (double) counted) / 1000000. + " - Count: " + counted + " Time: " + new Date());
 					out.flush();
 				}
 
@@ -543,11 +532,11 @@ public class CatalogueToCassandraThreads {
 			final String lfn_guid = lfn.guid.toString();
 			final String lfn_guid_start = "guid:";
 
-			for (final GUID g : whereis.keySet()) {
-				final Set<PFN> pfns = g.getPFNs();
+			for (final Map.Entry<GUID, LFN> entry : whereis.entrySet()) {
+				final Set<PFN> pfns = entry.getKey().getPFNs();
 				for (final PFN pf : pfns)
 					if (pf.pfn.startsWith(lfn_guid_start) && pf.pfn.contains(lfn_guid))
-						members.add(whereis.get(g));
+						members.add(entry.getValue());
 			}
 
 			return members;
@@ -573,7 +562,7 @@ public class CatalogueToCassandraThreads {
 			if (counted >= limit.get()) {
 				// out.println("LFN: " + dir.getCanonicalName() + " - Count: " +
 				// counted + " Time: " + new Date());
-				out.println("LFN: " + dir.getCanonicalName() + " Estimation: " + (ns_count.get() / counted) / 1000000. + " - Count: " + counted + " Time: " + new Date());
+				out.println("LFN: " + dir.getCanonicalName() + " Estimation: " + (ns_count.get() / (double) counted) / 1000000. + " - Count: " + counted + " Time: " + new Date());
 				out.flush();
 				limit.set(counted + origlimit);
 			}
@@ -700,9 +689,9 @@ public class CatalogueToCassandraThreads {
 
 					Set<PFN> pfns = null;
 					// we have the pfns in the map
-					for (final GUID guidmap : whereis.keySet())
-						if (whereis.get(guidmap).equals(l))
-							pfns = guidmap.getPFNs();
+					for (final Map.Entry<GUID, LFN> entry : whereis.entrySet())
+						if (entry.getValue().equals(l))
+							pfns = entry.getKey().getPFNs();
 
 					if (pfns != null) {
 						final HashMap<Integer, String> pfnset = new HashMap<>();

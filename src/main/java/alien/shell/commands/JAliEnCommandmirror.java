@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.StringTokenizer;
 
 import alien.catalogue.FileSystemUtils;
@@ -140,15 +141,16 @@ public class JAliEnCommandmirror extends JAliEnBaseCommand {
 						results = commander.c_api.mirrorLFN(this.lfn, this.ses, this.exses, this.qos, true, this.attempts);
 
 					if (results != null) {
-						for (final String s : results.keySet()) {
+						for (final Map.Entry<String, Long> entry : results.entrySet()) {
 							String result_string;
-							final Long result = results.get(s);
+							final String s = entry.getKey();
+							final Long result = entry.getValue();
 
 							if (result != null) {
 								if (result.longValue() > 0)
 									commander.printOutln(s + ": queued transfer ID " + result.longValue());
 								else {
-									result_string = JAliEnCommandmirror.Errcode2Text(result.intValue());
+									result_string = JAliEnCommandmirror.errcode2Text(result.intValue());
 									commander.printErrln(s + ": " + result_string);
 								}
 							}
@@ -171,7 +173,7 @@ public class JAliEnCommandmirror extends JAliEnBaseCommand {
 	 * @param error
 	 * @return string representation of the error code
 	 */
-	protected static String Errcode2Text(final int error) {
+	protected static String errcode2Text(final int error) {
 		String text = null;
 		switch (error) {
 			case 0:

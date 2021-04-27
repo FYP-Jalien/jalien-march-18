@@ -14,8 +14,8 @@ import joptsimple.OptionException;
  */
 public class JAliEnCommandw extends JAliEnBaseCommand {
 
-	private static final String format = "%3d. %-20s | %12s | %12s\n";
-	private static final String formatH = "     %-20s | %12s | %12s\n";
+	private static final String format = "%3d. %-20s | %12s | %12s%n";
+	private static final String formatH = "     %-20s | %12s | %12s%n";
 
 	private static final String separator = "--------------------------+--------------+--------------\n";
 

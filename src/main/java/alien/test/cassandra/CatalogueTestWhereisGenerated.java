@@ -44,16 +44,7 @@ public class CatalogueTestWhereisGenerated {
 	/**
 	 * Unique Ctime for auto insertion
 	 */
-	public static Date ctime_fixed = null;
-	static {
-		try {
-			ctime_fixed = new SimpleDateFormat("yyyy-mm-dd hh:mm:ss").parse("2017-01-01 00:00:00");
-		}
-		catch (final ParseException e) {
-			System.err.println(e);
-			System.exit(-1);
-		}
-	}
+	public static final Date ctime_fixed = new Date(1483225200000L);
 
 	/** Entries processed */
 	static AtomicLong global_count = new AtomicLong();
@@ -346,7 +337,7 @@ public class CatalogueTestWhereisGenerated {
 
 				final long counted = global_count.incrementAndGet();
 				if (counted % 5000 == 0) {
-					out.println("LFN: " + lfn + " Estimation: " + (ns_count.get() / counted) / 1000000. + " - Count: " + counted + " Time: " + new Date());
+					out.println("LFN: " + lfn + " Estimation: " + (ns_count.get() / (double) counted) / 1000000. + " - Count: " + counted + " Time: " + new Date());
 					out.flush();
 				}
 
@@ -438,7 +429,7 @@ public class CatalogueTestWhereisGenerated {
 
 				final long counted = global_count_insert.incrementAndGet();
 				if (counted % 5000 == 0) {
-					out.println("LFN: " + lfnparent + lfn + " Estimation for insert: " + (ns_count_insert.get() / counted) / 1000000. + " - Count: " + counted + " Time: " + new Date());
+					out.println("LFN: " + lfnparent + lfn + " Estimation for insert: " + (ns_count_insert.get() / (double) counted) / 1000000. + " - Count: " + counted + " Time: " + new Date());
 					out.flush();
 				}
 

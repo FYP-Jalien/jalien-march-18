@@ -408,13 +408,7 @@ public final class SEUtils {
 				if (se1 != null && se2 != null)
 					diff += write ? (se1.demoteWrite - se2.demoteWrite) : (se1.demoteRead - se2.demoteRead);
 
-				if (diff < 0)
-					return -1;
-
-				if (diff > 0)
-					return 1;
-
-				return 0;
+				return Double.compare(diff, 0);
 			}
 
 			if (distance1 != null)
@@ -687,13 +681,7 @@ public final class SEUtils {
 
 			final double diff = rank1 - rank2;
 
-			if (diff < 0)
-				return -1;
-
-			if (diff > 0)
-				return 1;
-
-			return 0;
+			return Double.compare(diff, 0);
 		}
 	}
 

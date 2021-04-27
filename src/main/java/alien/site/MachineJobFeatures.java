@@ -38,7 +38,7 @@ public class MachineJobFeatures {
 		String output = null;
 
 		if (fullPath == null) {
-			logger.log(Level.WARNING, "Can't resolve path: " + fullPath);
+			logger.log(Level.WARNING, "Can't pass null to getValueFromFile()");
 			return null;
 		}
 
