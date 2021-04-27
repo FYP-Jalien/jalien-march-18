@@ -183,39 +183,43 @@ public class SLURM extends BatchQueue {
 
 		submit_cmd += "rm " + script;
 
-		// Create temp file
+		if (this.temp_file != null && (!this.temp_file.exists() || !this.temp_file.canExecute() || this.temp_file.length() == 0)) {
+			if (!this.temp_file.delete())
+				logger.log(Level.INFO, "Invalid previous file: " + this.temp_file.getAbsolutePath());
+
+			this.temp_file = null;
+		}
+
 		if (this.temp_file != null) {
 			List<String> temp_file_lines = null;
+			boolean keep = false;
+
 			try {
 				temp_file_lines = Files.readAllLines(Paths.get(this.temp_file.getAbsolutePath()), StandardCharsets.UTF_8);
 			}
 			catch (final IOException e1) {
-				this.logger.info("Error reading old temp file");
-				e1.printStackTrace();
+				this.logger.log(Level.INFO, "Error reading old temp file " + this.temp_file.getAbsolutePath(), e1);
 			}
 			finally {
 				if (temp_file_lines != null) {
-					String temp_file_lines_str = "";
-					for (final String line : temp_file_lines) {
-						temp_file_lines_str += line + '\n';
-					}
-					if (!temp_file_lines_str.equals(submit_cmd)) {
-						if (!this.temp_file.delete()) {
-							this.logger.info("Could not delete temp file");
-						}
-						try {
-							this.temp_file = File.createTempFile("slurm-submit.", ".sh");
-						}
-						catch (final IOException e) {
-							this.logger.info("Error creating temp file");
-							e.printStackTrace();
-							return;
-						}
-					}
+					final StringBuilder temp_file_lines_str = new StringBuilder();
+					for (final String line : temp_file_lines)
+						temp_file_lines_str.append(line).append('\n');
+
+					keep = temp_file_lines_str.toString().equals(submit_cmd);
 				}
 			}
+
+			if (!keep) {
+				if (!this.temp_file.delete())
+					this.logger.info("Could not delete temp file " + this.temp_file.getAbsolutePath());
+
+				this.temp_file = null;
+			}
 		}
-		else {
+
+		// Create temp file
+		if (this.temp_file == null) {
 			try {
 				this.temp_file = File.createTempFile("slurm-submit.", ".sh");
 			}
@@ -224,18 +228,17 @@ public class SLURM extends BatchQueue {
 				e.printStackTrace();
 				return;
 			}
-		}
 
-		this.temp_file.setReadable(true);
-		this.temp_file.setExecutable(true);
+			this.temp_file.setReadable(true);
+			this.temp_file.setExecutable(true);
 
-		try (PrintWriter out = new PrintWriter(this.temp_file.getAbsolutePath())) {
-			out.println(submit_cmd);
-			out.close();
-		}
-		catch (final FileNotFoundException e) {
-			this.logger.info("Error writing to temp file");
-			e.printStackTrace();
+			try (PrintWriter out = new PrintWriter(this.temp_file.getAbsolutePath())) {
+				out.println(submit_cmd);
+			}
+			catch (final FileNotFoundException e) {
+				this.logger.info("Error writing to temp file");
+				e.printStackTrace();
+			}
 		}
 
 		final String cmd = "cat " + this.temp_file.getAbsolutePath() + " | " + this.submitCmd + " " + this.submitArgs;
@@ -302,11 +305,11 @@ public class SLURM extends BatchQueue {
 		if (!config.containsKey(argToRead) || config.get(argToRead) == null)
 			return "";
 		else if ((config.get(argToRead) instanceof TreeSet)) {
-			String args = "";
+			final StringBuilder args = new StringBuilder();
 			for (final String arg : (TreeSet<String>) config.get(argToRead)) {
-				args += arg + " ";
+				args.append(arg).append(' ');
 			}
-			return args;
+			return args.toString();
 		}
 		else {
 			return config.get(argToRead).toString();
