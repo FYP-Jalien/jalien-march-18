@@ -142,7 +142,7 @@ public class Xrootd extends Protocol {
 
 			final ProcessBuilder pBuilder = new ProcessBuilder(Arrays.asList(xrdcpPath, "--version"));
 
-			checkLibraryPath(pBuilder);
+			checkLibraryPath(pBuilder, defaultPath);
 
 			pBuilder.redirectErrorStream(true);
 
@@ -1818,7 +1818,7 @@ public class Xrootd extends Protocol {
 
 				if (line != null) {
 					line = line.trim();
-					if (!line.equals("version") && !line.startsWith("["))
+					if (!"version".equals(line) && !line.startsWith("["))
 						if (line.startsWith("v"))
 							ret.setVersion("Xrootd", line);
 						else if (line.startsWith("dCache "))

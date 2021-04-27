@@ -123,23 +123,23 @@ public class JAKeyStore {
 
 	static {
 		Security.addProvider(new BouncyCastleProvider());
-		
+
 		KeyStore ktmp = null;
-		
+
 		try {
 			ktmp = KeyStore.getInstance("JKS");
 			ktmp.load(null, pass);
-			loadTrusts(ktmp);
+			loadTrusts(ktmp, true);
 		}
 		catch (final KeyStoreException | NoSuchAlgorithmException | CertificateException | IOException e) {
 			logger.log(Level.SEVERE, "Exception during loading trust stores (static block)", e);
 			e.printStackTrace();
 		}
-		
+
 		trustStore = ktmp;
 	}
 
-	private static void loadTrusts(final KeyStore keystore) {
+	private static void loadTrusts(final KeyStore keystore, final boolean isTrustStore) {
 		final String trustsDirSet = ConfigUtils.getConfig().gets("trusted.certificates.location",
 				UserFactory.getUserHome() + System.getProperty("file.separator") + ".j" + System.getProperty("file.separator") + "trusts");
 
@@ -191,9 +191,9 @@ public class JAKeyStore {
 					logger.log(Level.SEVERE, "Cannot load the default trust keystore from classpath", t);
 				}
 
-			if (keystore.equals(trustStore)) {
+			if (isTrustStore) {
 				final TrustManagerFactory tmf = TrustManagerFactory.getInstance("SunX509");
-				tmf.init(trustStore);
+				tmf.init(keystore);
 				trusts = tmf.getTrustManagers();
 			}
 		}
@@ -384,7 +384,7 @@ public class JAKeyStore {
 		try {
 			ks = KeyStore.getInstance("JKS");
 			ks.load(null, pass);
-			loadTrusts(ks);
+			loadTrusts(ks, false);
 
 			addKeyPairToKeyStore(ks, "User.cert", key, cert);
 			logger.log(Level.SEVERE, "Loaded " + message);
