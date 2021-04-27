@@ -76,36 +76,36 @@ public class JAliEnCommandlistSEs extends JAliEnBaseCommand {
 		long summaryFileCount = 0;
 
 		for (final SE se : filteredSEs) {
-			String qos = "";
+			final StringBuilder qos = new StringBuilder();
 
 			int len = 0;
 
 			for (final String q : se.qos) {
 				if (qos.length() > 0) {
 					len += 2;
-					qos += ", ";
+					qos.append(", ");
 				}
 
 				len += q.length();
 
 				switch (q) {
 					case "disk":
-						qos += ShellColor.jobStateGreen() + q + ShellColor.reset();
+						qos.append(ShellColor.jobStateGreen() + q + ShellColor.reset());
 						break;
 					case "tape":
-						qos += ShellColor.jobStateBlue() + q + ShellColor.reset();
+						qos.append(ShellColor.jobStateBlue() + q + ShellColor.reset());
 						break;
 					case "legooutput":
 					case "legoinput":
-						qos += ShellColor.jobStateYellow() + q + ShellColor.reset();
+						qos.append(ShellColor.jobStateYellow() + q + ShellColor.reset());
 						break;
 					default:
-						qos += ShellColor.jobStateRed() + q + ShellColor.reset();
+						qos.append(ShellColor.jobStateRed() + q + ShellColor.reset());
 				}
 			}
 
 			for (; len < maxQosLength; len++)
-				qos += " ";
+				qos.append(' ');
 
 			final long totalSpace = se.size * 1024;
 			final long usedSpace = se.seUsedSpace;
@@ -120,7 +120,7 @@ public class JAliEnCommandlistSEs extends JAliEnBaseCommand {
 					+ "\t" + padLeft(Format.size(usedSpace), 8) + "\t" + padLeft(Format.size(freeSpace), 8)
 					+ String.format("%16d", Long.valueOf(se.seNumFiles))
 					+ "\t" + String.format("% .4f", Double.valueOf(se.demoteRead)) + " "
-					+ String.format("% .4f", Double.valueOf(se.demoteWrite)) + "\t" + qos + "\t  " + se.generateProtocol());
+					+ String.format("% .4f", Double.valueOf(se.demoteWrite)) + "\t" + qos.toString() + "\t  " + se.generateProtocol());
 
 			commander.printOut("seName", se.originalName);
 			commander.printOut("seNumber", String.valueOf(se.seNumber));

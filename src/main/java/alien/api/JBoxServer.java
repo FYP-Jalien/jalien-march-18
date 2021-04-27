@@ -264,14 +264,16 @@ public class JBoxServer extends Thread {
 
 								final NodeList optionsNodeList = document.getElementsByTagName("o");
 
-								for (int i = 0; i < optionsNodeList.getLength(); i++) {
+								final int nodeCount = optionsNodeList.getLength();
+
+								for (int i = 0; i < nodeCount; i++) {
 									final Node optionNode = optionsNodeList.item(i);
 									cmdOptions.add(optionNode.getTextContent());
 									fullCmd.add(optionNode.getTextContent());
 									logger.info("Command options = " + optionNode.getTextContent());
 								}
 
-								if (sCmdValue != null && "password".equals(sCmdValue)) {
+								if ("password".equals(sCmdValue)) {
 
 									if (cmdOptions.get(0).equals(password)) {
 										os.write(passACK.getBytes());

@@ -33,6 +33,8 @@ public class HTCONDOR extends BatchQueue {
 	private boolean use_job_router = false;
 	private boolean use_external_cloud = false;
 
+	private static final Pattern p = Pattern.compile("(\\d+)\\s*\\*\\s*(\\S+)");
+
 	//
 	// 2020-06-24 - Maarten Litmaath, Maxim Storetvedt
 	//
@@ -129,7 +131,6 @@ public class HTCONDOR extends BatchQueue {
 				for (final String str : val.split(",")) {
 					double w = 1;
 					String ce = str;
-					final Pattern p = Pattern.compile("(\\d+)\\s*\\*\\s*(\\S+)");
 					final Matcher m = p.matcher(str);
 
 					if (m.find()) {
@@ -441,7 +442,6 @@ public class HTCONDOR extends BatchQueue {
 
 		try (PrintWriter out = new PrintWriter(submit_file)) {
 			out.println(submit_jdl);
-			out.close();
 		}
 		catch (final Exception e) {
 			logger.severe("Error writing to submit file: " + submit_file);
@@ -459,7 +459,7 @@ public class HTCONDOR extends BatchQueue {
 	}
 
 	private String readJdlFile(final String path) {
-		String file_contents = "";
+		final StringBuilder file_contents = new StringBuilder();
 		String line;
 
 		try (BufferedReader br = new BufferedReader(new FileReader(path))) {
@@ -476,7 +476,7 @@ public class HTCONDOR extends BatchQueue {
 
 				// remove erroneous spaces
 				line = line.replaceAll(err_spaces_pattern.pattern(), "\\\\\n");
-				file_contents += line + "\n";
+				file_contents.append(line).append('\n');
 			}
 		}
 		catch (final Exception e) {
@@ -485,7 +485,7 @@ public class HTCONDOR extends BatchQueue {
 			return "";
 		}
 
-		return file_contents;
+		return file_contents.toString();
 	}
 
 	private boolean getJobNumbers() {

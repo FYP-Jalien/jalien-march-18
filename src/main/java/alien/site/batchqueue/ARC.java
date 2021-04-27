@@ -14,6 +14,7 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,49 +35,51 @@ import alien.site.Functions;
  */
 public class ARC extends BatchQueue {
 
-	private Map<String, String> environment = new HashMap<>();
+	private final Map<String, String> environment = new HashMap<>();
 	private Set<String> envFromConfig;
-	private String submitCmd;
+	private final String submitCmd;
 	private String submitArg = "";
-	private List<String> submitArgList = new ArrayList<>();
-	private List<String> submitXRSL = new ArrayList<>();
+	private final List<String> submitArgList = new ArrayList<>();
+	private final List<String> submitXRSL = new ArrayList<>();
 	private String siteBDII;
 	private final static int GLUE_2 = 2;
 	private int useLDAP = GLUE_2;
 	private int cDay = 0;
 	private int seqNr = 0;
-	private String tmpDir;
+	private final String tmpDir;
 
 	//
 	// to support weighted, round-robin load-balancing over a CE set:
 	//
 
-	private ArrayList<String> ce_list = new ArrayList<>();
-	private HashMap<String, Double> ce_weight = new HashMap<>();
+	private final ArrayList<String> ce_list = new ArrayList<>();
+	private final HashMap<String, Double> ce_weight = new HashMap<>();
 	private int next_ce = 0;
-	private HashMap<String, Integer> running = new HashMap<>();
-	private HashMap<String, Integer> waiting = new HashMap<>();
+	private final HashMap<String, Integer> running = new HashMap<>();
+	private final HashMap<String, Integer> waiting = new HashMap<>();
 	private int tot_running = 0;
 	private int tot_waiting = 0;
 	private long job_numbers_timestamp = 0;
 	private long proxy_check_timestamp = 0;
+
+	private static final Pattern p = Pattern.compile("(\\d+)\\s*\\*\\s*(\\S+)");
 
 	/**
 	 * @param conf
 	 * @param logr
 	 */
 	@SuppressWarnings("unchecked")
-	public ARC(HashMap<String, Object> conf, Logger logr) {
+	public ARC(final HashMap<String, Object> conf, final Logger logr) {
 		config = conf;
 		logger = logr;
 
 		logger.info("This VO-Box is " + config.get("ALIEN_CM_AS_LDAP_PROXY") +
 				", site is " + config.get("site_accountname"));
 
-		String ce_env_str = "ce_environment";
+		final String ce_env_str = "ce_environment";
 
 		if (config.get(ce_env_str) == null) {
-			String msg = ce_env_str + " needs to be defined!";
+			final String msg = ce_env_str + " needs to be defined!";
 			logger.warning(msg);
 			config.put(ce_env_str, new TreeSet<String>());
 		}
@@ -84,7 +87,7 @@ public class ARC extends BatchQueue {
 		try {
 			envFromConfig = (TreeSet<String>) config.get(ce_env_str);
 		}
-		catch (@SuppressWarnings("unused") ClassCastException e) {
+		catch (@SuppressWarnings("unused") final ClassCastException e) {
 			envFromConfig = Set.of((String) config.get(ce_env_str));
 		}
 
@@ -92,10 +95,10 @@ public class ARC extends BatchQueue {
 		// initialize our environment from the LDAP configuration
 		//
 
-		for (String env_field : envFromConfig) {
-			String[] parts = env_field.split("=", 2);
-			String var = parts[0];
-			String val = parts.length > 1 ? parts[1] : "";
+		for (final String env_field : envFromConfig) {
+			final String[] parts = env_field.split("=", 2);
+			final String var = parts[0];
+			final String val = parts.length > 1 ? parts[1] : "";
 			environment.put(var, val);
 			logger.info("envFromConfig: " + var + "=" + val);
 		}
@@ -106,7 +109,7 @@ public class ARC extends BatchQueue {
 
 		environment.putAll(System.getenv());
 
-		String ce_submit_cmd_str = "CE_SUBMITCMD";
+		final String ce_submit_cmd_str = "CE_SUBMITCMD";
 
 		submitCmd = environment.getOrDefault(ce_submit_cmd_str, (String) config.getOrDefault(ce_submit_cmd_str, "arcsub"));
 		logger.info("submit command: " + submitCmd);
@@ -115,11 +118,11 @@ public class ARC extends BatchQueue {
 
 		logger.info("temp directory: " + tmpDir);
 
-		for (Map.Entry<String, String> entry : environment.entrySet()) {
+		for (final Map.Entry<String, String> entry : environment.entrySet()) {
 			final String var = entry.getKey();
 			String val = entry.getValue();
 
-			if (var.equals("CE_LCGCE")) {
+			if ("CE_LCGCE".equals(var)) {
 				double tot = 0;
 				val = val.replaceAll("[()]", "");
 
@@ -131,11 +134,11 @@ public class ARC extends BatchQueue {
 
 				logger.info("Load-balancing over these CEs with configured weights:");
 
-				for (String str : val.split(",")) {
+				for (final String str : val.split(",")) {
 					Double w = Double.valueOf(1);
 					String ce = str;
-					Pattern p = Pattern.compile("(\\d+)\\s*\\*\\s*(\\S+)");
-					Matcher m = p.matcher(str);
+
+					final Matcher m = p.matcher(str);
 
 					if (m.find()) {
 						w = Double.valueOf(m.group(1));
@@ -161,21 +164,21 @@ public class ARC extends BatchQueue {
 				}
 
 				if (tot <= 0) {
-					String msg = "CE_LCGCE invalid: " + val;
+					final String msg = "CE_LCGCE invalid: " + val;
 					logger.severe(msg);
 					throw new IllegalArgumentException(msg);
 				}
 
 				if (ce_weight.size() != ce_list.size()) {
-					String msg = "CE_LCGCE has duplicate CEs: " + val;
+					final String msg = "CE_LCGCE has duplicate CEs: " + val;
 					logger.severe(msg);
 					throw new IllegalArgumentException(msg);
 				}
 
 				logger.info("Load-balancing over these CEs with normalized weights:");
 
-				for (String ce : ce_list) {
-					Double w = Double.valueOf(ce_weight.get(ce).doubleValue() / tot);
+				for (final String ce : ce_list) {
+					final Double w = Double.valueOf(ce_weight.get(ce).doubleValue() / tot);
 					ce_weight.replace(ce, w);
 					logger.info(ce + " --> " + String.format("%5.3f", w));
 				}
@@ -183,24 +186,24 @@ public class ARC extends BatchQueue {
 				continue;
 			}
 
-			if (var.equals("CE_SUBMITARG")) {
+			if ("CE_SUBMITARG".equals(var)) {
 				logger.info("environment: " + var + "=" + val);
 				submitArg = val;
 				continue;
 			}
 
-			if (var.equals("CE_SUBMITARG_LIST")) {
+			if ("CE_SUBMITARG_LIST".equals(var)) {
 				logger.info("environment: " + var + "=" + val);
 
-				String[] tmp = val.split("\\s+", 0);
-				String p = "^xrsl:";
+				final String[] tmp = val.split("\\s+", 0);
+				final String expression = "^xrsl:";
 
-				for (String s : tmp) {
-					if (Pattern.matches(p + "\\(.*\\)", s)) {
-						submitXRSL.add(s.replaceAll(p, ""));
+				for (final String s : tmp) {
+					if (Pattern.matches(expression + "\\(.*\\)", s)) {
+						submitXRSL.add(s.replaceAll(expression, ""));
 					}
-					else if (Pattern.matches(p + ".*", s)) {
-						submitXRSL.add("(" + s.replaceAll(p, "") + ")");
+					else if (Pattern.matches(expression + ".*", s)) {
+						submitXRSL.add("(" + s.replaceAll(expression, "") + ")");
 					}
 					else {
 						submitArgList.add(s);
@@ -210,16 +213,16 @@ public class ARC extends BatchQueue {
 				continue;
 			}
 
-			if (var.equals("CE_USE_BDII")) {
+			if ("CE_USE_BDII".equals(var)) {
 				logger.info("environment: " + var + "=" + val);
 				useLDAP = Integer.parseInt(val);
 				continue;
 			}
 
-			if (var.equals("CE_SITE_BDII")) {
+			if ("CE_SITE_BDII".equals(var)) {
 				logger.info("environment: " + var + "=" + val);
 
-				String s = val.replaceAll("^([^:]+://)?([^/]+).*", "$2");
+				final String s = val.replaceAll("^([^:]+://)?([^/]+).*", "$2");
 				siteBDII = "ldap://" + s;
 
 				if (!Pattern.matches(".*:.*", s)) {
@@ -231,13 +234,13 @@ public class ARC extends BatchQueue {
 		}
 
 		if (ce_list.size() <= 0) {
-			String msg = "No CE usage specified in the environment";
+			final String msg = "No CE usage specified in the environment";
 			logger.severe(msg);
 			throw new IllegalArgumentException(msg);
 		}
 
 		if (useLDAP != GLUE_2) {
-			String msg = "useLDAP != GLUE_2: not implemented!";
+			final String msg = "useLDAP != GLUE_2: not implemented!";
 			logger.severe(msg);
 			throw new IllegalArgumentException(msg);
 		}
@@ -245,33 +248,33 @@ public class ARC extends BatchQueue {
 
 	private void proxyCheck() {
 
-		String proxy = environment.get("X509_USER_PROXY");
-		File proxy_no_check = new File(environment.get("HOME") + "/no-proxy-check");
+		final String proxy = environment.get("X509_USER_PROXY");
+		final File proxy_no_check = new File(environment.get("HOME") + "/no-proxy-check");
 
 		if (proxy == null || proxy_no_check.exists()) {
 			return;
 		}
 
-		String vo_str = (String) config.getOrDefault("LCGVO", "alice");
-		String proxy_renewal_str = String.format("/etc/init.d/%s-box-proxyrenewal", vo_str);
-		File proxy_renewal_svc = new File(proxy_renewal_str);
+		final String vo_str = (String) config.getOrDefault("LCGVO", "alice");
+		final String proxy_renewal_str = String.format("/etc/init.d/%s-box-proxyrenewal", vo_str);
+		final File proxy_renewal_svc = new File(proxy_renewal_str);
 
 		if (!proxy_renewal_svc.exists()) {
 			return;
 		}
 
-		String threshold = (String) config.getOrDefault("CE_PROXYTHRESHOLD", String.valueOf(46 * 3600));
+		final String threshold = (String) config.getOrDefault("CE_PROXYTHRESHOLD", String.valueOf(46 * 3600));
 		logger.info(String.format("X509_USER_PROXY is %s", proxy));
 		logger.info("Checking remaining proxy lifetime");
 
-		String proxy_info_cmd = "voms-proxy-info -acsubject -actimeleft 2>&1";
-		ArrayList<String> proxy_info_output = executeCommand(proxy_info_cmd);
+		final String proxy_info_cmd = "voms-proxy-info -acsubject -actimeleft 2>&1";
+		final ArrayList<String> proxy_info_output = executeCommand(proxy_info_cmd);
 
 		String dn_str = "";
 		String time_left_str = "";
 
-		for (String line : proxy_info_output) {
-			String trimmed_line = line.trim();
+		for (final String line : proxy_info_output) {
+			final String trimmed_line = line.trim();
 
 			if (trimmed_line.matches("^/.+")) {
 				dn_str = trimmed_line;
@@ -303,13 +306,13 @@ public class ARC extends BatchQueue {
 
 		logger.info("Checking proxy renewal service");
 
-		String proxy_renewal_cmd = String.format("%s start 2>&1", proxy_renewal_svc);
+		final String proxy_renewal_cmd = String.format("%s start 2>&1", proxy_renewal_svc);
 		ArrayList<String> proxy_renewal_output = null;
 
 		try {
 			proxy_renewal_output = executeCommand(proxy_renewal_cmd);
 		}
-		catch (Exception e) {
+		catch (final Exception e) {
 			logger.info(String.format("[LCG] Problem while executing command: %s", proxy_renewal_cmd));
 			e.printStackTrace();
 		}
@@ -317,7 +320,7 @@ public class ARC extends BatchQueue {
 			if (proxy_renewal_output != null) {
 				logger.info("Proxy renewal output:\n");
 
-				for (String line : proxy_renewal_output) {
+				for (final String line : proxy_renewal_output) {
 					logger.info(line.trim());
 				}
 			}
@@ -335,10 +338,10 @@ public class ARC extends BatchQueue {
 		logger.info("Determining the next CE to use:");
 
 		for (int i = 0; i < ce_list.size(); i++) {
-			String ce = ce_list.get(next_ce);
-			Integer idle = waiting.get(ce);
-			Double w = ce_weight.get(ce);
-			double f = tot_waiting > 0 ? idle.doubleValue() / tot_waiting : 0;
+			final String ce = ce_list.get(next_ce);
+			final Integer idle = waiting.get(ce);
+			final Double w = ce_weight.get(ce);
+			final double f = tot_waiting > 0 ? idle.doubleValue() / tot_waiting : 0;
 
 			logger.info(String.format(
 					"--> %s has idle fraction %d / %d = %5.3f vs. weight %5.3f",
@@ -352,7 +355,7 @@ public class ARC extends BatchQueue {
 			next_ce %= ce_list.size();
 		}
 
-		String ce = ce_list.get(next_ce);
+		final String ce = ce_list.get(next_ce);
 
 		logger.info("--> next CE to use: " + ce);
 
@@ -362,12 +365,12 @@ public class ARC extends BatchQueue {
 		next_ce++;
 		next_ce %= ce_list.size();
 
-		String host = ce.replaceAll(":.*", "");
-		String name = "JAliEn-" + job_numbers_timestamp + "-" + (seqNr++);
-		String remote_script = name + ".sh";
-		String cm = config.get("host_host") + ":" + config.get("host_port");
+		final String host = ce.replaceAll(":.*", "");
+		final String name = "JAliEn-" + job_numbers_timestamp + "-" + (seqNr++);
+		final String remote_script = name + ".sh";
+		final String cm = config.get("host_host") + ":" + config.get("host_port");
 
-		String submit_xrsl = "&\n" +
+		StringBuilder submit_xrsl = new StringBuilder("&\n" +
 				"(jobName = " + name + ")\n" +
 				"(executable = /usr/bin/time)\n" +
 				"(arguments = bash " + remote_script + ")\n" +
@@ -376,22 +379,22 @@ public class ARC extends BatchQueue {
 				"(gmlog = gmlog)\n" +
 				"(inputFiles = (" + remote_script + " " + script + "))\n" +
 				"(outputFiles = (std.err \"\") (std.out \"\") (gmlog \"\") (" + remote_script + " \"\"))\n" +
-				"(environment = (ALIEN_CM_AS_LDAP_PROXY " + cm + "))\n";
+				"(environment = (ALIEN_CM_AS_LDAP_PROXY " + cm + "))\n");
 
-		for (String s : submitXRSL) {
-			submit_xrsl += s + "\n";
+		for (final String s : submitXRSL) {
+			submit_xrsl.append(s).append('\n');
 		}
 
-		DateFormat date_format = new SimpleDateFormat("yyyy-MM-dd");
-		String current_date_str = date_format.format(new Date());
-		String log_folder_path = tmpDir + "/arc/" + current_date_str;
-		File log_folder = new File(log_folder_path);
+		final DateFormat date_format = new SimpleDateFormat("yyyy-MM-dd");
+		final String current_date_str = date_format.format(new Date());
+		final String log_folder_path = tmpDir + "/arc/" + current_date_str;
+		final File log_folder = new File(log_folder_path);
 
 		if (!log_folder.exists()) {
 			try {
 				log_folder.mkdirs();
 			}
-			catch (Exception e) {
+			catch (final Exception e) {
 				logger.severe("[ARC] log folder mkdirs() exception: " + log_folder);
 				e.printStackTrace();
 			}
@@ -406,29 +409,30 @@ public class ARC extends BatchQueue {
 		// keep overwriting the same file for ~1 minute
 		//
 
-		String submit_file = log_folder + "/arc-" + (job_numbers_timestamp >> 16) + ".xrsl";
+		final String submit_file = log_folder + "/arc-" + (job_numbers_timestamp >> 16) + ".xrsl";
 
 		try (PrintWriter out = new PrintWriter(submit_file)) {
-			out.println(submit_xrsl);
-			out.close();
+			out.println(submit_xrsl.toString());
 		}
-		catch (Exception e) {
+		catch (final Exception e) {
 			logger.severe("Error writing to submit file: " + submit_file);
 			e.printStackTrace();
 			return;
 		}
 
-		String submit_cmd = submitCmd + " -t 20 -f " + submit_file + " -c " + host + " " + submitArg;
+		StringBuilder submit_cmd = new StringBuilder(submitCmd + " -t 20 -f " + submit_file + " -c " + host + " " + submitArg);
 
-		for (String s : submitArgList) {
-			submit_cmd += " " + s;
+		for (final String s : submitArgList) {
+			submit_cmd.append(' ').append(s);
 		}
 
-		ArrayList<String> output = executeCommand(submit_cmd);
+		final ArrayList<String> output = executeCommand(submit_cmd.toString());
 
-		for (String line : output) {
-			String trimmed_line = line.trim();
-			logger.info(trimmed_line);
+		if (logger.isLoggable(Level.INFO)) {
+			for (final String line : output) {
+				final String trimmed_line = line.trim();
+				logger.log(Level.INFO, trimmed_line);
+			}
 		}
 	}
 
@@ -436,59 +440,59 @@ public class ARC extends BatchQueue {
 
 		logger.info("query target " + svc);
 
-		Hashtable<String, String> env = new Hashtable<>();
+		final Hashtable<String, String> env = new Hashtable<>();
 		env.put(Context.INITIAL_CONTEXT_FACTORY, "com.sun.jndi.ldap.LdapCtxFactory");
 		env.put(Context.PROVIDER_URL, svc);
 		env.put("com.sun.jndi.ldap.connect.timeout", "10000");
 		env.put("com.sun.jndi.ldap.read.timeout", "10000");
 
-		String vo_str = (String) config.getOrDefault("LCGVO", "alice");
-		String filter = "(|(GLUE2PolicyRule=*:" + vo_str + ")"
+		final String vo_str = (String) config.getOrDefault("LCGVO", "alice");
+		final String filter = "(|(GLUE2PolicyRule=*:" + vo_str + ")"
 				+ "(objectClass=GLUE2ComputingEndpoint)(objectClass=GLUE2ComputingShare))";
 
-		SearchControls sc = new SearchControls();
+		final SearchControls sc = new SearchControls();
 		sc.setSearchScope(SearchControls.SUBTREE_SCOPE);
 
-		List<String> shares = new ArrayList<>();
-		HashMap<String, String> urls = new HashMap<>();
-		HashMap<String, String> endp = new HashMap<>();
-		HashMap<String, Object> running_on_share = new HashMap<>();
-		HashMap<String, Object> waiting_on_share = new HashMap<>();
+		final List<String> shares = new ArrayList<>();
+		final HashMap<String, String> urls = new HashMap<>();
+		final HashMap<String, String> endp = new HashMap<>();
+		final HashMap<String, Object> running_on_share = new HashMap<>();
+		final HashMap<String, Object> waiting_on_share = new HashMap<>();
 
 		DirContext ctx = null;
 
 		try {
 			ctx = new InitialDirContext(env);
 
-			NamingEnumeration<SearchResult> results = ctx.search("o=glue", filter, sc);
+			final NamingEnumeration<SearchResult> results = ctx.search("o=glue", filter, sc);
 
 			while (results.hasMore()) {
-				SearchResult sr = results.next();
-				Attributes attrs = sr.getAttributes();
+				final SearchResult sr = results.next();
+				final Attributes attrs = sr.getAttributes();
 
-				Attribute ep = attrs.get("GLUE2EndpointID");
+				final Attribute ep = attrs.get("GLUE2EndpointID");
 
 				if (ep != null) {
-					String ep_v = Objects.toString(ep.get());
-					Attribute url = attrs.get("GLUE2EndpointURL");
-					String url_v = Objects.toString(url.get());
+					final String ep_v = Objects.toString(ep.get());
+					final Attribute url = attrs.get("GLUE2EndpointURL");
+					final String url_v = Objects.toString(url.get());
 					urls.put(ep_v, url_v);
 					continue;
 				}
 
-				Attribute fKey = attrs.get("GLUE2MappingPolicyShareForeignKey");
+				final Attribute fKey = attrs.get("GLUE2MappingPolicyShareForeignKey");
 
 				if (fKey != null) {
 					//
 					// we found the name of a share for our VO
 					//
 
-					String fKey_v = Objects.toString(fKey.get());
+					final String fKey_v = Objects.toString(fKey.get());
 					shares.add(fKey_v);
 					continue;
 				}
 
-				Attribute share = attrs.get("GLUE2ShareID");
+				final Attribute share = attrs.get("GLUE2ShareID");
 
 				if (share == null) {
 					continue;
@@ -498,24 +502,24 @@ public class ARC extends BatchQueue {
 				// we found a share for some VO
 				//
 
-				String share_v = Objects.toString(share.get());
+				final String share_v = Objects.toString(share.get());
 
-				Attribute fKeys = attrs.get("GLUE2ComputingShareComputingEndpointForeignKey");
+				final Attribute fKeys = attrs.get("GLUE2ComputingShareComputingEndpointForeignKey");
 
 				if (fKeys == null) {
 					continue;
 				}
 
 				boolean found = false;
-				NamingEnumeration<?> e = fKeys.getAll();
+				final NamingEnumeration<?> e = fKeys.getAll();
 
 				while (e.hasMore()) {
-					String fk = Objects.toString(e.next());
+					final String fk = Objects.toString(e.next());
 
-					for (String ce : ce_list) {
-						String s = ce.replaceAll(":.*", ":2811");
-						Pattern p = Pattern.compile(s);
-						Matcher m = p.matcher(fk);
+					for (final String ce : ce_list) {
+						final String s = ce.replaceAll(":.*", ":2811");
+						final Pattern pSite = Pattern.compile(s);
+						final Matcher m = pSite.matcher(fk);
 
 						//
 						// skip endpoints outside of our CE list,
@@ -539,15 +543,15 @@ public class ARC extends BatchQueue {
 					continue;
 				}
 
-				Attribute r = attrs.get("GLUE2ComputingShareRunningJobs");
-				Attribute w = attrs.get("GLUE2ComputingShareWaitingJobs");
+				final Attribute r = attrs.get("GLUE2ComputingShareRunningJobs");
+				final Attribute w = attrs.get("GLUE2ComputingShareWaitingJobs");
 
 				running_on_share.put(share_v, r == null ? null : r.get());
 				waiting_on_share.put(share_v, w == null ? null : w.get());
 			}
 
 		}
-		catch (Exception e) {
+		catch (final Exception e) {
 			logger.warning("Error querying LDAP service " + svc);
 			e.printStackTrace();
 		}
@@ -556,7 +560,7 @@ public class ARC extends BatchQueue {
 				try {
 					ctx.close();
 				}
-				catch (@SuppressWarnings("unused") Exception e) {
+				catch (@SuppressWarnings("unused") final Exception e) {
 					// ignore
 				}
 			}
@@ -564,21 +568,21 @@ public class ARC extends BatchQueue {
 
 		int n = 0;
 
-		for (String share : shares) {
-			String ep = endp.get(share);
+		for (final String share : shares) {
+			final String ep = endp.get(share);
 
 			if (ep == null) {
 				continue;
 			}
 
-			String url = urls.get(ep);
+			final String url = urls.get(ep);
 
 			if (url == null) {
 				continue;
 			}
 
-			Object r_obj = running_on_share.get(share);
-			Object w_obj = waiting_on_share.get(share);
+			final Object r_obj = running_on_share.get(share);
+			final Object w_obj = waiting_on_share.get(share);
 
 			if (r_obj == null || w_obj == null) {
 				continue;
@@ -590,15 +594,15 @@ public class ARC extends BatchQueue {
 				r = Integer.valueOf(r_obj.toString());
 				w = Integer.valueOf(w_obj.toString());
 			}
-			catch (@SuppressWarnings("unused") Exception e) {
+			catch (@SuppressWarnings("unused") final Exception e) {
 				continue;
 			}
 
-			String ce = url.replaceAll("^[^:]*:?/*([^:/]+).*", "$1");
-			String name = share.replaceAll(".*:", "");
+			final String ce = url.replaceAll("^[^:]*:?/*([^:/]+).*", "$1");
+			final String name = share.replaceAll(".*:", "");
 
-			Integer cr = running.get(ce);
-			Integer cw = waiting.get(ce);
+			final Integer cr = running.get(ce);
+			final Integer cw = waiting.get(ce);
 
 			if (cr == null || cw == null) {
 				continue;
@@ -621,8 +625,8 @@ public class ARC extends BatchQueue {
 
 	private boolean getJobNumbers() {
 
-		long now = System.currentTimeMillis();
-		long dt = (now - job_numbers_timestamp) / 1000;
+		final long now = System.currentTimeMillis();
+		final long dt = (now - job_numbers_timestamp) / 1000;
 
 		if (dt < 60) {
 			logger.info("Reusing cached job numbers collected " + dt + " seconds ago");
@@ -643,19 +647,19 @@ public class ARC extends BatchQueue {
 			// hack to keep the jobs DB size manageable...
 			//
 
-			Calendar calendar = Calendar.getInstance();
-			int wDay = calendar.get(Calendar.DAY_OF_WEEK);
+			final Calendar calendar = Calendar.getInstance();
+			final int wDay = calendar.get(Calendar.DAY_OF_WEEK);
 
 			if (cDay != 0 && cDay != wDay) {
-				String prefix = "~/.arc/jobs.";
-				String suffixes[] = { "dat", "xml" };
+				final String prefix = "~/.arc/jobs.";
+				final String suffixes[] = { "dat", "xml" };
 
-				for (String suffix : suffixes) {
-					String f = prefix + suffix;
-					String cmd = String.format("test ! -e %s || mv %s %s.%d", f, f, f, Integer.valueOf(cDay));
-					ArrayList<String> output = executeCommand(cmd);
+				for (final String suffix : suffixes) {
+					final String f = prefix + suffix;
+					final String cmd = String.format("test ! -e %s || mv %s %s.%d", f, f, f, Integer.valueOf(cDay));
+					final ArrayList<String> output = executeCommand(cmd);
 
-					for (String line : output) {
+					for (final String line : output) {
 						logger.info(line);
 					}
 				}
@@ -664,7 +668,7 @@ public class ARC extends BatchQueue {
 			cDay = wDay;
 		}
 
-		for (String ce : ce_list) {
+		for (final String ce : ce_list) {
 			running.put(ce, Integer.valueOf(0));
 			waiting.put(ce, Integer.valueOf(0));
 		}
@@ -677,7 +681,7 @@ public class ARC extends BatchQueue {
 				n = queryLDAP(siteBDII);
 			}
 			else {
-				for (String ce : ce_list) {
+				for (final String ce : ce_list) {
 					n += queryLDAP("ldap://" + ce + ":2135");
 				}
 			}
@@ -688,14 +692,14 @@ public class ARC extends BatchQueue {
 			}
 		}
 		else {
-			String msg = "useLDAP != GLUE_2: not implemented!";
+			final String msg = "useLDAP != GLUE_2: not implemented!";
 			logger.severe(msg);
 			throw new IllegalArgumentException(msg);
 		}
 
 		logger.info("Found " + tot_waiting + " idle (and " + tot_running + " running) jobs:");
 
-		for (String ce : ce_list) {
+		for (final String ce : ce_list) {
 			logger.info(String.format("%5d (%5d) for %s", waiting.get(ce), running.get(ce), ce));
 		}
 
