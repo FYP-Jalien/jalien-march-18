@@ -3,7 +3,6 @@ package alien.site;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,16 +38,16 @@ public class SiteMap {
 		logger.log(Level.INFO, "Getting site map");
 
 		// Local vars
-		PackMan packMan = null;
+		PackMan packMan;
 		int origTtl;
 		String partition = "";
 		String ceRequirements = "";
 		List<String> packages;
 		List<String> installedPackages;
 		final ArrayList<String> extrasites = new ArrayList<>();
-		String site = null;
-		String ce = null;
-		String cehost = null;
+		String site;
+		String ce;
+		String cehost;
 
 		// Get hostname
 		final String hostName = ConfigUtils.getLocalHostname();
@@ -161,7 +160,7 @@ public class SiteMap {
 					// get from system
 					numCpus = BkThread.getNumCPUs();
 
-					potentialCpus = memorySize / (2 * 1024 * 1024 * 1024l);
+					potentialCpus = memorySize / (2 * 1024 * 1024 * 1024L);
 					if (numCpus > potentialCpus)
 						numCpus = potentialCpus;
 				}
@@ -191,19 +190,10 @@ public class SiteMap {
 			installedPackages = packMan.getListInstalledPackages();
 
 			// We prepare the packages for direct matching
-			String packs = ",";
-			Collections.sort(packages);
-			for (final String pack : packages)
-				packs += pack + ",,";
 
-			packs = packs.substring(0, packs.length() - 1);
+			final String packs = "," + String.join(",,", packages) + ",";
 
-			String instpacks = ",";
-			Collections.sort(installedPackages);
-			for (final String pack : installedPackages)
-				instpacks += pack + ",,";
-
-			instpacks = instpacks.substring(0, instpacks.length() - 1);
+			final String instpacks = "," + String.join(",,", installedPackages) + ",";
 
 			siteMap.put("Packages", packs);
 			siteMap.put("InstalledPackages", instpacks);
@@ -227,7 +217,7 @@ public class SiteMap {
 		else
 			siteMap.put("Disk", Long.valueOf(JobAgent.getFreeSpace(workdir) / 1024));
 
-		if (!partition.equals(""))
+		if (!"".equals(partition))
 			siteMap.put("Partition", partition);
 
 		return siteMap;

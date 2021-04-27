@@ -11,7 +11,6 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -586,7 +585,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			logger.log(Level.INFO, "Going to create XML: " + list);
 
 			final String format = jdl.gets("InputDataListFormat");
-			if (format == null || !format.equals("xml-single")) {
+			if (format == null || !"xml-single".equals(format)) {
 				logger.log(Level.WARNING, "XML format not understood");
 				return;
 			}
@@ -616,19 +615,19 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 	private HashMap<String, String> getJobPackagesEnvironment() {
 		final String voalice = "VO_ALICE@";
-		String packagestring = "";
+		final StringBuilder packages = new StringBuilder();
 		final HashMap<String, String> packs = (HashMap<String, String>) jdl.getPackages();
 		HashMap<String, String> envmap = new HashMap<>();
 
 		logger.log(Level.INFO, "Preparing to install packages");
 		if (packs != null) {
 			for (final Map.Entry<String, String> entry : packs.entrySet())
-				packagestring += voalice + entry.getKey() + "::" + packs.get(entry.getValue()) + ",";
+				packages.append(voalice + entry.getKey() + "::" + packs.get(entry.getValue()) + ",");
 
 			if (!packs.containsKey("APISCONFIG"))
-				packagestring += voalice + "APISCONFIG,";
+				packages.append(voalice + "APISCONFIG,");
 
-			packagestring = packagestring.substring(0, packagestring.length() - 1);
+			final String packagestring = packages.substring(0, packages.length() - 1);
 
 			final ArrayList<String> packagesList = new ArrayList<>();
 			packagesList.add(packagestring);
@@ -667,41 +666,45 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			return false;
 		}
 
-		ArrayList<OutputEntry> archivesToUpload = new ArrayList<>();
-		ArrayList<OutputEntry> standaloneFilesToUpload = new ArrayList<>();
-		ArrayList<String> allArchiveEntries = new ArrayList<>();
+		final ArrayList<OutputEntry> archivesToUpload = new ArrayList<>();
+		final ArrayList<OutputEntry> standaloneFilesToUpload = new ArrayList<>();
+		final ArrayList<String> allArchiveEntries = new ArrayList<>();
 
-		ArrayList<String> outputTags = getOutputTags(exitStatus);
-		for (String tag : outputTags) {
+		final ArrayList<String> outputTags = getOutputTags(exitStatus);
+		for (final String tag : outputTags) {
 			try {
 				final ParsedOutput filesTable = new ParsedOutput(queueId, jdl, currentDir.getAbsolutePath(), tag);
-				for (OutputEntry entry : filesTable.getEntries()) {
+				for (final OutputEntry entry : filesTable.getEntries()) {
 					if (entry.isArchive()) {
 						logger.log(Level.INFO, "This is an archive: " + entry.getName());
 						final ArrayList<String> archiveEntries = entry.createZip(currentDir.getAbsolutePath());
 						if (archiveEntries.size() == 0) {
 							logger.log(Level.WARNING, "Ignoring empty archive: " + entry.getName());
 							commander.q_api.putJobLog(queueId, "trace", "Ignoring empty archive: " + entry.getName());
-						} else {
+						}
+						else {
 							for (final String archiveEntry : archiveEntries) {
 								allArchiveEntries.add(archiveEntry);
 								logger.log(Level.INFO, "Adding to archive members: " + archiveEntry);
 							}
 							archivesToUpload.add(entry);
 						}
-					} else {
+					}
+					else {
 						logger.log(Level.INFO, "This is not an archive: " + entry.getName());
-						File entryFile = new File(currentDir.getAbsolutePath() + "/" + entry.getName());
-						if (entryFile.length() <= 0) { //archive files are checked for this during createZip, but standalone files still need to be checked
+						final File entryFile = new File(currentDir.getAbsolutePath() + "/" + entry.getName());
+						if (entryFile.length() <= 0) { // archive files are checked for this during createZip, but standalone files still need to be checked
 							logger.log(Level.WARNING, "The following file has size 0 and will be ignored: " + entry.getName());
 							commander.q_api.putJobLog(queueId, "trace", "The following file has size 0 and will be ignored: " + entry.getName());
-						} else {
+						}
+						else {
 							standaloneFilesToUpload.add(entry);
 							logger.log(Level.INFO, "Adding to standalone: " + entry.getName());
 						}
 					}
 				}
-			} catch (NullPointerException ex) {
+			}
+			catch (final NullPointerException ex) {
 				logger.log(Level.SEVERE,
 						"A required outputfile for an archive was NOT found! Aborting: " + ex.getMessage());
 				commander.q_api.putJobLog(queueId, "trace",
@@ -710,67 +713,67 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				return false;
 			}
 		}
-		
-		ArrayList<OutputEntry> toUpload = mergeAndRemoveDuplicateEntries(standaloneFilesToUpload, archivesToUpload, allArchiveEntries);
-			for (final OutputEntry entry : toUpload) {
-				try {
-					final File localFile = new File(currentDir.getAbsolutePath() + "/" + entry.getName());
-					logger.log(Level.INFO, "Processing output file: " + localFile);
 
-					if (localFile.exists() && localFile.isFile() && localFile.canRead() && localFile.length() > 0) {
-						commander.q_api.putJobLog(queueId, "trace", "Uploading: " + entry.getName() + " to " + outputDir);
+		final ArrayList<OutputEntry> toUpload = mergeAndRemoveDuplicateEntries(standaloneFilesToUpload, archivesToUpload, allArchiveEntries);
+		for (final OutputEntry entry : toUpload) {
+			try {
+				final File localFile = new File(currentDir.getAbsolutePath() + "/" + entry.getName());
+				logger.log(Level.INFO, "Processing output file: " + localFile);
 
-						final List<String> cpOptions = new ArrayList<>();
-						cpOptions.add("-w");
-						cpOptions.add("-S");
+				if (localFile.exists() && localFile.isFile() && localFile.canRead() && localFile.length() > 0) {
+					commander.q_api.putJobLog(queueId, "trace", "Uploading: " + entry.getName() + " to " + outputDir);
 
-						if (entry.getOptions() != null && entry.getOptions().length() > 0)
-							cpOptions.add(entry.getOptions());
-						else
-							cpOptions.add("disk:2");
+					final List<String> cpOptions = new ArrayList<>();
+					cpOptions.add("-w");
+					cpOptions.add("-S");
 
-						cpOptions.add("-j");
-						cpOptions.add(String.valueOf(queueId));
+					if (entry.getOptions() != null && entry.getOptions().length() > 0)
+						cpOptions.add(entry.getOptions());
+					else
+						cpOptions.add("disk:2");
 
-						// Don't commit in case of ERROR_E or ERROR_V
-						if (exitStatus == JobStatus.ERROR_E || exitStatus == JobStatus.ERROR_V)
-							cpOptions.add("-nc");
+					cpOptions.add("-j");
+					cpOptions.add(String.valueOf(queueId));
 
-						final ByteArrayOutputStream out = new ByteArrayOutputStream();
-						final LFN uploadResult = IOUtils.upload(localFile, outputDir + "/" + entry.getName(), UserFactory.getByUsername(username), out, cpOptions.toArray(new String[0]));
+					// Don't commit in case of ERROR_E or ERROR_V
+					if (exitStatus == JobStatus.ERROR_E || exitStatus == JobStatus.ERROR_V)
+						cpOptions.add("-nc");
 
-						final String output_upload = out.toString();
-						logger.log(Level.INFO,
-								"Output result of " + localFile.getAbsolutePath() + " to " + outputDir + "/" + entry.getName() + " is:\nLFN = " + uploadResult + "\nFull `cp` output:\n"
-										+ output_upload);
+					final ByteArrayOutputStream out = new ByteArrayOutputStream();
+					final LFN uploadResult = IOUtils.upload(localFile, outputDir + "/" + entry.getName(), UserFactory.getByUsername(username), out, cpOptions.toArray(new String[0]));
 
-						if (uploadResult == null) {
-							// complete failure to upload the file, mark the job as failed, not trying further to upload anything
-							uploadedAllOutFiles = false;
-							commander.q_api.putJobLog(queueId, "trace", "Failed to upload to " + outputDir + "/" + entry.getName() + ": " + out.toString());
-							break;
-						}
+					final String output_upload = out.toString();
+					logger.log(Level.INFO,
+							"Output result of " + localFile.getAbsolutePath() + " to " + outputDir + "/" + entry.getName() + " is:\nLFN = " + uploadResult + "\nFull `cp` output:\n"
+									+ output_upload);
 
-						// success, but could all the copies requested in the JDL be created as per user specs?
-						if (output_upload.contains("requested replicas could be uploaded")) {
-							// partial success, will lead to a DONE_WARN state
-							uploadedNotAllCopies = true;
-							commander.q_api.putJobLog(queueId, "trace", output_upload);
-						}
-						else
-							commander.q_api.putJobLog(queueId, "trace", uploadResult.getCanonicalName() + ": uploaded as requested");
+					if (uploadResult == null) {
+						// complete failure to upload the file, mark the job as failed, not trying further to upload anything
+						uploadedAllOutFiles = false;
+						commander.q_api.putJobLog(queueId, "trace", "Failed to upload to " + outputDir + "/" + entry.getName() + ": " + out.toString());
+						break;
 					}
-					else {
-						logger.log(Level.WARNING, "Can't upload output file " + localFile.getName() + ", does not exist or has zero size.");
-						commander.q_api.putJobLog(queueId, "trace", "Can't upload output file " + localFile.getName() + ", does not exist or has zero size.");
+
+					// success, but could all the copies requested in the JDL be created as per user specs?
+					if (output_upload.contains("requested replicas could be uploaded")) {
+						// partial success, will lead to a DONE_WARN state
+						uploadedNotAllCopies = true;
+						commander.q_api.putJobLog(queueId, "trace", output_upload);
 					}
+					else
+						commander.q_api.putJobLog(queueId, "trace", uploadResult.getCanonicalName() + ": uploaded as requested");
 				}
-				catch (final IOException e) {
-					logger.log(Level.WARNING, "IOException received while attempting to upload " + entry.getName(), e);
-					commander.q_api.putJobLog(queueId, "trace", "Failed to upload " + entry.getName() + " due to: " + e.getMessage());
-					uploadedAllOutFiles = false;
+				else {
+					logger.log(Level.WARNING, "Can't upload output file " + localFile.getName() + ", does not exist or has zero size.");
+					commander.q_api.putJobLog(queueId, "trace", "Can't upload output file " + localFile.getName() + ", does not exist or has zero size.");
 				}
 			}
+			catch (final IOException e) {
+				logger.log(Level.WARNING, "IOException received while attempting to upload " + entry.getName(), e);
+				commander.q_api.putJobLog(queueId, "trace", "Failed to upload " + entry.getName() + " due to: " + e.getMessage());
+				uploadedAllOutFiles = false;
+			}
+		}
 		createAndAddResultsJDL(null); // Not really used. Set to null for now.
 
 		if (!uploadedAllOutFiles) {
@@ -792,6 +795,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		return uploadedAllOutFiles;
 	}
 
+	@SuppressWarnings("unchecked")
 	private HashMap<String, String> loadJDLEnvironmentVariables() {
 		final HashMap<String, String> hashret = new HashMap<>();
 
@@ -803,21 +807,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					String value = "";
 					final Object val = jdl.get(s);
 
-					if (val instanceof Collection<?>) {
-						@SuppressWarnings("unchecked")
-						final Iterator<String> it = ((Collection<String>) val).iterator();
-						String sbuff = "";
-						boolean isFirst = true;
-
-						while (it.hasNext()) {
-							if (!isFirst)
-								sbuff += "##";
-							final String v = it.next().toString();
-							sbuff += v;
-							isFirst = false;
-						}
-						value = sbuff;
-					}
+					if (val instanceof Collection<?>)
+						value = String.join("##", (Collection<String>) val);
 					else
 						value = val.toString();
 
@@ -1022,7 +1013,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		return tags;
 	}
 
-	private static ArrayList<OutputEntry> mergeAndRemoveDuplicateEntries(ArrayList<OutputEntry> filesToMerge, ArrayList<OutputEntry> fileList, ArrayList<String> allArchiveEntries) {
+	private static ArrayList<OutputEntry> mergeAndRemoveDuplicateEntries(final ArrayList<OutputEntry> filesToMerge, final ArrayList<OutputEntry> fileList, final ArrayList<String> allArchiveEntries) {
 		for (final OutputEntry file : filesToMerge) {
 			if (!allArchiveEntries.contains(file.getName())) {
 				logger.log(Level.INFO, "Standalone file not in any archive. To be uploaded separately: " + file.getName());

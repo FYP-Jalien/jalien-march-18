@@ -687,21 +687,21 @@ public class TransferBroker {
 
 			final Map<String, Object> values = new HashMap<>();
 
-			String seList = "";
+			final StringBuilder seList = new StringBuilder();
 
 			for (final PFN pfn : t.targets) {
 				final SE targetSE = pfn.getSE();
 
 				if (targetSE != null) {
 					if (seList.length() > 0)
-						seList += ",";
+						seList.append(',');
 
-					seList += targetSE.seName;
+					seList.append(targetSE.seName);
 				}
 			}
 
 			if (seList.length() > 0)
-				values.put("se_name", seList);
+				values.put("se_name", seList.toString());
 			else
 				values.put("se_name", "unknown");
 
@@ -840,15 +840,15 @@ public class TransferBroker {
 			}
 
 			String owner = null;
-			String seList = "";
+			final StringBuilder seList = new StringBuilder();
 
 			for (final PFN target : t.targets) {
 				final SE targetSE = target.getSE();
 				if (targetSE != null) {
 					if (seList.length() > 0)
-						seList += ",";
+						seList.append(',');
 
-					seList += targetSE.seName;
+					seList.append(targetSE.seName);
 				}
 
 				if (owner == null)
@@ -857,7 +857,7 @@ public class TransferBroker {
 
 			if (seList.length() > 0) {
 				p.add("destination");
-				v.add(seList);
+				v.add(seList.toString());
 			}
 
 			if (owner != null) {
