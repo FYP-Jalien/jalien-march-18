@@ -148,9 +148,6 @@ public class OrphanPFNsCleanup {
 				try {
 					for (final Host h : CatalogueUtils.getAllHosts())
 						try (DBFunctions db = h.getDB()) {
-							if (db == null)
-								continue;
-
 							db.setReadOnly(true);
 							db.query("SELECT distinct se FROM orphan_pfns;");
 
