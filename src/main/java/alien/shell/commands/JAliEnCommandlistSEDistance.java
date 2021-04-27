@@ -3,7 +3,6 @@ package alien.shell.commands;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import alien.catalogue.FileSystemUtils;
 import alien.se.SE;
