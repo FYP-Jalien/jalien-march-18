@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.security.cert.X509Certificate;
+import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicLong;
@@ -133,7 +134,10 @@ public abstract class Request implements Serializable, Runnable {
 	 * @return certificate of the partner, set on receiving a request over the wire
 	 */
 	public final X509Certificate[] getPartnerCertificate() {
-		return partner_certificate;
+		if (partner_certificate == null)
+			return null;
+
+		return Arrays.copyOf(partner_certificate, partner_certificate.length);
 	}
 
 	/**
@@ -181,15 +185,14 @@ public abstract class Request implements Serializable, Runnable {
 		// first the user
 		if (requester_uid != null)
 			if (requester_ruid != null) {
-				if (requester_ruid.getName() != null)
-					if (requester_uid.canBecome(requester_ruid.getName())) {
-						if (logger.isLoggable(Level.FINE))
-							logger.log(Level.FINE, "Successfully switched user from '" + requester_euid + "' to '" + requester_ruid + "'.");
+				if ((requester_ruid.getName() != null) && requester_uid.canBecome(requester_ruid.getName())) {
+					if (logger.isLoggable(Level.FINE))
+						logger.log(Level.FINE, "Successfully switched user from '" + requester_euid + "' to '" + requester_ruid + "'.");
 
-						requester_euid = requester_ruid;
+					requester_euid = requester_ruid;
 
-						return true;
-					}
+					return true;
+				}
 			}
 			else {
 				if (logger.isLoggable(Level.FINE))

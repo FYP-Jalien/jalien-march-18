@@ -33,7 +33,8 @@ public class HTCONDOR extends BatchQueue {
 	private boolean use_job_router = false;
 	private boolean use_external_cloud = false;
 
-	private static final Pattern p = Pattern.compile("(\\d+)\\s*\\*\\s*(\\S+)");
+	private static final Pattern pJobNumbers = Pattern.compile("^\\s*([12]).*\\s(\\S+)");
+	private static final Pattern pLoadBalancer = Pattern.compile("(\\d+)\\s*\\*\\s*(\\S+)");
 
 	//
 	// 2020-06-24 - Maarten Litmaath, Maxim Storetvedt
@@ -131,7 +132,7 @@ public class HTCONDOR extends BatchQueue {
 				for (final String str : val.split(",")) {
 					double w = 1;
 					String ce = str;
-					final Matcher m = p.matcher(str);
+					final Matcher m = pLoadBalancer.matcher(str);
 
 					if (m.find()) {
 						w = Double.parseDouble(m.group(1));
@@ -361,7 +362,7 @@ public class HTCONDOR extends BatchQueue {
 		if (!use_job_router && ce_list.size() > 0) {
 			logger.info("Determining the next CE to use:");
 
-			for (final String element : ce_list) {
+			for (int i = 0; i < ce_list.size(); i++) {
 				final String ce = ce_list.get(next_ce);
 				final AtomicInteger idle = waiting.computeIfAbsent(ce, (r) -> new AtomicInteger(0));
 				final Double w = ce_weight.get(ce);
@@ -511,7 +512,6 @@ public class HTCONDOR extends BatchQueue {
 		final ArrayList<String> job_list = executeCommand(cmd);
 
 		tot_running = tot_waiting = 0;
-		final Pattern p = Pattern.compile("^\\s*([12]).*\\s(\\S+)");
 
 		// in case the CE list has changed
 		running.clear();
@@ -523,7 +523,7 @@ public class HTCONDOR extends BatchQueue {
 		}
 
 		for (final String line : job_list) {
-			final Matcher m = p.matcher(line);
+			final Matcher m = pJobNumbers.matcher(line);
 
 			if (m.matches()) {
 				final int job_status = Integer.parseInt(m.group(1));

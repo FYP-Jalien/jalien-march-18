@@ -54,6 +54,7 @@ public class PFNData {
 
 	/**
 	 * Set a map holding crawling data for a PFN analysed
+	 * 
 	 * @param data
 	 */
 	private void setData(final Map<String, Object> data) {
@@ -250,6 +251,7 @@ public class PFNData {
 
 	/**
 	 * Convert from PFNData to JSONObject
+	 * 
 	 * @return JSONObject
 	 */
 	@SuppressWarnings("unchecked")
@@ -261,6 +263,7 @@ public class PFNData {
 
 	/**
 	 * Convert from JSONObject to PFNData
+	 * 
 	 * @param jsonObject
 	 * @return PFNData
 	 */
@@ -268,8 +271,8 @@ public class PFNData {
 		final PFNData pfnData = new PFNData();
 		final Map<String, Object> data = new LinkedHashMap<>();
 
-		for (final Object key : jsonObject.keySet()) {
-			data.put(key.toString(), jsonObject.get(key));
+		for (final Map.Entry<?, ?> entry : (Set<Map.Entry<?, ?>>) jsonObject.entrySet()) {
+			data.put(entry.getKey().toString(), entry.getValue());
 		}
 
 		pfnData.setData(data);
