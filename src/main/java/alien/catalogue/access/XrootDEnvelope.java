@@ -317,7 +317,7 @@ public class XrootDEnvelope implements Serializable {
 
 		final GUID guid = pfn.getGuid();
 
-		final Set<LFN> lfns = guid.getLFNs(false);
+		final Set<LFN> lfns = guid.getLFNs(true);
 
 		String ret = "<authz>\n  <file>\n" + "    <access>" + access + "</access>\n";
 
