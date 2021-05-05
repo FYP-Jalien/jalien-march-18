@@ -5,8 +5,10 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
+import java.io.BufferedInputStream;
 import java.math.BigInteger;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
@@ -37,6 +39,7 @@ import alien.catalogue.access.AuthorizationFactory;
 import alien.config.ConfigUtils;
 import alien.io.protocols.Protocol;
 import alien.io.protocols.TempFileManager;
+import alien.io.StreamingXXHash64;
 import alien.se.SEUtils;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.shell.commands.JAliEnCommandcp;
@@ -115,6 +118,31 @@ public class IOUtils {
 			throw ioe;
 		}
 	}
+
+	/**
+	 * @param f
+	 * @return the xxHash64 checksum of the entire file
+	 * @throws IOException
+	 */
+
+	public static long getXXHash64(final File f) throws IOException {
+        try {
+            InputStream input = new FileInputStream(f);
+            BufferedInputStream buffStream = new BufferedInputStream(input);
+            StreamingXXHash64 hash64 = new StreamingXXHash64(0);
+            byte[] buffer = new byte[8192];
+            for (;;) {
+                int read = buffStream.read(buffer);
+                if (read == -1) {
+                    break;
+                }
+                hash64.update(buffer, 0, read);
+            }
+            return hash64.getValue();
+        } catch (final IOException ioe) {
+            throw ioe;
+        }
+    }
 
 	/**
 	 * Download the file in a temporary location. The GUID should be filled with authorization tokens before calling this method.
