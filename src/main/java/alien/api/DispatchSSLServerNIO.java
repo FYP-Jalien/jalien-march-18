@@ -26,6 +26,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -49,6 +50,7 @@ import alien.shell.ErrNo;
 import alien.user.AliEnPrincipal;
 import alien.user.JAKeyStore;
 import alien.user.UserFactory;
+import utils.CachedThreadPool;
 
 /**
  * @author costing
@@ -76,10 +78,12 @@ public class DispatchSSLServerNIO implements Runnable {
 	 */
 	private static BlockingQueue<Runnable> taskQueue = new LinkedBlockingQueue<>();
 
+	private static final AtomicInteger threadNo = new AtomicInteger();
+
 	/**
 	 * Thread pool handling messages
 	 */
-	private static ThreadPoolExecutor executor = new ThreadPoolExecutor(8, 16, 1, TimeUnit.MINUTES, taskQueue);
+	private static ThreadPoolExecutor executor = new CachedThreadPool(200, 1, TimeUnit.MINUTES, (r) -> new Thread(r, "DispatchSSLServerNIO - " + threadNo.incrementAndGet()));
 
 	private static final int defaultPort = 8098;
 	private static String serviceName = "apiService";
