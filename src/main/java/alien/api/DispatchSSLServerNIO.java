@@ -10,7 +10,6 @@ import java.io.PipedOutputStream;
 import java.net.Inet6Address;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedChannelException;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.ServerSocketChannel;
@@ -256,7 +255,7 @@ public class DispatchSSLServerNIO implements Runnable {
 		return remoteIdentity != null;
 	}
 
-	private void notifyData() throws IOException {
+	private void notifyData() {
 		// System.err.println("Handling data notification");
 
 		if (isKilled.get())
@@ -532,14 +531,14 @@ public class DispatchSSLServerNIO implements Runnable {
 						if (key == null || !key.isValid()) {
 							logger.log(Level.INFO, "Detected closed key, disposing of it");
 
-							if (key != null){
+							if (key != null) {
 								final DispatchSSLServerNIO obj = sessionMap.remove(key);
 
-								if (obj!=null){
-									try{
+								if (obj != null) {
+									try {
 										obj.cleanup();
 									}
-									catch (final Throwable t){
+									catch (final Throwable t) {
 										logger.log(Level.WARNING, "Cleaning up an invalid key encountered a problem", t);
 									}
 								}
@@ -561,12 +560,12 @@ public class DispatchSSLServerNIO implements Runnable {
 								try {
 									obj.notifyData();
 								}
-								catch (final Throwable t1){
+								catch (final Throwable t1) {
 									try {
 										logger.log(Level.WARNING, "Throwable notifying data", t1);
 										obj.cleanup();
 									}
-									catch (final Throwable t){
+									catch (final Throwable t) {
 										logger.log(Level.WARNING, "Cleaning up after an error encountered a problem", t);
 									}
 								}
