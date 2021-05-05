@@ -27,6 +27,7 @@ import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.TreeMap;
 import java.util.Vector;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -2703,59 +2704,71 @@ public class TaskQueueUtils {
 	}
 
 	/**
+	 * @author costing
+	 * @since May 5, 2021
+	 */
+	private static final class LookupTable extends GenericLastValuesCache<String, Integer> {
+		private static final long serialVersionUID = 1L;
+
+		private final String query;
+		private final String insert;
+
+		/**
+		 * @param key
+		 * 
+		 */
+		public LookupTable(final String key) {
+			query = "SELECT " + key.toLowerCase() + "id FROM QUEUE_" + key + " WHERE " + key.toLowerCase() + "=?";
+			insert = "INSERT INTO QUEUE_" + key.toUpperCase() + " (" + key.toLowerCase() + ") VALUES (?)";
+		}
+
+		@Override
+		protected int getMaximumSize() {
+			return 100000;
+		}
+
+		@Override
+		protected Integer resolve(String key) {
+			try (DBFunctions db = getQueueDB()) {
+				if (db == null)
+					return null;
+
+				db.setReadOnly(true);
+				db.setQueryTimeout(60);
+
+				if (!db.query(query, false, key))
+					return null;
+
+				if (db.moveNext())
+					return Integer.valueOf(db.geti(1));
+
+				db.setReadOnly(false);
+				db.setLastGeneratedKey(true);
+
+				if (!db.query(insert, false, key))
+					return null;
+
+				return db.getLastGeneratedKey();
+			}
+		}
+	}
+
+	private static ConcurrentHashMap<String, LookupTable> lookupTable = new ConcurrentHashMap<>();
+
+	/**
 	 * @param key
 	 * @param value
 	 * @return value for this key
 	 */
 	public static int getOrInsertFromLookupTable(final String key, final String value) {
-		// FIXME: these values can also be cached
-		try (DBFunctions db = getQueueDB()) {
-			if (db == null)
-				return 0;
+		LookupTable cache = lookupTable.computeIfAbsent(key.toUpperCase(), (k) -> new LookupTable(k));
 
-			db.setQueryTimeout(60);
+		Integer i = cache.get(value);
 
-			final String table = "QUEUE_" + key.toUpperCase();
-			final String id = key + "id";
-			final String q = "select " + id + " from " + table + " where " + key + "=?";
+		if (i != null)
+			return i.intValue();
 
-			if (logger.isLoggable(Level.FINER))
-				logger.log(Level.FINER, "Going to get hostId, query: " + q);
-
-			db.setReadOnly(true);
-			db.query(q, false, value);
-
-			// the host exists
-			if (db.moveNext()) {
-				if (logger.isLoggable(Level.FINER))
-					logger.log(Level.FINER, "The host exists: " + db.geti(1));
-
-				return db.geti(1);
-			}
-			// host doesn't exist, we insert it
-			if (logger.isLoggable(Level.FINE))
-				logger.log(Level.FINE, "The host doesn't exist. Inserting...");
-
-			db.setLastGeneratedKey(true);
-
-			final String qi = "insert into " + table + " (" + key + ") values (?);";
-			db.setReadOnly(false);
-			final boolean ret = db.query(qi, false, value);
-
-			if (logger.isLoggable(Level.FINE))
-				logger.log(Level.FINE, qi + " with ?=" + value + ": " + ret);
-
-			if (ret) {
-				final int val = db.getLastGeneratedKey().intValue();
-				if (logger.isLoggable(Level.FINE))
-					logger.log(Level.FINE, "Returning: " + val);
-
-				return val;
-			}
-
-			// something went wrong ? :-(
-			return 0;
-		}
+		return 0;
 	}
 
 	/**
