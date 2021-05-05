@@ -119,15 +119,19 @@ public final class ComputingElement extends Thread {
 				logger.info("Building new SiteMap.");
 
 				try {
-					config = ConfigUtils.getConfigFromLdap();
-					site = (String) config.get("site_accountname");
-					getSiteMap();
+					final HashMap<String, Object> newConfig = ConfigUtils.getConfigFromLdap();
+					if (newConfig != null) {
+						config = newConfig;
 
-					logger.info("New sitemap: ");
+						site = (String) config.get("site_accountname");
+						getSiteMap();
 
-					siteMap.forEach((field, entry) -> {
-						logger.info("[" + field + ": " + entry + "]");
-					});
+						logger.info("New sitemap: ");
+
+						siteMap.forEach((field, entry) -> {
+							logger.info("[" + field + ": " + entry + "]");
+						});
+					}
 				}
 				catch (Exception ex) {
 					logger.log(Level.WARNING, "Error syncing with LDAP: ", ex);
