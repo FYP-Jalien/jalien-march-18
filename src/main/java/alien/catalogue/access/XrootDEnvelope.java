@@ -429,7 +429,7 @@ public class XrootDEnvelope implements Serializable {
 
 		final GUID guid = pfn.getGuid();
 
-		final Set<LFN> lfns = guid.getLFNs();
+		final Set<LFN> lfns = guid.getLFNs(true);
 
 		final HashMap<String, String> e = new HashMap<>(8);
 

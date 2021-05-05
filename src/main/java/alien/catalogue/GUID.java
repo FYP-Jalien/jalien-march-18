@@ -850,7 +850,19 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 	 * @return the <b>cached</b> LFNs associated to this GUID, from either the internal cache or the G*L_REF tables.
 	 */
 	public Set<LFN> getLFNs() {
-		if (lfnCache != null)
+		return getLFNs(false);
+	}
+
+	/**
+	 * This method is _not_ authoritative, if you want to do the actual lookup to see which LFNs point to this GUID then use {@link LFNUtils#getLFN(GUID)}.
+	 * Should only be called when the previous code has filled the cache with known LFN objects.
+	 * 
+	 * @param cachedOnly if <code>true</code> even central services will not try to look up the LFN
+	 *
+	 * @return the <b>cached</b> LFNs associated to this GUID, from either the internal cache or the G*L_REF tables.
+	 */
+	public Set<LFN> getLFNs(final boolean cachedOnly) {
+		if (lfnCache != null || cachedOnly)
 			return lfnCache;
 
 		if (guidId == 0)
