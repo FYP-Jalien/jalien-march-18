@@ -378,6 +378,29 @@ public class JobBroker {
 		}
 	}
 
+	private static String lastRemoteAgents = null;
+
+	private static long lastRemoteAgentsChecked = 0;
+
+	private static synchronized String getRemoteAgents() {
+		if (System.currentTimeMillis() > lastRemoteAgentsChecked) {
+			lastRemoteAgents = null;
+
+			try (DBFunctions db = ConfigUtils.getDB("processes")) {
+				db.setReadOnly(true);
+				db.setQueryTimeout(60);
+
+				if (db.query("select group_concat(distinct agentId) from QUEUE where agentId is not null and statusId=5 and timestampdiff(SECOND,mtime,now())>=ifnull(remoteTimeout,43200)")
+						&& db.moveNext())
+					lastRemoteAgents = db.gets(1);
+			}
+
+			lastRemoteAgentsChecked = System.currentTimeMillis() + 1000L * 60;
+		}
+
+		return lastRemoteAgents;
+	}
+
 	/**
 	 * @param matchRequest
 	 * @return number of jobs waiting for a site given its parameters, or an
@@ -520,9 +543,7 @@ public class JobBroker {
 				// TODO: ask cache for ns:jobbroker key:remoteagents
 				// $self->{CONFIG}->{CACHE_SERVICE_ADDRESS}?ns=jobbroker&key=remoteagents
 
-				db.query("select group_concat(distinct agentId) from QUEUE where agentId is not null and statusId=5 and timestampdiff(SECOND,mtime,now())>=ifnull(remoteTimeout,43200)");
-
-				final String agents = db.gets(1);
+				final String agents = getRemoteAgents();
 
 				if (agents != null && !agents.isBlank()) {
 					where += " and entryId in (" + agents + ")";
@@ -536,7 +557,7 @@ public class JobBroker {
 
 			db.setReadOnly(true);
 
-			final String q = "select " + ret + " from JOBAGENT where 1=1 " + where + " order by priority desc, price desc, oldestQueueId asc limit 1";
+			final String q = "select " + ret + " from JOBAGENT where counter>0 " + where + " order by priority desc, price desc, oldestQueueId asc limit 1";
 
 			if (logger.isLoggable(Level.FINE)) {
 				logger.log(Level.FINE, "Going to select agents (" + q + ")");
