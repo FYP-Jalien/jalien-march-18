@@ -27,7 +27,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -88,8 +87,6 @@ public class DispatchSSLServerNIO implements Runnable {
 
 	private static boolean forwardRequest = false;
 
-	private static AtomicInteger activeSessions = new AtomicInteger();
-
 	private static CacheMonitor ipv6Connections = null;
 
 	private static Selector serverSelector;
@@ -104,9 +101,6 @@ public class DispatchSSLServerNIO implements Runnable {
 		if (monitor != null) {
 			monitor.addMonitoring("activeSessions", (names, values) -> {
 				names.add("activeSessions");
-				values.add(Double.valueOf(activeSessions.get()));
-
-				names.add("connectedClients");
 				values.add(Double.valueOf(sessionMap.size()));
 
 				names.add("executorPoolSize");
