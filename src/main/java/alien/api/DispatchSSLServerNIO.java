@@ -80,10 +80,14 @@ public class DispatchSSLServerNIO implements Runnable {
 
 	private static final AtomicInteger threadNo = new AtomicInteger();
 
+	private static final AtomicInteger sslThreadNo = new AtomicInteger();
+
 	/**
 	 * Thread pool handling messages
 	 */
 	private static ThreadPoolExecutor executor = new CachedThreadPool(200, 1, TimeUnit.MINUTES, (r) -> new Thread(r, "DispatchSSLServerNIO - " + threadNo.incrementAndGet()));
+
+	private static ThreadPoolExecutor sslExecutor = new CachedThreadPool(32, 1, TimeUnit.MINUTES, (r) -> new Thread(r, "SSLNegociator- " + sslThreadNo.incrementAndGet()));
 
 	private static final int defaultPort = 8098;
 	private static String serviceName = "apiService";
@@ -111,6 +115,12 @@ public class DispatchSSLServerNIO implements Runnable {
 
 				names.add("executorActiveCount");
 				values.add(Double.valueOf(executor.getActiveCount()));
+
+				names.add("sslExecutorPoolSize");
+				values.add(Double.valueOf(sslExecutor.getPoolSize()));
+
+				names.add("sslExecutorActiveCount");
+				values.add(Double.valueOf(sslExecutor.getActiveCount()));
 
 				names.add("eQueueSize");
 				values.add(Double.valueOf(taskQueue.size()));
@@ -653,7 +663,7 @@ public class DispatchSSLServerNIO implements Runnable {
 
 		final NioSslLogger nioLogger = null; // disabled logging
 
-		serverSocketChannel = new SSLServerSocketChannel(plainSocketChannel, sslContext, executor, nioLogger);
+		serverSocketChannel = new SSLServerSocketChannel(plainSocketChannel, sslContext, sslExecutor, nioLogger);
 		serverSocketChannel.needClientAuthentication = true;
 
 		try {
