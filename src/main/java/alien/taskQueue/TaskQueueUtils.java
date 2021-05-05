@@ -2309,11 +2309,12 @@ public class TaskQueueUtils {
 	/**
 	 * @param jobId
 	 * @param username
+	 * @param resubmission
 	 * @return the new token
 	 */
-	public static JobToken insertJobToken(final long jobId, final String username) {
+	public static JobToken insertJobToken(final long jobId, final String username, final int resubmission) {
 		try (DBFunctions db = getQueueDB()) {
-			final JobToken jb = new JobToken(jobId, username);
+			final JobToken jb = new JobToken(jobId, username, resubmission);
 			if (!jb.updateOrInsert(db)) {
 				logger.info("Cannot insert (or update) token for job: " + jobId);
 				return null;
@@ -2505,12 +2506,12 @@ public class TaskQueueUtils {
 
 		System.out.println("---------------------------------------------------------------------");
 
-		if (insertJobToken(12341234, "me") == null)
+		if (insertJobToken(12341234, "me", -1) == null)
 			System.out.println("exists, update refused.");
 
 		System.out.println("---------------------------------------------------------------------");
 
-		if (insertJobToken(12341234, "me") == null)
+		if (insertJobToken(12341234, "me", -1) == null)
 			System.out.println("exists, update refused.");
 
 		System.out.println("---------------------------------------------------------------------");

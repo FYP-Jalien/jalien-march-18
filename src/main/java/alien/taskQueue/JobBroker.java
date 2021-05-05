@@ -182,8 +182,8 @@ public class JobBroker {
 				final Long queueId = (Long) matchAnswer.get("queueId");
 				final String username = (String) matchAnswer.get("User");
 
-				int resubmission = -1;
-				final JobToken jobToken = TaskQueueUtils.insertJobToken(queueId.longValue(), (String) matchAnswer.get("User"));
+				int resubmission = ((Integer) matchAnswer.getOrDefault("Resubmission", Integer.valueOf(-1))).intValue();
+				final JobToken jobToken = TaskQueueUtils.insertJobToken(queueId.longValue(), (String) matchAnswer.get("User"), resubmission);
 				if (jobToken != null) {
 					resubmission = jobToken.resubmission;
 
@@ -238,7 +238,7 @@ public class JobBroker {
 
 			db.setQueryTimeout(60);
 
-			final String agentId = (String) waiting.get("entryId");
+			final Integer agentId = Integer.valueOf((String) waiting.get("entryId"));
 			final String host = (String) waiting.get("Host");
 			final String ceName = (String) waiting.get("CE");
 
@@ -321,12 +321,15 @@ public class JobBroker {
 			// we got something to run
 			String jdl, user;
 
-			db.query("select origjdl jdl, user from QUEUEJDL join QUEUE using (queueid) join QUEUE_USER using (userId) where queueId=?", false, Long.valueOf(queueId));
+			db.query("select origjdl jdl, user, resubmission from QUEUEJDL join QUEUE using (queueid) join QUEUE_USER using (userId) where queueId=?", false, Long.valueOf(queueId));
+
+			int resubmission = -1;
 
 			if (db.moveNext()) {
 				logger.log(Level.INFO, "Updated and getting fields queueId, jdl, user for queueId " + queueId);
 				jdl = db.gets(1);
 				user = db.gets(2);
+				resubmission = db.geti(3);
 			}
 			else {
 				logger.log(Level.INFO, "Couldn't get the queueId, jdl and user for the agentId: " + agentId);
@@ -339,11 +342,12 @@ public class JobBroker {
 
 			db.query("update SITEQUEUES set ASSIGNED=GREATEST(ASSIGNED,0)+1, WAITING=GREATEST(WAITING-1,0) where siteid=?", false, Integer.valueOf(siteId));
 
-			TaskQueueUtils.deleteJobAgent(Long.parseLong(agentId), queueId);
+			TaskQueueUtils.deleteJobAgent(agentId.longValue(), queueId);
 
 			job.put("queueId", Long.valueOf(queueId));
 			job.put("JDL", jdl);
 			job.put("User", user);
+			job.put("Resubmission", Integer.valueOf(resubmission));
 
 			if (logger.isLoggable(Level.FINE))
 				logger.log(Level.FINE, "Going to return " + queueId + " and " + user + " and " + jdl);

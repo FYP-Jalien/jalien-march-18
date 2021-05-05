@@ -73,12 +73,14 @@ public class JobToken implements Comparable<JobToken> {
 	 * @param queueId
 	 * @param username
 	 */
-	JobToken(final long queueId, final String username) {
+	JobToken(final long queueId, final String username, final int resubmission) {
 		this.queueId = queueId;
 
 		this.username = username;
 
 		this.exists = false;
+
+		this.resubmission = resubmission;
 
 		this.legacyToken = generateToken();
 	}
@@ -162,9 +164,9 @@ public class JobToken implements Comparable<JobToken> {
 		if (db == null)
 			return false;
 
-		logger.log(Level.INFO, "Replace JobToken for: " + queueId + " and exists: " + exists);
+		logger.log(Level.INFO, "Replace JobToken for: " + queueId + " and exists: " + exists + ", known resubmission count: " + resubmission);
 
-		final int resubmission_queue = TaskQueueUtils.getResubmission(Long.valueOf(queueId));
+		final int resubmission_queue = resubmission >= 0 ? resubmission : TaskQueueUtils.getResubmission(Long.valueOf(queueId));
 
 		if (resubmission_queue < 0) { // problem getting resubmission from QUEUE
 			logger.info("JobToken updateOrInsert: cannot retrieve resubmision");
