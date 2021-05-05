@@ -317,7 +317,7 @@ public class XrootDEnvelope implements Serializable {
 
 		final GUID guid = pfn.getGuid();
 
-		final Set<LFN> lfns = guid.getLFNs();
+		final Set<LFN> lfns = guid.getLFNs(false);
 
 		String ret = "<authz>\n  <file>\n" + "    <access>" + access + "</access>\n";
 
@@ -390,7 +390,7 @@ public class XrootDEnvelope implements Serializable {
 		if (se.seName.indexOf("DCACHE") > 0) {
 			final GUID guid = pfn.getGuid();
 
-			final Set<LFN> lfns = guid.getLFNs();
+			final Set<LFN> lfns = guid.getLFNs(true);
 
 			if (lfns != null && lfns.size() > 0)
 				turl = se.seioDaemons + "/" + lfns.iterator().next().getCanonicalName();

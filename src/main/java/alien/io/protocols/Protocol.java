@@ -120,7 +120,7 @@ public abstract class Protocol implements Serializable, Comparable<Protocol>, Cl
 				return false;
 			}
 		else {
-			final Set<LFN> knownLFNs = guid.getLFNs();
+			final Set<LFN> knownLFNs = guid.getLFNs(true);
 
 			if (knownLFNs != null)
 				for (final LFN lfn : knownLFNs)

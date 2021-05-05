@@ -882,9 +882,7 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 
 			db.setReadOnly(true);
 
-			db.query("SELECT distinct lfnRef FROM G" + tablename + "L_REF WHERE guidId=?;", false, Integer.valueOf(guidId));
-
-			if (!db.moveNext())
+			if (!db.query("SELECT distinct lfnRef FROM G" + tablename + "L_REF WHERE guidId=?;", false, Integer.valueOf(guidId)) || !db.moveNext())
 				return null;
 
 			lfnCache = new LinkedHashSet<>();
