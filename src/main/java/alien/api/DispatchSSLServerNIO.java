@@ -228,7 +228,8 @@ public class DispatchSSLServerNIO implements Runnable {
 				event.identity = remoteIdentity;
 				event.clientID = Request.getVMID();
 
-				System.err.println("Identity address and port: " + event.identity.getRemoteEndpoint() + ":" + event.identity.getRemotePort());
+				if (logger.isLoggable(Level.FINE))
+					logger.log(Level.FINE, "Identity address and port: " + event.identity.getRemoteEndpoint() + ":" + event.identity.getRemotePort());
 
 				event.arguments = new ArrayList<>();
 
@@ -278,9 +279,8 @@ public class DispatchSSLServerNIO implements Runnable {
 			try {
 				num = channel.read(smallBuffer);
 			}
-			catch (final ClosedChannelException cce) {
-				System.err.println("Channel was closed, cleaning up");
-				cce.printStackTrace();
+			catch (final IOException cce) {
+				logger.log(Level.WARNING, "Channel was closed, cleaning up", cce);
 				cleanup();
 				return;
 			}
@@ -330,7 +330,7 @@ public class DispatchSSLServerNIO implements Runnable {
 		DispatchSSLServerNIO removed = sessionMap.remove(key);
 
 		if (removed == null) {
-			System.err.println("no object was removed from map for " + key);
+			logger.log(Level.FINE, "no object was removed from map for " + key);
 		}
 
 		key.interestOps(0);
@@ -530,7 +530,21 @@ public class DispatchSSLServerNIO implements Runnable {
 						final SelectionKey key = it.next();
 
 						if (key == null || !key.isValid()) {
-							System.err.println("Detected closed key, disposing of it");
+							logger.log(Level.INFO, "Detected closed key, disposing of it");
+
+							if (key != null){
+								final DispatchSSLServerNIO obj = sessionMap.remove(key);
+
+								if (obj!=null){
+									try{
+										obj.cleanup();
+									}
+									catch (final Throwable t){
+										logger.log(Level.WARNING, "Cleaning up an invalid key encountered a problem", t);
+									}
+								}
+							}
+
 							it.remove();
 							continue;
 						}
@@ -544,7 +558,18 @@ public class DispatchSSLServerNIO implements Runnable {
 								// disable future events until the dispatcher has digested the data
 								// key.interestOps(0);
 								// System.err.println("Notifying of new data");
-								obj.notifyData();
+								try {
+									obj.notifyData();
+								}
+								catch (final Throwable t1){
+									try {
+										logger.log(Level.WARNING, "Throwable notifying data", t1);
+										obj.cleanup();
+									}
+									catch (final Throwable t){
+										logger.log(Level.WARNING, "Cleaning up after an error encountered a problem", t);
+									}
+								}
 							}
 							else {
 								System.err.println("Didn't find a corresponding session");
