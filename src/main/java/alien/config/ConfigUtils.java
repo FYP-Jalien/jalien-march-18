@@ -597,42 +597,39 @@ public class ConfigUtils {
 	 * @return LDAP configuration, for a particular hostname
 	 */
 	public static HashMap<String, Object> getConfigFromLdap(final boolean checkContent, final String hostName) {
-		final String domain = hostName.substring(hostName.indexOf(".") + 1, hostName.length());
-
 		final HashMap<String, Object> configuration = new HashMap<>();
 
 		final HashMap<String, Object> voConfig = LDAPHelper.getVOConfig();
 		if (voConfig == null || voConfig.size() == 0)
 			return null;
 
-		// We get the site name from the domain and the site root info
-		final Set<String> siteset = LDAPHelper.checkLdapInformation("(&(domain=" + domain + "))", "ou=Sites,", "accountName");
+		//Check if the hostname is used anywhere at a site 
+		final Set<String> siteDNsForHostname = LDAPHelper.checkLdapInformation("host=" + hostName, "ou=Sites,", "dn");
 
-		if (checkContent && (siteset == null || siteset.size() == 0 || siteset.size() > 1)) {
-			logger.severe("Error: " + (siteset == null ? "null" : String.valueOf(siteset.size())) + " sites found for domain: " + domain);
+		if (checkContent && (siteDNsForHostname == null || siteDNsForHostname.size() == 0)) {
+			logger.severe("Error: " + (siteDNsForHostname == null ? "null" : String.valueOf(siteDNsForHostname.size())) + " entries across all sites for the hostname: " + hostName);
 			return null;
-		}
-
-		// users won't be always in a registered domain so we can exit here
-		if (siteset.size() == 0) {
-			if (checkContent)
-				return null;
-
-			return configuration;
 		}
 
 		HashMap<String, Object> hostConfig = null;
 		String site = null;
 
-		// siteset might contain more than one site. Let's see if one of them matches the given hostname
-		while (siteset.iterator().hasNext()) {
-			site = siteset.iterator().next();
+		// siteDNsForHostname might contain more than one site. Let's see if one of the them has the configuration
+		while (siteDNsForHostname.iterator().hasNext()) {
+			final String dn = siteDNsForHostname.iterator().next();
 
-			// Get the hostConfig from LDAP based on the site and hostname
-			hostConfig = LDAPHelper.checkLdapTree("(&(host=" + hostName + "))", "ou=Config,ou=" + site + ",ou=Sites,", "host");
+			try {
+				site = dn.substring(dn.lastIndexOf("ou=") + 1);
 
-			if (hostConfig.size() != 0)
-				break;
+				// Get the hostConfig from LDAP based on the site and hostname
+				hostConfig = LDAPHelper.checkLdapTree("(&(host=" + hostName + "))", "ou=Config,ou=" + site + ",ou=Sites,", "host");
+
+				if (hostConfig.size() != 0)
+					break;
+			}
+			catch (IndexOutOfBoundsException iobe) {
+				// ignore
+			}
 		}
 
 		if (hostConfig == null) {
