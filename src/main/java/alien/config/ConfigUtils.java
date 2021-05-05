@@ -619,7 +619,7 @@ public class ConfigUtils {
 			final String dn = siteDNsForHostname.iterator().next();
 
 			try {
-				site = dn.substring(dn.lastIndexOf("ou=") + 1);
+				site = dn.substring(dn.lastIndexOf('=') + 1);
 
 				// Get the hostConfig from LDAP based on the site and hostname
 				hostConfig = LDAPHelper.checkLdapTree("(&(host=" + hostName + "))", "ou=Config,ou=" + site + ",ou=Sites,", "host");
