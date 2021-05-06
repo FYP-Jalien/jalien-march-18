@@ -703,10 +703,15 @@ public class TaskQueueUtils {
 			db.setReadOnly(true);
 			db.setQueryTimeout(600);
 
-			if (!db.query(q, false, Long.valueOf(job))) {
-				logger.log(Level.SEVERE, "Error executing the select query from QUEUE");
-
-				return false;
+			final int queryRetriesMax = 3;
+			for (int retries = 0;; retries++) {
+				if (!db.query(q, false, Long.valueOf(job))) {
+					logger.log(Level.SEVERE, "Error executing the select query from QUEUE");
+					if (retries == queryRetriesMax - 1)
+						return false;
+				}
+				else
+					break;
 			}
 
 			if (!db.moveNext()) {
@@ -754,8 +759,14 @@ public class TaskQueueUtils {
 
 			db.setQueryTimeout(600);
 
-			if (!db.query(q, false, newstatus, Long.valueOf(job)))
-				return false;
+			for (int retries = 0;; retries++) {
+				if (!db.query(q, false, newstatus, Long.valueOf(job))) {
+					if (retries == queryRetriesMax - 1)
+						return false;
+				}
+				else
+					break;
+			}
 
 			final boolean updated = db.getUpdateCount() != 0;
 
