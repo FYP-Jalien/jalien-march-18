@@ -42,6 +42,8 @@ public class SEBenchmark {
 
 	private static final AtomicInteger completed = new AtomicInteger();
 
+	private static final AtomicInteger failed = new AtomicInteger();
+
 	private static long startup;
 
 	private static final Object lock = new Object();
@@ -68,7 +70,7 @@ public class SEBenchmark {
 				final double rate = (uploadedSoFar.longValue() * 1000. / dTime) / 1024 / 1024;
 
 				System.err.println("So far " + completed + " files (" + Format.size(uploadedSoFar.longValue()) + ") have completed in " + Format.toInterval(dTime) + ", for an average rate of "
-						+ (Format.point(rate) + " MB/s"));
+						+ (Format.point(rate) + " MB/s") + "; " + failed + " failures");
 			}
 		}
 	};
@@ -101,14 +103,14 @@ public class SEBenchmark {
 
 		@Override
 		public void run() {
-			final String testPath = UsersHelper.getHomeDir(account.getDefaultUser()) + "/se_test_" + tNo;
+			final String testPath = UsersHelper.getHomeDir(account.getDefaultUser()) + "se_test_" + tNo;
 
 			do {
 				if (!cleanupCatalogueFile(testPath))
 					break;
 
 				try (Timing timing = new Timing()) {
-					LFN target = IOUtils.upload(localFile, testPath, account, null, "-S", seName);
+					final LFN target = IOUtils.upload(localFile, testPath, account, null, "-S", seName);
 
 					if (target != null) {
 						System.err.println("Thread " + tNo + " completed one upload in " + timing + " (" + Format.point(localFile.length() / timing.getSeconds() / 1024 / 1024) + " MB/s)");
@@ -116,11 +118,14 @@ public class SEBenchmark {
 						uploadedSoFar.addAndGet(localFile.length());
 						completed.incrementAndGet();
 					}
-					else
+					else {
 						System.err.println("Failed to upload to " + testPath);
+						failed.incrementAndGet();
+					}
 				}
 				catch (final IOException e) {
 					System.err.println("Thread " + tNo + " failed to upload a file: " + e.getMessage());
+					failed.incrementAndGet();
 				}
 			} while (--iterations > 0);
 
