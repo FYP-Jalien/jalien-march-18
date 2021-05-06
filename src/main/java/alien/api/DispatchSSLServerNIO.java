@@ -57,12 +57,6 @@ import utils.CachedThreadPool;
  *
  */
 public class DispatchSSLServerNIO implements Runnable {
-
-	/**
-	 * Reset the object stream every this many objects sent
-	 */
-	private static final int RESET_OBJECT_STREAM_COUNTER = 10;
-
 	/**
 	 * Logger
 	 */
@@ -146,8 +140,6 @@ public class DispatchSSLServerNIO implements Runnable {
 	 * Writing replies here
 	 */
 	private ObjectOutputStream oos;
-
-	private int objectsSentCounter = 0;
 
 	private OutputStream os;
 
@@ -401,12 +393,7 @@ public class DispatchSSLServerNIO implements Runnable {
 			try (Timing timing = new Timing()) {
 				// System.err.println("When returning the object, ex is "+r.getException());
 
-				oos.writeObject(r);
-
-				if (++objectsSentCounter >= RESET_OBJECT_STREAM_COUNTER) {
-					oos.reset();
-					objectsSentCounter = 0;
-				}
+				oos.writeUnshared(r);
 
 				oos.flush();
 

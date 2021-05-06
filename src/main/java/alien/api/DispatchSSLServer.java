@@ -54,12 +54,6 @@ import utils.CachedThreadPool;
  *
  */
 public class DispatchSSLServer extends Thread {
-
-	/**
-	 * Reset the object stream every this many objects sent
-	 */
-	private static final int RESET_OBJECT_STREAM_COUNTER = 10;
-
 	/**
 	 * Logger
 	 */
@@ -93,8 +87,6 @@ public class DispatchSSLServer extends Thread {
 	private static String serviceName = "apiService";
 
 	private static boolean forwardRequest = false;
-
-	private int objectsSentCounter = 0;
 
 	private static AtomicInteger activeSessions = new AtomicInteger();
 
@@ -245,11 +237,6 @@ public class DispatchSSLServer extends Thread {
 							// System.err.println("When returning the object, ex is "+r.getException());
 
 							oos.writeObject(r);
-
-							if (++objectsSentCounter >= RESET_OBJECT_STREAM_COUNTER) {
-								oos.reset();
-								objectsSentCounter = 0;
-							}
 
 							oos.flush();
 

@@ -36,14 +36,6 @@ import alien.user.JAKeyStore;
  *
  */
 public class DispatchSSLClient {
-
-	/**
-	 * Reset the object stream every this many objects sent
-	 */
-	private static final int RESET_OBJECT_STREAM_COUNTER = 1000;
-
-	private int objectsSentCounter = 0;
-
 	/**
 	 * Logger
 	 */
@@ -457,12 +449,7 @@ public class DispatchSSLClient {
 
 		final long lStart = System.currentTimeMillis();
 
-		c.oos.writeObject(r);
-
-		if (++c.objectsSentCounter >= RESET_OBJECT_STREAM_COUNTER) {
-			c.oos.reset();
-			c.objectsSentCounter = 0;
-		}
+		c.oos.writeUnshared(r);
 
 		c.oos.flush();
 
