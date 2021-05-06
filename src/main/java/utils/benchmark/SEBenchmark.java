@@ -42,7 +42,7 @@ public class SEBenchmark {
 
 	private static final AtomicInteger completed = new AtomicInteger();
 
-	private static final long startup = System.currentTimeMillis();
+	private static long startup;
 
 	private static final Object lock = new Object();
 
@@ -63,9 +63,12 @@ public class SEBenchmark {
 					}
 				}
 
-				final double rate = (uploadedSoFar.longValue() * 1000. / (System.currentTimeMillis() - startup)) / 1024 / 1024;
+				final long dTime = System.currentTimeMillis() - startup;
 
-				System.err.println("So far " + completed + " files (" + Format.size(uploadedSoFar.longValue()) + ") have completed, for an average rate of " + (Format.point(rate) + " MB/s"));
+				final double rate = (uploadedSoFar.longValue() * 1000. / dTime) / 1024 / 1024;
+
+				System.err.println("So far " + completed + " files (" + Format.size(uploadedSoFar.longValue()) + ") have completed in " + Format.toInterval(dTime) + ", for an average rate of "
+						+ (Format.point(rate) + " MB/s"));
 			}
 		}
 	};
@@ -105,12 +108,16 @@ public class SEBenchmark {
 					break;
 
 				try (Timing timing = new Timing()) {
-					IOUtils.upload(localFile, testPath, account, null, "-S", seName);
+					LFN target = IOUtils.upload(localFile, testPath, account, null, "-S", seName);
 
-					System.err.println("Thread " + tNo + " completed one upload in " + timing + " (" + Format.point(localFile.length() / timing.getSeconds() / 1024 / 1024) + " MB/s)");
+					if (target != null) {
+						System.err.println("Thread " + tNo + " completed one upload in " + timing + " (" + Format.point(localFile.length() / timing.getSeconds() / 1024 / 1024) + " MB/s)");
 
-					uploadedSoFar.addAndGet(localFile.length());
-					completed.incrementAndGet();
+						uploadedSoFar.addAndGet(localFile.length());
+						completed.incrementAndGet();
+					}
+					else
+						System.err.println("Failed to upload to " + testPath);
 				}
 				catch (final IOException e) {
 					System.err.println("Thread " + tNo + " failed to upload a file: " + e.getMessage());
@@ -187,6 +194,8 @@ public class SEBenchmark {
 		final String seName = (String) options.valueOf("s");
 
 		final List<UploadThread> tList = new ArrayList<>(threads);
+
+		startup = System.currentTimeMillis();
 
 		for (int i = 0; i < threads; i++) {
 			final UploadThread ut = new UploadThread(iterations, seName);
