@@ -21,7 +21,7 @@ public class AddResultsJDL extends Request {
 	/**
 	 *
 	 */
-	private final JDL jdl;
+	private JDL jdl;
 	private final long queueId;
 
 	private boolean successfulUpdate = false;
@@ -43,6 +43,8 @@ public class AddResultsJDL extends Request {
 	@Override
 	public void run() {
 		successfulUpdate = TaskQueueUtils.addResultsJdl(this.jdl, Long.valueOf(this.queueId));
+
+		this.jdl = null;
 	}
 
 	@Override

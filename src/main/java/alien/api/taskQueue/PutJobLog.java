@@ -18,8 +18,8 @@ public class PutJobLog extends Request {
 	 */
 	private static final long serialVersionUID = -6330031807464568555L;
 	private final long jobnumber;
-	private final String tag;
-	private final String message;
+	private String tag;
+	private String message;
 
 	/**
 	 * @param jobnumber
@@ -40,6 +40,7 @@ public class PutJobLog extends Request {
 	@Override
 	public void run() {
 		TaskQueueUtils.putJobLog(jobnumber, tag, message, null);
+		tag = message = null;
 	}
 
 	@Override

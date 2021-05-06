@@ -22,7 +22,7 @@ public class SubmitJob extends Request {
 	 */
 	private static final long serialVersionUID = 7349968366381661013L;
 
-	private final JDL jdl;
+	private JDL jdl;
 	private long jobID = 0;
 
 	/**
@@ -49,6 +49,9 @@ public class SubmitJob extends Request {
 		}
 		catch (final IOException ioe) {
 			throw new IllegalArgumentException(ioe.getMessage());
+		}
+		finally {
+			jdl = null;
 		}
 	}
 
