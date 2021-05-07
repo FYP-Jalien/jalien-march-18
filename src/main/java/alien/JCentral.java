@@ -39,6 +39,8 @@ public class JCentral {
 			JAKeyStore.loadKeyStore();
 			TomcatServer.startTomcatServer();
 
+			JOptimizers optimizers = new JOptimizers();
+
 			if (ConfigUtils.getConfig().getb("jalien.nio", false))
 				DispatchSSLServerNIO.runService();
 			else
