@@ -704,7 +704,7 @@ public class TaskQueueUtils {
 				q = "SELECT status FROM QUEUE where queueId=?;";
 
 			db.setReadOnly(true);
-			db.setQueryTimeout(600);
+			db.setQueryTimeout(120);
 
 			final int queryRetriesMax = 3;
 			for (int retries = 0;; retries++) {
@@ -726,6 +726,13 @@ public class TaskQueueUtils {
 				}
 				finally {
 					limiter.release();
+				}
+
+				try {
+					Thread.sleep(1000 * (retries + 1) * (retries + 1));
+				}
+				catch (@SuppressWarnings("unused") InterruptedException e) {
+					return false;
 				}
 			}
 
@@ -772,7 +779,7 @@ public class TaskQueueUtils {
 				q = "UPDATE QUEUE SET status=? WHERE queueId=?;";
 			}
 
-			db.setQueryTimeout(600);
+			db.setQueryTimeout(120);
 
 			for (int retries = 0;; retries++) {
 				try {
@@ -792,6 +799,13 @@ public class TaskQueueUtils {
 				}
 				finally {
 					limiter.release();
+				}
+
+				try {
+					Thread.sleep(1000 * (retries + 1) * (retries + 1));
+				}
+				catch (@SuppressWarnings("unused") InterruptedException e) {
+					return false;
 				}
 			}
 
