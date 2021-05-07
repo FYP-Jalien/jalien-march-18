@@ -79,9 +79,13 @@ public class DispatchSSLServerNIO implements Runnable {
 	/**
 	 * Thread pool handling messages
 	 */
-	private static ThreadPoolExecutor executor = new CachedThreadPool(200, 1, TimeUnit.MINUTES, (r) -> new Thread(r, "DispatchSSLServerNIO - " + threadNo.incrementAndGet()));
+	private static final int executorMaxSize = ConfigUtils.getConfig().geti(DispatchSSLServerNIO.class.getCanonicalName() + ".executorMaxSize", 100);
 
-	private static ThreadPoolExecutor sslExecutor = new CachedThreadPool(32, 1, TimeUnit.MINUTES, (r) -> new Thread(r, "SSLNegociator- " + sslThreadNo.incrementAndGet()));
+	private static final int sslExecutorMaxSize = ConfigUtils.getConfig().geti(DispatchSSLServerNIO.class.getCanonicalName() + ".sslExecutorMaxSize", 16);
+
+	private static ThreadPoolExecutor executor = new CachedThreadPool(executorMaxSize, 1, TimeUnit.MINUTES, (r) -> new Thread(r, "DispatchSSLServerNIO - " + threadNo.incrementAndGet()));
+
+	private static ThreadPoolExecutor sslExecutor = new CachedThreadPool(sslExecutorMaxSize, 1, TimeUnit.MINUTES, (r) -> new Thread(r, "SSLNegociator- " + sslThreadNo.incrementAndGet()));
 
 	private static final int defaultPort = 8098;
 	private static String serviceName = "apiService";
@@ -155,6 +159,8 @@ public class DispatchSSLServerNIO implements Runnable {
 
 	private PipedOutputStream pos = null;
 	private PipedInputStream pis = null;
+
+	private long lastActive = System.currentTimeMillis();
 
 	private class ByteBufferOutputStream extends OutputStream {
 		private ByteBuffer buffer = ByteBuffer.allocate(1024);
@@ -456,6 +462,8 @@ public class DispatchSSLServerNIO implements Runnable {
 		}
 		finally {
 			isActive.set(false);
+
+			lastActive = System.currentTimeMillis();
 		}
 	}
 
@@ -670,7 +678,25 @@ public class DispatchSSLServerNIO implements Runnable {
 					return;
 				}
 
+				// serverSelector.wakeup();
+
 				Thread.sleep(60000);
+
+				final long maxIdleTime = ConfigUtils.getConfig().geti("alien.api.DispatchSSLServer.idleTimeout_seconds", 900) * 1000L;
+
+				final long referenceTime = System.currentTimeMillis() - maxIdleTime;
+
+				for (DispatchSSLServerNIO instance : sessionMap.values()) {
+					if (instance.lastActive < referenceTime && !instance.isActive.get()) {
+						try {
+							logger.log(Level.WARNING, "Closing idle connection: " + instance.remoteIdentity.getName() + "@" + instance.remoteIdentity.getRemoteEndpoint());
+							instance.cleanup();
+						}
+						catch (Throwable t) {
+							logger.log(Level.WARNING, "Exception closing an idle connection", t);
+						}
+					}
+				}
 			}
 
 		}
