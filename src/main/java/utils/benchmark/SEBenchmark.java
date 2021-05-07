@@ -204,7 +204,6 @@ public class SEBenchmark {
 
 		startup = System.currentTimeMillis();
 
-		Factory.xrootd.setDebugLevel(3);
 		ConfigUtils.setApplicationName(SEBenchmark.class.getCanonicalName());
 
 		for (int i = 0; i < threads; i++) {
