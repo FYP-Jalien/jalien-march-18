@@ -14,7 +14,9 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import alien.catalogue.LFN;
 import alien.catalogue.access.AuthorizationFactory;
+import alien.config.ConfigUtils;
 import alien.io.IOUtils;
+import alien.io.protocols.Factory;
 import alien.monitoring.Timing;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.user.AliEnPrincipal;
@@ -201,6 +203,9 @@ public class SEBenchmark {
 		final List<UploadThread> tList = new ArrayList<>(threads);
 
 		startup = System.currentTimeMillis();
+
+		Factory.xrootd.setDebugLevel(3);
+		ConfigUtils.setApplicationName(SEBenchmark.class.getCanonicalName());
 
 		for (int i = 0; i < threads; i++) {
 			final UploadThread ut = new UploadThread(iterations, seName);
