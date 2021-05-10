@@ -690,7 +690,7 @@ public class TextCache extends HttpServlet {
 	 * @throws IOException
 	 */
 	public static String invalidateCache(final String ns, final String... pattern) throws IOException {
-		final String url = ConfigUtils.getConfig().gets("alien.servlets.TextCache.URL", "http://aliendb3.cern.ch:8888/TextCache");
+		final String url = ConfigUtils.getConfig().gets("alien.servlets.TextCache.URL", "http://alice-cache.cern.ch:8888/TextCache");
 
 		if (url.trim().length() == 0)
 			return null;
