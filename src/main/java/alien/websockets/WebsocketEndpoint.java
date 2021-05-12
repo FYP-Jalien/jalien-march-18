@@ -245,7 +245,7 @@ public class WebsocketEndpoint extends Endpoint {
 		else
 			remoteHostAddress = null;
 
-		commander = new JAliEnCOMMander(userIdentity, null, getSite(remoteHostAddress), null);
+		commander = new JAliEnCOMMander(userIdentity, null, getSite(remoteHostAddress), null, serverConfig.getUserProperties());
 
 		final SessionContext context = new SessionContext(this, session, commander.getUser().getUserCert()[0].getNotAfter().getTime());
 

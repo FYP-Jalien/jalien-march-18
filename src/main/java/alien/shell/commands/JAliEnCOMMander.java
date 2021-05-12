@@ -13,6 +13,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -220,6 +221,17 @@ public class JAliEnCOMMander implements Runnable {
 	 * @param out
 	 */
 	public JAliEnCOMMander(final AliEnPrincipal user, final LFN curDir, final String site, final UIPrintWriter out) {
+		this(user, curDir, site, out, null);
+	}
+
+	/**
+	 * @param user
+	 * @param curDir
+	 * @param site
+	 * @param out
+	 * @param userProperties
+	 */
+	public JAliEnCOMMander(final AliEnPrincipal user, final LFN curDir, final String site, final UIPrintWriter out, final Map<String, Object> userProperties) {
 		c_api = new CatalogueApiUtils(this);
 
 		q_api = new TaskQueueApiUtils(this);
@@ -259,7 +271,7 @@ public class JAliEnCOMMander implements Runnable {
 		for (final String s : hiddenCommandList)
 			userAvailableCommands.remove(s);
 
-		bootMessage();
+		bootMessage(userProperties);
 	}
 
 	/**
@@ -520,7 +532,7 @@ public class JAliEnCOMMander implements Runnable {
 	/**
 	 *
 	 */
-	private void bootMessage() {
+	private void bootMessage(Map<String, Object> userProperties) {
 		logger.log(Level.FINE, "Starting Commander");
 
 		try (RequestEvent event = new RequestEvent(getAccessLogTarget())) {
@@ -536,6 +548,7 @@ public class JAliEnCOMMander implements Runnable {
 					certificates.add(cert.getSubjectX500Principal().getName() + " (expires " + cert.getNotAfter() + ")");
 
 				event.arguments = certificates;
+				event.userProperties = userProperties;
 			}
 		}
 		catch (@SuppressWarnings("unused") final IOException ioe) {

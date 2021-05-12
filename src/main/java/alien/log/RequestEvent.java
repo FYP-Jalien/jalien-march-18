@@ -93,6 +93,11 @@ public class RequestEvent implements Closeable {
 	private final OutputStream os;
 
 	/**
+	 * User-defined connection properties
+	 */
+	public Map<String, Object> userProperties;
+
+	/**
 	 * Create a request event that can be written to the given stream at the end of the execution
 	 * 
 	 * @param os
@@ -165,6 +170,9 @@ public class RequestEvent implements Closeable {
 		values.put("server", ConfigUtils.getLocalHostname());
 		values.put("server_pid", Integer.valueOf(MonitorFactory.getSelfProcessID()));
 		values.put("server_uuid", Request.getVMID());
+
+		if (userProperties != null)
+			userProperties.forEach((k, v) -> values.putIfAbsent(k, v));
 
 		return values;
 	}
