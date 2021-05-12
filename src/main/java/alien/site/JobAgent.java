@@ -897,7 +897,7 @@ public class JobAgent implements Runnable {
 					final String error = checkProcessResources();
 					if (error != null) {
 						logger.log(Level.SEVERE, "Process overusing resources: " + error);
-						commander.q_api.putJobLog(queueId, "trace", "ERROR[FATAL]: Process overusing resources. Killing job!");
+						commander.q_api.putJobLog(queueId, "trace", "ERROR[FATAL]: Process overusing resources. Killing job!. Cause: " + error);
 						t.cancel();
 						killJobWrapperAndPayload(p);
 						return 1;
@@ -987,8 +987,8 @@ public class JobAgent implements Runnable {
 				RES_WORKDIR_SIZE = diskinfo.get(ApMonMonitoringConstants.LJOB_WORKDIR_SIZE);
 
 			if (jobinfo != null) {
-				RES_RMEM = jobinfo.get(ApMonMonitoringConstants.LJOB_PSS);
-				RES_VMEM = Double.valueOf(jobinfo.get(ApMonMonitoringConstants.LJOB_SWAPPSS).doubleValue() + RES_RMEM.doubleValue());
+				RES_RMEM = Double.valueOf(jobinfo.get(ApMonMonitoringConstants.LJOB_PSS).doubleValue() / 1024);
+				RES_VMEM = Double.valueOf(jobinfo.get(ApMonMonitoringConstants.LJOB_SWAPPSS).doubleValue() /1024 + RES_RMEM.doubleValue());
 
 				RES_CPUTIME = jobinfo.get(ApMonMonitoringConstants.LJOB_CPU_TIME);
 				RES_CPUUSAGE = jobinfo.get(ApMonMonitoringConstants.LJOB_CPU_USAGE);
