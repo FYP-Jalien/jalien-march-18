@@ -1,5 +1,6 @@
 package alien.site;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.util.logging.Level;
@@ -42,7 +43,14 @@ public class MachineJobFeatures {
 			return null;
 		}
 
-		try (FileInputStream fis = new FileInputStream(fullPath)) {
+		final File f = new File(fullPath);
+
+		if (!f.exists() || !f.isFile() || !f.canRead()) {
+			logger.log(Level.INFO, "Cannot access MJF file: " + fullPath);
+			return null;
+		}
+
+		try (FileInputStream fis = new FileInputStream(f)) {
 			output = String.valueOf(fis.readAllBytes());
 		}
 		catch (final IOException e) {
@@ -71,14 +79,9 @@ public class MachineJobFeatures {
 	}
 
 	private static String getFeature(final String featureString, final FeatureType type) {
-		String output = null;
-		String resolvedPath = null;
+		final String resolvedPath = resolvePath(featureString, type);
 
-		resolvedPath = resolvePath(featureString, type);
-
-		output = getValueFromFile(resolvedPath);
-
-		return output;
+		return getValueFromFile(resolvedPath);
 	}
 
 	/**
@@ -99,14 +102,11 @@ public class MachineJobFeatures {
 	 * @return feature value as number
 	 */
 	public static Long getFeatureNumber(final String featureString, final FeatureType type) {
-		String output = null;
-		String resolvedPath = null;
+		final String resolvedPath = resolvePath(featureString, type);
 
-		resolvedPath = resolvePath(featureString, type);
+		final String output = getValueFromFile(resolvedPath);
 
-		output = getValueFromFile(resolvedPath);
-
-		System.out.println("Got value " + output);
+		logger.log(Level.INFO, "Got value for " + featureString + " = " + output);
 
 		return output != null ? Long.valueOf(output) : null;
 	}
