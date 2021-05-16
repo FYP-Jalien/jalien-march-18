@@ -13,6 +13,10 @@ import java.util.logging.Logger;
 
 public class LFNCrawler {
     private static Date             currentDate;
+    private static long             directoriesDeleted;
+    private static long             filesDeleted;
+    private static long             reclaimedSpace;
+    private static boolean          dryRun;
     private static final LFNCrawler lfnCrawlerInstance = new LFNCrawler();
     private static final Logger     logger             = ConfigUtils.getLogger(LFNCrawler.class.getCanonicalName());
 
@@ -25,7 +29,18 @@ public class LFNCrawler {
     }
 
     public static void main(String[] args) {
-        currentDate = new Date();
+        dryRun             = false;
+        currentDate        = new Date();
+        directoriesDeleted = 0;
+        filesDeleted       = 0;
+        reclaimedSpace     = 0;
+
+        for (String s: args) {
+            if (s.equals("--dry-run") || s.equals("-d")) {
+                print("dryRun: the LFNs will not be deleted");
+                dryRun = true;
+            }
+        }
 
         print("Starting expired LFN crawling iteration");
 
@@ -55,7 +70,12 @@ public class LFNCrawler {
                         currentDirectory = lfn;
                     } else if (!lfn.getCanonicalName().contains(currentDirectory.getCanonicalName() + "/")) {
                         print("Removing directory recursively: " + currentDirectory.getCanonicalName());
+                        if (!dryRun) {
+                            currentDirectory.delete(true, true);
+                        }
 
+                        reclaimedSpace  += currentDirectory.size;
+                        directoriesDeleted++;
                         currentDirectory = lfn;
                     } else {
                         print("Found subentry: " + lfn.getCanonicalName());
@@ -65,6 +85,12 @@ public class LFNCrawler {
                 // Remove the last directory
                 if (currentDirectory != null) {
                     print("Removing directory recursively: " + currentDirectory.getCanonicalName());
+                    if (!dryRun) {
+                        currentDirectory.delete(true, true);
+                    }
+
+                    reclaimedSpace  += currentDirectory.size;
+                    directoriesDeleted++;
                     currentDirectory = null;
                 }
 
@@ -78,21 +104,30 @@ public class LFNCrawler {
         Set<LFN> processedToDelete = new HashSet<>();
 
         for (final LFN l : lfnsToDelete) {
-            final List<LFN> members = LFNUtils.getArchiveMembers(LFNUtils.getRealLFN(l));
+            print("Parsing LFN: " + l.getCanonicalName());
 
-            print("Parsing lfn: " + l.getCanonicalName());
-            if (members != null) {
-                for (final LFN member : members) {
-                    processedToDelete.add(member);
-                    print("Found archive member: " + member.getCanonicalName());
+            if (!processedToDelete.contains(l)) {
+                final List<LFN> members = LFNUtils.getArchiveMembers(LFNUtils.getRealLFN(l));
+                if (members != null) {
+                    for (final LFN member : members) {
+                        processedToDelete.add(member);
+                        print("Found archive member: " + member.getCanonicalName());
+                    }
                 }
+                processedToDelete.add(l);
             }
-            processedToDelete.add(l);
         }
 
         for (final LFN l : processedToDelete) {
-            print("Removing lfn: " + l.getCanonicalName());
+            print("Removing LFN: " + l.getCanonicalName());
+            if (!dryRun) {
+                l.delete(true, false);
+            }
+
+            reclaimedSpace += l.size;
         }
+
+        filesDeleted += processedToDelete.size();
     }
 
     private static void removeFiles(Collection<IndexTableEntry> indextableCollection) {
@@ -160,5 +195,16 @@ public class LFNCrawler {
 
         print("========== Files iteration ==========");
         removeFiles(indextableCollection);
+
+        print("========== Results ==========");
+        if (dryRun) {
+            print("Directories that would have been deleted: " + directoriesDeleted);
+            print("Files that would have been deleted: " + filesDeleted);
+            print("Space that would have been reclaimed: " + reclaimedSpace);
+        } else {
+            print("Directories deleted: " + directoriesDeleted);
+            print("Files deleted: " + filesDeleted);
+            print("Reclaimed space: " + reclaimedSpace);
+        }
     }
 }
