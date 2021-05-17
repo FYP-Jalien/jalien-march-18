@@ -16,7 +16,6 @@ import alien.catalogue.LFN;
 import alien.catalogue.access.AuthorizationFactory;
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
-import alien.io.protocols.Factory;
 import alien.monitoring.Timing;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.user.AliEnPrincipal;
@@ -108,8 +107,16 @@ public class SEBenchmark {
 			final String testPath = UsersHelper.getHomeDir(account.getDefaultUser()) + "se_test_" + tNo;
 
 			do {
-				if (!cleanupCatalogueFile(testPath))
-					break;
+				if (!cleanupCatalogueFile(testPath)) {
+					try {
+						sleep(1000);
+					}
+					catch (@SuppressWarnings("unused") InterruptedException e) {
+						break;
+					}
+
+					continue;
+				}
 
 				try (Timing timing = new Timing()) {
 					final LFN target = IOUtils.upload(localFile, testPath, account, null, "-S", seName);
