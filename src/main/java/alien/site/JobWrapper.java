@@ -612,13 +612,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	private HashMap<String, String> getJobPackagesEnvironment() {
 		final String voalice = "VO_ALICE@";
 		final StringBuilder packages = new StringBuilder();
-		final HashMap<String, String> packs = (HashMap<String, String>) jdl.getPackages();
+		final Map<String, String> packs = jdl.getPackages();
 		HashMap<String, String> envmap = new HashMap<>();
 
 		logger.log(Level.INFO, "Preparing to install packages");
 		if (packs != null) {
 			for (final Map.Entry<String, String> entry : packs.entrySet())
-				packages.append(voalice + entry.getKey() + "::" + packs.get(entry.getValue()) + ",");
+				packages.append(voalice + entry.getKey() + "::" + entry.getValue() + ",");
 
 			if (!packs.containsKey("APISCONFIG"))
 				packages.append(voalice + "APISCONFIG,");
