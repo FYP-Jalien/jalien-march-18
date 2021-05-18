@@ -269,21 +269,15 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			return null;
 		}
 
-		final Map<String, String> ok = new HashMap<>();
-
-		for (final String pack : packToInstall) {
-			final Map<String, String> env = packMan.installPackage(username, pack, null);
-			if (env == null) {
-				logger.log(Level.INFO, "Error installing the package " + pack);
-				// monitor.sendParameter("ja_status", "ERROR_IP");
-				logger.log(Level.SEVERE, "Error installing " + pack);
-				System.exit(1);
-			}
-
-			ok.putAll(env);
+		final Map<String, String> env = packMan.installPackage(username, String.join(",", packToInstall), null);
+		if (env == null) {
+			logger.log(Level.INFO, "Error installing the package " + packToInstall);
+			// monitor.sendParameter("ja_status", "ERROR_IP");
+			logger.log(Level.SEVERE, "Error installing " + packToInstall);
+			System.exit(1);
 		}
 
-		return ok;
+		return env;
 	}
 
 	private int runJob() {
