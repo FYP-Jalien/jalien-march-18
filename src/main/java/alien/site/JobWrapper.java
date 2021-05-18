@@ -302,11 +302,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				else
 					commander.q_api.putJobLog(queueId, "trace", "Marking the job as ERROR_E since executable exit code was " + execExitCode);
 
-				if (jdl.gets("OutputErrorE") != null)
-					return uploadOutputFiles(JobStatus.ERROR_E) ? execExitCode : -1;
+				// if (jdl.gets("OutputErrorE") != null)
+				return uploadOutputFiles(JobStatus.ERROR_E) ? execExitCode : -1;
 
-				changeStatus(JobStatus.ERROR_E);
-				return execExitCode;
+				// changeStatus(JobStatus.ERROR_E);
+				// return execExitCode;
 			}
 
 			final int valExitCode = validate();
@@ -658,7 +658,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (outDir == null) {
 			logger.log(Level.SEVERE, "Error creating the OutputDir [" + outputDir + "].");
 			commander.q_api.putJobLog(queueId, "trace", "Can't create the output directory " + outputDir);
-			changeStatus(JobStatus.ERROR_SV);
+			if (!exitStatus.toString().contains("ERROR"))
+				changeStatus(JobStatus.ERROR_SV);
 			return false;
 		}
 
@@ -705,7 +706,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 						"A required outputfile for an archive was NOT found! Aborting: " + ex.getMessage());
 				commander.q_api.putJobLog(queueId, "trace",
 						"Error: A required outputfile for an archive was NOT found! Aborting: " + ex.getMessage());
-				changeStatus(JobStatus.ERROR_SV);
+				if (!exitStatus.toString().contains("ERROR"))
+					changeStatus(JobStatus.ERROR_S);
 				return false;
 			}
 		}
@@ -772,7 +774,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 		createAndAddResultsJDL(null); // Not really used. Set to null for now.
 
-		if (!uploadedAllOutFiles) {
+		if (!uploadedAllOutFiles && exitStatus == JobStatus.DONE) {
 			changeStatus(JobStatus.ERROR_SV);
 			return false;
 		} // else
@@ -995,8 +997,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	private ArrayList<String> getOutputTags(final JobStatus exitStatus) {
 		final ArrayList<String> tags = new ArrayList<>();
 
-		if (exitStatus == JobStatus.ERROR_E)
+		if (exitStatus == JobStatus.ERROR_E) {
+			if (jdl.gets("OutputErrorE") == null) {
+				commander.q_api.putJobLog(queueId, "trace", "No output given for ERROR_E in JDL. Defaulting to std*");
+				jdl.set("OutputErrorE", "log_archive.zip:std*@disk=1"); // set a default if nothing is provided
+			}
 			tags.add("OutputErrorE");
+		}
 		else {
 			if (jdl.gets("OutputArchive") != null)
 				tags.add("OutputArchive");
