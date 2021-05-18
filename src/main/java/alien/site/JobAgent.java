@@ -900,7 +900,7 @@ public class JobAgent implements Runnable {
 						commander.q_api.putJobLog(queueId, "trace", "ERROR[FATAL]: Process overusing resources. Killing job!. Cause: " + error);
 					//	t.cancel();
 					//	killJobWrapperAndPayload(p);
-						return 1;
+					//	return 1;
 					}
 					if (monitor_loops == 120) {
 						monitor_loops = 0;
