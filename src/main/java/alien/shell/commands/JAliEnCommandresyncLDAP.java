@@ -14,8 +14,7 @@ public class JAliEnCommandresyncLDAP extends JAliEnBaseCommand {
 
 	@Override
 	public void run() {
-		commander.printOutln("Starting resyncLDAP ");
-		final PeriodicOptimiser opt = new PeriodicOptimiser();
+		commander.printOutln("Starting manual resyncLDAP ");
 		try (DBFunctions db = ConfigUtils.getDB("alice_users"); DBFunctions db2 = ConfigUtils.getDB("ADMIN");) {
 			if (db == null || db2 == null) {
 				logger.log(Level.INFO, "Could not get DBs!");
@@ -24,9 +23,9 @@ public class JAliEnCommandresyncLDAP extends JAliEnBaseCommand {
 
 			PeriodicOptimiser.checkLdapSyncTable(db);
 
-			opt.manualResyncLDAP();
+			PeriodicOptimiser.manualResyncLDAP();
 
-			commander.printOutln("resyncLDAP completed");
+			commander.printOutln("Manual esyncLDAP completed");
 		}
 
 	}
