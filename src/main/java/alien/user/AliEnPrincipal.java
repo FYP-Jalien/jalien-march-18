@@ -59,7 +59,7 @@ public class AliEnPrincipal implements Principal, Serializable {
 	 *
 	 * @param username
 	 */
-	AliEnPrincipal(final String username) {
+	public AliEnPrincipal(final String username) {
 		this.username = StringFactory.get(username);
 		this.defaultUser = StringFactory.get(username);
 		this.usercert = null;

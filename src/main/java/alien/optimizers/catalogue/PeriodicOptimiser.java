@@ -7,9 +7,13 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import alien.catalogue.LFN;
+import alien.catalogue.LFNUtils;
 import alien.config.ConfigUtils;
 import alien.optimizers.Optimizer;
+import alien.user.AliEnPrincipal;
 import alien.user.LDAPHelper;
+import alien.user.UsersHelper;
 import lazyj.DBFunctions;
 
 /**
@@ -33,7 +37,7 @@ public class PeriodicOptimiser extends Optimizer {
 	 */
 	private static AtomicBoolean periodic = new AtomicBoolean(true);
 
-	String[] classnames = { "users", "roles", "SEs" };
+	private static String[] classnames = { "users", "roles", "SEs" };
 
 	@Override
 	public void run() {
@@ -46,9 +50,12 @@ public class PeriodicOptimiser extends Optimizer {
 			}
 			checkLdapSyncTable(usersdb);
 			while (true) {
-
-				resyncLDAP(usersdb, admindb);
-
+				try {
+					resyncLDAP(usersdb, admindb);
+				}
+				catch (Exception e) {
+					e.printStackTrace();
+				}
 				try {
 					synchronized (requestSync) {
 						logger.log(Level.INFO, "Periodic sleeps " + this.getSleepPeriod());
@@ -56,7 +63,8 @@ public class PeriodicOptimiser extends Optimizer {
 					}
 				}
 				catch (final InterruptedException e) {
-					e.printStackTrace();
+					logger.log(Level.WARNING, "The periodic optimiser has been forced to exit");
+					break;
 				}
 			}
 		}
@@ -67,29 +75,20 @@ public class PeriodicOptimiser extends Optimizer {
 	 */
 	public static void checkLdapSyncTable(DBFunctions db) {
 		String sqlLdapDB = "CREATE TABLE IF NOT EXISTS `LDAP_SYNC` (`class` varchar(15) COLLATE latin1_general_cs NOT NULL, "
-				+ "`lastUpdate` double NOT NULL, `frequency` int(11) NOT NULL, PRIMARY KEY (`class`)) "
+				+ "`lastUpdate` bigInt NOT NULL, `frequency` int(11) NOT NULL, PRIMARY KEY (`class`)) "
 				+ "ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_general_cs;";
-		if (!db.query(sqlLdapDB)) {
+		if (!db.query(sqlLdapDB))
 			logger.log(Level.SEVERE, "Could not create table: LDAP_SYNC " + sqlLdapDB);
-			return;
-		}
 	}
 
 	/**
 	 * Manual instruction for the resyncLDAP
 	 */
 	public static void manualResyncLDAP() {
-		try (DBFunctions usersdb = ConfigUtils.getDB("alice_users"); DBFunctions admindb = ConfigUtils.getDB("ADMIN");) {
-			if (usersdb == null || admindb == null) {
-				logger.log(Level.INFO, "Could not get DBs!");
-				return;
-			}
-			checkLdapSyncTable(usersdb);
-			synchronized (requestSync) {
-				logger.log(Level.INFO, "Started manual resyncLDAP");
-				periodic.set(false);
-				requestSync.notifyAll();
-			}
+		synchronized (requestSync) {
+			logger.log(Level.INFO, "Started manual resyncLDAP");
+			periodic.set(false);
+			requestSync.notifyAll();
 		}
 	}
 
@@ -99,9 +98,9 @@ public class PeriodicOptimiser extends Optimizer {
 	 * @param usersdb Database instance for SE, SE_VOLUMES and LDAP_SYNC tables
 	 * @param admindb Database instance for USERS_LDAP and USERS_LDAP_ROLE tables
 	 */
-	private void resyncLDAP(DBFunctions usersdb, DBFunctions admindb) {
+	private static void resyncLDAP(DBFunctions usersdb, DBFunctions admindb) {
 		Long timestamp = Long.valueOf(System.currentTimeMillis());
-		final int frequency = 60000; // To change
+		final int frequency = 60000; // To change (1 hour default)
 
 		logger.log(Level.INFO, "Checking if an LDAP resynchronisation is needed");
 		usersdb.setReadOnly(false);
@@ -152,7 +151,6 @@ public class PeriodicOptimiser extends Optimizer {
 	public static void updateUsers(DBFunctions db) {
 		logger.log(Level.INFO, "Synchronising DB users with LDAP");
 		String ouHosts = "ou=People,";
-		db.query("UPDATE USERS_LDAP SET up=0");
 
 		// Insertion of the users
 		final Set<String> uids = LDAPHelper.checkLdapInformation("(objectClass=pkiUser)", ouHosts, "uid", false);
@@ -161,12 +159,27 @@ public class PeriodicOptimiser extends Optimizer {
 		if (length == 0)
 			logger.log(Level.WARNING, "No users gotten from LDAP");
 
+		// TODO: To be done with replace into
+		db.query("UPDATE USERS_LDAP SET up=0");
 		for (String user : uids) {
 			final Set<String> dns = LDAPHelper.checkLdapInformation("uid=" + user, ouHosts, "subject", false);
 			for (String dn : dns) {
-				db.query("REPLACE INTO USERS_LDAP (user, dn, up) VALUES (?, ?, 1)", false, user, dn);
+				// db.query("REPLACE INTO USERS_LDAP (user, dn, up) VALUES (?, ?, 1)", false, user, dn);
+				db.query("INSERT INTO USERS_LDAP (user, dn, up) VALUES (?, ?, 1)", false, user, dn);
+			}
+
+			String homeDir = UsersHelper.getHomeDir(user);
+			LFN userHome = LFNUtils.getLFN(homeDir);
+			if (userHome == null || !userHome.exists) {
+				AliEnPrincipal adminUser = new AliEnPrincipal("admin");
+				userHome = LFNUtils.mkdirs(adminUser, homeDir);
+			}
+			if (userHome != null) {
+				AliEnPrincipal newUser = new AliEnPrincipal(user);
+				userHome.chown(newUser);
 			}
 		}
+		db.query("select a.user from USERS_LDAP a left join USERS_LDAP b on b.up=0 and a.user=b.user where a.up=1 and b.user is null");
 	}
 
 	/**
@@ -177,7 +190,6 @@ public class PeriodicOptimiser extends Optimizer {
 	public static void updateRoles(DBFunctions db) {
 		logger.log(Level.INFO, "Synchronising DB roles with LDAP");
 		String ouRoles = "ou=Roles,";
-		db.query("UPDATE USERS_LDAP_ROLE SET up=0");
 
 		// Insertion of the roles
 		final Set<String> roles = LDAPHelper.checkLdapInformation("(objectClass=AliEnRole)", ouRoles, "uid", false);
@@ -186,20 +198,24 @@ public class PeriodicOptimiser extends Optimizer {
 		if (length == 0)
 			logger.log(Level.WARNING, "No roles gotten from LDAP");
 
-		for (String user : roles) {
-			final Set<String> dns = LDAPHelper.checkLdapInformation("uid=" + user, ouRoles, "users", false);
-			for (String dn : dns) {
-				db.query("REPLACE INTO USERS_LDAP_ROLE (user, role, up) VALUES (?, ?, 1)", false, dn, user);
+		// TODO: To be done with replace into
+		db.query("UPDATE USERS_LDAP_ROLE SET up=0");
+		for (String role : roles) {
+			final Set<String> users = LDAPHelper.checkLdapInformation("uid=" + role, ouRoles, "users", false);
+			for (String user : users) {
+				db.query("SELECT count(*) from `USERS_LDAP` WHERE user = ?", false, user);
+				if (db.moveNext()) {
+					int userInstances = db.geti(1);
+					if (userInstances == 0) {
+						logger.log(Level.WARNING, "An already deleted user is still associated with role " + role + ". Consider cleaning ldap");
+					}
+					else {
+						db.query("INSERT INTO USERS_LDAP_ROLE (user, role, up) VALUES (?, ?, 1)", false, user, role);
+					}
+				}
 			}
 		}
-		//Here it performs something of adding users ... Needed?
-		/* $self->info("And let's add the new users");
-    	my $newUsers=$addbh->queryColumn("select a.". $addbh->reservedWord("user")." from USERS_LDAP a left join USERS_LDAP b on b.up=0 and
- 			a.". $addbh->reservedWord("user")."=b.". $addbh->reservedWord("user")." where a.up=1 and b.". $addbh->reservedWord("user")." is null");
-    	foreach my $u (@$newUsers){
-      	$self->info("Adding the user $u");
-      	$self->f_addUser($u);
-    }*/
+		db.query("select a.role from USERS_LDAP_ROLE a left join USERS_LDAP_ROLE b on b.up=0 and a.role=b.role where a.up=1 and b.role is null");
 	}
 
 	/**
@@ -209,15 +225,13 @@ public class PeriodicOptimiser extends Optimizer {
 	 */
 	public static void updateSEs(DBFunctions db) {
 		logger.log(Level.INFO, "Synchronising DB SEs and volumes with LDAP");
-		String ouSE = "ou=Sites,";
-//		ArrayList<String> oldEntries = new ArrayList<>();
-		ArrayList<String> newSEs = new ArrayList<>();
+		String ouSites = "ou=Sites,";
 
-		final Set<String> dns = LDAPHelper.checkLdapInformation("(objectClass=AliEnSE)", ouSE, "dn", true);
+		final Set<String> dns = LDAPHelper.checkLdapInformation("(objectClass=AliEnSE)", ouSites, "dn", true);
 		ArrayList<String> seNames = new ArrayList<>();
 		ArrayList<String> sites = new ArrayList<>();
 
-		//From the dn we get the seName and site
+		// From the dn we get the seName and site
 		Iterator<String> itr = dns.iterator();
 		while (itr.hasNext()) {
 			String dn = itr.next();
@@ -228,9 +242,10 @@ public class PeriodicOptimiser extends Optimizer {
 			String[] entries = dn.split("[=,]");
 			if (entries.length >= 8) {
 				seNames.add(entries[1]);
-				sites.add(entries[7]);
+				sites.add(entries[entries.length - 1]);
 			}
 		}
+
 		int length = seNames.size();
 		if (length == 0)
 			logger.log(Level.WARNING, "No ses gotten from LDAP");
@@ -239,23 +254,17 @@ public class PeriodicOptimiser extends Optimizer {
 			String site = sites.get(ind);
 			String se = seNames.get(ind);
 
-			//This will be the base dn for the SE
-			String ouSe = "ou=SE,ou=Services,ou=" + site + ",ou=Sites,";
+			// This will be the base dn for the SE
+			String ouSE = "ou=SE,ou=Services,ou=" + site + ",ou=Sites,";
 
 			String vo = "ALICE";
 			String seName = vo + "::" + site + "::" + se;
 
-			checkSEDescription(db, ouSe, se, seName);
-			checkIODaemons(db, ouSe, se, seName);
-			// checkFTDProtocol(ouSE, se, db);
-
 			final String t = getLdapContentSE(ouSE, se, "mss");
 			final String host = getLdapContentSE(ouSE, se, "host");
-			newSEs.add(seName);
 
 			final Set<String> savedir = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "savedir");
 			for (String path : savedir) {
-				boolean found = false;
 				String size = "-1";
 				logger.log(Level.INFO, "Checking the path of " + path);
 				if (path.matches(".*,\\d+")) {
@@ -263,215 +272,74 @@ public class PeriodicOptimiser extends Optimizer {
 					path = path.split(",")[0];
 				}
 
-				db.query("select * from SE_VOLUMES where upper(seName)=upper(?)", true, seName);
-				while (db.moveNext()) {
-					String mountpoint = db.gets("mountpoint");
-					newSEs.remove(seName);
-					if (!mountpoint.equals(path))
-						continue;
-					found = true;
-					logger.log(Level.INFO, "The path already existed");
-					String sizedb = db.gets("sizedb");
-					if (sizedb.equals(size))
-						continue;
-					logger.log(Level.INFO, "The size is different (" + size + " and " + sizedb + ")");
-					db.query("update SE_VOLUMES set size=? where mountpoint=? and sename=?", false, size, mountpoint, seName);
-				}
-
-				if (found)
-					continue;
-
-				/*
-				 * if (host == null || host == "") {
-				 * logger.log(Level.INFO, "The host did not exist. Going to check if it can be gotten from its parent");
-				 * // do I have to check that? And from where do I take the dn?
-				 * }
-				 */
 				logger.log(Level.INFO, "Need to add the volume " + path);
 				String method = t.toLowerCase() + "://" + host;
-				db.query("insert into SE_VOLUMES(sename,volume,method,mountpoint,size) values (?,?,?,?,?)", false,
+				db.query("REPLACE INTO SE_VOLUMES(sename,volume,method,mountpoint,size) values (?,?,?,?,?)", false,
 						seName, path, method, path, size);
 			}
-			/*
-			 * for (String oldEntry : oldEntries) {
-			 * logger.log(Level.INFO, "The path " + oldEntry + " is not used any more");
-			 * db.query("update SE_VOLUMES set size=usedspace where mountpoint=? and upper(sename)=upper(?)",
-			 * false, oldEntry, seName);
-			 * }
-			 */
 
-		}
-		for (String newSE : newSEs) {
-			logger.log(Level.INFO, "The SE " + newSE + " is new. We have to add it");
-			db.query("SELECT max(seNumber)+1 FROM SE", false);
-			int seNumber = 0;
-			if (db.moveNext()) {
-				seNumber = db.geti(1);
-				logger.log(Level.INFO, "SE number " + seNumber + " for se " + newSE);
+			final String iodaemons = getLdapContentSE(ouSE, se, "iodaemons");
+			String[] temp = iodaemons.split(":");
+			String seioDaemons = "";
+			if (temp.length > 2) {
+				String proto = temp[0];
+				proto = proto.replace("xrootd", "root");
+				String hostName = "";
+				String port = "";
+				hostName = temp[1];
+				if (!hostName.matches("host=([^:]+)(:.*)?$")) {
+					logger.log(Level.INFO, "Error getting the host name from " + seName);
+					seioDaemons = "NULL";
+				}
+				hostName = hostName.split("=")[1];
+
+				port = temp[2];
+				if (!port.matches("port=(\\d+)")) {
+					logger.log(Level.INFO, "Error getting the port for " + seName);
+					seioDaemons = "NULL";
+				}
+				port = port.split("=")[1];
+
+				if (!seioDaemons.equals("NULL")) {
+					seioDaemons = proto + "://" + hostName + ":" + port;
+					logger.log(Level.INFO, "Using proto = " + proto + " host = " + hostName + " and port = " + port + " for " + seName);
+				}
 			}
 
-			if (!db.query("insert into SE(seName, seNumber) values (?, ?)", false, newSE, Integer.valueOf(seNumber))) {
-				logger.log(Level.INFO, "Error adding the entry");
+			String path = getLdapContentSE(ouSE, se, "savedir");
+			if (path.equals("")) {
+				logger.log(Level.INFO, "Error getting the savedir for " + seName);
 				return;
 			}
-			logger.log(Level.INFO, "Added entry");
+
+			if (path.matches(".*,\\d+")) {
+				path = path.split(",")[0];
+			}
+
+			String minSize = "0";
+
+			final Set<String> options = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "options");
+			for (String option : options) {
+				if (option.matches("min_size\\s*=\\s*(\\d+)")) {
+					minSize = option.split("=")[1];
+				}
+			}
+
+			final String mss = getLdapContentSE(ouSE, se, "mss");
+			final String qos = getLdapContentSE(ouSE, se, "Qos");
+			final String seExclusiveWrite = getLdapContentSE(ouSE, se, "seExclusiveWrite");
+			final String seExclusiveRead = getLdapContentSE(ouSE, se, "seExclusiveRead");
+			final String seVersion = getLdapContentSE(ouSE, se, "seVersion");
+
+			db.query("REPLACE INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
+					+ "values (?,?,?,?,?,?,?,?,?)", false, seName, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
+					seioDaemons);
+			logger.log(Level.INFO, "Added or updated entry for SE " + seName);
 		}
+
 		db.query("update SE_VOLUMES set usedspace=0 where usedspace is null");
 		db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
 		db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
-	}
-
-	/*
-	 * private static void checkFTDProtocol(String ouSE, String se, DBFunctions db) {
-	 * final Set<String> ftdprotocol = LDAPHelper.checkLdapInformation("name="+se, ouSE, "ftdprotocol");
-	 * logger.log(Level.INFO, "DBG: Gotten the ldap ftdprotocol info " + se + " " + ftdprotocol.toString());
-	 * for (String protocol : ftdprotocol) {
-	 * logger.log(Level.INFO, "DBG: Protocol " + protocol);
-	 * String[] splitted = protocol.split(" +");
-	 * logger.log(Level.INFO, "DBG: Protocol array length" + splitted.length);
-	 * String name = splitted[0];
-	 * logger.log(Level.INFO, "DBG: Protocol array " + splitted[0]);
-	 * String options = "";
-	 * if (splitted.length > 1)
-	 * options = splitted[1];
-	 * logger.log(Level.INFO, "Inserting " + name + " and " + options);
-	 * String maxTransfers = "0";
-	 * if (options != null && options != "") {
-	 * if (options.matches("\\s*transfers=(\\d+)\\s*")) {
-	 * maxTransfers = options.split("=")[1];
-	 * //Does something more with options
-	 * }
-	 * }
-	 * //insert Protocol function
-	 * //db.query("insert into PROTOCOLS (sename, protocol, maxtransfers) values (?, ?, ?)", false, se, name, maxTransfers);
-	 * }
-	 * final Set<String> deleteprotocol = LDAPHelper.checkLdapInformation("name="+se, ouSE, "deleteprotocol");
-	 * logger.log(Level.INFO, "DBG: Gotten the ldap deleteprotocol info " + se + " " + deleteprotocol.toString());
-	 * for (String protocol : deleteprotocol) {
-	 * String name = protocol.split(" ")[0];
-	 * //db.query("insert into PROTOCOLS (sename, protocol, deleteprotocol) values (?, ?, ?)", false, se, name, 1);
-	 * //insert Protocol function -- WHERE IS THIS FUNCTION
-	 * }
-	 * }
-	 */
-
-	/**
-	 * Gets the IODaemons from LDAP and adds them to the database
-	 *
-	 * @param Database instance
-	 * @param ouSE Prefix for the DN of the SE
-	 * @param se SE name in the LDAP system
-	 * @param seName SE identifier in the database (vo:site:se)
-	 */
-	private static void checkIODaemons(DBFunctions db, String ouSE, String se, String seName) {
-		final String iodaemons = getLdapContentSE(ouSE, se, "iodaemons");
-		String[] temp = iodaemons.split(":");
-		String seioDaemons = "NULL";
-		if (temp.length > 2) {
-			String proto = temp[0];
-			String host = "";
-			String port = "";
-			host = temp[1];
-			if (!host.matches("host=([^:]+)(:.*)?$")) {
-				logger.log(Level.INFO, "Error getting the host name from " + seName);
-				return;
-			}
-			host = host.split("=")[1];
-
-			port = temp[2];
-			if (!port.matches("port=(\\d+)")) {
-				logger.log(Level.INFO, "Error getting the port for " + seName);
-				return;
-			}
-			port = port.split("=")[1];
-
-			// Missing something with the proto variable
-			seioDaemons = proto + "://" + host + ":" + port;
-			logger.log(Level.INFO, "Using proto = " + proto + " host = " + host + " and port = " + port + " for " + seName);
-		}
-
-		final String savedir = getLdapContentSE(ouSE, se, "savedir");
-		if (savedir.equals("")) {
-			logger.log(Level.INFO, "Error getting the savedir for " + seName);
-			return;
-		}
-
-		logger.log(Level.INFO, "And the update for " + seName + "should be: " + seioDaemons + ", " + savedir);
-
-		// Missing something with the path variable ( $path=~ s/,.*$//; )
-		String path = savedir;
-
-		//db.query("SELECT sename,seioDaemons,sestoragepath from SE where upper(seName)=upper(?)",
-		//		false, seName);
-
-		if (path.matches(".*,\\d+")) {
-			path = path.split(",")[0];
-		}
-		// Is anything missing in path2 variable?
-		String path2 = "/";
-
-		db.query("SELECT count(*) from SE where upper(seName)=upper(?) and seioDaemons=? "
-				+ "and ( seStoragePath=? or sestoragepath=?)", false, seName, seioDaemons, path, path2);
-
-		if (db.moveNext()) {
-			int valuecounts = db.geti(1);
-			logger.log(Level.INFO, "***Updating the information of " + seName + " with " + valuecounts +
-					" counts");
-			db.query("SELECT seNumber from SE where upper(seName)=upper(?)", false, seName);
-
-			if (db.moveNext()) {
-				int seNumber = db.geti(1);
-				if (seNumber == -1) {
-					logger.log(Level.INFO, "The se " + seName + " does not exist");
-				} else {
-					if (!db.query("UPDATE SE set seName=?, seStoragePath=?, seioDaemons=? WHERE upper(seName)=upper(?)",
-							false, seName, path, seioDaemons, seName)) {
-						logger.log(Level.INFO, "Error updating " + seName + " with seStoragePath " + path
-								+ " and seioDaemons " + seioDaemons);
-					}
-				}
-			}
-		}
-	}
-
-	/**
-	 * Gets the SE description from LDAP and adds it to the database
-	 *
-	 * @param Database instance
-	 * @param ouSE Prefix for the DN of the SE
-	 * @param se SE name in the LDAP system
-	 * @param seName SE identifier in the database (vo:site:se)
-	 */
-	private static void checkSEDescription(DBFunctions db, String ouSE, String se, String seName) {
-		String minSize = "0";
-
-		final Set<String> options = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "options");
-		for (String option : options) {
-			if (option.matches("min_size\\s*=\\s*(\\d+)")) {
-				minSize = option.split("=")[1];
-			}
-		}
-
-		final String mss = getLdapContentSE(ouSE, se, "mss");
-		final String qos = getLdapContentSE(ouSE, se, "Qos");
-		final String seExclusiveWrite = getLdapContentSE(ouSE, se, "seExclusiveWrite");
-		final String seExclusiveRead = getLdapContentSE(ouSE, se, "seExclusiveRead");
-		final String seVersion = getLdapContentSE(ouSE, se, "seVersion");
-
-		logger.log(Level.INFO, "The se " + seName + " has " + minSize + " and " + mss + " and " + qos +
-				" and ex-write: " + seExclusiveWrite + " and ex-rad: " + seExclusiveRead);
-
-		db.query("select count(*) from SE where upper(sename)=upper(?) and seMinSize=? and seType=? and seQoS=? "
-				+ "and seExclusiveWrite=? and seExclusiveRead=? and seVersion=?", false, seName, minSize, mss, qos, seExclusiveWrite,
-				seExclusiveRead, seVersion);
-		if (db.moveNext()) {
-			int counts = db.geti(1);
-			if (counts == 0) {
-				logger.log(Level.INFO, "We have to update the entry");
-				db.query("update SE set seMinSize=?, seType=?, seQoS=?, seExclusiveWrite=?, seExclusiveRead=? , seVersion=? where seName=?",
-						false, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, seName);
-			}
-		}
 	}
 
 	private static String getLdapContentSE(String ouSE, String se, String parameter) {
