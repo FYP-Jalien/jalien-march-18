@@ -26,7 +26,6 @@ import java.io.StringReader;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -561,8 +560,6 @@ public class Xrootd extends Protocol {
 
 			command.add(xrdcpPath);
 
-			command.addAll(getCommonArguments(applicationName));
-
 			/*
 			 * TODO: enable when servers support checksum queries, at the moment most don't if (xrootdNewerThan4 && guid.md5 != null && guid.md5.length() > 0) { command.add("-C"); command.add("md5:" +
 			 * guid.md5); }
@@ -573,11 +570,18 @@ public class Xrootd extends Protocol {
 			if (pfn.ticket != null && pfn.ticket.envelope != null)
 				transactionURL = pfn.ticket.envelope.getTransactionURL();
 
+			String opaqueParams = "-OS";
+
 			if (pfn.ticket != null && pfn.ticket.envelope != null)
 				if (pfn.ticket.envelope.getEncryptedEnvelope() != null)
-					command.add("-OS&authz=" + pfn.ticket.envelope.getEncryptedEnvelope());
+					opaqueParams += "authz=" + pfn.ticket.envelope.getEncryptedEnvelope();
 				else if (pfn.ticket.envelope.getSignedEnvelope() != null)
-					command.add("-OS" + pfn.ticket.envelope.getSignedEnvelope());
+					opaqueParams += pfn.ticket.envelope.getSignedEnvelope();
+
+			opaqueParams = decorateOpaqueParams(opaqueParams, applicationName);
+
+			if (opaqueParams.length() > 4)
+				command.add(opaqueParams);
 
 			command.add(transactionURL);
 			command.add(target.getCanonicalPath());
@@ -745,8 +749,6 @@ public class Xrootd extends Protocol {
 
 			command.add(xrdcpPath);
 
-			command.addAll(getCommonArguments(applicationName));
-
 			// no progress bar
 			if (xrootdNewerThan4)
 				command.add("--nopbar");
@@ -775,18 +777,19 @@ public class Xrootd extends Protocol {
 			if (pfn.ticket != null && pfn.ticket.envelope != null) {
 				transactionURL = pfn.ticket.envelope.getTransactionURL();
 
-				if (pfn.ticket.envelope.getEncryptedEnvelope() != null) {
-					String opaqueParams = "-OD";
+				String opaqueParams = "-OD";
 
+				if (pfn.ticket.envelope.getEncryptedEnvelope() != null) {
 					if (!xrootdNewerThan4)
 						opaqueParams += "eos.bookingsize=" + guid.size + "&";
 
 					opaqueParams += "authz=" + pfn.ticket.envelope.getEncryptedEnvelope();
 
-					command.add(opaqueParams);
 				}
 				else if (pfn.ticket.envelope.getSignedEnvelope() != null)
-					command.add("-OD" + pfn.ticket.envelope.getSignedEnvelope());
+					opaqueParams = pfn.ticket.envelope.getSignedEnvelope();
+
+				command.add(decorateOpaqueParams(opaqueParams, applicationName));
 			}
 
 			command.add(transactionURL);
@@ -903,15 +906,29 @@ public class Xrootd extends Protocol {
 		pBuilder.environment().putAll(env);
 	}
 
-	private static final List<String> getCommonArguments(final String defaultApplicationName) {
-		final List<String> ret = new ArrayList<>();
-
+	private static String decorateOpaqueParams(final String params, final String defaultApplicationName) {
 		final String appName = ConfigUtils.getApplicationName(defaultApplicationName);
 
-		if (appName != null)
-			ret.add("-ODeos.app=" + appName);
+		if (appName != null) {
+			String ret = params;
 
-		return ret;
+			if (ret.startsWith("-O")) {
+				if (ret.contains("="))
+					ret += "&";
+			}
+			else if (ret.contains("?")) {
+				if (!ret.endsWith("&"))
+					ret += "&";
+			}
+			else
+				ret += "?";
+
+			ret += "eos.app=" + appName;
+
+			return ret;
+		}
+
+		return params;
 	}
 
 	/**
@@ -1126,7 +1143,6 @@ public class Xrootd extends Protocol {
 				}
 				else {
 					command.add(xrootd_default_path + "/bin/xrdstat");
-					command.addAll(getCommonArguments(null));
 					command.add(pfn.getPFN());
 				}
 
@@ -1295,8 +1311,6 @@ public class Xrootd extends Protocol {
 			command.add("--posc");
 			command.add("--nopbar");
 
-			command.addAll(getCommonArguments("transfer-3rd"));
-
 			final boolean sourceEnvelope = source.ticket.envelope != null;
 
 			final boolean targetEnvelope = target.ticket.envelope != null;
@@ -1326,6 +1340,9 @@ public class Xrootd extends Protocol {
 					targetPath += "?authz=" + target.ticket.envelope.getEncryptedEnvelope();
 				else if (target.ticket.envelope.getSignedEnvelope() != null)
 					targetPath += "?" + target.ticket.envelope.getSignedEnvelope();
+
+			sourcePath = decorateOpaqueParams(sourcePath, "transfer-3rd");
+			targetPath = decorateOpaqueParams(targetPath, "transfer-3rd");
 
 			command.add(sourcePath);
 			command.add(targetPath);
