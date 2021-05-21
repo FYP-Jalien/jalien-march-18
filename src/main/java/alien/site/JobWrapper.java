@@ -546,11 +546,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			final GUID g = pfns.iterator().next().getGuid();
 
-			commander.q_api.putJobLog(queueId, "trace", "Getting InputFile: " + entry.getKey().getCanonicalName());
-
-			logger.log(Level.INFO, g + ". entry.getvalue(): " + entry.getValue());
-			commander.q_api.putJobLog(queueId, "trace", g + ". entry.getvalue(): " + entry.getValue());
-
 			final StringBuilder errorMessage = new StringBuilder();
 
 			File f = entry.getValue();
@@ -560,10 +555,16 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				f = new File(currentDir + "/" + duplicates, f.getName());
 				f.mkdir();
 				logger.log(Level.WARNING, "Warning: Could not download to " + entry.getValue().getAbsolutePath() + ". Already exists. Will instead use: " + f.getAbsolutePath());
-				//commander.q_api.putJobLog(queueId, "trace", "Warning: Could not download to " + entry.getValue().getAbsolutePath() + ". Already exists. Will instead use: " + f.getAbsolutePath());
+				// commander.q_api.putJobLog(queueId, "trace", "Warning: Could not download to " + entry.getValue().getAbsolutePath() + ". Already exists. Will instead use: " + f.getAbsolutePath());
 			}
+
 			if (inputDataList != null)
 				inputDataList = inputDataList.replace("turl=\"alien://" + entry.getKey().getCanonicalName(), "turl=\"file:///" + f.getAbsolutePath()); // xmlcollection format here does not match AliEn
+
+			commander.q_api.putJobLog(queueId, "trace", "Getting InputFile: " + entry.getKey().getCanonicalName() + " to " + f.getAbsolutePath());
+			logger.log(Level.INFO, g + ". entry.getvalue(): " + entry.getValue());
+			commander.q_api.putJobLog(queueId, "trace", g + ". entry.getvalue(): " + entry.getValue());
+			
 			f = IOUtils.get(g, f, errorMessage);
 
 			if (f == null) {
