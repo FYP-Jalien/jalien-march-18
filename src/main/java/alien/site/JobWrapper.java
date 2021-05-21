@@ -487,6 +487,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (list != null)
 			filesToDownload.addAll(list);
 
+		String inputDataList = createInputDataList();
+
 		String s = jdl.getExecutable();
 
 		if (s != null)
@@ -532,6 +534,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			localFiles.put(l, localFile);
 		}
 
+		int duplicates = 0;
 		for (final Map.Entry<LFN, File> entry : localFiles.entrySet()) {
 			final List<PFN> pfns = c_api.getPFNsToRead(entry.getKey(), null, null);
 
@@ -550,7 +553,18 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			final StringBuilder errorMessage = new StringBuilder();
 
-			final File f = IOUtils.get(g, entry.getValue(), errorMessage);
+			File f = entry.getValue();
+
+			if (f.exists()) {
+				duplicates++;
+				f = new File(currentDir + "/" + duplicates, f.getName());
+				f.mkdir();
+				logger.log(Level.WARNING, "Warning: Could not download to " + entry.getValue().getAbsolutePath() + ". Already exists. Will instead use: " + f.getAbsolutePath());
+				commander.q_api.putJobLog(queueId, "trace", "Warning: Could not download to " + entry.getValue().getAbsolutePath() + ". Already exists. Will instead use: " + f.getAbsolutePath());
+			}
+			if (inputDataList != null)
+				inputDataList = inputDataList.replace("turl=\"alien://" + entry.getKey().getCanonicalName(), "turl=\"file:///" + f.getAbsolutePath()); // xmlcollection format here does not match AliEn
+			f = IOUtils.get(g, f, errorMessage);
 
 			if (f == null) {
 				logger.log(Level.WARNING, "Could not download " + entry.getKey().getCanonicalName() + " to " + entry.getValue().getAbsolutePath());
@@ -562,28 +576,36 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			}
 		}
 
-		dumpInputDataList();
-
 		logger.log(Level.INFO, "Sandbox populated: " + currentDir.getAbsolutePath());
 
-		return true;
+		// Dump inputDataList XML
+		try {
+			Files.write(Paths.get(currentDir.getAbsolutePath() + "/" + jdl.gets("InputDataList")), inputDataList.getBytes());
+		}
+		catch (final Exception e) {
+			logger.log(Level.SEVERE, "Problem dumping XML: ", e);
+		}
 
+		return true;
 	}
 
-	private void dumpInputDataList() {
+	private String createInputDataList() {
+		logger.log(Level.INFO, "Starting XML creation");
+
 		// creates xml file with the InputData
 		try {
 			final String list = jdl.gets("InputDataList");
 
-			if (list == null)
-				return;
-
+			if (list == null) {
+				logger.log(Level.WARNING, "XML List is NULL!");
+				return null;
+			}
 			logger.log(Level.INFO, "Going to create XML: " + list);
 
 			final String format = jdl.gets("InputDataListFormat");
 			if (format == null || !"xml-single".equals(format)) {
 				logger.log(Level.WARNING, "XML format not understood");
-				return;
+				return null;
 			}
 
 			final XmlCollection c = new XmlCollection();
@@ -598,15 +620,17 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				c.add(l);
 			}
 
-			final String content = c.toString();
+			return c.toString();
 
-			Files.write(Paths.get(currentDir.getAbsolutePath() + "/" + list), content.getBytes());
+			// logger.log(Level.WARNING, "Writing XML to:" + currentDir.getAbsolutePath() + "/" + list);
+			// Files.write(Paths.get(currentDir.getAbsolutePath() + "/" + list), content.getBytes());
 
 		}
 		catch (final Exception e) {
-			logger.log(Level.WARNING, "Problem dumping XML: " + e.toString());
+			logger.log(Level.SEVERE, "Problem creating XML: ", e);
+			return null;
 		}
-
+		// logger.log(Level.INFO, "XML creation has completed");;
 	}
 
 	private HashMap<String, String> getJobPackagesEnvironment() {
