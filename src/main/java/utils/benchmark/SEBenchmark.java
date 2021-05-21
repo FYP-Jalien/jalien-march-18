@@ -49,6 +49,8 @@ public class SEBenchmark {
 
 	private static final Object lock = new Object();
 
+	private static String fileNamePrefix = ConfigUtils.getLocalHostname();
+
 	private static final Thread monitoringThread = new Thread() {
 		{
 			setDaemon(true);
@@ -77,16 +79,23 @@ public class SEBenchmark {
 	};
 
 	private static final boolean cleanupCatalogueFile(final String fileName) {
-		final JAliEnCOMMander cmd = JAliEnCOMMander.getInstance();
+		try {
+			final JAliEnCOMMander cmd = JAliEnCOMMander.getInstance();
 
-		final LFN l = cmd.c_api.getLFN(fileName, true);
+			final LFN l = cmd.c_api.getLFN(fileName, true);
 
-		if (l.exists && !cmd.c_api.removeLFN(fileName, false, true)) {
-			System.err.println("Cannot remove the previously existing file: " + fileName);
+			if (l.exists && !cmd.c_api.removeLFN(fileName, false, true)) {
+				System.err.println("Cannot remove the previously existing file: " + fileName);
+				return false;
+			}
+
+			return true;
+		}
+		catch (final Throwable t) {
+			System.err.println("Caught exception cleaning up " + fileName + ": " + t.getMessage());
+			t.printStackTrace();
 			return false;
 		}
-
-		return true;
 	}
 
 	private static final class UploadThread extends Thread {
@@ -104,7 +113,9 @@ public class SEBenchmark {
 
 		@Override
 		public void run() {
-			final String testPath = UsersHelper.getHomeDir(account.getDefaultUser()) + "se_test_" + tNo;
+			final String testPath = UsersHelper.getHomeDir(account.getDefaultUser()) + "se_test_" + fileNamePrefix + "_" + tNo;
+
+			System.err.println("Using this catalogue file name: " + testPath);
 
 			do {
 				if (!cleanupCatalogueFile(testPath)) {
@@ -136,6 +147,10 @@ public class SEBenchmark {
 					System.err.println("Thread " + tNo + " failed to upload a file: " + e.getMessage());
 					failed.incrementAndGet();
 				}
+				catch (final Throwable t) {
+					System.err.println("Thread " + tNo + " caught an exception in the upload part: " + t.getMessage());
+					failed.incrementAndGet();
+				}
 			} while (--iterations > 0);
 
 			cleanupCatalogueFile(testPath);
@@ -154,6 +169,7 @@ public class SEBenchmark {
 		parser.accepts("b").withRequiredArg().ofType(Float.class);
 		parser.accepts("f").withRequiredArg();
 		parser.accepts("i").withRequiredArg().ofType(Integer.class);
+		parser.accepts("n").withRequiredArg();
 
 		final OptionSet options = parser.parse(args);
 
@@ -164,6 +180,7 @@ public class SEBenchmark {
 			System.err.println("\t-i <iterations>\t\t\t(optional, default 1)");
 			System.err.println("\t-b <file size, in MB>\t\t(optional, default " + DEFAULT_SIZE + ")");
 			System.err.println("\t-f <file name>\t\t\t(optional, file to use, size to be extracted from it)");
+			System.err.println("\t-n <catalogue name>\t\t(optional, default '" + fileNamePrefix + "')");
 
 			return;
 		}
@@ -206,6 +223,9 @@ public class SEBenchmark {
 		final int iterations = options.has("i") ? ((Integer) options.valueOf("i")).intValue() : 1;
 
 		final String seName = (String) options.valueOf("s");
+
+		if (options.has("n"))
+			fileNamePrefix = (String) options.valueOf("n");
 
 		final List<UploadThread> tList = new ArrayList<>(threads);
 
