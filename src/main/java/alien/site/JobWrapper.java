@@ -560,7 +560,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				f = new File(currentDir + "/" + duplicates, f.getName());
 				f.mkdir();
 				logger.log(Level.WARNING, "Warning: Could not download to " + entry.getValue().getAbsolutePath() + ". Already exists. Will instead use: " + f.getAbsolutePath());
-				commander.q_api.putJobLog(queueId, "trace", "Warning: Could not download to " + entry.getValue().getAbsolutePath() + ". Already exists. Will instead use: " + f.getAbsolutePath());
+				//commander.q_api.putJobLog(queueId, "trace", "Warning: Could not download to " + entry.getValue().getAbsolutePath() + ". Already exists. Will instead use: " + f.getAbsolutePath());
 			}
 			if (inputDataList != null)
 				inputDataList = inputDataList.replace("turl=\"alien://" + entry.getKey().getCanonicalName(), "turl=\"file:///" + f.getAbsolutePath()); // xmlcollection format here does not match AliEn
