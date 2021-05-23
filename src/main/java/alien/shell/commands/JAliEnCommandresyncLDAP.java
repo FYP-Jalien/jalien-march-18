@@ -1,11 +1,10 @@
 package alien.shell.commands;
 
 import java.util.List;
-import java.util.logging.Level;
 
-import alien.config.ConfigUtils;
 import alien.optimizers.catalogue.PeriodicOptimiser;
-import lazyj.DBFunctions;
+import alien.shell.ShellColor;
+
 /**
  * @author Marta
  * @since May 5, 2021
@@ -15,18 +14,11 @@ public class JAliEnCommandresyncLDAP extends JAliEnBaseCommand {
 	@Override
 	public void run() {
 		commander.printOutln("Starting manual resyncLDAP ");
-		try (DBFunctions db = ConfigUtils.getDB("alice_users"); DBFunctions db2 = ConfigUtils.getDB("ADMIN");) {
-			if (db == null || db2 == null) {
-				logger.log(Level.INFO, "Could not get DBs!");
-				return;
-			}
 
-			PeriodicOptimiser.checkLdapSyncTable(db);
+		String logOutput = PeriodicOptimiser.manualResyncLDAP();
+		commander.printOutln(ShellColor.jobStateRed() + logOutput + ShellColor.reset());
 
-			PeriodicOptimiser.manualResyncLDAP();
-
-			commander.printOutln("Manual esyncLDAP completed");
-		}
+		commander.printOutln("Manual resyncLDAP completed");
 
 	}
 
