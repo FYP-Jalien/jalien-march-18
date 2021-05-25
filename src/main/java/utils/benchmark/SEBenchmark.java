@@ -156,7 +156,7 @@ public class SEBenchmark {
 					finally {
 						fTemp.delete();
 
-						if (shutdown || (!readBackFiles.offer(s) && !keepWrittenFiles))
+						if ((shutdown || !readBackFiles.offer(s)) && !keepWrittenFiles)
 							cleanupCatalogueFile(s);
 					}
 				}
