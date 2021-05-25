@@ -28,6 +28,7 @@ public class PeriodicOptimiser extends Optimizer {
 	 * Optimizer synchronisations
 	 */
 	static final Object requestSync = new Object();
+	static final Object backRequestSync = new Object();
 
 	/**
 	 * Logging facility
@@ -42,6 +43,7 @@ public class PeriodicOptimiser extends Optimizer {
 	private static String[] classnames = { "users", "roles", "SEs" };
 
 	private static String logOutput = "";
+	private static int updates = 0;
 
 	@Override
 	public void run() {
@@ -56,6 +58,10 @@ public class PeriodicOptimiser extends Optimizer {
 			while (true) {
 				try {
 					resyncLDAP(usersdb, admindb);
+					synchronized (backRequestSync) {
+						backRequestSync.notifyAll();
+					}
+					periodic.set(true);
 				}
 				catch (Exception e) {
 					e.printStackTrace();
@@ -67,7 +73,7 @@ public class PeriodicOptimiser extends Optimizer {
 					}
 				}
 				catch (final InterruptedException e) {
-					logger.log(Level.WARNING, "The periodic optimiser has been forced to exit");
+					logger.log(Level.SEVERE, "The periodic optimiser has been forced to exit");
 					break;
 				}
 			}
@@ -77,12 +83,23 @@ public class PeriodicOptimiser extends Optimizer {
 	/**
 	 * Manual instruction for the resyncLDAP
 	 */
-	public static String manualResyncLDAP() {
+	public static String manualResyncLDAP(boolean lastLog) {
 		synchronized (requestSync) {
 			logger.log(Level.INFO, "Started manual resyncLDAP");
 			periodic.set(false);
 			requestSync.notifyAll();
 		}
+
+		try {
+			synchronized (backRequestSync) {
+				backRequestSync.wait();
+			}
+		}
+		catch (final InterruptedException e) {
+			logger.log(Level.SEVERE, "The periodic optimiser has been forced to exit");
+		}
+		if (lastLog && updates == 0)
+			return DBSyncUtils.getLastLog();
 		return logOutput;
 	}
 
@@ -93,18 +110,18 @@ public class PeriodicOptimiser extends Optimizer {
 	 * @param admindb Database instance for USERS_LDAP and USERS_LDAP_ROLE tables
 	 */
 	private static void resyncLDAP(DBFunctions usersdb, DBFunctions admindb) {
-
 		final int frequency = 60000; // To change (1 hour default)
 		logOutput = "";
+		updates = 0;
 
 		logger.log(Level.INFO, "Checking if an LDAP resynchronisation is needed");
 		usersdb.setReadOnly(false);
 		boolean updated = false;
 		for (String classname : classnames) {
 			if (periodic.get())
-				updated = DBSyncUtils.updatePeriodic(usersdb, frequency, PeriodicOptimiser.class.getCanonicalName() + "." + classname);
+				updated = DBSyncUtils.updatePeriodic(frequency, PeriodicOptimiser.class.getCanonicalName() + "." + classname);
 			else
-				updated = DBSyncUtils.updateManual(usersdb, PeriodicOptimiser.class.getCanonicalName() + "." + classname);
+				updated = DBSyncUtils.updateManual(PeriodicOptimiser.class.getCanonicalName() + "." + classname);
 			if (updated) {
 				switch (classname) {
 					case "users":
@@ -119,12 +136,9 @@ public class PeriodicOptimiser extends Optimizer {
 					default:
 						break;
 				}
-				deleteInactive(admindb);
+				logger.log(Level.INFO, logOutput);
 			}
 		}
-
-		logger.log(Level.INFO, logOutput);
-		periodic.set(true);
 	}
 
 	/**
@@ -135,7 +149,7 @@ public class PeriodicOptimiser extends Optimizer {
 	public static void updateUsers(DBFunctions db) {
 		logger.log(Level.INFO, "Synchronising DB users with LDAP");
 		String ouHosts = "ou=People,";
-		HashMap <String, String> modifications = new HashMap<> ();
+		HashMap<String, String> modifications = new HashMap<>();
 
 		// Insertion of the users
 		final Set<String> uids = LDAPHelper.checkLdapInformation("(objectClass=pkiUser)", ouHosts, "uid", false);
@@ -144,7 +158,11 @@ public class PeriodicOptimiser extends Optimizer {
 		if (length == 0)
 			logger.log(Level.WARNING, "No users gotten from LDAP");
 
-		db.query("SELECT user from `USERS_LDAP`", false);
+		boolean querySuccess = db.query("SELECT user from `USERS_LDAP`", false);
+		if (!querySuccess) {
+			logger.log(Level.SEVERE, "Error getting users from DB");
+			return;
+		}
 		while (db.moveNext()) {
 			String user = db.gets("user");
 			if (!uids.contains(user)) {
@@ -156,7 +174,11 @@ public class PeriodicOptimiser extends Optimizer {
 		db.query("UPDATE USERS_LDAP SET up=0");
 		for (String user : uids) {
 			ArrayList<String> originalDns = new ArrayList<>();
-			db.query("SELECT * from `USERS_LDAP` WHERE user = ?", false, user);
+			querySuccess = db.query("SELECT * from `USERS_LDAP` WHERE user = ?", false, user);
+			if (!querySuccess) {
+				logger.log(Level.SEVERE, "Error getting DB entry for user " + user);
+				return;
+			}
 			while (db.moveNext())
 				originalDns.add(db.gets("dn"));
 			if (originalDns.isEmpty())
@@ -194,11 +216,20 @@ public class PeriodicOptimiser extends Optimizer {
 				}
 			}
 		}
-		logOutput = logOutput + "\n" + "Users: " + length + " synchronized. " + modifications.keySet().size() + " changes. \n" ;
-		if (modifications.size() > 0 ) {
+
+		logger.log(Level.INFO, "Deleting inactive users");
+		db.query("DELETE FROM USERS_LDAP WHERE up = 0");
+		// TODO: Delete home dir of inactive users
+
+		String usersLog = "Users: " + length + " synchronized. " + modifications.keySet().size() + " changes. \n";
+		if (modifications.size() > 0) {
 			for (String user : modifications.keySet())
-				logOutput = logOutput + modifications.get(user) + "\n";
+				usersLog = usersLog + modifications.get(user) + "\n";
 		}
+		logOutput = logOutput + "\n" + usersLog;
+		updates = updates + modifications.keySet().size();
+		if (modifications.keySet().size() != 0)
+			DBSyncUtils.registerLog(PeriodicOptimiser.class.getCanonicalName() + ".users", usersLog);
 	}
 
 	/**
@@ -209,7 +240,7 @@ public class PeriodicOptimiser extends Optimizer {
 	public static void updateRoles(DBFunctions db) {
 		logger.log(Level.INFO, "Synchronising DB roles with LDAP");
 		String ouRoles = "ou=Roles,";
-		HashMap <String, String> modifications = new HashMap<> ();
+		HashMap<String, String> modifications = new HashMap<>();
 
 		// Insertion of the roles
 		final Set<String> roles = LDAPHelper.checkLdapInformation("(objectClass=AliEnRole)", ouRoles, "uid", false);
@@ -218,18 +249,27 @@ public class PeriodicOptimiser extends Optimizer {
 		if (length == 0)
 			logger.log(Level.WARNING, "No roles gotten from LDAP");
 
-		db.query("SELECT role from `USERS_LDAP_ROLE`", false);
+		boolean querySuccess = db.query("SELECT role from `USERS_LDAP_ROLE`", false);
+		if (!querySuccess) {
+			logger.log(Level.SEVERE, "Error getting roles from DB");
+			return;
+		}
 		while (db.moveNext()) {
 			String role = db.gets("role");
 			if (!roles.contains(role)) {
 				modifications.put(role, role + ": deleted role \n");
 			}
 		}
+
 		// TODO: To be done with replace into
 		db.query("UPDATE USERS_LDAP_ROLE SET up=0");
 		for (String role : roles) {
 			ArrayList<String> originalUsers = new ArrayList<>();
-			db.query("SELECT * from `USERS_LDAP_ROLE` WHERE role = ?", false, role);
+			querySuccess = db.query("SELECT * from `USERS_LDAP_ROLE` WHERE role = ?", false, role);
+			if (!querySuccess) {
+				logger.log(Level.SEVERE, "Error getting DB entry for role " + role);
+				return;
+			}
 			while (db.moveNext())
 				originalUsers.add(db.gets("user"));
 			if (originalUsers.isEmpty())
@@ -237,7 +277,11 @@ public class PeriodicOptimiser extends Optimizer {
 			final Set<String> users = LDAPHelper.checkLdapInformation("uid=" + role, ouRoles, "users", false);
 			ArrayList<String> currentUsers = new ArrayList<>();
 			for (String user : users) {
-				db.query("SELECT count(*) from `USERS_LDAP` WHERE user = ?", false, user);
+				querySuccess = db.query("SELECT count(*) from `USERS_LDAP` WHERE user = ?", false, user);
+				if (!querySuccess) {
+					logger.log(Level.SEVERE, "Error getting user count from DB");
+					return;
+				}
 				if (db.moveNext()) {
 					int userInstances = db.geti(1);
 					if (userInstances == 0) {
@@ -257,17 +301,25 @@ public class PeriodicOptimiser extends Optimizer {
 			printModifications(modifications, currentUsers, originalUsers, role, "added", "users");
 			printModifications(modifications, originalUsers, currentUsers, role, "removed", "users");
 		}
+
 		db.query("select a.role from USERS_LDAP_ROLE a left join USERS_LDAP_ROLE b on b.up=0 and a.role=b.role where a.up=1 and b.role is null");
 		while (db.moveNext()) {
 			String roleToDelete = db.gets("role");
 			logger.log(Level.WARNING, "The role " + roleToDelete + " is no longer listed in LDAP. It will be deleted from the database");
 		}
 
-		logOutput = logOutput + "\n" + "Roles: " + length + " synchronized. " + modifications.keySet().size() + " changes. \n" ;
-		if (modifications.size() > 0 ) {
+		logger.log(Level.INFO, "Deleting inactive roles");
+		db.query("DELETE FROM USERS_LDAP_ROLE WHERE up = 0");
+
+		String rolesLog = "Roles: " + length + " synchronized. " + modifications.keySet().size() + " changes. \n";
+		if (modifications.size() > 0) {
 			for (String role : modifications.keySet())
-				logOutput = logOutput + modifications.get(role) + "\n";
+				rolesLog = rolesLog + modifications.get(role) + "\n";
 		}
+		logOutput = logOutput + "\n" + rolesLog;
+		updates = updates + modifications.keySet().size();
+		if (modifications.keySet().size() != 0)
+			DBSyncUtils.registerLog(PeriodicOptimiser.class.getCanonicalName() + ".roles", rolesLog);
 	}
 
 	/**
@@ -282,7 +334,7 @@ public class PeriodicOptimiser extends Optimizer {
 		final Set<String> dns = LDAPHelper.checkLdapInformation("(objectClass=AliEnSE)", ouSites, "dn", true);
 		ArrayList<String> seNames = new ArrayList<>();
 		ArrayList<String> sites = new ArrayList<>();
-		HashMap <String, String> modifications = new HashMap<> ();
+		HashMap<String, String> modifications = new HashMap<>();
 
 		// From the dn we get the seName and site
 		Iterator<String> itr = dns.iterator();
@@ -314,9 +366,14 @@ public class PeriodicOptimiser extends Optimizer {
 			String seName = vo + "::" + site + "::" + se;
 
 			HashMap<String, String> originalSEs = new HashMap<>();
-			db.query("SELECT * from `SE` WHERE seName = ?", false, seName);
+			boolean querySuccess = db.query("SELECT * from `SE` WHERE seName = ?", false, seName);
+			if (!querySuccess) {
+				logger.log(Level.SEVERE, "Error getting SEs from DB");
+				return;
+			}
 			while (db.moveNext()) {
-				originalSEs = populateSERegistry(db.gets("seName"), db.gets("seioDaemons"), db.gets("seStoragePath"), db.gets("seMinSize"), db.gets("seType"), db.gets("seQoS"), db.gets("seExclusiveWrite"), db.gets("seExclusiveRead"), db.gets("seVersion"));
+				originalSEs = populateSERegistry(db.gets("seName"), db.gets("seioDaemons"), db.gets("seStoragePath"), db.gets("seMinSize"), db.gets("seType"), db.gets("seQoS"),
+						db.gets("seExclusiveWrite"), db.gets("seExclusiveRead"), db.gets("seVersion"));
 			}
 			if (originalSEs.isEmpty())
 				modifications.put(seName, seName + " : new storage element, ");
@@ -327,9 +384,13 @@ public class PeriodicOptimiser extends Optimizer {
 			final Set<String> savedir = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "savedir");
 			for (String path : savedir) {
 				HashMap<String, String> originalSEVolumes = new HashMap<>();
-				db.query("SELECT * from `SE_VOLUMES` WHERE seName = ?", false, seName);
+				querySuccess = db.query("SELECT * from `SE_VOLUMES` WHERE seName = ?", false, seName);
+				if (!querySuccess) {
+					logger.log(Level.SEVERE, "Error getting SE volumes from DB");
+					return;
+				}
 				while (db.moveNext()) {
-					originalSEVolumes =  populateSEVolumesRegistry(db.gets("sename"), db.gets("volume"), db.gets("method"), db.gets("mountpoint"), db.gets("size"));
+					originalSEVolumes = populateSEVolumesRegistry(db.gets("sename"), db.gets("volume"), db.gets("method"), db.gets("mountpoint"), db.gets("size"));
 				}
 
 				String size = "-1";
@@ -415,28 +476,22 @@ public class PeriodicOptimiser extends Optimizer {
 		db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
 		db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
 
-		logOutput = logOutput + "\n" + "SEs: " + length + " synchronized. " + modifications.keySet().size() + " changes. \n" ;
-		if (modifications.size() > 0 ) {
-			for (String seName : modifications.keySet())
-				logOutput = logOutput + modifications.get(seName) + "\n";
-		}
-	}
-
-	/**
-	 * Deletes non-active users and roles from the LDAP database
-	 *
-	 * @param Database instance
-	 */
-	public static void deleteInactive(DBFunctions db) {
-		logger.log(Level.INFO, "Deleting inactive users and roles");
-		db.query("DELETE FROM USERS_LDAP WHERE up = 0");
-		// TODO: Delete home dir of inactive users
-		db.query("DELETE FROM USERS_LDAP_ROLE WHERE up = 0");
 		// TODO: Delete inactive SEs
+
+		String sesLog = "SEs: " + length + " synchronized. " + modifications.keySet().size() + " changes. \n";
+		if (modifications.size() > 0) {
+			for (String seName : modifications.keySet())
+				sesLog = sesLog + modifications.get(seName) + "\n";
+		}
+		logOutput = logOutput + "\n" + sesLog;
+		updates = updates + modifications.keySet().size();
+		if (modifications.keySet().size() != 0)
+			DBSyncUtils.registerLog(PeriodicOptimiser.class.getCanonicalName() + ".SEs", sesLog);
 	}
 
 	/**
 	 * Method for building the output for the manual resyncLDAP for Users and Roles
+	 *
 	 * @param modifications
 	 * @param original
 	 * @param current
@@ -462,7 +517,7 @@ public class PeriodicOptimiser extends Optimizer {
 	 * @param se
 	 */
 	private static void printModificationsSEs(HashMap<String, String> modifications, HashMap<String, String> original, HashMap<String, String> current, String se, String entity) {
-		ArrayList<String> updates = new ArrayList<>();
+		ArrayList<String> updatedSEs = new ArrayList<>();
 		Set<String> keySet = null;
 		if (original.keySet().size() > current.keySet().size())
 			keySet = original.keySet();
@@ -470,21 +525,21 @@ public class PeriodicOptimiser extends Optimizer {
 			keySet = current.keySet();
 		for (String param : keySet) {
 			if (original.get(param) == null || original.get(param) == "")
-				original.put(param,"null");
+				original.put(param, "null");
 			if (current.get(param) == null)
-				current.put(param,"null");
+				current.put(param, "null");
 			if (!original.get(param).equals(current.get(param))) {
-				updates.add(param + " (new value = " + current.get(param) + ")");
+				updatedSEs.add(param + " (new value = " + current.get(param) + ")");
 			}
 		}
 
-		if (updates.size() > 0) {
+		if (updatedSEs.size() > 0) {
 			addEntityLog(modifications, se);
-			modifications.put(se, modifications.get(se) + "\n \t " + entity + " updated " + updates.size() + " parameters " + updates.toString());
+			modifications.put(se, modifications.get(se) + "\n \t " + entity + " updated " + updatedSEs.size() + " parameters " + updatedSEs.toString());
 		}
 	}
 
-	private static HashMap<String,String> populateSEVolumesRegistry(String seName, String volume, String method, String mountpoint, String size) {
+	private static HashMap<String, String> populateSEVolumesRegistry(String seName, String volume, String method, String mountpoint, String size) {
 		HashMap<String, String> seVolumes = new HashMap<>();
 		seVolumes.put("seName", seName);
 		seVolumes.put("volume", volume);
@@ -494,7 +549,7 @@ public class PeriodicOptimiser extends Optimizer {
 		return seVolumes;
 	}
 
-	private static HashMap<String,String> populateSERegistry(String seName, String seioDaemons, String path, String minSize, final String mss, final String qos, final String seExclusiveWrite,
+	private static HashMap<String, String> populateSERegistry(String seName, String seioDaemons, String path, String minSize, final String mss, final String qos, final String seExclusiveWrite,
 			final String seExclusiveRead, final String seVersion) {
 		HashMap<String, String> ses = new HashMap<>();
 		ses.put("seName", seName);

@@ -4,6 +4,8 @@ import java.util.List;
 
 import alien.optimizers.catalogue.PeriodicOptimiser;
 import alien.shell.ShellColor;
+import joptsimple.OptionParser;
+import joptsimple.OptionSet;
 
 /**
  * @author Marta
@@ -11,11 +13,14 @@ import alien.shell.ShellColor;
  */
 public class JAliEnCommandresyncLDAP extends JAliEnBaseCommand {
 
+	private boolean lastLog = false;
+
 	@Override
 	public void run() {
+		commander.printOutln("Print last log flag set to " + this.lastLog);
 		commander.printOutln("Starting manual resyncLDAP ");
 
-		String logOutput = PeriodicOptimiser.manualResyncLDAP();
+		String logOutput = PeriodicOptimiser.manualResyncLDAP(this.lastLog);
 		commander.printOutln(ShellColor.jobStateRed() + logOutput + ShellColor.reset());
 
 		commander.printOutln("Manual resyncLDAP completed");
@@ -35,10 +40,10 @@ public class JAliEnCommandresyncLDAP extends JAliEnBaseCommand {
 	@Override
 	public void printHelp() {
 		commander.printOutln();
-		commander.printOutln(helpUsage("submit", "<URL>"));
+		commander.printOutln("Usage: resyncLDAP -l <boolean printLastNonEmptyLog>");
 		commander.printOutln();
-		commander.printOutln(helpParameter("<URL> => <LFN>"));
-		commander.printOutln(helpParameter("<URL> => file:///<local path>"));
+		commander.printOutln(helpParameter("Synchronizes the DB with the updated values in LDAP"));
+		commander.printOutln(helpParameter("-l : Boolean set to print last non empty update log"));
 		commander.printOutln();
 	}
 
@@ -52,6 +57,16 @@ public class JAliEnCommandresyncLDAP extends JAliEnBaseCommand {
 	 */
 	public JAliEnCommandresyncLDAP(final JAliEnCOMMander commander, final List<String> alArguments) {
 		super(commander, alArguments);
+
+		final OptionParser parser = new OptionParser();
+		parser.accepts("l");
+		final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
+		final List<String> params = optionToString(options.nonOptionArguments());
+		// check for at least 1 argument1
+		if (params.size() >= 1)
+			this.lastLog = Boolean.parseBoolean(params.get(0));
+		else
+			this.lastLog = false;
 	}
 
 	@Override

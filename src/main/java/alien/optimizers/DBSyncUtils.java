@@ -26,15 +26,18 @@ public class DBSyncUtils {
 	 */
 	static final Monitor monitor = MonitorFactory.getMonitor(DBSyncUtils.class.getCanonicalName());
 
+	static DBFunctions db;
+
 	/**
-	 * Creates the LDAP_SYNC table if it did not exist before
+	 * Creates the OPTIMIZERS table if it did not exist before
 	 */
-	public static void checkLdapSyncTable(DBFunctions db) {
-		String sqlLdapDB = "CREATE TABLE IF NOT EXISTS `LDAP_SYNC` (`class` varchar(100) COLLATE latin1_general_cs NOT NULL, "
-				+ "`lastUpdate` bigInt NOT NULL, `frequency` int(11) NOT NULL, PRIMARY KEY (`class`)) "
-				+ "ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_general_cs;";
+	public static void checkLdapSyncTable(DBFunctions dbSync) {
+		db = dbSync;
+		String sqlLdapDB = "CREATE TABLE IF NOT EXISTS `OPTIMIZERS` (`class` varchar(100) COLLATE latin1_general_cs NOT NULL, "
+				+ "`lastUpdate` bigInt NOT NULL, `frequency` int(11) NOT NULL, `lastUpdatedLog` text COLLATE latin1_general_ci DEFAULT NULL, "
+				+ "PRIMARY KEY (`class`)) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_general_cs;";
 		if (!db.query(sqlLdapDB))
-			logger.log(Level.SEVERE, "Could not create table: LDAP_SYNC " + sqlLdapDB);
+			logger.log(Level.SEVERE, "Could not create table: OPTIMIZERS " + sqlLdapDB);
 	}
 
 	/**
@@ -45,28 +48,27 @@ public class DBSyncUtils {
 	 * @param classname Class to update
 	 * @return Success of update query
 	 */
-	public static boolean updatePeriodic(DBFunctions db, int frequency, String classname) {
+	public static boolean updatePeriodic(int frequency, String classname) {
 		boolean updated = false;
 		Long timestamp = Long.valueOf(System.currentTimeMillis());
-		logger.log(Level.INFO, "DBG: Called update periodic method");
-		db.query("SELECT count(*) from `LDAP_SYNC` WHERE class = ?", false, classname);
+		db.query("SELECT count(*) from `OPTIMIZERS` WHERE class = ?", false, classname);
 		if (db.moveNext()) {
 			int valuecounts = db.geti(1);
 			if (valuecounts == 0) {
-				updated = registerClass(db, frequency, classname, timestamp);
+				updated = registerClass(frequency, classname, timestamp);
 			}
 			else {
 				Long lastUpdated = Long.valueOf(System.currentTimeMillis() - frequency);
-				updated = db.query("UPDATE LDAP_SYNC SET lastUpdate = ? WHERE class = ? AND lastUpdate < ?",
+				updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ? WHERE class = ? AND lastUpdate < ?",
 						false, timestamp, classname, lastUpdated) && db.getUpdateCount() > 0;
 			}
 		}
 		return updated;
 	}
 
-	private static boolean registerClass(DBFunctions db, int frequency, String classname, Long timestamp) {
+	private static boolean registerClass(int frequency, String classname, Long timestamp) {
 		boolean updated;
-		updated = db.query("INSERT INTO LDAP_SYNC (class, lastUpdate, frequency) VALUES (?, ?, ?)",
+		updated = db.query("INSERT INTO OPTIMIZERS (class, lastUpdate, frequency) VALUES (?, ?, ?)",
 				false, classname, timestamp, Integer.valueOf(frequency));
 		return updated;
 	}
@@ -78,12 +80,37 @@ public class DBSyncUtils {
 	 * @param classname Class to update
 	 * @return Success of the update query
 	 */
-	public static boolean updateManual(DBFunctions db, String classname) {
-		logger.log(Level.INFO, "DBG: Called update manual method");
+	public static boolean updateManual(String classname) {
 		Long timestamp = Long.valueOf(System.currentTimeMillis());
-		boolean updated = db.query("UPDATE LDAP_SYNC SET lastUpdate = ? WHERE class = ?",
+		boolean updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ? WHERE class = ?",
 				false, timestamp, classname) && db.getUpdateCount() > 0;
 		return updated;
 	}
 
+	/**
+	 * Registers the log output from the DB synchronization
+	 *
+	 * @param db Database to update
+	 * @param classname Class to update
+	 * @param logOutput Log to register
+	 * @return Success of the update query
+	 */
+	public static boolean registerLog(String classname, String logOutput) {
+		logger.log(Level.INFO, "Registering log output in DB");
+		boolean updated = db.query("UPDATE OPTIMIZERS set lastUpdatedLog = ? WHERE class = ?", false, logOutput, classname);
+		return updated;
+	}
+
+	public static String getLastLog() {
+		boolean querySuccess = db.query("SELECT * FROM `OPTIMIZERS`");
+		if (!querySuccess) {
+			logger.log(Level.SEVERE, "Could not get the last updated logs from the OPTIMIZERS db");
+			return "ERROR in getting last log";
+		}
+		String log = "";
+		while (db.moveNext()) {
+			log = log + db.gets("lastUpdatedLog") + "\n";
+		}
+		return log;
+	}
 }
