@@ -785,9 +785,10 @@ public class CatalogueApiUtils {
 	 *            full path to local file
 	 * @param args
 	 *            other `cp` command parameters to pass
+	 * @return the indicated or a temporary local file if successful, <code>null</code> if not
 	 * @throws IOException
 	 */
-	public void downloadFile(final String fromLFN, final File localFile, final String... args) throws IOException {
+	public File downloadFile(final String fromLFN, final File localFile, final String... args) throws IOException {
 		if (localFile.exists())
 			throw new IOException("localFile already exists: " + localFile.getAbsolutePath());
 
@@ -802,7 +803,7 @@ public class CatalogueApiUtils {
 
 		final JAliEnCommandcp cp = new JAliEnCommandcp(commander, cpArgs);
 
-		cp.copyGridToLocal(lfnAbsolutePath, localFile);
+		return cp.copyGridToLocal(lfnAbsolutePath, localFile);
 	}
 
 	/**
