@@ -26,6 +26,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 	 */
 	private boolean bX = false;
 	private boolean bH = false;
+	private boolean bC = false;
 
 	private String xmlCollectionName = null;
 
@@ -137,6 +138,8 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 
 		lfns = commander.c_api.find(path, alPaths.get(1), query, flags, xmlCollectionPath, queueid, xmlCollectionPath != null && limit != Long.MAX_VALUE ? limit : -1);
 
+		int count = 0;
+
 		if (lfns != null) {
 			if (offset >= lfns.size())
 				return;
@@ -151,6 +154,8 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 
 				if (--limit < 0)
 					break;
+
+				count++;
 
 				commander.outNextResult();
 				commander.printOut("lfn", lfn.getCanonicalName());
@@ -188,6 +193,9 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 					commander.printOutln(lfn.getCanonicalName());
 			}
 		}
+
+		if (bC)
+			commander.printOutln("Found " + count + " maching entries");
 	}
 
 	private static final DateFormat formatter = new SimpleDateFormat("MMM dd HH:mm");
@@ -209,7 +217,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 
 		commander.printOutln(helpOption("-a", "show hidden .* files"));
 		commander.printOutln(helpOption("-s", "no sorting"));
-		// commander.printOutln(helpOption("-c", "collection filename (put the output in a collection)"));
+		commander.printOutln(helpOption("-c", "print the number of matching files"));
 		commander.printOutln(helpOption("-x <target LFN>", "create the indicated XML collection with the results of the find operation"));
 		commander.printOutln(helpOption("-d", "return also the directories"));
 		commander.printOutln(helpOption("-w[h]", "long format, optionally human readable file sizes"));
@@ -251,6 +259,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 
 			parser.accepts("w");
 			parser.accepts("s");
+			parser.accepts("c");
 			parser.accepts("x").withRequiredArg();
 			parser.accepts("a");
 			parser.accepts("h");
@@ -285,6 +294,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			bH = options.has("h");
 			bY = options.has("y");
 			bR = options.has("r");
+			bC = options.has("c");
 
 			if (options.has("l")) {
 				limit = ((Long) options.valueOf("l")).longValue();
@@ -354,6 +364,8 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			sb.append(" -j");
 		if (bR)
 			sb.append(" -r");
+		if (bC)
+			sb.append(" -c");
 
 		sb.append("}");
 
