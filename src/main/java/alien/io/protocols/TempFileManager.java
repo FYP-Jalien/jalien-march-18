@@ -134,6 +134,9 @@ public class TempFileManager extends LRUMap<GUID, File> {
 		if (this.delete)
 			value.deleteOnExit();
 
+		if (getLimit() <= 0)
+			return null;
+
 		monitor.incrementCounter(this.delete ? "temp_put" : "persistent_put");
 
 		this.currentSize += key.size;
