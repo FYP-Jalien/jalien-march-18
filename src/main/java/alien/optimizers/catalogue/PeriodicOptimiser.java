@@ -90,13 +90,16 @@ public class PeriodicOptimiser extends Optimizer {
 			requestSync.notifyAll();
 		}
 
-		try {
-			synchronized (backRequestSync) {
-				backRequestSync.wait();
+		while (!periodic.get()){
+			try {
+				synchronized (backRequestSync) {
+					backRequestSync.wait(1000);
+				}
+
 			}
-		}
-		catch (final InterruptedException e) {
-			logger.log(Level.SEVERE, "The periodic optimiser has been forced to exit");
+			catch (final InterruptedException e) {
+				logger.log(Level.SEVERE, "The periodic optimiser has been forced to exit");
+			}
 		}
 		if (lastLog && updates == 0)
 			return DBSyncUtils.getLastLog();
