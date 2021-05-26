@@ -424,7 +424,11 @@ public class JobAgent implements Runnable {
 				logger.log(Level.INFO, Long.toString(queueId));
 				sendBatchInfo();
 
-				reqCPU = ((Number) jdl.getLong("CPUCores")).longValue();
+				if (jdl.getLong("CPUCores") != null)
+					reqCPU = ((Number) jdl.getLong("CPUCores")).longValue();
+				else
+					reqCPU = Long.valueOf(1);
+
 				reqDisk = 10 * 1024L;
 				final String workdirMaxSize = jdl.gets("Workdirectorysize");
 
