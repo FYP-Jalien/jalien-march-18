@@ -997,7 +997,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		try {
-			final Process process = Runtime.getRuntime().exec((cleanupScript.getAbsolutePath() + " -v -m ALIEN_PROC_ID=" + queueId + " $$ -KILL"));
+			final ProcessBuilder pb = new ProcessBuilder(cleanupScript.getAbsolutePath() + " -v -m ALIEN_PROC_ID=" + queueId + " $$ -KILL");
+			pb.redirectOutput(Redirect.INHERIT);
+			pb.redirectError(Redirect.INHERIT);
+			final Process process = pb.start();
 			return process.waitFor();
 		}
 		catch (IOException | InterruptedException e) {
