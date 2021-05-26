@@ -106,8 +106,10 @@ public class LFNCrawler {
         for (final LFN l : lfnsToDelete) {
             print("Parsing LFN: " + l.getCanonicalName());
 
-            if (!processedToDelete.contains(l)) {
-                final List<LFN> members = LFNUtils.getArchiveMembers(LFNUtils.getRealLFN(l));
+            LFN realLFN = LFNUtils.getRealLFN(l);
+
+            if (!processedToDelete.contains(l) && !processedToDelete.contains(realLFN)) {
+                final List<LFN> members = LFNUtils.getArchiveMembers(realLFN);
                 if (members != null) {
                     for (final LFN member : members) {
                         processedToDelete.add(member);
@@ -115,6 +117,9 @@ public class LFNCrawler {
                     }
                 }
                 processedToDelete.add(l);
+                if (realLFN != null) {
+                    processedToDelete.add(realLFN);
+                }
             }
         }
 
