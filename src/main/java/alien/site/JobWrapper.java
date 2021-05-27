@@ -324,7 +324,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 				final int valUploadExitCode = uploadOutputFiles(JobStatus.ERROR_V) ? valExitCode : -1;
 
-				changeStatus(JobStatus.ERROR_V);
+				//changeStatus(JobStatus.ERROR_V);
 				return valUploadExitCode;
 			}
 
@@ -997,10 +997,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		try {
-			final ProcessBuilder pb = new ProcessBuilder(cleanupScript.getAbsolutePath() + " -v -m ALIEN_PROC_ID=" + queueId + " $$ -KILL");
-			pb.redirectOutput(Redirect.INHERIT);
+			final ProcessBuilder pb = new ProcessBuilder(cleanupScript.getAbsolutePath(), "-v", "-m", "ALIEN_PROC_ID=" + queueId, String.valueOf(pid), "-KILL");
 			pb.redirectError(Redirect.INHERIT);
 			final Process process = pb.start();
+
+			final String result = new String(process.getInputStream().readAllBytes());
+			logger.log(Level.INFO, result);
+
 			return process.waitFor();
 		}
 		catch (IOException | InterruptedException e) {
