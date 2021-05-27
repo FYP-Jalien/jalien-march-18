@@ -2,7 +2,8 @@ package alien.shell.commands;
 
 import java.util.List;
 
-import alien.optimizers.catalogue.PeriodicOptimiser;
+import alien.optimizers.DBSyncUtils;
+import alien.optimizers.catalogue.ResyncLDAP;
 import alien.shell.ShellColor;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -15,16 +16,20 @@ public class JAliEnCommandresyncLDAP extends JAliEnBaseCommand {
 
 	private boolean lastLog = false;
 
+	private static String[] classnames = { "users", "roles", "SEs" };
+
 	@Override
 	public void run() {
 		commander.printOutln("Print last log flag set to " + this.lastLog);
-		commander.printOutln("Starting manual resyncLDAP ");
-
-		String logOutput = PeriodicOptimiser.manualResyncLDAP(this.lastLog);
+		String logOutput = ResyncLDAP.manualResyncLDAP();
+		if (this.lastLog) {
+			String prefix = "alien.optimizers.catalogue.ResyncLDAP.";
+			logOutput = "";
+			for (String classname : classnames) {
+				logOutput = logOutput + DBSyncUtils.getLastLog(prefix + classname, false) + "\n";
+			}
+		}
 		commander.printOutln(ShellColor.jobStateRed() + logOutput + ShellColor.reset());
-
-		commander.printOutln("Manual resyncLDAP completed");
-
 	}
 
 	/**
