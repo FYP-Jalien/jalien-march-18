@@ -3,7 +3,10 @@ package alien.shell.commands;
 import java.util.ArrayList;
 import java.util.List;
 
-import alien.optimizers.DBSyncUtils;
+import alien.api.Dispatcher;
+import alien.api.ServerException;
+import alien.api.catalogue.OptimiserLogs;
+import alien.shell.ErrNo;
 import alien.shell.ShellColor;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -16,22 +19,45 @@ public class JAliEnCommandoptimiserLogs extends JAliEnBaseCommand {
 
 	private List<String> classes;
 	private boolean verbose;
+	private boolean listClasses;
 	private int frequency;
 
 	@Override
 	public void run() {
+		try {
+			Dispatcher.execute(new OptimiserLogs());
 
-		if (frequency != 0 && classes != null && !classes.isEmpty())
-			DBSyncUtils.modifyFrequency(frequency, classes);
+			String log = "";
 
-		String log = "";
-		if (classes != null && !classes.isEmpty()) {
-			for (String className : classes) {
-				log = log + DBSyncUtils.getLastLog(className, verbose) + "\n";
+			if (frequency != 0)
+				OptimiserLogs.modifyFrequency(frequency, classes);
+
+			if (listClasses) {
+				log = log + "Classnames matching query : \n";
+				for (String className : classes) {
+					log = log + "\t" + OptimiserLogs.getFullClassName(className) + "\n";
+				}
+				log = log + "\n";
 			}
-			commander.printOutln(ShellColor.jobStateRed() + log + ShellColor.reset());
-		} else
-			commander.printOutln(ShellColor.jobStateRed() + "None or wrong classes were introduced" + ShellColor.reset());
+			else {
+				for (String className : classes) {
+					String classLog = OptimiserLogs.getLastLogFromDB(className, verbose, false);
+					if (classLog != "") {
+						log = log + classLog + "\n";
+					}
+					else {
+						log = log + "The introduced classname/keyword (" + className + ") is not registered. The classes in the database are : \n";
+						for (String classname : OptimiserLogs.getRegisteredClasses())
+							log = log + "\t" + classname + "\n";
+					}
+				}
+			}
+			commander.printOutln(ShellColor.jobStateRed() + log.trim() + ShellColor.reset());
+		}
+		catch (ServerException e) {
+			commander.setReturnCode(ErrNo.ENODATA, "Could not get the optimiser db logs from optimiserLogs command : " + e.getMessage());
+			return;
+		}
 
 	}
 
@@ -48,10 +74,11 @@ public class JAliEnCommandoptimiserLogs extends JAliEnBaseCommand {
 	@Override
 	public void printHelp() {
 		commander.printOutln();
-		commander.printOutln("Usage: lastOptimiserLog [-v] [-f <frequency>] <classnames or metanames>");
+		commander.printOutln("Usage: lastOptimiserLog [-l] [-v] [-f <frequency>] <classnames or metanames>");
 		commander.printOutln();
 		commander.printOutln(helpParameter("Gets the last log from the optimiser"));
 		commander.printOutln(helpParameter("-v : Verbose, displays the frequency, last run timestamp and log"));
+		commander.printOutln(helpParameter("-l : List the class names that match a query"));
 		commander.printOutln(helpParameter("-f <value> : Frequency, in seconds"));
 		commander.printOutln();
 	}
@@ -73,48 +100,49 @@ public class JAliEnCommandoptimiserLogs extends JAliEnBaseCommand {
 		final OptionParser parser = new OptionParser();
 		parser.accepts("f").withRequiredArg();
 		parser.accepts("v");
+		parser.accepts("l");
 
 		final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
 
 		if (options.has("v"))
 			verbose = true;
 
+		if (options.has("l"))
+			listClasses = true;
+
 		if (options.has("f")) {
 			try {
 				frequency = Integer.valueOf(options.valueOf("f").toString()).intValue();
 				frequency = frequency > -1 ? frequency * 1000 : frequency;
-			} catch (NumberFormatException e) {
+			}
+			catch (NumberFormatException e) {
 				frequency = -1;
 			}
 		}
 
 		final List<String> params = optionToString(options.nonOptionArguments());
-		// check for at least 1 arguments
-		if (params.size() < 1)
-			return;
 
-		List<String> originalClasses = params;
-		this.classes = new ArrayList<>();
-		for (String classname : originalClasses) {
-			if (classname.equals("ResyncLDAP.*") || classname.equals("resyncLDAP")) {
-				addResyncLDAPParameter("users");
-				addResyncLDAPParameter("roles");
-				addResyncLDAPParameter("SEs");
-			}
-			if (classname.equals("users") || classname.equals("roles") || classname.equals("SEs"))
-				addResyncLDAPParameter(classname);
+		ArrayList<String> allowedKeyWords = new ArrayList<>();
+		allowedKeyWords.add("ResyncLDAP.*");
+		allowedKeyWords.add("resyncLDAP");
+		this.classes = params;
+		for (String keyword : allowedKeyWords) {
+			if (classes.contains(keyword))
+				replaceKeyWord(keyword, "ResyncLDAP");
+		}
+
+		if (classes == null || classes.isEmpty()) {
+			classes = OptimiserLogs.getRegisteredClasses();
 		}
 	}
 
-	private void addResyncLDAPParameter(String parameter) {
-		String prefix = "alien.optimizers.catalogue.ResyncLDAP.";
-		if (!this.classes.contains(prefix + parameter)) {
-			this.classes.add(prefix + parameter);
-		}
+	private void replaceKeyWord(String keyword, String substitute) {
+		this.classes.remove(keyword);
+		this.classes.add(substitute);
 	}
 
 	@Override
 	public boolean canRunWithoutArguments() {
-		return false;
+		return true;
 	}
 }

@@ -1,5 +1,6 @@
 package alien.optimizers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -70,7 +71,7 @@ public class DBSyncUtils {
 					db.query("SELECT frequency from `OPTIMIZERS` WHERE class = ?", false, classname);
 					if (db.moveNext()) {
 						int frequency = db.geti("frequency");
-						//If the frequency is set to -1 do not run
+						// If the frequency is set to -1 do not run
 						if (frequency != -1) {
 							Long lastUpdated = Long.valueOf(System.currentTimeMillis() - frequency);
 							updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ? WHERE class = ? AND lastUpdate < ?",
@@ -148,15 +149,26 @@ public class DBSyncUtils {
 	 * Returns last log stored in the database for the class
 	 *
 	 * @param classname Class to get the last log from
+	 * @param verbose Boolean for the verbose output
+	 * @param exactMatch Boolean for the exact matching of the classname in the db
 	 * @return String containing the last log
 	 */
-	public static String getLastLog(String classname, boolean verbose) {
+	public static String getLastLog(String classname, boolean verbose, boolean exactMatch) {
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
 			if (db == null) {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return "";
 			}
-			boolean querySuccess = db.query("SELECT * FROM `OPTIMIZERS` WHERE class = ?", false, classname);
+			boolean querySuccess = false;
+			if (exactMatch)
+				querySuccess = db.query("SELECT * FROM `OPTIMIZERS` WHERE class = ?", false, classname);
+			else {
+				String log = "";
+				querySuccess = db.query("SELECT * FROM `OPTIMIZERS` WHERE class LIKE concat('%', ?, '%')", false, classname);
+				while (db.moveNext())
+					log = log + getLastLog(db.gets("class"), verbose, true);
+				return log;
+			}
 			if (!querySuccess) {
 				logger.log(Level.SEVERE, "Could not get the last updated logs from the OPTIMIZERS db");
 				return "ERROR in getting last log";
@@ -190,5 +202,51 @@ public class DBSyncUtils {
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Returns a list of all the registered classes in the database
+	 *
+	 * @return List of registered classes
+	 */
+	public static ArrayList<String> getRegisteredClasses() {
+		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
+			if (db == null) {
+				logger.log(Level.INFO, "Could not get DBs!");
+				return null;
+			}
+			boolean querySuccess = db.query("SELECT class FROM `OPTIMIZERS`");
+			if (!querySuccess) {
+				logger.log(Level.SEVERE, "Could not get the classnames from the OPTIMIZERS db");
+				return null;
+			}
+			ArrayList<String> classes = new ArrayList<>();
+			while (db.moveNext())
+				classes.add(db.gets("class"));
+			return classes;
+		}
+	}
+
+	/**
+	 * Gets the full name of a class given a keyword
+	 *
+	 * @param classname Class to get full name
+	 * @return The full name of the class
+	 */
+	public static String getFullClassName(String classname) {
+		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
+			if (db == null) {
+				logger.log(Level.INFO, "Could not get DBs!");
+				return "";
+			}
+			boolean querySuccess = db.query("SELECT class FROM `OPTIMIZERS` WHERE class LIKE concat('%', ?, '%')", false, classname);
+			if (!querySuccess) {
+				logger.log(Level.SEVERE, "Could not get the classnames from the OPTIMIZERS db");
+				return "";
+			}
+			if (db.moveNext())
+				return db.gets("class");
+			return "";
+		}
 	}
 }

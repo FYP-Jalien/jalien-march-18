@@ -1,7 +1,5 @@
 package alien;
 
-import java.net.Socket;
-
 import alien.optimizers.Optimizer;
 
 /**
@@ -10,13 +8,20 @@ import alien.optimizers.Optimizer;
  */
 public class JOptimizers {
 
+	private static JOptimizers _instance;
 	/**
 	 * @param args
 	 * @throws Exception
 	 */
-	public JOptimizers() throws Exception {
+	private JOptimizers() {
 		final Optimizer opt = new Optimizer();
 		opt.start();
+	}
+
+	public static JOptimizers getInstance() throws Exception {
+		if (_instance == null)
+			_instance = new JOptimizers();
+		return _instance;
 	}
 
 	/**

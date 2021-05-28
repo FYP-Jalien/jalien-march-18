@@ -15,6 +15,7 @@ import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
 import alien.user.AliEnPrincipal;
 import alien.user.LDAPHelper;
+import alien.user.UserFactory;
 import alien.user.UsersHelper;
 import lazyj.DBFunctions;
 
@@ -194,11 +195,11 @@ public class ResyncLDAP extends Optimizer {
 				String homeDir = UsersHelper.getHomeDir(user);
 				LFN userHome = LFNUtils.getLFN(homeDir);
 				if (userHome == null || !userHome.exists) {
-					AliEnPrincipal adminUser = new AliEnPrincipal("admin");
+					AliEnPrincipal adminUser = UserFactory.getByUsername("admin");
 					userHome = LFNUtils.mkdirs(adminUser, homeDir);
 				}
 				if (userHome != null) {
-					AliEnPrincipal newUser = new AliEnPrincipal(user);
+					AliEnPrincipal newUser = UserFactory.getByUsername(user);
 					userHome.chown(newUser);
 				}
 			}

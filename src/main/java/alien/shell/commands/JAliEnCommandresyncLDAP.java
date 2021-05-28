@@ -2,8 +2,10 @@ package alien.shell.commands;
 
 import java.util.List;
 
-import alien.optimizers.DBSyncUtils;
-import alien.optimizers.catalogue.ResyncLDAP;
+import alien.api.Dispatcher;
+import alien.api.ServerException;
+import alien.api.catalogue.ManualResyncLDAP;
+import alien.shell.ErrNo;
 import alien.shell.ShellColor;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -21,15 +23,22 @@ public class JAliEnCommandresyncLDAP extends JAliEnBaseCommand {
 	@Override
 	public void run() {
 		commander.printOutln("Print last log flag set to " + this.lastLog);
-		String logOutput = ResyncLDAP.manualResyncLDAP();
-		if (this.lastLog) {
-			String prefix = "alien.optimizers.catalogue.ResyncLDAP.";
-			logOutput = "";
-			for (String classname : classnames) {
-				logOutput = logOutput + DBSyncUtils.getLastLog(prefix + classname, false) + "\n";
+		try {
+			final ManualResyncLDAP manualCall = Dispatcher.execute(new ManualResyncLDAP());
+			String logOutput = manualCall.getLogOutput();
+			if (this.lastLog) {
+				String prefix = "alien.optimizers.catalogue.ResyncLDAP.";
+				logOutput = "";
+				for (String classname : classnames) {
+					logOutput = logOutput + ManualResyncLDAP.getLastLogFromDB(prefix + classname) + "\n";
+				}
 			}
+			commander.printOutln(ShellColor.jobStateRed() + logOutput.trim() + ShellColor.reset());
 		}
-		commander.printOutln(ShellColor.jobStateRed() + logOutput + ShellColor.reset());
+		catch (ServerException e) {
+			commander.setReturnCode(ErrNo.ENODATA, "Could not get the log output from resyncLDAP command : " + e.getMessage());
+			return;
+		}
 	}
 
 	/**
