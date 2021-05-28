@@ -6,6 +6,7 @@ import java.util.logging.Logger;
 
 import alien.catalogue.GUIDUtils;
 import alien.config.ConfigUtils;
+import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
 import lazyj.DBFunctions;
 import lazyj.mail.Mail;
@@ -43,6 +44,9 @@ public class GuidTable extends Optimizer {
 
 		logger.log(Level.INFO, "GuidTable optimizer starts");
 
+		DBSyncUtils.checkLdapSyncTable();
+		final int frequency = 3600 * 1000; // 1 hour default
+
 		try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
 			if (db == null) {
 				logger.log(Level.INFO, "GuidTable could not get a DB!");
@@ -52,44 +56,51 @@ public class GuidTable extends Optimizer {
 			while (true) {
 				logger.log(Level.INFO, "GuidTable wakes up!: going to get G tables counts with max: " + maxCount);
 
-				// Get count of latest G tables
-				db.setReadOnly(true);
-				db.query("select max(tableName) from GUIDINDEX where guidTime is not null");
-				db.moveNext();
-				final int tableNumber = db.geti(1);
+				boolean updated = DBSyncUtils.updatePeriodic(frequency, GuidTable.class.getCanonicalName());
 
-				db.setReadOnly(true);
-				db.query("select count(1) from G" + tableNumber + "L_PFN");
-				db.moveNext();
-				count = db.geti(1);
-
-				if (count > maxCount)
-					// new G table
-					createNewGTable(db, tableNumber + 1);
-				else {
+				if (updated) {
+					// Get count of latest G tables
 					db.setReadOnly(true);
-					db.query("select count(1) from G" + tableNumber + "L");
+					db.query("select max(tableName) from GUIDINDEX where guidTime is not null");
+					db.moveNext();
+					final int tableNumber = db.geti(1);
+
+					db.setReadOnly(true);
+					db.query("select count(1) from G" + tableNumber + "L_PFN");
 					db.moveNext();
 					count = db.geti(1);
 
 					if (count > maxCount)
 						// new G table
 						createNewGTable(db, tableNumber + 1);
-				}
+					else {
+						db.setReadOnly(true);
+						db.query("select count(1) from G" + tableNumber + "L");
+						db.moveNext();
+						count = db.geti(1);
 
-				if (count > warnCount) {
-					final String admins = ConfigUtils.getConfig().gets("mail_admins"); // comma separated list of emails in config.properties 'mail_admins'
-					if (admins != null && admins.length() > 0) {
-						final Mail m = new Mail();
-						m.sSubject = "JAliEn CS: G table filling up";
-						m.sBody = "The table G" + tableNumber + "L has passed " + warnCount + " entries and will be soon renewed!";
-						m.sFrom = "JAliEnMaster@cern.ch";
-						m.sTo = admins;
-						final Sendmail s = new Sendmail(m.sFrom, "cernmx.cern.ch");
-
-						if (!s.send(m))
-							logger.log(Level.SEVERE, "Could not send notification email: " + s.sError);
+						if (count > maxCount)
+							// new G table
+							createNewGTable(db, tableNumber + 1);
 					}
+
+					if (count > warnCount) {
+						final String admins = ConfigUtils.getConfig().gets("mail_admins"); // comma separated list of emails in config.properties 'mail_admins'
+						if (admins != null && admins.length() > 0) {
+							final Mail m = new Mail();
+							m.sSubject = "JAliEn CS: G table filling up";
+							m.sBody = "The table G" + tableNumber + "L has passed " + warnCount + " entries and will be soon renewed!";
+							m.sFrom = "JAliEnMaster@cern.ch";
+							m.sTo = admins;
+							final Sendmail s = new Sendmail(m.sFrom, "cernmx.cern.ch");
+
+							if (!s.send(m))
+								logger.log(Level.SEVERE, "Could not send notification email: " + s.sError);
+						}
+					}
+
+					String dbLog = "The table G" + tableNumber + "L has passed " + count + " entries.";
+					DBSyncUtils.registerLog(GuidTable.class.getCanonicalName(), dbLog);
 				}
 
 				try {
