@@ -999,12 +999,17 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		try {
 			final ProcessBuilder pb = new ProcessBuilder(cleanupScript.getAbsolutePath(), "-v", "-m", "ALIEN_PROC_ID=" + queueId, String.valueOf(pid), "-KILL");
 			pb.redirectError(Redirect.INHERIT);
+
 			final Process process = pb.start();
+
+			process.waitFor(30, TimeUnit.SECONDS);
+			if (process.isAlive())
+				process.destroyForcibly();
 
 			final String result = new String(process.getInputStream().readAllBytes());
 			logger.log(Level.INFO, result);
 
-			return process.waitFor();
+			return process.exitValue();
 		}
 		catch (IOException | InterruptedException e) {
 			logger.log(Level.WARNING, "An error occurred while attempting to run process cleanup: " + e);
