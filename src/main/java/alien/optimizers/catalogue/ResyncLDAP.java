@@ -47,7 +47,7 @@ public class ResyncLDAP extends Optimizer {
 
 	@Override
 	public void run() {
-		this.setSleepPeriod(20 * 1000); // 1min
+		this.setSleepPeriod(3600 * 1000); // 1 hour
 		logger.log(Level.INFO, "DB resyncLDAP starts");
 
 		DBSyncUtils.checkLdapSyncTable();
@@ -106,7 +106,7 @@ public class ResyncLDAP extends Optimizer {
 	 * @param admindb Database instance for USERS_LDAP and USERS_LDAP_ROLE tables
 	 */
 	private static void resyncLDAP() {
-		final int frequency = 60000; // To change (1 hour default)
+		final int frequency = 3600 * 1000; // 1 hour default
 		logOutput = "";
 
 		logger.log(Level.INFO, "Checking if an LDAP resynchronisation is needed");
@@ -139,7 +139,7 @@ public class ResyncLDAP extends Optimizer {
 	 *
 	 * @param Database instance
 	 */
-	public static void updateUsers() {
+	private static void updateUsers() {
 		logger.log(Level.INFO, "Synchronising DB users with LDAP");
 		String ouHosts = "ou=People,";
 		HashMap<String, String> modifications = new HashMap<>();
@@ -237,7 +237,7 @@ public class ResyncLDAP extends Optimizer {
 	 *
 	 * @param Database instance
 	 */
-	public static void updateRoles() {
+	private static void updateRoles() {
 		logger.log(Level.INFO, "Synchronising DB roles with LDAP");
 		String ouRoles = "ou=Roles,";
 		HashMap<String, String> modifications = new HashMap<>();
@@ -333,7 +333,7 @@ public class ResyncLDAP extends Optimizer {
 	 *
 	 * @param Database instance
 	 */
-	public static void updateSEs() {
+	private static void updateSEs() {
 		logger.log(Level.INFO, "Synchronising DB SEs and volumes with LDAP");
 		String ouSites = "ou=Sites,";
 

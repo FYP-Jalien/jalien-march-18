@@ -32,7 +32,7 @@ public class ManualResyncLDAP extends Request {
 				String prefix = "alien.optimizers.catalogue.ResyncLDAP.";
 				logOutput = "";
 				for (String classname : classnames) {
-					logOutput = logOutput + ManualResyncLDAP.getLastLogFromDB(prefix + classname) + "\n";
+					logOutput = logOutput + getLastLogFromDB(prefix + classname) + "\n";
 				}
 			}
 		} else {
@@ -55,7 +55,7 @@ public class ManualResyncLDAP extends Request {
 	 * @param classname
 	 * @return
 	 */
-	public static String getLastLogFromDB(String classname) {
+	private static String getLastLogFromDB(String classname) {
 		return DBSyncUtils.getLastLog(classname, false, true);
 	}
 

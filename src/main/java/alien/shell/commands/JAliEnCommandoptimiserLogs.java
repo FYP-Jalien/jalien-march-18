@@ -105,10 +105,6 @@ public class JAliEnCommandoptimiserLogs extends JAliEnBaseCommand {
 			if (classes.contains(keyword))
 				replaceKeyWord(keyword, "ResyncLDAP");
 		}
-
-		if (classes == null || classes.isEmpty()) {
-			classes = OptimiserLogs.getRegisteredClasses();
-		}
 	}
 
 	private void replaceKeyWord(String keyword, String substitute) {

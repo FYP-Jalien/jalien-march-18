@@ -32,25 +32,33 @@ public class OptimiserLogs extends Request {
 	@Override
 	public void run() {
 
+		if (classes == null || classes.isEmpty()) {
+			classes = getRegisteredClasses();
+		}
+
 		if (frequency != 0)
-			OptimiserLogs.modifyFrequency(frequency, classes);
+			if (getEffectiveRequester().canBecome("admin")) {
+				modifyFrequency(frequency, classes);
+			} else {
+				logOutput = "Only users with role admin can execute this call";
+			}
 
 		if (listClasses) {
 			logOutput = logOutput + "Classnames matching query : \n";
 			for (String className : classes) {
-				logOutput = logOutput + "\t" + OptimiserLogs.getFullClassName(className) + "\n";
+				logOutput = logOutput + "\t" + getFullClassName(className) + "\n";
 			}
 			logOutput = logOutput + "\n";
 		}
 		else {
 			for (String className : classes) {
-				String classLog = OptimiserLogs.getLastLogFromDB(className, verbose, false);
+				String classLog = getLastLogFromDB(className, verbose, false);
 				if (classLog != "") {
 					logOutput = logOutput + classLog + "\n";
 				}
 				else {
 					logOutput = logOutput + "The introduced classname/keyword (" + className + ") is not registered. The classes in the database are : \n";
-					for (String classname : OptimiserLogs.getRegisteredClasses())
+					for (String classname : getRegisteredClasses())
 						logOutput = logOutput + "\t" + classname + "\n";
 				}
 			}
@@ -63,7 +71,7 @@ public class OptimiserLogs extends Request {
 	 * @param frequency
 	 * @param classes
 	 */
-	public static void modifyFrequency(int frequency, List<String> classes) {
+	private static void modifyFrequency(int frequency, List<String> classes) {
 		DBSyncUtils.modifyFrequency(frequency, classes);
 	}
 
@@ -73,7 +81,7 @@ public class OptimiserLogs extends Request {
 	 * @param classname
 	 * @return
 	 */
-	public static String getLastLogFromDB(String classname, boolean verbose, boolean exactMatch) {
+	private static String getLastLogFromDB(String classname, boolean verbose, boolean exactMatch) {
 		return DBSyncUtils.getLastLog(classname, verbose, exactMatch);
 	}
 
@@ -82,7 +90,7 @@ public class OptimiserLogs extends Request {
 	 *
 	 * @return
 	 */
-	public static ArrayList<String> getRegisteredClasses() {
+	private static ArrayList<String> getRegisteredClasses() {
 		return DBSyncUtils.getRegisteredClasses();
 	}
 
@@ -92,13 +100,13 @@ public class OptimiserLogs extends Request {
 	 * @param className
 	 * @return
 	 */
-	public static String getFullClassName(String className) {
+	private static String getFullClassName(String className) {
 		return DBSyncUtils.getFullClassName(className);
 	}
 
 	@Override
 	public String toString() {
-		return "Asked for a manual resyncLDAP";
+		return "Asked for a optimiserLogs";
 	}
 
 	@Override
