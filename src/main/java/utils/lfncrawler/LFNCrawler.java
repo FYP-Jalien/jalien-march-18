@@ -104,22 +104,28 @@ public class LFNCrawler {
         Set<LFN> processedToDelete = new HashSet<>();
 
         for (final LFN l : lfnsToDelete) {
+            if (processedToDelete.contains(l)) {
+                continue;
+            }
+
+            final LFN realLFN = LFNUtils.getRealLFN(l);
+            if (processedToDelete.contains(realLFN)) {
+                continue;
+            }
+
             print("Parsing LFN: " + l.getCanonicalName());
 
-            LFN realLFN = LFNUtils.getRealLFN(l);
+            final List<LFN> members = LFNUtils.getArchiveMembers(realLFN);
+            if (members != null) {
+                for (final LFN member : members) {
+                    processedToDelete.add(member);
+                    print("Found archive member: " + member.getCanonicalName());
+                }
+            }
 
-            if (!processedToDelete.contains(l) && !processedToDelete.contains(realLFN)) {
-                final List<LFN> members = LFNUtils.getArchiveMembers(realLFN);
-                if (members != null) {
-                    for (final LFN member : members) {
-                        processedToDelete.add(member);
-                        print("Found archive member: " + member.getCanonicalName());
-                    }
-                }
-                processedToDelete.add(l);
-                if (realLFN != null) {
-                    processedToDelete.add(realLFN);
-                }
+            processedToDelete.add(l);
+            if (realLFN != null) {
+                processedToDelete.add(realLFN);
             }
         }
 
