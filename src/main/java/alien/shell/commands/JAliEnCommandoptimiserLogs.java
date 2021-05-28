@@ -25,34 +25,9 @@ public class JAliEnCommandoptimiserLogs extends JAliEnBaseCommand {
 	@Override
 	public void run() {
 		try {
-			Dispatcher.execute(new OptimiserLogs());
+			OptimiserLogs optimiserLogs = Dispatcher.execute(new OptimiserLogs(classes, frequency, verbose, listClasses));
 
-			String log = "";
-
-			if (frequency != 0)
-				OptimiserLogs.modifyFrequency(frequency, classes);
-
-			if (listClasses) {
-				log = log + "Classnames matching query : \n";
-				for (String className : classes) {
-					log = log + "\t" + OptimiserLogs.getFullClassName(className) + "\n";
-				}
-				log = log + "\n";
-			}
-			else {
-				for (String className : classes) {
-					String classLog = OptimiserLogs.getLastLogFromDB(className, verbose, false);
-					if (classLog != "") {
-						log = log + classLog + "\n";
-					}
-					else {
-						log = log + "The introduced classname/keyword (" + className + ") is not registered. The classes in the database are : \n";
-						for (String classname : OptimiserLogs.getRegisteredClasses())
-							log = log + "\t" + classname + "\n";
-					}
-				}
-			}
-			commander.printOutln(ShellColor.jobStateRed() + log.trim() + ShellColor.reset());
+			commander.printOutln(ShellColor.jobStateRed() + optimiserLogs.getLogOutput().trim() + ShellColor.reset());
 		}
 		catch (ServerException e) {
 			commander.setReturnCode(ErrNo.ENODATA, "Could not get the optimiser db logs from optimiserLogs command : " + e.getMessage());

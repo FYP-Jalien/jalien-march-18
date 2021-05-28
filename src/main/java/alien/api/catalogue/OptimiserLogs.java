@@ -5,7 +5,6 @@ import java.util.List;
 
 import alien.api.Request;
 import alien.optimizers.DBSyncUtils;
-import alien.optimizers.catalogue.ResyncLDAP;
 
 /**
  * Outputs the logs stored in the optimizers db
@@ -16,9 +15,47 @@ import alien.optimizers.catalogue.ResyncLDAP;
 public class OptimiserLogs extends Request {
 	private static final long serialVersionUID = -8097151852196189205L;
 
-	public OptimiserLogs() {
+	private List<String> classes;
+	private boolean verbose;
+	private boolean listClasses;
+	private int frequency;
+	private String logOutput;
+
+	public OptimiserLogs(List<String> classes, int frequency, boolean verbose, boolean listClasses) {
+		this.classes = classes;
+		this.frequency = frequency;
+		this.verbose = verbose;
+		this.listClasses = listClasses;
+		this.logOutput = "";
 	}
 
+	@Override
+	public void run() {
+
+		if (frequency != 0)
+			OptimiserLogs.modifyFrequency(frequency, classes);
+
+		if (listClasses) {
+			logOutput = logOutput + "Classnames matching query : \n";
+			for (String className : classes) {
+				logOutput = logOutput + "\t" + OptimiserLogs.getFullClassName(className) + "\n";
+			}
+			logOutput = logOutput + "\n";
+		}
+		else {
+			for (String className : classes) {
+				String classLog = OptimiserLogs.getLastLogFromDB(className, verbose, false);
+				if (classLog != "") {
+					logOutput = logOutput + classLog + "\n";
+				}
+				else {
+					logOutput = logOutput + "The introduced classname/keyword (" + className + ") is not registered. The classes in the database are : \n";
+					for (String classname : OptimiserLogs.getRegisteredClasses())
+						logOutput = logOutput + "\t" + classname + "\n";
+				}
+			}
+		}
+	}
 
 	/**
 	 * Modifies the frequency for the classes in the db
@@ -69,7 +106,12 @@ public class OptimiserLogs extends Request {
 		return null;
 	}
 
-	@Override
-	public void run() {
+	/**
+	 * Gets the log to output to the user
+	 *
+	 * @return
+	 */
+	public String getLogOutput() {
+		return logOutput;
 	}
 }

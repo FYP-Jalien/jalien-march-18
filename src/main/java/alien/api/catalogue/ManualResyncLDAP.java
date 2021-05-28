@@ -16,17 +16,28 @@ public class ManualResyncLDAP extends Request {
 	private static final long serialVersionUID = -8097151852196189205L;
 
 	private String logOutput;
+	private boolean lastLog;
+	private static String[] classnames = { "users", "roles", "SEs" };
 
-	public ManualResyncLDAP() {
-		logOutput = "";
+	public ManualResyncLDAP(boolean lastLog) {
+		this.lastLog = lastLog;
+		this.logOutput = "";
 	}
 
 	@Override
 	public void run() {
-		if (getEffectiveRequester().canBecome("admin"))
+		if (getEffectiveRequester().canBecome("admin")) {
 			logOutput = ResyncLDAP.manualResyncLDAP();
-		else
+			if (this.lastLog) {
+				String prefix = "alien.optimizers.catalogue.ResyncLDAP.";
+				logOutput = "";
+				for (String classname : classnames) {
+					logOutput = logOutput + ManualResyncLDAP.getLastLogFromDB(prefix + classname) + "\n";
+				}
+			}
+		} else {
 			logOutput = "Only users with role admin can execute this call";
+		}
 	}
 
 	/**

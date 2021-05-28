@@ -18,22 +18,13 @@ public class JAliEnCommandresyncLDAP extends JAliEnBaseCommand {
 
 	private boolean lastLog = false;
 
-	private static String[] classnames = { "users", "roles", "SEs" };
-
 	@Override
 	public void run() {
 		commander.printOutln("Print last log flag set to " + this.lastLog);
 		try {
-			final ManualResyncLDAP manualCall = Dispatcher.execute(new ManualResyncLDAP());
-			String logOutput = manualCall.getLogOutput();
-			if (this.lastLog) {
-				String prefix = "alien.optimizers.catalogue.ResyncLDAP.";
-				logOutput = "";
-				for (String classname : classnames) {
-					logOutput = logOutput + ManualResyncLDAP.getLastLogFromDB(prefix + classname) + "\n";
-				}
-			}
-			commander.printOutln(ShellColor.jobStateRed() + logOutput.trim() + ShellColor.reset());
+			final ManualResyncLDAP manualCall = Dispatcher.execute(new ManualResyncLDAP(this.lastLog));
+
+			commander.printOutln(ShellColor.jobStateRed() + manualCall.getLogOutput().trim() + ShellColor.reset());
 		}
 		catch (ServerException e) {
 			commander.setReturnCode(ErrNo.ENODATA, "Could not get the log output from resyncLDAP command : " + e.getMessage());
