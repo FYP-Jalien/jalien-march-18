@@ -294,6 +294,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			// run payload
 			final int execExitCode = execute();
+			
+			getTraceFromFile();
+			
 			if (execExitCode != 0) {
 				logger.log(Level.SEVERE, "Failed to run payload");
 
@@ -310,6 +313,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			}
 
 			final int valExitCode = validate();
+			
+			getTraceFromFile();
+			
 			if (valExitCode != 0) {
 				logger.log(Level.SEVERE, "Validation failed");
 
@@ -317,11 +323,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					commander.q_api.putJobLog(queueId, "trace", "Failed to start validation. Exit code: " + Math.abs(valExitCode));
 				else
 					commander.q_api.putJobLog(queueId, "trace", "Validation failed. Exit code: " + valExitCode);
-
-				final String fileTrace = getTraceFromFile();
-				if (fileTrace != null)
-					commander.q_api.putJobLog(queueId, "trace", fileTrace);
-
+				
 				final int valUploadExitCode = uploadOutputFiles(JobStatus.ERROR_V) ? valExitCode : -1;
 
 				//changeStatus(JobStatus.ERROR_V);
@@ -564,7 +566,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			commander.q_api.putJobLog(queueId, "trace", "Getting InputFile: " + entry.getKey().getCanonicalName() + " to " + f.getAbsolutePath());
 			logger.log(Level.INFO, g + ". entry.getvalue(): " + entry.getValue());
 			commander.q_api.putJobLog(queueId, "trace", g + ". entry.getvalue(): " + entry.getValue());
-			
+
 			f = IOUtils.get(g, f, errorMessage);
 
 			if (f == null) {
@@ -912,19 +914,24 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		return outputDir;
 	}
 
-	private static String getTraceFromFile() {
+	private void getTraceFromFile() {
 		final File traceFile = new File(".alienValidation.trace");
 
-		if (traceFile.exists()) {
+		if (traceFile.exists() && traceFile.length() > 0) {
 			try {
-				return new String(Files.readAllBytes(traceFile.toPath()));
+				String trace = new String(Files.readAllBytes(traceFile.toPath()));
+
+				if (!trace.isBlank())
+					commander.q_api.putJobLog(queueId, "trace", trace);
+
+				traceFile.delete();
 			}
 			catch (final Exception e) {
 				logger.log(Level.WARNING, "An error occurred when reading .alienValidation.trace: " + e);
 			}
 		}
+
 		logger.log(Level.INFO, ".alienValidation.trace does not exist.");
-		return null;
 	}
 
 	private void createAndAddResultsJDL(@SuppressWarnings("unused") final ParsedOutput filesTable) {
