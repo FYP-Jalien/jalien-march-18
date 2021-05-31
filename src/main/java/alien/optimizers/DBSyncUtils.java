@@ -37,7 +37,7 @@ public class DBSyncUtils {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return;
 			}
-			String sqlLdapDB = "CREATE TABLE IF NOT EXISTS `OPTIMIZERS` (`class` varchar(100) COLLATE latin1_general_cs NOT NULL, "
+			final String sqlLdapDB = "CREATE TABLE IF NOT EXISTS `OPTIMIZERS` (`class` varchar(100) COLLATE latin1_general_cs NOT NULL, "
 					+ "`lastUpdate` bigInt NOT NULL, `frequency` int(11) NOT NULL, `lastUpdatedLog` text COLLATE latin1_general_ci DEFAULT NULL, "
 					+ "PRIMARY KEY (`class`)) ENGINE=MyISAM DEFAULT CHARSET=latin1 COLLATE=latin1_general_cs;";
 			if (!db.query(sqlLdapDB))
@@ -48,14 +48,13 @@ public class DBSyncUtils {
 	/**
 	 * Performs the database update operations when instructed from a periodic call
 	 *
-	 * @param db Database to update
-	 * @param frequency Frequency of updates
+	 * @param initFrequency Frequency of updates, default value for this class
 	 * @param classname Class to update
 	 * @return Success of update query
 	 */
-	public static boolean updatePeriodic(int initFrequency, String classname) {
+	public static boolean updatePeriodic(final int initFrequency, final String classname) {
 		boolean updated = false;
-		Long timestamp = Long.valueOf(System.currentTimeMillis());
+		final Long timestamp = Long.valueOf(System.currentTimeMillis());
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
 			if (db == null) {
 				logger.log(Level.INFO, "Could not get DBs!");
@@ -63,17 +62,17 @@ public class DBSyncUtils {
 			}
 			db.query("SELECT count(*) from `OPTIMIZERS` WHERE class = ?", false, classname);
 			if (db.moveNext()) {
-				int valuecounts = db.geti(1);
+				final int valuecounts = db.geti(1);
 				if (valuecounts == 0) {
 					updated = registerClass(initFrequency, classname, timestamp);
 				}
 				else {
 					db.query("SELECT frequency from `OPTIMIZERS` WHERE class = ?", false, classname);
 					if (db.moveNext()) {
-						int frequency = db.geti("frequency");
+						final int frequency = db.geti("frequency");
 						// If the frequency is set to -1 do not run
 						if (frequency != -1) {
-							Long lastUpdated = Long.valueOf(System.currentTimeMillis() - frequency);
+							final Long lastUpdated = Long.valueOf(System.currentTimeMillis() - frequency);
 							updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ? WHERE class = ? AND lastUpdate < ?",
 									false, timestamp, classname, lastUpdated) && db.getUpdateCount() > 0;
 						}
@@ -92,7 +91,7 @@ public class DBSyncUtils {
 	 * @param timestamp Last update timestamp
 	 * @return Success of the registration
 	 */
-	private static boolean registerClass(int frequency, String classname, Long timestamp) {
+	private static boolean registerClass(final int frequency, final String classname, final Long timestamp) {
 		boolean updated;
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
 			if (db == null) {
@@ -108,18 +107,18 @@ public class DBSyncUtils {
 	/**
 	 * Performs the database update operations when instructed from the user's shell call
 	 *
-	 * @param db Database to update
 	 * @param classname Class to update
+	 * @param log
 	 * @return Success of the update query
 	 */
-	public static boolean updateManual(String classname, String log) {
-		Long timestamp = Long.valueOf(System.currentTimeMillis());
+	public static boolean updateManual(final String classname, final String log) {
+		final Long timestamp = Long.valueOf(System.currentTimeMillis());
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
 			if (db == null) {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return false;
 			}
-			boolean updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ?, lastUpdatedLog = ? WHERE class = ?",
+			final boolean updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ?, lastUpdatedLog = ? WHERE class = ?",
 					false, timestamp, log, classname) && db.getUpdateCount() > 0;
 			return updated;
 		}
@@ -128,19 +127,18 @@ public class DBSyncUtils {
 	/**
 	 * Registers the log output from the DB synchronization
 	 *
-	 * @param db Database to update
 	 * @param classname Class to update
 	 * @param logOutput Log to register
 	 * @return Success of the update query
 	 */
-	public static boolean registerLog(String classname, String logOutput) {
+	public static boolean registerLog(final String classname, final String logOutput) {
 		logger.log(Level.INFO, "Registering log output in DB");
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
 			if (db == null) {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return false;
 			}
-			boolean updated = db.query("UPDATE OPTIMIZERS set lastUpdatedLog = ? WHERE class = ?", false, logOutput, classname);
+			final boolean updated = db.query("UPDATE OPTIMIZERS set lastUpdatedLog = ? WHERE class = ?", false, logOutput, classname);
 			return updated;
 		}
 	}
@@ -153,7 +151,7 @@ public class DBSyncUtils {
 	 * @param exactMatch Boolean for the exact matching of the classname in the db
 	 * @return String containing the last log
 	 */
-	public static String getLastLog(String classname, boolean verbose, boolean exactMatch) {
+	public static String getLastLog(final String classname, final boolean verbose, final boolean exactMatch) {
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
 			if (db == null) {
 				logger.log(Level.INFO, "Could not get DBs!");
@@ -188,14 +186,14 @@ public class DBSyncUtils {
 	 * @param classnames List of classes to change the frequency for
 	 * @return Boolean stating the success of the update
 	 */
-	public static boolean modifyFrequency(int updatedFrequency, List<String> classnames) {
+	public static boolean modifyFrequency(final int updatedFrequency, final List<String> classnames) {
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
 			if (db == null) {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return false;
 			}
-			for (String classname : classnames) {
-				boolean updated = db.query("UPDATE OPTIMIZERS SET frequency = ? WHERE class = ?",
+			for (final String classname : classnames) {
+				final boolean updated = db.query("UPDATE OPTIMIZERS SET frequency = ? WHERE class = ?",
 						false, Integer.valueOf(updatedFrequency), classname) && db.getUpdateCount() > 0;
 				if (updated == false)
 					return false;
@@ -215,12 +213,12 @@ public class DBSyncUtils {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return null;
 			}
-			boolean querySuccess = db.query("SELECT class FROM `OPTIMIZERS`");
+			final boolean querySuccess = db.query("SELECT class FROM `OPTIMIZERS`");
 			if (!querySuccess) {
 				logger.log(Level.SEVERE, "Could not get the classnames from the OPTIMIZERS db");
 				return null;
 			}
-			ArrayList<String> classes = new ArrayList<>();
+			final ArrayList<String> classes = new ArrayList<>();
 			while (db.moveNext())
 				classes.add(db.gets("class"));
 			return classes;
@@ -233,13 +231,13 @@ public class DBSyncUtils {
 	 * @param classname Class to get full name
 	 * @return The full name of the class
 	 */
-	public static String getFullClassName(String classname) {
+	public static String getFullClassName(final String classname) {
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
 			if (db == null) {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return "";
 			}
-			boolean querySuccess = db.query("SELECT class FROM `OPTIMIZERS` WHERE class LIKE concat('%', ?, '%')", false, classname);
+			final boolean querySuccess = db.query("SELECT class FROM `OPTIMIZERS` WHERE class LIKE concat('%', ?, '%')", false, classname);
 			if (!querySuccess) {
 				logger.log(Level.SEVERE, "Could not get the classnames from the OPTIMIZERS db");
 				return "";

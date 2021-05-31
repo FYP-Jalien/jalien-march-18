@@ -59,7 +59,7 @@ public class ResyncLDAP extends Optimizer {
 				}
 				periodic.set(true);
 			}
-			catch (Exception e) {
+			catch (final Exception e) {
 				e.printStackTrace();
 			}
 			try {
@@ -69,7 +69,7 @@ public class ResyncLDAP extends Optimizer {
 				}
 			}
 			catch (final InterruptedException e) {
-				logger.log(Level.SEVERE, "The periodic optimiser has been forced to exit");
+				logger.log(Level.SEVERE, "The periodic optimiser has been forced to exit", e);
 				break;
 			}
 		}
@@ -77,6 +77,8 @@ public class ResyncLDAP extends Optimizer {
 
 	/**
 	 * Manual instruction for the ResyncLDAP
+	 *
+	 * @return the log of the manually executed command
 	 */
 	public static String manualResyncLDAP() {
 		synchronized (requestSync) {
@@ -85,14 +87,15 @@ public class ResyncLDAP extends Optimizer {
 			requestSync.notifyAll();
 		}
 
-		while (!periodic.get()){
+		while (!periodic.get()) {
 			try {
 				synchronized (backRequestSync) {
 					backRequestSync.wait(1000);
 				}
 			}
 			catch (final InterruptedException e) {
-				logger.log(Level.SEVERE, "The periodic optimiser has been forced to exit");
+				logger.log(Level.SEVERE, "The periodic optimiser has been forced to exit", e);
+				break;
 			}
 		}
 
@@ -111,7 +114,7 @@ public class ResyncLDAP extends Optimizer {
 
 		logger.log(Level.INFO, "Checking if an LDAP resynchronisation is needed");
 		boolean updated = true;
-		for (String classname : classnames) {
+		for (final String classname : classnames) {
 			if (periodic.get())
 				updated = DBSyncUtils.updatePeriodic(frequency, ResyncLDAP.class.getCanonicalName() + "." + classname);
 
@@ -141,12 +144,12 @@ public class ResyncLDAP extends Optimizer {
 	 */
 	private static void updateUsers() {
 		logger.log(Level.INFO, "Synchronising DB users with LDAP");
-		String ouHosts = "ou=People,";
-		HashMap<String, String> modifications = new HashMap<>();
+		final String ouHosts = "ou=People,";
+		final HashMap<String, String> modifications = new HashMap<>();
 
 		// Insertion of the users
 		final Set<String> uids = LDAPHelper.checkLdapInformation("(objectClass=pkiUser)", ouHosts, "uid", false);
-		int length = uids.size();
+		final int length = uids.size();
 		logger.log(Level.INFO, "Inserting " + length + " users");
 		if (length == 0)
 			logger.log(Level.WARNING, "No users gotten from LDAP");
@@ -162,7 +165,7 @@ public class ResyncLDAP extends Optimizer {
 				return;
 			}
 			while (db.moveNext()) {
-				String user = db.gets("user");
+				final String user = db.gets("user");
 				if (!uids.contains(user)) {
 					modifications.put(user, user + ": deleted account \n");
 				}
@@ -170,8 +173,8 @@ public class ResyncLDAP extends Optimizer {
 
 			// TODO: To be done with replace into
 			db.query("UPDATE USERS_LDAP SET up=0");
-			for (String user : uids) {
-				ArrayList<String> originalDns = new ArrayList<>();
+			for (final String user : uids) {
+				final ArrayList<String> originalDns = new ArrayList<>();
 				querySuccess = db.query("SELECT * from `USERS_LDAP` WHERE user = ?", false, user);
 				if (!querySuccess) {
 					logger.log(Level.SEVERE, "Error getting DB entry for user " + user);
@@ -182,8 +185,8 @@ public class ResyncLDAP extends Optimizer {
 				if (originalDns.isEmpty())
 					modifications.put(user, user + ": new account, ");
 				final Set<String> dns = LDAPHelper.checkLdapInformation("uid=" + user, ouHosts, "subject", false);
-				ArrayList<String> currentDns = new ArrayList<>();
-				for (String dn : dns) {
+				final ArrayList<String> currentDns = new ArrayList<>();
+				for (final String dn : dns) {
 					currentDns.add(dn);
 					// db.query("REPLACE INTO USERS_LDAP (user, dn, up) VALUES (?, ?, 1)", false, user, dn);
 					db.query("INSERT INTO USERS_LDAP (user, dn, up) VALUES (?, ?, 1)", false, user, dn);
@@ -192,23 +195,23 @@ public class ResyncLDAP extends Optimizer {
 				printModifications(modifications, currentDns, originalDns, user, "added", "DNs");
 				printModifications(modifications, originalDns, currentDns, user, "removed", "DNs");
 
-				String homeDir = UsersHelper.getHomeDir(user);
+				final String homeDir = UsersHelper.getHomeDir(user);
 				LFN userHome = LFNUtils.getLFN(homeDir);
 				if (userHome == null || !userHome.exists) {
-					AliEnPrincipal adminUser = UserFactory.getByUsername("admin");
+					final AliEnPrincipal adminUser = UserFactory.getByUsername("admin");
 					userHome = LFNUtils.mkdirs(adminUser, homeDir);
 				}
 				if (userHome != null) {
-					AliEnPrincipal newUser = UserFactory.getByUsername(user);
+					final AliEnPrincipal newUser = UserFactory.getByUsername(user);
 					userHome.chown(newUser);
 				}
 			}
 			db.query("select a.user from USERS_LDAP a left join USERS_LDAP b on b.up=0 and a.user=b.user where a.up=1 and b.user is null");
 			while (db.moveNext()) {
-				String userToDelete = db.gets("user");
+				final String userToDelete = db.gets("user");
 				db.query("SELECT count(*) from `USERS_LDAP` WHERE user = ?", false, userToDelete);
 				if (db.moveNext()) {
-					int count = db.geti(1);
+					final int count = db.geti(1);
 					if (count == 0) {
 						logger.log(Level.WARNING, "The user " + userToDelete + " is no longer listed in LDAP. It will be deleted from the database");
 					}
@@ -219,15 +222,15 @@ public class ResyncLDAP extends Optimizer {
 			db.query("DELETE FROM USERS_LDAP WHERE up = 0");
 			// TODO: Delete home dir of inactive users
 
-			String usersLog = "Users: " + length + " synchronized. " + modifications.keySet().size() + " changes. \n";
+			String usersLog = "Users: " + length + " synchronized. " + modifications.size() + " changes. \n";
 			if (modifications.size() > 0) {
-				for (String user : modifications.keySet())
+				for (final String user : modifications.keySet())
 					usersLog = usersLog + modifications.get(user) + "\n";
 			}
 			logOutput = logOutput + "\n" + usersLog;
 			if (periodic.get())
 				DBSyncUtils.registerLog(ResyncLDAP.class.getCanonicalName() + ".users", usersLog);
-			else if (modifications.keySet().size() > 0)
+			else if (modifications.size() > 0)
 				DBSyncUtils.updateManual(ResyncLDAP.class.getCanonicalName() + ".users", usersLog);
 		}
 	}
@@ -239,12 +242,12 @@ public class ResyncLDAP extends Optimizer {
 	 */
 	private static void updateRoles() {
 		logger.log(Level.INFO, "Synchronising DB roles with LDAP");
-		String ouRoles = "ou=Roles,";
-		HashMap<String, String> modifications = new HashMap<>();
+		final String ouRoles = "ou=Roles,";
+		final HashMap<String, String> modifications = new HashMap<>();
 
 		// Insertion of the roles
 		final Set<String> roles = LDAPHelper.checkLdapInformation("(objectClass=AliEnRole)", ouRoles, "uid", false);
-		int length = roles.size();
+		final int length = roles.size();
 		logger.log(Level.INFO, "Inserting " + length + " roles");
 		if (length == 0)
 			logger.log(Level.WARNING, "No roles gotten from LDAP");
@@ -259,7 +262,7 @@ public class ResyncLDAP extends Optimizer {
 				return;
 			}
 			while (db.moveNext()) {
-				String role = db.gets("role");
+				final String role = db.gets("role");
 				if (!roles.contains(role)) {
 					modifications.put(role, role + ": deleted role \n");
 				}
@@ -267,8 +270,8 @@ public class ResyncLDAP extends Optimizer {
 
 			// TODO: To be done with replace into
 			db.query("UPDATE USERS_LDAP_ROLE SET up=0");
-			for (String role : roles) {
-				ArrayList<String> originalUsers = new ArrayList<>();
+			for (final String role : roles) {
+				final ArrayList<String> originalUsers = new ArrayList<>();
 				querySuccess = db.query("SELECT * from `USERS_LDAP_ROLE` WHERE role = ?", false, role);
 				if (!querySuccess) {
 					logger.log(Level.SEVERE, "Error getting DB entry for role " + role);
@@ -279,15 +282,15 @@ public class ResyncLDAP extends Optimizer {
 				if (originalUsers.isEmpty())
 					modifications.put(role, role + ": new role, ");
 				final Set<String> users = LDAPHelper.checkLdapInformation("uid=" + role, ouRoles, "users", false);
-				ArrayList<String> currentUsers = new ArrayList<>();
-				for (String user : users) {
+				final ArrayList<String> currentUsers = new ArrayList<>();
+				for (final String user : users) {
 					querySuccess = db.query("SELECT count(*) from `USERS_LDAP` WHERE user = ?", false, user);
 					if (!querySuccess) {
 						logger.log(Level.SEVERE, "Error getting user count from DB");
 						return;
 					}
 					if (db.moveNext()) {
-						int userInstances = db.geti(1);
+						final int userInstances = db.geti(1);
 						if (userInstances == 0) {
 							logger.log(Level.WARNING, "An already deleted user is still associated with role " + role + ". Consider cleaning ldap");
 							if (originalUsers.contains(user))
@@ -308,22 +311,22 @@ public class ResyncLDAP extends Optimizer {
 
 			db.query("select a.role from USERS_LDAP_ROLE a left join USERS_LDAP_ROLE b on b.up=0 and a.role=b.role where a.up=1 and b.role is null");
 			while (db.moveNext()) {
-				String roleToDelete = db.gets("role");
+				final String roleToDelete = db.gets("role");
 				logger.log(Level.WARNING, "The role " + roleToDelete + " is no longer listed in LDAP. It will be deleted from the database");
 			}
 
 			logger.log(Level.INFO, "Deleting inactive roles");
 			db.query("DELETE FROM USERS_LDAP_ROLE WHERE up = 0");
 
-			String rolesLog = "Roles: " + length + " synchronized. " + modifications.keySet().size() + " changes. \n";
+			String rolesLog = "Roles: " + length + " synchronized. " + modifications.size() + " changes. \n";
 			if (modifications.size() > 0) {
-				for (String role : modifications.keySet())
+				for (final String role : modifications.keySet())
 					rolesLog = rolesLog + modifications.get(role) + "\n";
 			}
 			logOutput = logOutput + "\n" + rolesLog;
 			if (periodic.get())
 				DBSyncUtils.registerLog(ResyncLDAP.class.getCanonicalName() + ".roles", rolesLog);
-			else if (modifications.keySet().size() > 0)
+			else if (modifications.size() > 0)
 				DBSyncUtils.updateManual(ResyncLDAP.class.getCanonicalName() + ".roles", rolesLog);
 		}
 	}
@@ -335,12 +338,12 @@ public class ResyncLDAP extends Optimizer {
 	 */
 	private static void updateSEs() {
 		logger.log(Level.INFO, "Synchronising DB SEs and volumes with LDAP");
-		String ouSites = "ou=Sites,";
+		final String ouSites = "ou=Sites,";
 
 		final Set<String> dns = LDAPHelper.checkLdapInformation("(objectClass=AliEnSE)", ouSites, "dn", true);
-		ArrayList<String> seNames = new ArrayList<>();
-		ArrayList<String> sites = new ArrayList<>();
-		HashMap<String, String> modifications = new HashMap<>();
+		final ArrayList<String> seNames = new ArrayList<>();
+		final ArrayList<String> sites = new ArrayList<>();
+		final HashMap<String, String> modifications = new HashMap<>();
 
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
 			if (db == null) {
@@ -348,33 +351,33 @@ public class ResyncLDAP extends Optimizer {
 				return;
 			}
 			// From the dn we get the seName and site
-			Iterator<String> itr = dns.iterator();
+			final Iterator<String> itr = dns.iterator();
 			while (itr.hasNext()) {
-				String dn = itr.next();
+				final String dn = itr.next();
 				if (dn.contains("disabled")) {
 					logger.log(Level.WARNING, "Skipping " + dn + " (it is disabled)");
 					continue;
 				}
-				String[] entries = dn.split("[=,]");
+				final String[] entries = dn.split("[=,]");
 				if (entries.length >= 8) {
 					seNames.add(entries[1]);
 					sites.add(entries[entries.length - 1]);
 				}
 			}
 
-			int length = seNames.size();
+			final int length = seNames.size();
 			if (length == 0)
 				logger.log(Level.WARNING, "No SEs gotten from LDAP");
 
 			for (int ind = 0; ind < sites.size(); ind++) {
-				String site = sites.get(ind);
-				String se = seNames.get(ind);
+				final String site = sites.get(ind);
+				final String se = seNames.get(ind);
 
 				// This will be the base dn for the SE
-				String ouSE = "ou=SE,ou=Services,ou=" + site + ",ou=Sites,";
+				final String ouSE = "ou=SE,ou=Services,ou=" + site + ",ou=Sites,";
 
-				String vo = "ALICE";
-				String seName = vo + "::" + site + "::" + se;
+				final String vo = "ALICE";
+				final String seName = vo + "::" + site + "::" + se;
 
 				HashMap<String, String> originalSEs = new HashMap<>();
 				boolean querySuccess = db.query("SELECT * from `SE` WHERE seName = ?", false, seName);
@@ -412,23 +415,23 @@ public class ResyncLDAP extends Optimizer {
 					}
 
 					logger.log(Level.INFO, "Need to add the volume " + path);
-					String method = t.toLowerCase() + "://" + host;
+					final String method = t.toLowerCase() + "://" + host;
 					db.query("REPLACE INTO SE_VOLUMES(sename,volume,method,mountpoint,size) values (?,?,?,?,?)", false,
 							seName, path, method, path, size);
 
-					HashMap<String, String> currentSEVolumes = populateSEVolumesRegistry(seName, path, method, path, size);
+					final HashMap<String, String> currentSEVolumes = populateSEVolumesRegistry(seName, path, method, path, size);
 					printModificationsSEs(modifications, originalSEVolumes, currentSEVolumes, seName, "SE Volumes");
 
 				}
 
 				final String iodaemons = getLdapContentSE(ouSE, se, "iodaemons");
-				String[] temp = iodaemons.split(":");
+				final String[] temp = iodaemons.split(":");
 				String seioDaemons = "";
 				if (temp.length > 2) {
 					String proto = temp[0];
 					proto = proto.replace("xrootd", "root");
-					String hostName = "";
-					String port = "";
+					String hostName;
+					String port;
 					hostName = temp[1];
 					if (!hostName.matches("host=([^:]+)(:.*)?$")) {
 						logger.log(Level.INFO, "Error getting the host name from " + seName);
@@ -443,14 +446,14 @@ public class ResyncLDAP extends Optimizer {
 					}
 					port = port.split("=")[1];
 
-					if (!seioDaemons.equals("NULL")) {
+					if (!"NULL".equals(seioDaemons)) {
 						seioDaemons = proto + "://" + hostName + ":" + port;
 						logger.log(Level.INFO, "Using proto = " + proto + " host = " + hostName + " and port = " + port + " for " + seName);
 					}
 				}
 
 				String path = getLdapContentSE(ouSE, se, "savedir");
-				if (path.equals("")) {
+				if ("".equals(path)) {
 					logger.log(Level.INFO, "Error getting the savedir for " + seName);
 					return;
 				}
@@ -462,7 +465,7 @@ public class ResyncLDAP extends Optimizer {
 				String minSize = "0";
 
 				final Set<String> options = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "options");
-				for (String option : options) {
+				for (final String option : options) {
 					if (option.matches("min_size\\s*=\\s*(\\d+)")) {
 						minSize = option.split("=")[1];
 					}
@@ -474,7 +477,7 @@ public class ResyncLDAP extends Optimizer {
 				final String seExclusiveRead = getLdapContentSE(ouSE, se, "seExclusiveRead");
 				final String seVersion = getLdapContentSE(ouSE, se, "seVersion");
 
-				HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion);
+				final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion);
 				printModificationsSEs(modifications, originalSEs, currentSEs, seName, "SEs");
 
 				db.query("REPLACE INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
@@ -489,15 +492,15 @@ public class ResyncLDAP extends Optimizer {
 
 			// TODO: Delete inactive SEs
 
-			String sesLog = "SEs: " + length + " synchronized. " + modifications.keySet().size() + " changes. \n";
+			String sesLog = "SEs: " + length + " synchronized. " + modifications.size() + " changes. \n";
 			if (modifications.size() > 0) {
-				for (String seName : modifications.keySet())
+				for (final String seName : modifications.keySet())
 					sesLog = sesLog + modifications.get(seName) + "\n";
 			}
 			logOutput = logOutput + "\n" + sesLog;
 			if (periodic.get())
 				DBSyncUtils.registerLog(ResyncLDAP.class.getCanonicalName() + ".SEs", sesLog);
-			else if (modifications.keySet().size() > 0)
+			else if (modifications.size() > 0)
 				DBSyncUtils.updateManual(ResyncLDAP.class.getCanonicalName() + ".SEs", sesLog);
 		}
 	}
@@ -512,8 +515,9 @@ public class ResyncLDAP extends Optimizer {
 	 * @param action
 	 * @param entity
 	 */
-	private static void printModifications(HashMap<String, String> modifications, ArrayList<String> original, ArrayList<String> current, String element, String action, String entity) {
-		ArrayList<String> entities = new ArrayList<>(original);
+	private static void printModifications(final HashMap<String, String> modifications, final ArrayList<String> original, final ArrayList<String> current, final String element, final String action,
+			final String entity) {
+		final ArrayList<String> entities = new ArrayList<>(original);
 		entities.removeAll(current);
 		if (entities.size() > 0) {
 			addEntityLog(modifications, element);
@@ -529,14 +533,15 @@ public class ResyncLDAP extends Optimizer {
 	 * @param current
 	 * @param se
 	 */
-	private static void printModificationsSEs(HashMap<String, String> modifications, HashMap<String, String> original, HashMap<String, String> current, String se, String entity) {
-		ArrayList<String> updatedSEs = new ArrayList<>();
+	private static void printModificationsSEs(final HashMap<String, String> modifications, final HashMap<String, String> original, final HashMap<String, String> current, final String se,
+			final String entity) {
+		final ArrayList<String> updatedSEs = new ArrayList<>();
 		Set<String> keySet = null;
-		if (original.keySet().size() > current.keySet().size())
+		if (original.size() > current.size())
 			keySet = original.keySet();
 		else
 			keySet = current.keySet();
-		for (String param : keySet) {
+		for (final String param : keySet) {
 			if (original.get(param) == null || original.get(param) == "")
 				original.put(param, "null");
 			if (current.get(param) == null)
@@ -552,8 +557,8 @@ public class ResyncLDAP extends Optimizer {
 		}
 	}
 
-	private static HashMap<String, String> populateSEVolumesRegistry(String seName, String volume, String method, String mountpoint, String size) {
-		HashMap<String, String> seVolumes = new HashMap<>();
+	private static HashMap<String, String> populateSEVolumesRegistry(final String seName, final String volume, final String method, final String mountpoint, final String size) {
+		final HashMap<String, String> seVolumes = new HashMap<>();
 		seVolumes.put("seName", seName);
 		seVolumes.put("volume", volume);
 		seVolumes.put("method", method);
@@ -562,9 +567,10 @@ public class ResyncLDAP extends Optimizer {
 		return seVolumes;
 	}
 
-	private static HashMap<String, String> populateSERegistry(String seName, String seioDaemons, String path, String minSize, final String mss, final String qos, final String seExclusiveWrite,
+	private static HashMap<String, String> populateSERegistry(final String seName, final String seioDaemons, final String path, final String minSize, final String mss, final String qos,
+			final String seExclusiveWrite,
 			final String seExclusiveRead, final String seVersion) {
-		HashMap<String, String> ses = new HashMap<>();
+		final HashMap<String, String> ses = new HashMap<>();
 		ses.put("seName", seName);
 		ses.put("seMinSize", minSize);
 		ses.put("seType", mss);
@@ -577,7 +583,7 @@ public class ResyncLDAP extends Optimizer {
 		return ses;
 	}
 
-	private static String getLdapContentSE(String ouSE, String se, String parameter) {
+	private static String getLdapContentSE(final String ouSE, final String se, final String parameter) {
 		final Set<String> param = LDAPHelper.checkLdapInformation("name=" + se, ouSE, parameter);
 		String joined = "";
 		if (param.size() > 1) {
@@ -592,7 +598,7 @@ public class ResyncLDAP extends Optimizer {
 		return joined;
 	}
 
-	private static void addEntityLog(HashMap<String, String> modifications, String element) {
+	private static void addEntityLog(final HashMap<String, String> modifications, final String element) {
 		if (modifications.get(element) == null) {
 			modifications.put(element, element + " :  ");
 		}

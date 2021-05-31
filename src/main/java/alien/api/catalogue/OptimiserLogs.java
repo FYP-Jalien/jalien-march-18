@@ -16,12 +16,18 @@ public class OptimiserLogs extends Request {
 	private static final long serialVersionUID = -8097151852196189205L;
 
 	private List<String> classes;
-	private boolean verbose;
-	private boolean listClasses;
-	private int frequency;
+	private final boolean verbose;
+	private final boolean listClasses;
+	private final int frequency;
 	private String logOutput;
 
-	public OptimiserLogs(List<String> classes, int frequency, boolean verbose, boolean listClasses) {
+	/**
+	 * @param classes optimizers to get the log of
+	 * @param frequency new execution interval to set for the optimizers
+	 * @param verbose be verbose on the details of last execution
+	 * @param listClasses return just the list of matching classes
+	 */
+	public OptimiserLogs(final List<String> classes, final int frequency, final boolean verbose, final boolean listClasses) {
 		this.classes = classes;
 		this.frequency = frequency;
 		this.verbose = verbose;
@@ -39,26 +45,27 @@ public class OptimiserLogs extends Request {
 		if (frequency != 0)
 			if (getEffectiveRequester().canBecome("admin")) {
 				modifyFrequency(frequency, classes);
-			} else {
+			}
+			else {
 				logOutput = "Only users with role admin can execute this call";
 			}
 
 		if (listClasses) {
 			logOutput = logOutput + "Classnames matching query : \n";
-			for (String className : classes) {
+			for (final String className : classes) {
 				logOutput = logOutput + "\t" + getFullClassName(className) + "\n";
 			}
 			logOutput = logOutput + "\n";
 		}
 		else {
-			for (String className : classes) {
-				String classLog = getLastLogFromDB(className, verbose, false);
+			for (final String className : classes) {
+				final String classLog = getLastLogFromDB(className, verbose, false);
 				if (classLog != "") {
 					logOutput = logOutput + classLog + "\n";
 				}
 				else {
 					logOutput = logOutput + "The introduced classname/keyword (" + className + ") is not registered. The classes in the database are : \n";
-					for (String classname : getRegisteredClasses())
+					for (final String classname : getRegisteredClasses())
 						logOutput = logOutput + "\t" + classname + "\n";
 				}
 			}
@@ -71,7 +78,7 @@ public class OptimiserLogs extends Request {
 	 * @param frequency
 	 * @param classes
 	 */
-	private static void modifyFrequency(int frequency, List<String> classes) {
+	private static void modifyFrequency(final int frequency, final List<String> classes) {
 		DBSyncUtils.modifyFrequency(frequency, classes);
 	}
 
@@ -81,7 +88,7 @@ public class OptimiserLogs extends Request {
 	 * @param classname
 	 * @return
 	 */
-	private static String getLastLogFromDB(String classname, boolean verbose, boolean exactMatch) {
+	private static String getLastLogFromDB(final String classname, final boolean verbose, final boolean exactMatch) {
 		return DBSyncUtils.getLastLog(classname, verbose, exactMatch);
 	}
 
@@ -100,7 +107,7 @@ public class OptimiserLogs extends Request {
 	 * @param className
 	 * @return
 	 */
-	private static String getFullClassName(String className) {
+	private static String getFullClassName(final String className) {
 		return DBSyncUtils.getFullClassName(className);
 	}
 
@@ -117,7 +124,7 @@ public class OptimiserLogs extends Request {
 	/**
 	 * Gets the log to output to the user
 	 *
-	 * @return
+	 * @return the log of the periodic execution of the requested classes
 	 */
 	public String getLogOutput() {
 		return logOutput;

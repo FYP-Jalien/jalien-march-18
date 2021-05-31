@@ -17,7 +17,7 @@ import joptsimple.OptionSet;
  */
 public class JAliEnCommandoptimiserLogs extends JAliEnBaseCommand {
 
-	private List<String> classes;
+	private final List<String> classes;
 	private boolean verbose;
 	private boolean listClasses;
 	private int frequency;
@@ -25,11 +25,11 @@ public class JAliEnCommandoptimiserLogs extends JAliEnBaseCommand {
 	@Override
 	public void run() {
 		try {
-			OptimiserLogs optimiserLogs = Dispatcher.execute(new OptimiserLogs(classes, frequency, verbose, listClasses));
+			final OptimiserLogs optimiserLogs = Dispatcher.execute(new OptimiserLogs(classes, frequency, verbose, listClasses));
 
 			commander.printOutln(ShellColor.jobStateRed() + optimiserLogs.getLogOutput().trim() + ShellColor.reset());
 		}
-		catch (ServerException e) {
+		catch (final ServerException e) {
 			commander.setReturnCode(ErrNo.ENODATA, "Could not get the optimiser db logs from optimiserLogs command : " + e.getMessage());
 			return;
 		}
@@ -73,7 +73,7 @@ public class JAliEnCommandoptimiserLogs extends JAliEnBaseCommand {
 		frequency = 0;
 
 		final OptionParser parser = new OptionParser();
-		parser.accepts("f").withRequiredArg();
+		parser.accepts("f").withRequiredArg().ofType(Integer.class);
 		parser.accepts("v");
 		parser.accepts("l");
 
@@ -86,28 +86,23 @@ public class JAliEnCommandoptimiserLogs extends JAliEnBaseCommand {
 			listClasses = true;
 
 		if (options.has("f")) {
-			try {
-				frequency = Integer.valueOf(options.valueOf("f").toString()).intValue();
-				frequency = frequency > -1 ? frequency * 1000 : frequency;
-			}
-			catch (NumberFormatException e) {
-				frequency = -1;
-			}
+			frequency = ((Integer) options.valueOf("f")).intValue();
+			frequency = frequency > -1 ? frequency * 1000 : frequency;
 		}
 
 		final List<String> params = optionToString(options.nonOptionArguments());
 
-		ArrayList<String> allowedKeyWords = new ArrayList<>();
+		final ArrayList<String> allowedKeyWords = new ArrayList<>();
 		allowedKeyWords.add("ResyncLDAP.*");
 		allowedKeyWords.add("resyncLDAP");
 		this.classes = params;
-		for (String keyword : allowedKeyWords) {
+		for (final String keyword : allowedKeyWords) {
 			if (classes.contains(keyword))
 				replaceKeyWord(keyword, "ResyncLDAP");
 		}
 	}
 
-	private void replaceKeyWord(String keyword, String substitute) {
+	private void replaceKeyWord(final String keyword, final String substitute) {
 		this.classes.remove(keyword);
 		this.classes.add(substitute);
 	}

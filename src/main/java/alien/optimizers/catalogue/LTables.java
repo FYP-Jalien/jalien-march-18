@@ -52,7 +52,7 @@ public class LTables extends Optimizer {
 				String body = "";
 				String dbLog = "";
 
-				boolean updated = DBSyncUtils.updatePeriodic(frequency, LTables.class.getCanonicalName());
+				final boolean updated = DBSyncUtils.updatePeriodic(frequency, LTables.class.getCanonicalName());
 				if (updated) {
 					// Get count of latest L8 tables
 					db.setReadOnly(true);
@@ -101,12 +101,13 @@ public class LTables extends Optimizer {
 							if (!s.send(m))
 								logger.log(Level.SEVERE, "Could not send notification email: " + s.sError);
 
-
 							dbLog = "There are LFN tables that passed the " + maxCount + " entries limit: \n\n" + body;
 						}
 					}
 
-					dbLog = "There are no LFN tables that passed the " + maxCount + " entries limit.";
+					if (dbLog.isBlank())
+						dbLog = "There are no LFN tables that passed the " + maxCount + " entries limit.";
+
 					DBSyncUtils.registerLog(LTables.class.getCanonicalName(), dbLog);
 				}
 

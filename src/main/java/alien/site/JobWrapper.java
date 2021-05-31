@@ -3,6 +3,7 @@ package alien.site;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.lang.ProcessBuilder.Redirect;
 import java.nio.file.Files;
@@ -294,9 +295,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			// run payload
 			final int execExitCode = execute();
-			
+
 			getTraceFromFile();
-			
+
 			if (execExitCode != 0) {
 				logger.log(Level.SEVERE, "Failed to run payload");
 
@@ -313,9 +314,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			}
 
 			final int valExitCode = validate();
-			
+
 			getTraceFromFile();
-			
+
 			if (valExitCode != 0) {
 				logger.log(Level.SEVERE, "Validation failed");
 
@@ -323,10 +324,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					commander.q_api.putJobLog(queueId, "trace", "Failed to start validation. Exit code: " + Math.abs(valExitCode));
 				else
 					commander.q_api.putJobLog(queueId, "trace", "Validation failed. Exit code: " + valExitCode);
-				
+
 				final int valUploadExitCode = uploadOutputFiles(JobStatus.ERROR_V) ? valExitCode : -1;
 
-				//changeStatus(JobStatus.ERROR_V);
+				// changeStatus(JobStatus.ERROR_V);
 				return valUploadExitCode;
 			}
 
@@ -919,7 +920,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		if (traceFile.exists() && traceFile.length() > 0) {
 			try {
-				String trace = new String(Files.readAllBytes(traceFile.toPath()));
+				final String trace = new String(Files.readAllBytes(traceFile.toPath()));
 
 				if (!trace.isBlank())
 					commander.q_api.putJobLog(queueId, "trace", trace);
@@ -1013,8 +1014,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (process.isAlive())
 				process.destroyForcibly();
 
-			final String result = new String(process.getInputStream().readAllBytes());
-			logger.log(Level.INFO, result);
+			try (InputStream is = process.getInputStream()) {
+				final String result = new String(is.readAllBytes());
+				logger.log(Level.INFO, result);
+			}
 
 			return process.exitValue();
 		}

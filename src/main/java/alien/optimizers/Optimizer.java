@@ -65,7 +65,7 @@ public class Optimizer extends Thread {
 				logger.log(Level.INFO, "New catalogue optimizer: " + opt);
 				optclass.start();
 			}
-			catch (ReflectiveOperationException e) {
+			catch (final ReflectiveOperationException e) {
 				logger.log(Level.SEVERE, "Can't instantiate optimizer " + opt + "! " + e);
 			}
 	}

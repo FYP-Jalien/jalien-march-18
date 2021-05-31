@@ -9,6 +9,7 @@ import alien.optimizers.Optimizer;
 public class JOptimizers {
 
 	private static JOptimizers _instance;
+
 	/**
 	 * @param args
 	 * @throws Exception
@@ -18,9 +19,13 @@ public class JOptimizers {
 		opt.start();
 	}
 
-	public static JOptimizers getInstance() throws Exception {
+	/**
+	 * @return the only intance of optimizers for this JVM
+	 */
+	public static synchronized JOptimizers getInstance() {
 		if (_instance == null)
 			_instance = new JOptimizers();
+
 		return _instance;
 	}
 
@@ -28,8 +33,10 @@ public class JOptimizers {
 	 * @param args
 	 * @throws Exception
 	 */
-	/*public static void main(final String[] args) throws Exception {
-		final Optimizer opt = new Optimizer();
-		opt.start();
-	}*/
+	/*
+	 * public static void main(final String[] args) throws Exception {
+	 * final Optimizer opt = new Optimizer();
+	 * opt.start();
+	 * }
+	 */
 }

@@ -56,40 +56,46 @@ public class GuidTable extends Optimizer {
 			while (true) {
 				logger.log(Level.INFO, "GuidTable wakes up!: going to get G tables counts with max: " + maxCount);
 
-				boolean updated = DBSyncUtils.updatePeriodic(frequency, GuidTable.class.getCanonicalName());
+				final boolean updated = DBSyncUtils.updatePeriodic(frequency, GuidTable.class.getCanonicalName());
 
 				if (updated) {
 					// Get count of latest G tables
 					db.setReadOnly(true);
-					db.query("select max(tableName) from GUIDINDEX where guidTime is not null");
-					db.moveNext();
+
+					if (!db.query("select max(tableName) from GUIDINDEX where guidTime is not null"))
+						continue;
+
 					final int tableNumber = db.geti(1);
 
 					db.setReadOnly(true);
-					db.query("select count(1) from G" + tableNumber + "L_PFN");
-					db.moveNext();
+					if (!db.query("select count(1) from G" + tableNumber + "L_PFN"))
+						continue;
+
 					count = db.geti(1);
 
-					if (count > maxCount)
+					if (count > maxCount) {
 						// new G table
 						createNewGTable(db, tableNumber + 1);
-					else {
-						db.setReadOnly(true);
-						db.query("select count(1) from G" + tableNumber + "L");
-						db.moveNext();
+						continue;
+					}
+
+					if (!db.query("select count(1) from G" + tableNumber + "L"))
 						count = db.geti(1);
 
-						if (count > maxCount)
-							// new G table
-							createNewGTable(db, tableNumber + 1);
+					if (count > maxCount) {
+						createNewGTable(db, tableNumber + 1);
+						continue;
 					}
 
 					if (count > warnCount) {
-						final String admins = ConfigUtils.getConfig().gets("mail_admins"); // comma separated list of emails in config.properties 'mail_admins'
+						final String admins = ConfigUtils.getConfig().gets("mail_admins", "grigoras@cern.ch"); // comma separated list of emails in config.properties 'mail_admins'
+						final Mail m = new Mail();
+						m.sBody = "The table G" + tableNumber + "L has passed " + warnCount + " entries and will be soon renewed!";
+
+						DBSyncUtils.registerLog(GuidTable.class.getCanonicalName(), m.sBody);
+
 						if (admins != null && admins.length() > 0) {
-							final Mail m = new Mail();
 							m.sSubject = "JAliEn CS: G table filling up";
-							m.sBody = "The table G" + tableNumber + "L has passed " + warnCount + " entries and will be soon renewed!";
 							m.sFrom = "JAliEnMaster@cern.ch";
 							m.sTo = admins;
 							final Sendmail s = new Sendmail(m.sFrom, "cernmx.cern.ch");
@@ -97,9 +103,11 @@ public class GuidTable extends Optimizer {
 							if (!s.send(m))
 								logger.log(Level.SEVERE, "Could not send notification email: " + s.sError);
 						}
+
+						continue;
 					}
 
-					String dbLog = "The table G" + tableNumber + "L has passed " + count + " entries.";
+					final String dbLog = "The table G" + tableNumber + "L has passed " + count + " entries.";
 					DBSyncUtils.registerLog(GuidTable.class.getCanonicalName(), dbLog);
 				}
 
@@ -112,23 +120,27 @@ public class GuidTable extends Optimizer {
 				}
 			}
 		}
+
 	}
 
 	private void createNewGTable(final DBFunctions db, final int newTable) {
 		logger.log(Level.INFO, "GuidTable: creating new table: " + newTable);
-		final String admins = ConfigUtils.getConfig().gets("mail_admins"); // comma separated list of emails in config.properties 'mail_admins'
+		final String admins = ConfigUtils.getConfig().gets("mail_admins", "grigoras@cern.ch"); // comma separated list of emails in config.properties 'mail_admins'
+
+		final Mail m = new Mail();
+		m.sBody = "The table G" + newTable + "L has been inserted now.\n\n" + "The previous table had " + count + " entries.";
+
 		if (admins != null && admins.length() > 0) {
-			final Mail m = new Mail();
 			m.sSubject = "JAliEn CS: new G" + newTable + "L tables";
-			m.sBody = "The table G" + newTable + "L has been inserted now.\n\n" + "The previous table had " + count + " entries.";
 			m.sFrom = "JAliEnMaster@cern.ch";
 			m.sTo = admins;
 			final Sendmail s = new Sendmail(m.sFrom, "cernmx.cern.ch");
 
 			if (!s.send(m))
 				logger.log(Level.SEVERE, "Could not send notification email: " + s.sError);
-
 		}
+
+		DBSyncUtils.registerLog(GuidTable.class.getCanonicalName(), m.sBody);
 
 		String sql = "CREATE TABLE `G" + newTable + "L` (" + " " + "`guidId` int(11) NOT NULL AUTO_INCREMENT," + " `ctime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,"
 				+ " `owner` varchar(20) COLLATE latin1_general_cs DEFAULT NULL," + " `ref` int(11) DEFAULT '0'," + " `jobid` bigint DEFAULT NULL,"
