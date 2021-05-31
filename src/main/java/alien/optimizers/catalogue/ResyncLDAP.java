@@ -402,7 +402,7 @@ public class ResyncLDAP extends Optimizer {
 				}
 				while (db.moveNext()) {
 					originalSEs = populateSERegistry(db.gets("seName"), db.gets("seioDaemons"), db.gets("seStoragePath"), db.gets("seMinSize"), db.gets("seType"), db.gets("seQoS"),
-							db.gets("seExclusiveWrite"), db.gets("seExclusiveRead"), db.gets("seVersion"));
+							db.gets("seExclusiveWrite"), db.gets("seExclusiveRead"), db.gets("seVersion"), db.gets("seNumber"));
 				}
 				if (originalSEs.isEmpty())
 					modifications.put(seName, seName + " : new storage element, ");
@@ -492,12 +492,16 @@ public class ResyncLDAP extends Optimizer {
 				final String seExclusiveRead = getLdapContentSE(ouSE, se, "seExclusiveRead");
 				final String seVersion = getLdapContentSE(ouSE, se, "seVersion");
 
-				final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion);
+				final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, "0");
 				printModificationsSEs(modifications, originalSEs, currentSEs, seName, "SEs");
 
-				db.query("REPLACE INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
-						+ "values (?,?,?,?,?,?,?,?,?)", false, seName, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
-						seioDaemons);
+				if (!originalSEs.isEmpty())
+					db.query("REPLACE INTO SE (seNumber, seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
+							+ "values (?,?,?,?,?,?,?,?,?,?)", false, originalSEs.get("seNumber"), seName, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
+							seioDaemons);
+				else
+					db.query("REPLACE INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
+							+ "values (?,?,?,?,?,?,?,?,?)", false, seName, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path, seioDaemons);
 				logger.log(Level.INFO, "Added or updated entry for SE " + seName);
 
 				if (ind > updateDBCount)
@@ -560,12 +564,14 @@ public class ResyncLDAP extends Optimizer {
 		else
 			keySet = current.keySet();
 		for (final String param : keySet) {
-			if (original.get(param) == null || original.get(param) == "")
-				original.put(param, "null");
-			if (current.get(param) == null)
-				current.put(param, "null");
-			if (!original.get(param).equals(current.get(param))) {
-				updatedSEs.add(param + " (new value = " + current.get(param) + ")");
+			if (!param.equals("seNumber")) {
+				if (original.get(param) == null || original.get(param) == "")
+					original.put(param, "null");
+				if (current.get(param) == null)
+					current.put(param, "null");
+				if (!original.get(param).equals(current.get(param))) {
+					updatedSEs.add(param + " (new value = " + current.get(param) + ")");
+				}
 			}
 		}
 
@@ -586,8 +592,7 @@ public class ResyncLDAP extends Optimizer {
 	}
 
 	private static HashMap<String, String> populateSERegistry(final String seName, final String seioDaemons, final String path, final String minSize, final String mss, final String qos,
-			final String seExclusiveWrite,
-			final String seExclusiveRead, final String seVersion) {
+			final String seExclusiveWrite, final String seExclusiveRead, final String seVersion, final String seNumber) {
 		final HashMap<String, String> ses = new HashMap<>();
 		ses.put("seName", seName);
 		ses.put("seMinSize", minSize);
@@ -598,6 +603,7 @@ public class ResyncLDAP extends Optimizer {
 		ses.put("seVersion", seVersion);
 		ses.put("seStoragePath", path);
 		ses.put("seioDaemons", seioDaemons);
+		ses.put("seNumber", seNumber);
 		return ses;
 	}
 
