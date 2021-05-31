@@ -122,7 +122,9 @@ public class ParsedOutput {
 		if (!pwd.equals(""))
 			for (final String file : files) {
 				System.err.println("Going to parse: " + file);
-				if (file.contains("*")) {
+				if (file.length() == 0)
+					System.err.println("Looks like we have an empty file. Ignoring: " + file);
+				else if (file.contains("*")) {
 					final String[] parts = SystemCommand.bash("find " + pwd + " ! -type d -name \"" + file + "\"").stdout.split("\n");
 				//	final String[] parts = SystemCommand.bash("ls " + pwd + file).stdout.split("\n");
 					if (parts.length > 0)
