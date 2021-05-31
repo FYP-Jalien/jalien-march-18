@@ -37,6 +37,11 @@ public class ResyncLDAP extends Optimizer {
 	static final Logger logger = ConfigUtils.getLogger(ResyncLDAP.class.getCanonicalName());
 
 	/**
+	 * When to update the lastUpdateTimestamp in the OPTIMIZERS db
+	 */
+	final static int updateDBCount = 10000;
+
+	/**
 	 * Periodic synchronization boolean
 	 */
 	private static AtomicBoolean periodic = new AtomicBoolean(true);
@@ -171,6 +176,7 @@ public class ResyncLDAP extends Optimizer {
 				}
 			}
 
+			int counter = 0;
 			// TODO: To be done with replace into
 			db.query("UPDATE USERS_LDAP SET up=0");
 			for (final String user : uids) {
@@ -205,6 +211,10 @@ public class ResyncLDAP extends Optimizer {
 					final AliEnPrincipal newUser = UserFactory.getByUsername(user);
 					userHome.chown(newUser);
 				}
+
+				counter = counter + 1;
+				if (counter > updateDBCount)
+					DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".users");
 			}
 			db.query("select a.user from USERS_LDAP a left join USERS_LDAP b on b.up=0 and a.user=b.user where a.up=1 and b.user is null");
 			while (db.moveNext()) {
@@ -268,6 +278,7 @@ public class ResyncLDAP extends Optimizer {
 				}
 			}
 
+			int counter = 0;
 			// TODO: To be done with replace into
 			db.query("UPDATE USERS_LDAP_ROLE SET up=0");
 			for (final String role : roles) {
@@ -307,6 +318,10 @@ public class ResyncLDAP extends Optimizer {
 					modifications.remove(role);
 				printModifications(modifications, currentUsers, originalUsers, role, "added", "users");
 				printModifications(modifications, originalUsers, currentUsers, role, "removed", "users");
+
+				counter = counter + 1;
+				if (counter > updateDBCount)
+					DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".roles");
 			}
 
 			db.query("select a.role from USERS_LDAP_ROLE a left join USERS_LDAP_ROLE b on b.up=0 and a.role=b.role where a.up=1 and b.role is null");
@@ -484,6 +499,9 @@ public class ResyncLDAP extends Optimizer {
 						+ "values (?,?,?,?,?,?,?,?,?)", false, seName, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
 						seioDaemons);
 				logger.log(Level.INFO, "Added or updated entry for SE " + seName);
+
+				if (ind > updateDBCount)
+					DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".SEs");
 			}
 
 			db.query("update SE_VOLUMES set usedspace=0 where usedspace is null");

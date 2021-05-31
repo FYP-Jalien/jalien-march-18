@@ -27,6 +27,11 @@ public class LTables extends Optimizer {
 	final static int maxCount = 50000000; // 50M
 
 	/**
+	 * When to update the lastUpdateTimestamp in the OPTIMIZERS db
+	 */
+	final static int updateDBCount = 10000;
+
+	/**
 	 * Number of rows in the last table
 	 */
 	int count;
@@ -61,6 +66,9 @@ public class LTables extends Optimizer {
 						String tableNumber = db.gets(1);
 						final long tableRows = db.getl(2);
 						tableNumber = tableNumber.replace("L", "");
+
+						if (tableRows > updateDBCount)
+							DBSyncUtils.setLastActive(LTables.class.getCanonicalName());
 
 						if (tableRows > maxCount) {
 							found = true;

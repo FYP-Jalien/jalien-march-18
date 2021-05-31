@@ -34,6 +34,11 @@ public class GuidTable extends Optimizer {
 	final static int warnCount = 40000000; // 40M
 
 	/**
+	 * When to update the lastUpdateTimestamp in the OPTIMIZERS db
+	 */
+	final static int updateDBCount = 10000;
+
+	/**
 	 * Number of rows at the last iteration
 	 */
 	int count;
@@ -86,6 +91,9 @@ public class GuidTable extends Optimizer {
 						createNewGTable(db, tableNumber + 1);
 						continue;
 					}
+
+					if (count > updateDBCount)
+						DBSyncUtils.setLastActive(GuidTable.class.getCanonicalName());
 
 					if (count > warnCount) {
 						final String admins = ConfigUtils.getConfig().gets("mail_admins", "grigoras@cern.ch"); // comma separated list of emails in config.properties 'mail_admins'

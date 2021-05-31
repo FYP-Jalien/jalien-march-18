@@ -247,4 +247,23 @@ public class DBSyncUtils {
 			return "";
 		}
 	}
+
+	/**
+	 * Updates the lastUpdate field in the db for a certain classname
+	 *
+	 * @param classname Class to update the timestamp
+	 * @return Success of the update query
+	 */
+	public static boolean setLastActive(String classname) {
+		logger.log(Level.INFO, "Updating timestamp in DB for class " + classname);
+		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
+			if (db == null) {
+				logger.log(Level.INFO, "Could not get DBs!");
+				return false;
+			}
+			Long timestamp = Long.valueOf(System.currentTimeMillis());
+			boolean updated = db.query("UPDATE OPTIMIZERS set lastUpdate = ? WHERE class = ?", false, timestamp, classname);
+			return updated;
+		}
+	}
 }
