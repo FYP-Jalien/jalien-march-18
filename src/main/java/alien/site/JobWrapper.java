@@ -669,6 +669,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		boolean uploadedAllOutFiles = true;
 		boolean uploadedNotAllCopies = false;
 
+		boolean noError = true;
+		if (exitStatus.toString().contains("ERROR"))
+			noError = false;
+
 		logger.log(Level.INFO, "Uploading output for: " + jdl);
 
 		final String outputDir = getJobOutputDir(exitStatus);
@@ -686,7 +690,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (outDir == null) {
 			logger.log(Level.SEVERE, "Error creating the OutputDir [" + outputDir + "].");
 			commander.q_api.putJobLog(queueId, "trace", "Can't create the output directory " + outputDir);
-			if (!exitStatus.toString().contains("ERROR"))
+			if (noError)
 				changeStatus(JobStatus.ERROR_SV);
 			return false;
 		}
@@ -698,7 +702,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		final ArrayList<String> outputTags = getOutputTags(exitStatus);
 		for (final String tag : outputTags) {
 			try {
-				final ParsedOutput filesTable = new ParsedOutput(queueId, jdl, currentDir.getAbsolutePath(), tag);
+				final ParsedOutput filesTable = new ParsedOutput(queueId, jdl, currentDir.getAbsolutePath(), tag, noError);
 				for (final OutputEntry entry : filesTable.getEntries()) {
 					if (entry.isArchive()) {
 						logger.log(Level.INFO, "This is an archive: " + entry.getName());
@@ -734,7 +738,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 						"A required outputfile for an archive was NOT found! Aborting: " + ex.getMessage());
 				commander.q_api.putJobLog(queueId, "trace",
 						"Error: A required outputfile for an archive was NOT found! Aborting: " + ex.getMessage());
-				if (!exitStatus.toString().contains("ERROR"))
+				if (noError)
 					changeStatus(JobStatus.ERROR_S);
 				return false;
 			}

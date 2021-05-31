@@ -20,6 +20,7 @@ public class ParsedOutput {
 	private final long queueId;
 	private final String pwd;
 	private final String tag;
+	private final boolean checkContent;
 
 	/**
 	 * @param queueId
@@ -31,6 +32,7 @@ public class ParsedOutput {
 		this.queueId = queueId;
 		this.pwd = "";
 		this.tag = "Output";
+		this.checkContent = true;
 		parseOutput();
 	}
 
@@ -45,6 +47,7 @@ public class ParsedOutput {
 		this.queueId = queueId;
 		this.pwd = path + "/";
 		this.tag = "Output";
+		this.checkContent = true;
 		parseOutput();
 	}
 
@@ -60,6 +63,23 @@ public class ParsedOutput {
 		this.queueId = queueId;
 		this.pwd = path + "/";
 		this.tag = tag;
+		this.checkContent = true;
+		parseOutput();
+	}
+
+	/**
+	 * @param queueId
+	 * @param jdl
+	 * @param path
+	 * @param tag
+	 */
+	public ParsedOutput(final long queueId, final JDL jdl, final String path, final String tag, final boolean checkContent) {
+		this.jobOutput = new ArrayList<>();
+		this.jdl = jdl;
+		this.queueId = queueId;
+		this.pwd = path + "/";
+		this.tag = tag;
+		this.checkContent = checkContent;
 		parseOutput();
 	}
 
@@ -126,7 +146,7 @@ public class ParsedOutput {
 					System.err.println("Looks like we have an empty file. Ignoring: " + file);
 				else if (file.contains("*")) {
 					final String[] parts = SystemCommand.bash("find " + pwd + " ! -type d -name \"" + file + "\"").stdout.split("\n");
-				//	final String[] parts = SystemCommand.bash("ls " + pwd + file).stdout.split("\n");
+					// final String[] parts = SystemCommand.bash("ls " + pwd + file).stdout.split("\n");
 					if (parts.length > 0)
 						for (String f : parts) {
 							f = f.trim();
@@ -149,11 +169,13 @@ public class ParsedOutput {
 						alreadySeen.add(file);
 					}
 					else
-					System.err.println("Ignoring duplicate file: " + file);
-					
-					File fsFile = new File(file);
-					if(!fsFile.exists())
-						throw new NullPointerException("File " + file + " for archive " + "?" + " doesn't exist or cannot be read!");
+						System.err.println("Ignoring duplicate file: " + file);
+
+					if (checkContent) {
+						File fsFile = new File(file);
+						if (!fsFile.exists())
+							throw new NullPointerException("File " + file + " for archive " + "?" + " doesn't exist or cannot be read!");
+					}
 
 				}
 			}
