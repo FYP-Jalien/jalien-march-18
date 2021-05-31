@@ -273,6 +273,13 @@ public class DispatchSSLServer extends Thread {
 		finally {
 			activeSessions.decrementAndGet();
 
+			try{
+				connection.setSoTimeout(15 * 1000);
+			}
+			catch (@SuppressWarnings("unused") final IOException ioe){
+				// ignore
+			}
+
 			if (ois != null)
 				try {
 					ois.close();
