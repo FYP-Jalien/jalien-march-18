@@ -498,9 +498,9 @@ public class ResyncLDAP extends Optimizer {
 				printModificationsSEs(modifications, originalSEs, currentSEs, seName, "SEs");
 
 				if (seNumber != -1)
-					db.query("UPDATE SE SET seName=?, seMinSize=?, seType=?, seQoS=?, seExclusiveWrite=?, seExclusiveRead=?, seVersion=?, seStoragePath=?, seioDaemons=?"
-							+ "WHERE seNumber=?", false, seName, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
-							seioDaemons, Integer.valueOf(seNumber));
+					db.query("UPDATE SE SET seMinSize=?, seType=?, seQoS=?, seExclusiveWrite=?, seExclusiveRead=?, seVersion=?, seStoragePath=?, seioDaemons=?"
+							+ "WHERE seNumber=? and seName=?", false, seName, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
+							seioDaemons, Integer.valueOf(seNumber), seName=?);
 				else
 					db.query("REPLACE INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
 							+ "values (?,?,?,?,?,?,?,?,?)", false, seName, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path, seioDaemons);
