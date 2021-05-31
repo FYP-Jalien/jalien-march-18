@@ -387,6 +387,7 @@ public class ResyncLDAP extends Optimizer {
 			for (int ind = 0; ind < sites.size(); ind++) {
 				final String site = sites.get(ind);
 				final String se = seNames.get(ind);
+				int seNumber = -1;
 
 				// This will be the base dn for the SE
 				final String ouSE = "ou=SE,ou=Services,ou=" + site + ",ou=Sites,";
@@ -402,7 +403,8 @@ public class ResyncLDAP extends Optimizer {
 				}
 				while (db.moveNext()) {
 					originalSEs = populateSERegistry(db.gets("seName"), db.gets("seioDaemons"), db.gets("seStoragePath"), db.gets("seMinSize"), db.gets("seType"), db.gets("seQoS"),
-							db.gets("seExclusiveWrite"), db.gets("seExclusiveRead"), db.gets("seVersion"), db.gets("seNumber"));
+							db.gets("seExclusiveWrite"), db.gets("seExclusiveRead"), db.gets("seVersion"));
+					seNumber = db.geti("seNumber");
 				}
 				if (originalSEs.isEmpty())
 					modifications.put(seName, seName + " : new storage element, ");
@@ -492,13 +494,13 @@ public class ResyncLDAP extends Optimizer {
 				final String seExclusiveRead = getLdapContentSE(ouSE, se, "seExclusiveRead");
 				final String seVersion = getLdapContentSE(ouSE, se, "seVersion");
 
-				final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, "0");
+				final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion);
 				printModificationsSEs(modifications, originalSEs, currentSEs, seName, "SEs");
 
-				if (!originalSEs.isEmpty())
-					db.query("REPLACE INTO SE (seNumber, seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
-							+ "values (?,?,?,?,?,?,?,?,?,?)", false, originalSEs.get("seNumber"), seName, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
-							seioDaemons);
+				if (seNumber != -1)
+					db.query("UPDATE SE SET seName=?, seMinSize=?, seType=?, seQoS=?, seExclusiveWrite=?, seExclusiveRead=?, seVersion=?, seStoragePath=?, seioDaemons=?"
+							+ "WHERE seNumber=?", false, seName, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
+							seioDaemons, Integer.valueOf(seNumber));
 				else
 					db.query("REPLACE INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
 							+ "values (?,?,?,?,?,?,?,?,?)", false, seName, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path, seioDaemons);
@@ -564,14 +566,12 @@ public class ResyncLDAP extends Optimizer {
 		else
 			keySet = current.keySet();
 		for (final String param : keySet) {
-			if (!param.equals("seNumber")) {
-				if (original.get(param) == null || original.get(param) == "")
-					original.put(param, "null");
-				if (current.get(param) == null)
-					current.put(param, "null");
-				if (!original.get(param).equals(current.get(param))) {
-					updatedSEs.add(param + " (new value = " + current.get(param) + ")");
-				}
+			if (original.get(param) == null || original.get(param) == "")
+				original.put(param, "null");
+			if (current.get(param) == null)
+				current.put(param, "null");
+			if (!original.get(param).equals(current.get(param))) {
+				updatedSEs.add(param + " (new value = " + current.get(param) + ")");
 			}
 		}
 
@@ -592,7 +592,7 @@ public class ResyncLDAP extends Optimizer {
 	}
 
 	private static HashMap<String, String> populateSERegistry(final String seName, final String seioDaemons, final String path, final String minSize, final String mss, final String qos,
-			final String seExclusiveWrite, final String seExclusiveRead, final String seVersion, final String seNumber) {
+			final String seExclusiveWrite, final String seExclusiveRead, final String seVersion) {
 		final HashMap<String, String> ses = new HashMap<>();
 		ses.put("seName", seName);
 		ses.put("seMinSize", minSize);
@@ -603,7 +603,6 @@ public class ResyncLDAP extends Optimizer {
 		ses.put("seVersion", seVersion);
 		ses.put("seStoragePath", path);
 		ses.put("seioDaemons", seioDaemons);
-		ses.put("seNumber", seNumber);
 		return ses;
 	}
 
