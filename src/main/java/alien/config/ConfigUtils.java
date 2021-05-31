@@ -107,7 +107,7 @@ public class ConfigUtils {
 		// Configure the MonaLisa target
 		if (!hasMLConfig())
 			// write a copy of our main configuration content and, if any, a separate ML configuration file to ML's configuration registry
-			for (final String configFile : new String[] { "config", "mlconfig", "App" }) {
+			for (final String configFile : new String[] { "config", "mlconfig", "app" }) {
 				final ExtProperties eprop = otherConfigFiles.get(configFile);
 
 				if (eprop != null) {
@@ -316,7 +316,7 @@ public class ConfigUtils {
 	 * @return configuration contents
 	 */
 	public static final ExtProperties getConfiguration(final String key) {
-		return otherConfigFiles.get(key);
+		return otherConfigFiles.get(key.toLowerCase());
 	}
 
 	/**
@@ -603,7 +603,7 @@ public class ConfigUtils {
 		if (voConfig == null || voConfig.size() == 0)
 			return null;
 
-		//Check if the hostname is used anywhere at a site 
+		// Check if the hostname is used anywhere at a site
 		final Set<String> siteDNsForHostname = LDAPHelper.checkLdapInformation("host=" + hostName, "ou=Sites,", "dn");
 
 		if (checkContent && (siteDNsForHostname == null || siteDNsForHostname.size() == 0)) {
@@ -627,7 +627,7 @@ public class ConfigUtils {
 				if (hostConfig.size() != 0)
 					break;
 			}
-			catch (IndexOutOfBoundsException iobe) {
+			catch (@SuppressWarnings("unused") IndexOutOfBoundsException iobe) {
 				// ignore
 			}
 		}

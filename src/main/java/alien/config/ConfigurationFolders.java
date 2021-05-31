@@ -50,7 +50,7 @@ class ConfigurationFolders implements ConfigSource {
 							String sName = sub.getName();
 							sName = sName.substring(0, sName.lastIndexOf('.'));
 
-							ExtProperties oldProperties = oldConfigFiles.get(sName);
+							ExtProperties oldProperties = oldConfigFiles.get(sName.toLowerCase());
 
 							if (oldProperties == null)
 								oldProperties = new ExtProperties();
@@ -58,7 +58,7 @@ class ConfigurationFolders implements ConfigSource {
 							final ExtProperties prop = new ExtProperties(path, sName, oldProperties, true);
 							prop.setAutoReload(1000 * 60);
 
-							tmp.put(sName, prop);
+							tmp.put(sName.toLowerCase(), prop);
 						}
 			}
 		}
