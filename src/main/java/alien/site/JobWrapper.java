@@ -685,16 +685,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		logger.log(Level.INFO, "outputDir: " + outputDir);
 		logger.log(Level.INFO, "We are the current user: " + commander.getUser().getName());
 
-		// `mkdir -p`, returning the new or existing LFN, when it's a directory or `null` in case of any error creating it
-		final LFN outDir = c_api.createCatalogueDirectory(outputDir, true);
-		if (outDir == null) {
-			logger.log(Level.SEVERE, "Error creating the OutputDir [" + outputDir + "].");
-			commander.q_api.putJobLog(queueId, "trace", "Can't create the output directory " + outputDir);
-			if (noError)
-				changeStatus(JobStatus.ERROR_SV);
-			return false;
-		}
-
 		final ArrayList<OutputEntry> archivesToUpload = new ArrayList<>();
 		final ArrayList<OutputEntry> standaloneFilesToUpload = new ArrayList<>();
 		final ArrayList<String> allArchiveEntries = new ArrayList<>();
