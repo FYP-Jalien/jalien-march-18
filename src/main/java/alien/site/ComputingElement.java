@@ -355,7 +355,9 @@ public final class ComputingElement extends Thread {
 		}
 
 		// pass environment variables
-		before += "export HOME=$(pwd)" + "\n";
+		before += "export HOME=`pwd`" + "\n";
+		before += "export TMP=$HOME" + "\n";
+		before += "export TMPDIR=$TMP" + "\n";
 		if (config.containsKey("host_logdir") || config.containsKey("site_logdir"))
 			before += "export LOGDIR=\"" + (config.containsKey("host_logdir") ? config.get("host_logdir") : config.get("site_logdir")) + "\"\n";
 		if (config.containsKey("host_cachedir") || config.containsKey("site_cachedir"))

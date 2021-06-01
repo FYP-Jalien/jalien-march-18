@@ -122,12 +122,16 @@ public class SiteMap {
 
 		// Workdir
 		String workdir = UserFactory.getUserHome();
+		if (env.containsKey("HOME"))
+			workdir = env.get("HOME");
 		if (env.containsKey("WORKDIR"))
 			workdir = env.get("WORKDIR");
 		if (env.containsKey("TMPBATCH"))
 			workdir = env.get("TMPBATCH");
 
 		siteMap.put("workdir", workdir);
+
+		logger.log(Level.INFO, "Checking space requirements on dir: " + workdir);
 
 		long space = JobAgent.getFreeSpace(workdir) / 1024;
 
