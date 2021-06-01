@@ -35,6 +35,7 @@ import alien.api.JBoxServer;
 import alien.api.TomcatServer;
 import alien.catalogue.access.AuthorizationFactory;
 import alien.monitoring.MonitorFactory;
+import alien.site.Functions;
 import alien.user.AliEnPrincipal;
 import alien.user.LDAPHelper;
 import alien.user.UserFactory;
@@ -713,7 +714,7 @@ public class ConfigUtils {
 		for (final Map.Entry<String, String> entry : folders_config.entrySet()) {
 			final String folderpath = entry.getValue();
 			try {
-				final File folderf = new File(folderpath);
+				final File folderf = new File(Functions.resolvePathWithEnv(folderpath));
 				if (!folderf.exists()) {
 					final boolean created = folderf.mkdirs();
 					if (!created)
