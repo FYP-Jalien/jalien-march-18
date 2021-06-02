@@ -357,6 +357,7 @@ public class ResyncLDAP extends Optimizer {
 
 		final Set<String> dns = LDAPHelper.checkLdapInformation("(objectClass=AliEnSE)", ouSites, "dn", true);
 		final ArrayList<String> seNames = new ArrayList<>();
+		final ArrayList<String> dnsEntries = new ArrayList<>();
 		final ArrayList<String> sites = new ArrayList<>();
 		final HashMap<String, String> modifications = new HashMap<>();
 
@@ -365,18 +366,20 @@ public class ResyncLDAP extends Optimizer {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return;
 			}
+
 			// From the dn we get the seName and site
 			final Iterator<String> itr = dns.iterator();
 			while (itr.hasNext()) {
 				final String dn = itr.next();
 				if (dn.contains("disabled")) {
 					logger.log(Level.WARNING, "Skipping " + dn + " (it is disabled)");
-					continue;
-				}
-				final String[] entries = dn.split("[=,]");
-				if (entries.length >= 8) {
-					seNames.add(entries[1]);
-					sites.add(entries[entries.length - 1]);
+				} else {
+					dnsEntries.add(dn);
+					final String[] entries = dn.split("[=,]");
+					if (entries.length >= 8) {
+						seNames.add(entries[1]);
+						sites.add(entries[entries.length - 1]);
+					}
 				}
 			}
 
@@ -387,20 +390,23 @@ public class ResyncLDAP extends Optimizer {
 			for (int ind = 0; ind < sites.size(); ind++) {
 				final String site = sites.get(ind);
 				final String se = seNames.get(ind);
+				final String dnsEntry = dnsEntries.get(ind);
 				int seNumber = -1;
 
 				// This will be the base dn for the SE
-				final String ouSE = "ou=SE,ou=Services,ou=" + site + ",ou=Sites,";
+				final String ouSE = dnsEntry + ",ou=Sites,";
 
 				final String vo = "ALICE";
 				final String seName = vo + "::" + site + "::" + se;
 
 				HashMap<String, String> originalSEs = new HashMap<>();
+
 				boolean querySuccess = db.query("SELECT * from `SE` WHERE seName = ?", false, seName);
 				if (!querySuccess) {
 					logger.log(Level.SEVERE, "Error getting SEs from DB");
 					return;
 				}
+
 				while (db.moveNext()) {
 					originalSEs = populateSERegistry(db.gets("seName"), db.gets("seioDaemons"), db.gets("seStoragePath"), db.gets("seMinSize"), db.gets("seType"), db.gets("seQoS"),
 							db.gets("seExclusiveWrite"), db.gets("seExclusiveRead"), db.gets("seVersion"));
@@ -409,54 +415,61 @@ public class ResyncLDAP extends Optimizer {
 				if (originalSEs.isEmpty())
 					modifications.put(seName, seName + " : new storage element, ");
 
-				final String t = getLdapContentSE(ouSE, se, "mss");
-				final String host = getLdapContentSE(ouSE, se, "host");
+				final String t = getLdapContentSE(ouSE, se, "mss", null);
+				final String host = getLdapContentSE(ouSE, se, "host", null);
 
 				final Set<String> savedir = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "savedir");
 				for (String path : savedir) {
 					HashMap<String, String> originalSEVolumes = new HashMap<>();
-					querySuccess = db.query("SELECT * from `SE_VOLUMES` WHERE seName = ?", false, seName);
+
+					long size = -1;
+					logger.log(Level.INFO, "Checking the path of " + path);
+					if (path.matches(".*,\\d+")) {
+						size = Long.parseLong(path.split(",")[1]);
+						path = path.split(",")[0];
+					}
+					logger.log(Level.INFO, "Need to add the volume " + path);
+					final String method = t.toLowerCase() + "://" + host;
+
+					int volumeId = -1;
+					querySuccess = db.query("SELECT * from `SE_VOLUMES` WHERE seName=? and mountpoint=?", false, seName, path);
 					if (!querySuccess) {
 						logger.log(Level.SEVERE, "Error getting SE volumes from DB");
 						return;
 					}
 					while (db.moveNext()) {
 						originalSEVolumes = populateSEVolumesRegistry(db.gets("sename"), db.gets("volume"), db.gets("method"), db.gets("mountpoint"), db.gets("size"));
+						volumeId = db.geti("volumeId");
 					}
 
-					String size = "-1";
-					logger.log(Level.INFO, "Checking the path of " + path);
-					if (path.matches(".*,\\d+")) {
-						size = path.split(",")[1];
-						path = path.split(",")[0];
-					}
+					if (volumeId != -1)
+						db.query("UPDATE SE_VOLUMES SET volume=?, method=?, size=? WHERE seName=? AND mountpoint=? and volumeId=?", false,
+								path, method, Long.valueOf(size), seName, path, Integer.valueOf(volumeId));
+					else
+						db.query("REPLACE INTO SE_VOLUMES(sename,volume,method,mountpoint,size) values (?,?,?,?,?)", false,
+								seName, path, method, path, Long.valueOf(size));
 
-					logger.log(Level.INFO, "Need to add the volume " + path);
-					final String method = t.toLowerCase() + "://" + host;
-					db.query("REPLACE INTO SE_VOLUMES(sename,volume,method,mountpoint,size) values (?,?,?,?,?)", false,
-							seName, path, method, path, size);
-
-					final HashMap<String, String> currentSEVolumes = populateSEVolumesRegistry(seName, path, method, path, size);
+					final HashMap<String, String> currentSEVolumes = populateSEVolumesRegistry(seName, path, method, path, String.valueOf(size));
 					printModificationsSEs(modifications, originalSEVolumes, currentSEVolumes, seName, "SE Volumes");
 
 				}
 
-				final String iodaemons = getLdapContentSE(ouSE, se, "iodaemons");
+				final String iodaemons = getLdapContentSE(ouSE, se, "ioDaemons", null);
 				final String[] temp = iodaemons.split(":");
 				String seioDaemons = "";
 				if (temp.length > 2) {
 					String proto = temp[0];
 					proto = proto.replace("xrootd", "root");
-					String hostName;
-					String port;
-					hostName = temp[1];
+
+					String hostName = temp[1].matches("host=([^:]+)(:.*)?$") ? temp[1] : temp[2];
+					String port = temp[2].matches("port=(\\d+)") ? temp[2] : temp[1];
+
 					if (!hostName.matches("host=([^:]+)(:.*)?$")) {
 						logger.log(Level.INFO, "Error getting the host name from " + seName);
 						seioDaemons = "NULL";
 					}
 					hostName = hostName.split("=")[1];
 
-					port = temp[2];
 					if (!port.matches("port=(\\d+)")) {
 						logger.log(Level.INFO, "Error getting the port for " + seName);
 						seioDaemons = "NULL";
@@ -469,7 +482,7 @@ public class ResyncLDAP extends Optimizer {
 					}
 				}
 
-				String path = getLdapContentSE(ouSE, se, "savedir");
+				String path = getLdapContentSE(ouSE, se, "savedir", null);
 				if ("".equals(path)) {
 					logger.log(Level.INFO, "Error getting the savedir for " + seName);
 					return;
@@ -479,31 +492,31 @@ public class ResyncLDAP extends Optimizer {
 					path = path.split(",")[0];
 				}
 
-				String minSize = "0";
+				int minSize = 0;
 
 				final Set<String> options = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "options");
 				for (final String option : options) {
 					if (option.matches("min_size\\s*=\\s*(\\d+)")) {
-						minSize = option.split("=")[1];
+						minSize = Integer.parseInt(option.split("=")[1]);
 					}
 				}
 
-				final String mss = getLdapContentSE(ouSE, se, "mss");
-				final String qos = getLdapContentSE(ouSE, se, "Qos");
-				final String seExclusiveWrite = getLdapContentSE(ouSE, se, "seExclusiveWrite");
-				final String seExclusiveRead = getLdapContentSE(ouSE, se, "seExclusiveRead");
-				final String seVersion = getLdapContentSE(ouSE, se, "seVersion");
+				final String mss = getLdapContentSE(ouSE, se, "mss", null);
+				final String qos = "," + getLdapContentSE(ouSE, se, "Qos", null) + ",";
+				final String seExclusiveWrite = getLdapContentSE(ouSE, se, "seExclusiveWrite", "");
+				final String seExclusiveRead = getLdapContentSE(ouSE, se, "seExclusiveRead", "");
+				final String seVersion = getLdapContentSE(ouSE, se, "seVersion", "");
 
-				final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion);
+				final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, String.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion);
 				printModificationsSEs(modifications, originalSEs, currentSEs, seName, "SEs");
 
 				if (seNumber != -1)
 					db.query("UPDATE SE SET seMinSize=?, seType=?, seQoS=?, seExclusiveWrite=?, seExclusiveRead=?, seVersion=?, seStoragePath=?, seioDaemons=?"
-							+ "WHERE seNumber=? and seName=?", false, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
+							+ "WHERE seNumber=? and seName=?", false, Integer.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
 							seioDaemons, Integer.valueOf(seNumber), seName);
 				else
 					db.query("REPLACE INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
-							+ "values (?,?,?,?,?,?,?,?,?)", false, seName, minSize, mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path, seioDaemons);
+							+ "values (?,?,?,?,?,?,?,?,?)", false, seName, Integer.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path, seioDaemons);
 				logger.log(Level.INFO, "Added or updated entry for SE " + seName);
 
 				if (ind > updateDBCount)
@@ -570,7 +583,7 @@ public class ResyncLDAP extends Optimizer {
 				original.put(param, "null");
 			if (current.get(param) == null)
 				current.put(param, "null");
-			if (!original.get(param).equals(current.get(param))) {
+			if (!original.get(param).equalsIgnoreCase(current.get(param))) {
 				updatedSEs.add(param + " (new value = " + current.get(param) + ")");
 			}
 		}
@@ -606,7 +619,7 @@ public class ResyncLDAP extends Optimizer {
 		return ses;
 	}
 
-	private static String getLdapContentSE(final String ouSE, final String se, final String parameter) {
+	private static String getLdapContentSE(final String ouSE, final String se, final String parameter, final String defaultString) {
 		final Set<String> param = LDAPHelper.checkLdapInformation("name=" + se, ouSE, parameter);
 		String joined = "";
 		if (param.size() > 1) {
@@ -616,7 +629,7 @@ public class ResyncLDAP extends Optimizer {
 			joined = param.iterator().next();
 		}
 		else if (param.size() == 0) {
-			joined = null;
+			joined = defaultString;
 		}
 		return joined;
 	}
