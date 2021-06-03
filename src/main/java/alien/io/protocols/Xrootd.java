@@ -82,6 +82,9 @@ public class Xrootd extends Protocol {
 
 	private Map<String, String> extraEnvVariables = new HashMap<>();
 
+	private long rateLimit = 0;
+	private char rateLimitUnit = 'm';
+
 	static {
 		try {
 			org.apache.catalina.webresources.TomcatURLStreamHandlerFactory.getInstance().addUserFactory(new ROOTURLStreamHandlerFactory());
@@ -586,6 +589,8 @@ public class Xrootd extends Protocol {
 			command.add(transactionURL);
 			command.add(target.getCanonicalPath());
 
+			setRateLimit(command);
+
 			setLastCommand(command);
 
 			final ProcessBuilder pBuilder = new ProcessBuilder(command);
@@ -770,6 +775,8 @@ public class Xrootd extends Protocol {
 			 * command.add("md5:"+guid.md5); }
 			 */
 
+			setRateLimit(command);
+
 			command.add(localFile.getCanonicalPath());
 
 			String transactionURL = pfn.pfn;
@@ -860,6 +867,22 @@ public class Xrootd extends Protocol {
 			logger.log(Level.WARNING, "Caught exception", t);
 
 			throw new TargetException("Put aborted because " + t);
+		}
+	}
+
+	/**
+	 * @param command
+	 */
+	private void setRateLimit(List<String> command) {
+		if (rateLimit > 0) {
+			command.add("-X");
+
+			String value = String.valueOf(rateLimit);
+
+			if (rateLimitUnit == 'k' || rateLimitUnit == 'm' || rateLimitUnit == 'g')
+				value += rateLimitUnit;
+
+			command.add(value);
 		}
 	}
 
@@ -1860,5 +1883,16 @@ public class Xrootd extends Protocol {
 		theClone.extraEnvVariables = new HashMap<>(this.extraEnvVariables);
 
 		return theClone;
+	}
+
+	/**
+	 * Set a read or write (only when the target or respectively source is a local file) to the given rate (per second). See `man xrdcp`, the "-X" option
+	 * 
+	 * @param rate value
+	 * @param unit multiplying unit, can be one of 'k', 'm' or 'g'. Anything else is considered to be bytes/second.
+	 */
+	public void setRateLimit(final long rate, final char unit) {
+		this.rateLimit = rate;
+		this.rateLimitUnit = unit;
 	}
 }

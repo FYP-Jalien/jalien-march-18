@@ -13,11 +13,14 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import alien.catalogue.LFN;
 import alien.catalogue.access.AuthorizationFactory;
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
+import alien.io.protocols.Factory;
 import alien.monitoring.Timing;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.user.AliEnPrincipal;
@@ -269,6 +272,7 @@ public class SEBenchmark {
 		parser.accepts("n").withRequiredArg();
 		parser.accepts("r").withRequiredArg().ofType(Integer.class);
 		parser.accepts("k");
+		parser.accepts("X").withRequiredArg();
 
 		final OptionSet options = parser.parse(args);
 
@@ -282,6 +286,7 @@ public class SEBenchmark {
 			System.err.println("\t-n <catalogue name>\t\t(optional, default '" + fileNamePrefix + "')");
 			System.err.println("\t-r <threads>\t\t(number of read back threads, optional, default 0)");
 			System.err.println("\t-k\t\t(pass this flag to keep written files on disk)");
+			System.err.println("\t-X <value>\t(rate limiting parameter to each xrdcp command)");
 
 			return;
 		}
@@ -319,6 +324,25 @@ public class SEBenchmark {
 			}
 
 			tempFile = true;
+		}
+
+		if (options.has("X")) {
+			final String value = (String) options.valueOf("X");
+
+			final Pattern p = Pattern.compile("(\\d+)([a-z]?)");
+			final Matcher m = p.matcher(value);
+
+			if (m.matches()) {
+				final long rateLimit = Long.parseLong(m.group(1));
+
+				final String unit = m.group(2);
+
+				Factory.xrootd.setRateLimit(rateLimit, unit.length() > 0 ? unit.charAt(0) : 'b');
+			}
+			else {
+				System.err.println("Invalid rate specifications: " + value);
+				return;
+			}
 		}
 
 		final int iterations = options.has("i") ? ((Integer) options.valueOf("i")).intValue() : 1;
