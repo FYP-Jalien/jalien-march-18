@@ -879,7 +879,7 @@ public class JobAgent implements Runnable {
 			@Override
 			public void run() {
 				logger.log(Level.SEVERE, "Timeout has occurred. Killing job!");
-				commander.q_api.putJobLog(queueId, "trace", "Timeout has occurred. Killing job!");
+				commander.q_api.putJobLog(queueId, "trace", "Killing the job (it was running for longer than its TTL)");
 				killJobWrapperAndPayload(p);
 			}
 		};
@@ -901,7 +901,8 @@ public class JobAgent implements Runnable {
 					final String error = checkProcessResources();
 					if (error != null) {
 						logger.log(Level.SEVERE, "Process overusing resources: " + error);
-						commander.q_api.putJobLog(queueId, "trace", "ERROR[FATAL]: Process overusing resources. Killing job!. Cause: " + error);
+						commander.q_api.putJobLog(queueId, "trace", "ERROR[FATAL]: Process overusing resources");
+						commander.q_api.putJobLog(queueId, "trace", error);
 					//	t.cancel();
 					//	killJobWrapperAndPayload(p);
 					//	return 1;
@@ -1023,17 +1024,17 @@ public class JobAgent implements Runnable {
 
 			// check disk usage
 			if (workdirMaxSizeMB != 0 && RES_WORKDIR_SIZE.doubleValue() > workdirMaxSizeMB)
-				error = "Disk space limit is " + workdirMaxSizeMB + ", using " + RES_WORKDIR_SIZE;
+				error = "Killing the job (using more than " + workdirMaxSizeMB + "MB of diskspace (right now we were using " + RES_WORKDIR_SIZE + "))";
 
 			// check memory usage
 			if (jobMaxMemoryMB != 0 && RES_VMEM.doubleValue() > jobMaxMemoryMB)
-				error = "Memory usage limit is " + jobMaxMemoryMB + ", using " + RES_VMEM;
+				error = "Killing the job (using more than " + jobMaxMemoryMB + " memory (right now " + RES_VMEM + "))";
 
 			// cpu
 			final long time = System.currentTimeMillis();
 
 			if (prevTime != 0 && prevTime + (20 * 60 * 1000) < time && RES_CPUTIME.equals(prevCpuTime))
-				error = "The job hasn't used the CPU for 20 minutes";
+				error = "Killing the job (due to zero CPU consumption in the last 20 minutes!)";
 			else {
 				prevCpuTime = RES_CPUTIME;
 				prevTime = time;
