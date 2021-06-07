@@ -127,6 +127,11 @@ public class CVMFS extends PackMan {
 	 */
 	public static String getAlienvPrint() {
 		final String jalienEnvPrint = ALIEN_BIN_DIR + "/alienv printenv JAliEn";
+
+		final String versionFromProps = ConfigUtils.getConfiguration("version").gets("jobagent.version");
+		if ( versionFromProps != null && !versionFromProps.isBlank())
+			return jalienEnvPrint + "/" + versionFromProps + "-1";
+	
 		if (!Version.getTagFromEnv().isEmpty())
 			return jalienEnvPrint + Version.getTagFromEnv();
 

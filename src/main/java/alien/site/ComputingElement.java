@@ -450,7 +450,16 @@ public final class ComputingElement extends Thread {
 	}
 
 	private static String getStartup() {
-		return CVMFS.getJava32Dir() + "/java -Djdk.lang.Process.launchMechanism=vfork -cp $(dirname $(which jalien))/../lib/alien-users.jar alien.site.JobRunner";
+		final String javaDir = CVMFS.getJava32Dir();
+		final String javaCmd = "/java -Djdk.lang.Process.launchMechanism=vfork -cp";
+		final String jarDir = "$(dirname $(which jalien))/../lib";
+		final String jarAndClass = "/alien-users.jar alien.site.JobRunner";
+
+		final String jarDirCustom = ConfigUtils.getConfiguration("version").gets("custom.jobagent.jar.dir");
+		if (jarDirCustom != null && !jarDirCustom.isBlank())
+			return javaDir + javaCmd + " " + jarDirCustom + jarAndClass;
+
+		return javaDir + javaCmd + " " + jarDir + jarAndClass;	
 	}
 
 	/**

@@ -681,7 +681,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		boolean noError = true;
 		if (exitStatus.toString().contains("ERROR")){
 			commander.q_api.putJobLog(queueId, "trace", "Registering temporary log files in " + outputDir
-					+ ". You must do 'registerOutput' in this directory within 24 hours of the job termination to preserver them. After this period, they are automatically deleted");
+					+ ". You must do 'registerOutput' in this directory within 24 hours of the job termination to preserver them. After this period, they are automatically deleted.");
 			noError = false;
 		}
 
@@ -815,7 +815,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			else
 				changeStatus(JobStatus.DONE);
 		}
-		else 
+		else
 			changeStatus(exitStatus);
 
 		return uploadedAllOutFiles;
