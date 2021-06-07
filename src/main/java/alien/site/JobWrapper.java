@@ -672,15 +672,18 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		boolean uploadedAllOutFiles = true;
 		boolean uploadedNotAllCopies = false;
 
-		boolean noError = true;
-		if (exitStatus.toString().contains("ERROR"))
-			noError = false;
-
 		logger.log(Level.INFO, "Uploading output for: " + jdl);
 
 		final String outputDir = getJobOutputDir(exitStatus);
 
 		commander.q_api.putJobLog(queueId, "trace", "Going to uploadOutputFiles(exitStatus=" + exitStatus + ", outputDir=" + outputDir + ")");
+
+		boolean noError = true;
+		if (exitStatus.toString().contains("ERROR")){
+			commander.q_api.putJobLog(queueId, "trace", "Registering temporary log files in " + outputDir
+					+ ". You must do 'registerOutput' in this directory within 24 hours of the job termination to preserver them. After this period, they are automatically deleted");
+			noError = false;
+		}
 
 		changeStatus(JobStatus.SAVING);
 
@@ -812,7 +815,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			else
 				changeStatus(JobStatus.DONE);
 		}
-		else
+		else 
 			changeStatus(exitStatus);
 
 		return uploadedAllOutFiles;
