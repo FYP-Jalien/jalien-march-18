@@ -15,6 +15,7 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.lang.ProcessBuilder.Redirect;
 import java.net.URISyntaxException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -64,6 +65,7 @@ import apmon.ApMonException;
 import apmon.ApMonMonitoringConstants;
 import apmon.BkThread;
 import apmon.MonitoredJob;
+
 import lazyj.ExtProperties;
 import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
@@ -264,6 +266,8 @@ public class JobAgent implements Runnable {
 	 */
 	protected static final AtomicInteger retries = new AtomicInteger(0);
 
+	static int []usedCPUs;
+
 	/**
 	 */
 	public JobAgent() {
@@ -364,6 +368,19 @@ public class JobAgent implements Runnable {
 				RUNNING_JOBAGENTS = 0;
 
 				collectSystemInformation();
+
+				try {
+					usedCPUs = new int[Integer.valueOf(BkThread.getNumCPUs())];
+					for (int i = 0; i < RES_NOCPUS; i++) {
+						usedCPUs[i] = 0;
+					}
+				}
+				catch (final IOException e) {
+					logger.log(Level.WARNING, "Problem with the monitoring objects IO Exception: " + e.toString());
+				}
+				catch (final ApMonException e) {
+					logger.log(Level.WARNING, "Problem with the monitoring objects ApMon Exception: " + e.toString());
+				}
 			}
 		}
 
@@ -402,6 +419,7 @@ public class JobAgent implements Runnable {
 		catch (final ApMonException e) {
 			logger.log(Level.WARNING, "Problem with the monitoring objects ApMon Exception: " + e.toString());
 		}
+
 
 		try {
 			final File filepath = new java.io.File(JobAgent.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
@@ -552,6 +570,13 @@ public class JobAgent implements Runnable {
 				RUNNING_DISK += reqDisk;
 				RUNNING_JOBAGENTS -= 1;
 				setUsedCores(0);
+
+				for (int i = 0; i < RES_NOCPUS; i++) {
+					if (usedCPUs[i] == jobNumber) {
+						usedCPUs[i] = 0;
+					}
+				}
+
 
 				requestSync.notifyAll();
 			}
@@ -848,6 +873,166 @@ public class JobAgent implements Runnable {
 		jao.run();
 	}
 
+	int[] getFreeCPUs() {
+		int newVal;
+		int mask = 0;
+
+		try {
+			String cmd = "ps aux | grep -v \"^root\" | tr -s \" \" | cut -d\" \" -f2 | xargs -L1  taskset -p 2> /dev/null | cut -d \" \" -f 6 | sort | uniq";
+			System.out.println(cmd);
+
+			final Process affinityCmd = Runtime.getRuntime().exec(new String[] {"/bin/bash", "-c", cmd});
+			affinityCmd.waitFor();
+			try (Scanner cmdScanner = new Scanner(affinityCmd.getInputStream())) {
+				String readArg;
+				while (cmdScanner.hasNext()) {
+					readArg = (cmdScanner.next());
+					//System.out.println("newVal " + readArg);
+
+					newVal = Integer.parseInt(readArg.trim(), 16);
+
+					System.out.println(Math.pow(RES_NOCPUS, 2) - 1);
+					if ((Math.pow(2, RES_NOCPUS) - 1) == newVal)
+						continue;
+
+					mask |= newVal;
+					//System.out.println("Mask is " + mask);
+					//System.out.println("NoCPUS is " + RES_NOCPUS);
+
+				}
+				int []b = valueToArray(mask, RES_NOCPUS);
+				//System.out.println("Arr is " + b);
+				return b;
+			} catch (Exception e) {
+				System.out.println("In exception");
+				e.printStackTrace();
+			}
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+
+	int[] valueToArray(int v, int size) {
+		int[] maskArray = new int[size];
+		int count = 0;
+
+		while (v > 0) {
+			maskArray[count] = v & 1;
+			v = v >> 1;
+			count++;
+		}
+		return maskArray;
+	}
+
+	String arrayToTaskset(int[] array) {
+		String out = "";
+
+		for (int i = (array.length - 1); i >= 0; i--) {
+			if (array[i] == 1) {
+				if (out.length() != 0)
+					out += ",";
+				out += i;
+			}
+		}
+
+		return out;
+	}
+
+	int[] getHostMask() {
+		String cmd = "taskset -p $$ | cut -d\" \" -f6";
+		System.out.println(cmd);
+
+		try {
+			final String out = ExternalProcesses.getCmdOutput(Arrays.asList("/bin/bash", "-c", cmd), true, 30L, TimeUnit.SECONDS);
+
+			System.out.println(out);
+
+			return valueToArray((~Integer.parseInt(out.trim(), 16) & (1 << RES_NOCPUS) - 1), RES_NOCPUS);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return null;
+	}
+
+	int pickCPUs(int reqCPU, int[] mask, int[] newMask) {
+		for (int i = 0; i < RES_NOCPUS && reqCPU > 0; i++) {
+			if (mask[i] != 1 && usedCPUs[i] == 0) {
+				newMask[i] = 1;
+				reqCPU--;
+			}
+		}
+
+		if (reqCPU != 0)
+			return reqCPU;
+
+		for (int i = 0; i < RES_NOCPUS; i++) {
+			if (newMask[i] == 1) {
+				usedCPUs[i] = jobNumber;
+			}
+		}
+
+		return 0;
+	}
+
+	synchronized String addIsolation(int cpuSize) {
+		int[] mask = getFreeCPUs();
+		int[] hostMask = getHostMask();
+		int[] cpuAffinity = new int[RES_NOCPUS];
+		int ret = 0;
+
+		System.out.println("FreeCPU masks");
+		for (int i = RES_NOCPUS - 1; i >= 0; i--)
+			System.out.print(mask[i]);
+		System.out.println();
+
+		System.out.println("Own process mask");
+		for (int i = RES_NOCPUS - 1; i >= 0; i--)
+			System.out.print(hostMask[i]);
+		System.out.println();
+		System.out.println("USED CPUs mask before");
+		for (int i = 0; i < RES_NOCPUS; i++) {
+			System.out.print(usedCPUs[i]);
+		}
+		System.out.println();
+
+		boolean check = true;
+		for (int i = 0; i < RES_NOCPUS; i++) {
+			if (hostMask[i] != 0) {
+				check = false;
+				break;
+			}
+		}
+
+		System.out.println(check);
+		if (check == true)
+			ret = pickCPUs(cpuSize, mask, cpuAffinity);
+		else {
+			ret = pickCPUs(cpuSize, hostMask, cpuAffinity);
+		}
+
+		System.out.println(ret);
+		if (ret != 0) {
+			System.out.println("Error");
+			return null;
+		}
+
+		System.out.println("USED CPUs mask after");
+		for (int i = 0; i < RES_NOCPUS; i++) {
+			System.out.print(usedCPUs[i]);
+		}
+		System.out.println();
+
+		System.out.println("CPU affinity");
+		for (int i = RES_NOCPUS - 1; i >= 0; i--)
+			System.out.print(cpuAffinity[i]);
+		System.out.println();
+
+		return arrayToTaskset(cpuAffinity);
+	}
+
 	/**
 	 * @return Command w/arguments for starting the JobWrapper, based on the command used for the JobAgent
 	 * @throws InterruptedException
@@ -855,7 +1040,7 @@ public class JobAgent implements Runnable {
 	public List<String> generateLaunchCommand() throws InterruptedException {
 		try {
 			// Main cmd for starting the JobWrapper
-			final List<String> launchCmd = new ArrayList<>();
+			List<String> launchCmd = new ArrayList<>();
 
 			final Process cmdChecker = Runtime.getRuntime().exec(new String[] { "ps", "-p", String.valueOf(MonitorFactory.getSelfProcessID()), "-o", "command=" });
 			cmdChecker.waitFor();
@@ -881,8 +1066,15 @@ public class JobAgent implements Runnable {
 			if (cont != null) {
 				putJobTrace("Support for containers detected. Will use: " + cont.getContainerizerName());
 				cont.setWorkdir(jobWorkdir);
-				return cont.containerize(String.join(" ", launchCmd));
+				launchCmd = cont.containerize(String.join(" ", launchCmd));
 			}
+
+			// Run jobs in isolated environment
+			String isolCmd = addIsolation((int) reqCPU.longValue());
+			launchCmd.addAll(0, Arrays.asList("taskset", "-c", isolCmd));
+
+			System.out.println("Adding isolation like this " + launchCmd);
+
 			return launchCmd;
 		}
 		catch (final IOException e) {
@@ -1629,5 +1821,5 @@ public class JobAgent implements Runnable {
 			}
 		};
 	}
-	
+
 }
