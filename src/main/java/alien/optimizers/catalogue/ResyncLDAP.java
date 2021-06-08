@@ -446,7 +446,7 @@ public class ResyncLDAP extends Optimizer {
 						db.query("UPDATE SE_VOLUMES SET volume=?, method=?, size=? WHERE seName=? AND mountpoint=? and volumeId=?", false,
 								path, method, Long.valueOf(size), seName, path, Integer.valueOf(volumeId));
 					else
-						db.query("REPLACE INTO SE_VOLUMES(sename,volume,method,mountpoint,size) values (?,?,?,?,?)", false,
+						db.query("INSERT INTO SE_VOLUMES(sename,volume,method,mountpoint,size) values (?,?,?,?,?)", false,
 								seName, path, method, path, Long.valueOf(size));
 
 					final HashMap<String, String> currentSEVolumes = populateSEVolumesRegistry(seName, path, method, path, String.valueOf(size));
@@ -515,7 +515,7 @@ public class ResyncLDAP extends Optimizer {
 							+ "WHERE seNumber=? and seName=?", false, Integer.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
 							seioDaemons, Integer.valueOf(seNumber), seName);
 				else
-					db.query("REPLACE INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
+					db.query("INSERT INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
 							+ "values (?,?,?,?,?,?,?,?,?)", false, seName, Integer.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path, seioDaemons);
 				logger.log(Level.INFO, "Added or updated entry for SE " + seName);
 
