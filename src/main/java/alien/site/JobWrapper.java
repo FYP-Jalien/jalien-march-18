@@ -679,9 +679,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		commander.q_api.putJobLog(queueId, "trace", "Going to uploadOutputFiles(exitStatus=" + exitStatus + ", outputDir=" + outputDir + ")");
 
 		boolean noError = true;
-		if (exitStatus.toString().contains("ERROR")){
+		if (exitStatus.toString().contains("ERROR")) {
 			commander.q_api.putJobLog(queueId, "trace", "Registering temporary log files in " + outputDir
-					+ ". You must do 'registerOutput' in this directory within 24 hours of the job termination to preserver them. After this period, they are automatically deleted.");
+					+ ". You must do 'registerOutput " + queueId + "' within 24 hours of the job termination to preserve them. After this period, they are automatically deleted.");
 			noError = false;
 		}
 
