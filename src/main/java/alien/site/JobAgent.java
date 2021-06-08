@@ -15,7 +15,6 @@ import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.lang.ProcessBuilder.Redirect;
 import java.net.URISyntaxException;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -214,7 +213,7 @@ public class JobAgent implements Runnable {
 	private String RES_RESOURCEUSAGE = "";
 	private Long RES_RUNTIME = Long.valueOf(0);
 	private String RES_FRUNTIME = "";
-	private Integer RES_NOCPUS = Integer.valueOf(1);
+	private int RES_NOCPUS = 1;
 	private String RES_CPUMHZ = "";
 	private String RES_CPUFAMILY = "";
 
@@ -370,7 +369,7 @@ public class JobAgent implements Runnable {
 				collectSystemInformation();
 
 				try {
-					usedCPUs = new int[Integer.valueOf(BkThread.getNumCPUs())];
+					usedCPUs = new int[BkThread.getNumCPUs()];
 					for (int i = 0; i < RES_NOCPUS; i++) {
 						usedCPUs[i] = 0;
 					}
@@ -407,7 +406,7 @@ public class JobAgent implements Runnable {
 			RES_CPUFAMILY = cpuinfo.get(ApMonMonitoringConstants.LGEN_CPU_FAMILY);
 			RES_CPUMHZ = cpuinfo.get(ApMonMonitoringConstants.LGEN_CPU_MHZ);
 			RES_CPUMHZ = RES_CPUMHZ.substring(0, RES_CPUMHZ.indexOf("."));
-			RES_NOCPUS = Integer.valueOf(BkThread.getNumCPUs());
+			RES_NOCPUS = BkThread.getNumCPUs();
 
 			logger.log(Level.INFO, "CPUFAMILY: " + RES_CPUFAMILY);
 			logger.log(Level.INFO, "CPUMHZ: " + RES_CPUMHZ);
@@ -908,20 +907,21 @@ public class JobAgent implements Runnable {
 		return null;
 	}
 
-	int[] valueToArray(int v, int size) {
+	static int[] valueToArray(int v, int size) {
 		int[] maskArray = new int[size];
 		int count = 0;
+		int vAux = v;
 
-		while (v > 0) {
+		while (vAux > 0) {
 			maskArray[count] = v & 1;
-			v = v >> 1;
+			vAux = vAux >> 1;
 			count++;
 		}
 
 		return maskArray;
 	}
 
-	String arrayToTaskset(int[] array) {
+	static String arrayToTaskset(int[] array) {
 		String out = "";
 
 		for (int i = (array.length - 1); i >= 0; i--) {
@@ -1308,7 +1308,7 @@ public class JobAgent implements Runnable {
 			getFinalCPUUsage();
 
 		final String procinfo = String.format("%s %d %.2f %.2f %.2f %.2f %.2f %d %s %s %s %.2f %.2f 1000", RES_FRUNTIME, RES_RUNTIME, RES_CPUUSAGE, RES_MEMUSAGE, RES_CPUTIME, RES_RMEM, RES_VMEM,
-				RES_NOCPUS, RES_CPUFAMILY, RES_CPUMHZ, RES_RESOURCEUSAGE, RES_RMEMMAX, RES_VMEMMAX);
+				Integer.valueOf(RES_NOCPUS), RES_CPUFAMILY, RES_CPUMHZ, RES_RESOURCEUSAGE, RES_RMEMMAX, RES_VMEMMAX);
 		logger.log(Level.INFO, "+++++ Sending resources info +++++");
 		logger.log(Level.INFO, procinfo);
 
