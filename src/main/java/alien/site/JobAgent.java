@@ -213,7 +213,7 @@ public class JobAgent implements Runnable {
 	private String RES_RESOURCEUSAGE = "";
 	private Long RES_RUNTIME = Long.valueOf(0);
 	private String RES_FRUNTIME = "";
-	private int RES_NOCPUS = 1;
+	private Integer RES_NOCPUS = Integer.valueOf(1);
 	private String RES_CPUMHZ = "";
 	private String RES_CPUFAMILY = "";
 
@@ -370,7 +370,7 @@ public class JobAgent implements Runnable {
 
 				try {
 					usedCPUs = new int[BkThread.getNumCPUs()];
-					for (int i = 0; i < RES_NOCPUS; i++) {
+					for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
 						usedCPUs[i] = 0;
 					}
 				}
@@ -406,7 +406,7 @@ public class JobAgent implements Runnable {
 			RES_CPUFAMILY = cpuinfo.get(ApMonMonitoringConstants.LGEN_CPU_FAMILY);
 			RES_CPUMHZ = cpuinfo.get(ApMonMonitoringConstants.LGEN_CPU_MHZ);
 			RES_CPUMHZ = RES_CPUMHZ.substring(0, RES_CPUMHZ.indexOf("."));
-			RES_NOCPUS = BkThread.getNumCPUs();
+			RES_NOCPUS = Integer.valueOf(BkThread.getNumCPUs());
 
 			logger.log(Level.INFO, "CPUFAMILY: " + RES_CPUFAMILY);
 			logger.log(Level.INFO, "CPUMHZ: " + RES_CPUMHZ);
@@ -888,13 +888,13 @@ public class JobAgent implements Runnable {
 
 					newVal = Integer.parseInt(readArg.trim(), 16);
 
-					if ((1 << RES_NOCPUS) - 1 == newVal)
+					if ((1 << RES_NOCPUS.intValue()) - 1 == newVal)
 						continue;
 
 					mask |= newVal;
 
 				}
-				return valueToArray(mask, RES_NOCPUS);
+				return valueToArray(mask, RES_NOCPUS.intValue());
 			}
 		}
 		catch (InterruptedException e) {
@@ -940,7 +940,7 @@ public class JobAgent implements Runnable {
 
 		try {
 			final String out = ExternalProcesses.getCmdOutput(Arrays.asList("/bin/bash", "-c", cmd), true, 30L, TimeUnit.SECONDS);
-			return valueToArray((~Integer.parseInt(out.trim(), 16) & (1 << RES_NOCPUS) - 1), RES_NOCPUS);
+			return valueToArray((~Integer.parseInt(out.trim(), 16) & (1 << RES_NOCPUS.intValue()) - 1), RES_NOCPUS.intValue());
 		}
 		catch (IOException e) {
 			e.printStackTrace();
@@ -954,8 +954,8 @@ public class JobAgent implements Runnable {
 
 	String pickCPUs(int[] mask) {
 		int remainingCPU = (int) reqCPU.longValue();
-		int []newMask = new int[RES_NOCPUS];
-		for (int i = 0; i < RES_NOCPUS && remainingCPU > 0; i++) {
+		int []newMask = new int[RES_NOCPUS.intValue()];
+		for (int i = 0; i < RES_NOCPUS.intValue() && remainingCPU > 0; i++) {
 			if (mask[i] != 1 && usedCPUs[i] == 0) {
 				newMask[i] = 1;
 				remainingCPU--;
@@ -965,7 +965,7 @@ public class JobAgent implements Runnable {
 		if (remainingCPU != 0)
 			return "Error";
 
-		for (int i = 0; i < RES_NOCPUS; i++) {
+		for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
 			if (newMask[i] == 1) {
 				usedCPUs[i] = jobNumber;
 			}
@@ -984,7 +984,7 @@ public class JobAgent implements Runnable {
 			return null;
 
 		boolean check = true;
-		for (int i = 0; i < RES_NOCPUS; i++) {
+		for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
 			if (hostMask[i] != 0) {
 				check = false;
 				break;
@@ -1308,7 +1308,7 @@ public class JobAgent implements Runnable {
 			getFinalCPUUsage();
 
 		final String procinfo = String.format("%s %d %.2f %.2f %.2f %.2f %.2f %d %s %s %s %.2f %.2f 1000", RES_FRUNTIME, RES_RUNTIME, RES_CPUUSAGE, RES_MEMUSAGE, RES_CPUTIME, RES_RMEM, RES_VMEM,
-				Integer.valueOf(RES_NOCPUS), RES_CPUFAMILY, RES_CPUMHZ, RES_RESOURCEUSAGE, RES_RMEMMAX, RES_VMEMMAX);
+				RES_NOCPUS, RES_CPUFAMILY, RES_CPUMHZ, RES_RESOURCEUSAGE, RES_RMEMMAX, RES_VMEMMAX);
 		logger.log(Level.INFO, "+++++ Sending resources info +++++");
 		logger.log(Level.INFO, procinfo);
 
