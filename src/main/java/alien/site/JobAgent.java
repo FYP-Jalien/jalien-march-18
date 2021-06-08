@@ -879,7 +879,6 @@ public class JobAgent implements Runnable {
 
 		try {
 			String cmd = "ps aux | grep -v \"^root\" | tr -s \" \" | cut -d\" \" -f2 | xargs -L1  taskset -p 2> /dev/null | cut -d \" \" -f 6 | sort | uniq";
-			System.out.println(cmd);
 
 			final Process affinityCmd = Runtime.getRuntime().exec(new String[] {"/bin/bash", "-c", cmd});
 			affinityCmd.waitFor();
@@ -887,27 +886,22 @@ public class JobAgent implements Runnable {
 				String readArg;
 				while (cmdScanner.hasNext()) {
 					readArg = (cmdScanner.next());
-					//System.out.println("newVal " + readArg);
 
 					newVal = Integer.parseInt(readArg.trim(), 16);
 
-					System.out.println(Math.pow(RES_NOCPUS, 2) - 1);
-					if ((Math.pow(2, RES_NOCPUS) - 1) == newVal)
+					if ((1 << RES_NOCPUS) - 1 == newVal)
 						continue;
 
 					mask |= newVal;
-					//System.out.println("Mask is " + mask);
-					//System.out.println("NoCPUS is " + RES_NOCPUS);
 
 				}
-				int []b = valueToArray(mask, RES_NOCPUS);
-				//System.out.println("Arr is " + b);
-				return b;
-			} catch (Exception e) {
-				System.out.println("In exception");
-				e.printStackTrace();
+				return valueToArray(mask, RES_NOCPUS);
 			}
-		} catch (Exception e) {
+		}
+		catch (InterruptedException e) {
+			e.printStackTrace();
+		}
+		catch (IOException e) {
 			e.printStackTrace();
 		}
 
@@ -923,6 +917,7 @@ public class JobAgent implements Runnable {
 			v = v >> 1;
 			count++;
 		}
+
 		return maskArray;
 	}
 
@@ -942,31 +937,33 @@ public class JobAgent implements Runnable {
 
 	int[] getHostMask() {
 		String cmd = "taskset -p $$ | cut -d\" \" -f6";
-		System.out.println(cmd);
 
 		try {
 			final String out = ExternalProcesses.getCmdOutput(Arrays.asList("/bin/bash", "-c", cmd), true, 30L, TimeUnit.SECONDS);
-
-			System.out.println(out);
-
 			return valueToArray((~Integer.parseInt(out.trim(), 16) & (1 << RES_NOCPUS) - 1), RES_NOCPUS);
-		} catch (Exception e) {
+		}
+		catch (IOException e) {
+			e.printStackTrace();
+		}
+		catch (InterruptedException e) {
 			e.printStackTrace();
 		}
 
 		return null;
 	}
 
-	int pickCPUs(int reqCPU, int[] mask, int[] newMask) {
-		for (int i = 0; i < RES_NOCPUS && reqCPU > 0; i++) {
+	String pickCPUs(int[] mask) {
+		int remainingCPU = (int) reqCPU.longValue();
+		int []newMask = new int[RES_NOCPUS];
+		for (int i = 0; i < RES_NOCPUS && remainingCPU > 0; i++) {
 			if (mask[i] != 1 && usedCPUs[i] == 0) {
 				newMask[i] = 1;
-				reqCPU--;
+				remainingCPU--;
 			}
 		}
 
-		if (reqCPU != 0)
-			return reqCPU;
+		if (remainingCPU != 0)
+			return "Error";
 
 		for (int i = 0; i < RES_NOCPUS; i++) {
 			if (newMask[i] == 1) {
@@ -974,29 +971,17 @@ public class JobAgent implements Runnable {
 			}
 		}
 
-		return 0;
+		return arrayToTaskset(newMask);
 	}
 
 	synchronized String addIsolation(int cpuSize) {
 		int[] mask = getFreeCPUs();
 		int[] hostMask = getHostMask();
-		int[] cpuAffinity = new int[RES_NOCPUS];
 		int ret = 0;
+		String isolatedCPUs = "";
 
-		System.out.println("FreeCPU masks");
-		for (int i = RES_NOCPUS - 1; i >= 0; i--)
-			System.out.print(mask[i]);
-		System.out.println();
-
-		System.out.println("Own process mask");
-		for (int i = RES_NOCPUS - 1; i >= 0; i--)
-			System.out.print(hostMask[i]);
-		System.out.println();
-		System.out.println("USED CPUs mask before");
-		for (int i = 0; i < RES_NOCPUS; i++) {
-			System.out.print(usedCPUs[i]);
-		}
-		System.out.println();
+		if (mask == null || hostMask == null)
+			return null;
 
 		boolean check = true;
 		for (int i = 0; i < RES_NOCPUS; i++) {
@@ -1006,31 +991,18 @@ public class JobAgent implements Runnable {
 			}
 		}
 
-		System.out.println(check);
 		if (check == true)
-			ret = pickCPUs(cpuSize, mask, cpuAffinity);
+			isolatedCPUs = pickCPUs(mask);
 		else {
-			ret = pickCPUs(cpuSize, hostMask, cpuAffinity);
+			isolatedCPUs = pickCPUs(hostMask);
 		}
 
-		System.out.println(ret);
 		if (ret != 0) {
-			System.out.println("Error");
+			logger.log(Level.SEVERE, "Could not isolate job to " + cpuSize + " CPUs");
 			return null;
 		}
 
-		System.out.println("USED CPUs mask after");
-		for (int i = 0; i < RES_NOCPUS; i++) {
-			System.out.print(usedCPUs[i]);
-		}
-		System.out.println();
-
-		System.out.println("CPU affinity");
-		for (int i = RES_NOCPUS - 1; i >= 0; i--)
-			System.out.print(cpuAffinity[i]);
-		System.out.println();
-
-		return arrayToTaskset(cpuAffinity);
+		return isolatedCPUs;
 	}
 
 	/**
@@ -1071,9 +1043,8 @@ public class JobAgent implements Runnable {
 
 			// Run jobs in isolated environment
 			String isolCmd = addIsolation((int) reqCPU.longValue());
-			launchCmd.addAll(0, Arrays.asList("taskset", "-c", isolCmd));
-
-			System.out.println("Adding isolation like this " + launchCmd);
+			if (isolCmd != null && isolCmd.compareTo("") != 0)
+				launchCmd.addAll(0, Arrays.asList("taskset", "-c", isolCmd));
 
 			return launchCmd;
 		}
