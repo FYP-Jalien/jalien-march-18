@@ -120,7 +120,8 @@ public class SLURM extends BatchQueue {
 		final String name = String.format("jobagent_%s_%d", this.config.get("host_host"), timestamp);
 
 		// Check if we can use SLURM_LOG_PATH instead of sending to /dev/null
-		final String host_logdir = environment.get("SLURM_LOG_PATH");
+		final String host_logdir = environment.getOrDefault("SLURM_LOG_PATH", config.get("host_logdir") != null ? config.get("host_logdir").toString() : null);
+
 		if (host_logdir != null) {
 			final String log_folder_path = String.format("%s/%s", host_logdir, current_date_str);
 			final File log_folder = new File(log_folder_path);
