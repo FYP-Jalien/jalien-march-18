@@ -913,7 +913,7 @@ public class JobAgent implements Runnable {
 		int vAux = v;
 
 		while (vAux > 0) {
-			maskArray[count] = v & 1;
+			maskArray[count] = vAux & 1;
 			vAux = vAux >> 1;
 			count++;
 		}
@@ -961,7 +961,6 @@ public class JobAgent implements Runnable {
 				remainingCPU--;
 			}
 		}
-
 		if (remainingCPU != 0)
 			return "Error";
 
@@ -970,7 +969,6 @@ public class JobAgent implements Runnable {
 				usedCPUs[i] = jobNumber;
 			}
 		}
-
 		return arrayToTaskset(newMask);
 	}
 
