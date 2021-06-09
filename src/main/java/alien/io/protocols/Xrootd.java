@@ -901,7 +901,7 @@ public class Xrootd extends Protocol {
 	/**
 	 * @param command
 	 */
-	private void setRateLimit(List<String> command) {
+	private void setRateLimit(final List<String> command) {
 		if (rateLimit > 0) {
 			if (preferEoscp) {
 				double limitInM = rateLimit;
@@ -1942,7 +1942,7 @@ public class Xrootd extends Protocol {
 
 	/**
 	 * Set a read or write (only when the target or respectively source is a local file) to the given rate (per second). See `man xrdcp`, the "-X" option
-	 * 
+	 *
 	 * @param rate value
 	 * @param unit multiplying unit, can be one of 'k', 'm' or 'g'. Anything else is considered to be bytes/second.
 	 */
