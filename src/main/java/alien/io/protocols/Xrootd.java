@@ -44,6 +44,7 @@ import alien.config.ConfigUtils;
 import alien.io.IOUtils;
 import alien.se.SE;
 import alien.user.UserFactory;
+import lazyj.Format;
 import lia.util.process.ExternalProcess.ExitStatus;
 import utils.ExternalCalls;
 import utils.ProcessWithTimeout;
@@ -74,6 +75,10 @@ public class Xrootd extends Protocol {
 	private static final String xrootd_default_path;
 
 	private static String xrdcpPath = null;
+
+	private static String eoscpPath = null;
+
+	private static boolean preferEoscp = false;
 
 	/**
 	 * Statically filled variable, <code>true</code> when
@@ -129,6 +134,17 @@ public class Xrootd extends Protocol {
 				if (xrdcpPath != null)
 					break;
 			}
+
+		eoscpPath = ExternalCalls.programExistsInPath("eoscp");
+
+		if (ConfigUtils.getConfig().getb("alien.io.protocols.Xrootd.preferEoscp", false)) {
+			if (eoscpPath != null) {
+				logger.log(Level.INFO, "Prefering " + eoscpPath + " for transfers over " + xrdcpPath);
+				preferEoscp = true;
+			}
+			else
+				logger.log(Level.INFO, "Configuration prefers eoscp over xrdcp, but I couldn't locate it in $PATH, using xrdcp = " + xrdcpPath + " instead");
+		}
 
 		boolean newerThan4 = false;
 
@@ -556,12 +572,21 @@ public class Xrootd extends Protocol {
 		try {
 			final List<String> command = new LinkedList<>();
 
-			if (xrdcpPath == null) {
-				logger.log(Level.SEVERE, "Could not find xrdcp in path.");
-				throw new SourceException(XRDCP_NOT_FOUND_IN_PATH, "Could not find xrdcp in path.");
+			if (preferEoscp) {
+				command.add(eoscpPath);
+				command.add("-s");
+				command.add("-n");
+				command.add("-b");
+				command.add("33554432");
 			}
+			else {
+				if (xrdcpPath == null) {
+					logger.log(Level.SEVERE, "Could not find xrdcp in path.");
+					throw new SourceException(XRDCP_NOT_FOUND_IN_PATH, "Could not find xrdcp in path.");
+				}
 
-			command.add(xrdcpPath);
+				command.add(xrdcpPath);
+			}
 
 			/*
 			 * TODO: enable when servers support checksum queries, at the moment most don't if (xrootdNewerThan4 && guid.md5 != null && guid.md5.length() > 0) { command.add("-C"); command.add("md5:" +
@@ -573,18 +598,13 @@ public class Xrootd extends Protocol {
 			if (pfn.ticket != null && pfn.ticket.envelope != null)
 				transactionURL = pfn.ticket.envelope.getTransactionURL();
 
-			String opaqueParams = "-OS";
-
 			if (pfn.ticket != null && pfn.ticket.envelope != null)
 				if (pfn.ticket.envelope.getEncryptedEnvelope() != null)
-					opaqueParams += "authz=" + pfn.ticket.envelope.getEncryptedEnvelope();
+					transactionURL += "?authz=" + pfn.ticket.envelope.getEncryptedEnvelope();
 				else if (pfn.ticket.envelope.getSignedEnvelope() != null)
-					opaqueParams += pfn.ticket.envelope.getSignedEnvelope();
+					transactionURL += "?" + pfn.ticket.envelope.getSignedEnvelope();
 
-			opaqueParams = decorateOpaqueParams(opaqueParams, applicationName);
-
-			if (opaqueParams.length() > 4)
-				command.add(opaqueParams);
+			transactionURL = decorateOpaqueParams(transactionURL, applicationName);
 
 			command.add(transactionURL);
 			command.add(target.getCanonicalPath());
@@ -747,28 +767,37 @@ public class Xrootd extends Protocol {
 		try {
 			final List<String> command = new LinkedList<>();
 
-			if (xrdcpPath == null) {
-				logger.log(Level.SEVERE, "Could not find xrdcp in path.");
-				throw new TargetException("Could not find xrdcp in path.");
+			if (preferEoscp) {
+				command.add(eoscpPath);
+				command.add("-s");
+				command.add("-n");
+				command.add("-b");
+				command.add("33554432");
 			}
+			else {
+				if (xrdcpPath == null) {
+					logger.log(Level.SEVERE, "Could not find xrdcp in path.");
+					throw new TargetException("Could not find xrdcp in path.");
+				}
 
-			command.add(xrdcpPath);
+				command.add(xrdcpPath);
 
-			// no progress bar
-			if (xrootdNewerThan4)
-				command.add("--nopbar");
-			else
-				command.add("-np");
+				// no progress bar
+				if (xrootdNewerThan4)
+					command.add("--nopbar");
+				else
+					command.add("-np");
 
-			/**
-			 * // explicitly ask to create intermediate paths
-			 * if (xrootdNewerThan4)
-			 * command.add("--path");
-			 */
+				/**
+				 * // explicitly ask to create intermediate paths
+				 * if (xrootdNewerThan4)
+				 * command.add("--path");
+				 */
 
-			command.add("--verbose"); // display summary output
-			command.add("--force"); // re-create a file if already present
-			command.add("--posc"); // request POSC (persist-on-successful-close) processing to create a new file
+				command.add("--verbose"); // display summary output
+				command.add("--force"); // re-create a file if already present
+				command.add("--posc"); // request POSC (persist-on-successful-close) processing to create a new file
+			}
 
 			/*
 			 * TODO: enable when storages support checksum queries, at the moment most don't if (xrootdNewerThan4 && guid.md5!=null && guid.md5.length()>0){ command.add("-C");
@@ -784,19 +813,18 @@ public class Xrootd extends Protocol {
 			if (pfn.ticket != null && pfn.ticket.envelope != null) {
 				transactionURL = pfn.ticket.envelope.getTransactionURL();
 
-				String opaqueParams = "-OD";
-
 				if (pfn.ticket.envelope.getEncryptedEnvelope() != null) {
+					transactionURL += "?";
+
 					if (!xrootdNewerThan4)
-						opaqueParams += "eos.bookingsize=" + guid.size + "&";
+						transactionURL += "eos.bookingsize=" + guid.size + "&";
 
-					opaqueParams += "authz=" + pfn.ticket.envelope.getEncryptedEnvelope();
-
+					transactionURL += "authz=" + pfn.ticket.envelope.getEncryptedEnvelope();
 				}
 				else if (pfn.ticket.envelope.getSignedEnvelope() != null)
-					opaqueParams = pfn.ticket.envelope.getSignedEnvelope();
+					transactionURL += "?" + pfn.ticket.envelope.getSignedEnvelope();
 
-				command.add(decorateOpaqueParams(opaqueParams, applicationName));
+				transactionURL = decorateOpaqueParams(transactionURL, applicationName);
 			}
 
 			command.add(transactionURL);
@@ -875,14 +903,41 @@ public class Xrootd extends Protocol {
 	 */
 	private void setRateLimit(List<String> command) {
 		if (rateLimit > 0) {
-			command.add("-X");
+			if (preferEoscp) {
+				double limitInM = rateLimit;
 
-			String value = String.valueOf(rateLimit);
+				switch (rateLimitUnit) {
+					case 'k':
+						limitInM /= 1024;
+						break;
+					case 'g':
+						limitInM *= 1024;
+						break;
+					case 'm':
+						break;
+					default:
+						limitInM /= (1024 * 1024);
+						break;
+				}
 
-			if (rateLimitUnit == 'k' || rateLimitUnit == 'm' || rateLimitUnit == 'g')
-				value += rateLimitUnit;
+				if (limitInM >= 1 && limitInM <= 2000) {
+					command.add("-t");
+					command.add(Format.point(limitInM));
+				}
+				else {
+					logger.log(Level.WARNING, "eoscp can only limit the throughput between 1 and 2000 (MB/s)");
+				}
+			}
+			else {
+				command.add("-X");
 
-			command.add(value);
+				String value = String.valueOf(rateLimit);
+
+				if (rateLimitUnit == 'k' || rateLimitUnit == 'm' || rateLimitUnit == 'g')
+					value += rateLimitUnit;
+
+				command.add(value);
+			}
 		}
 	}
 

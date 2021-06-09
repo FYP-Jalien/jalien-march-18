@@ -329,13 +329,13 @@ public class SEBenchmark {
 		if (options.has("X")) {
 			final String value = (String) options.valueOf("X");
 
-			final Pattern p = Pattern.compile("(\\d+)([a-z]?)");
+			final Pattern p = Pattern.compile("(\\d+)([a-zA-Z]?)");
 			final Matcher m = p.matcher(value);
 
 			if (m.matches()) {
 				final long rateLimit = Long.parseLong(m.group(1));
 
-				final String unit = m.group(2);
+				final String unit = m.group(2).toLowerCase();
 
 				Factory.xrootd.setRateLimit(rateLimit, unit.length() > 0 ? unit.charAt(0) : 'b');
 			}
