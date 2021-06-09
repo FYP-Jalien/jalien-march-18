@@ -376,9 +376,9 @@ public class SEBenchmark {
 				rt.start();
 				rList.add(rt);
 			}
-		}
 
-		readBackFiles = new LinkedBlockingQueue<>(readBackThreads);
+			readBackFiles = new LinkedBlockingQueue<>(readBackThreads);
+		}
 
 		monitoringThread.start();
 
