@@ -917,7 +917,7 @@ public class JobAgent implements Runnable {
 					else if (!getWrapperJobStatusTimestamp().equals(lastStatusChange)) {
 						final String status = getWrapperJobStatus();
 
-						if (!status.equals("STARTED") && !status.equals("RUNNING")) {
+						if (!"STARTED".equals(status) && !"RUNNING".equals(status)) {
 							lastStatusChange = getWrapperJobStatusTimestamp();
 							sendProcessResources();
 						}
