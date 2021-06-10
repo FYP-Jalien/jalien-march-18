@@ -887,6 +887,8 @@ public class JobAgent implements Runnable {
 		final Timer t = new Timer();
 		t.schedule(killPayload, TimeUnit.MILLISECONDS.convert(ttl, TimeUnit.SECONDS)); // TODO: ttlForJob
 
+		Long lastStatusChange = getWrapperJobStatusTimestamp();
+
 		int code = 0;
 
 		logger.log(Level.INFO, "About to enter monitor loop. Is the JobWrapper process alive?: " + p.isAlive());
@@ -903,13 +905,22 @@ public class JobAgent implements Runnable {
 						logger.log(Level.SEVERE, "Process overusing resources: " + error);
 						commander.q_api.putJobLog(queueId, "trace", "ERROR[FATAL]: Process overusing resources");
 						commander.q_api.putJobLog(queueId, "trace", error);
-					//	t.cancel();
-					//	killJobWrapperAndPayload(p);
-					//	return 1;
+						// t.cancel();
+						// killJobWrapperAndPayload(p);
+						// return 1;
 					}
+					//Send report once every 10 min, or when the job changes state
 					if (monitor_loops == 120) {
 						monitor_loops = 0;
 						sendProcessResources();
+					}
+					else if (!getWrapperJobStatusTimestamp().equals(lastStatusChange)) {
+						final String status = getWrapperJobStatus();
+
+						if (!status.equals("STARTED") && !status.equals("RUNNING")) {
+							lastStatusChange = getWrapperJobStatusTimestamp();
+							sendProcessResources();
+						}
 					}
 				}
 				try {
@@ -922,8 +933,11 @@ public class JobAgent implements Runnable {
 			}
 			code = p.exitValue();
 
+			//Send a final report once the payload completes
+			sendProcessResources();
+
 			logger.log(Level.INFO, "JobWrapper has finished execution. Exit code: " + code);
-			logger.log(Level.INFO, "All done for job " + queueId  + ". Final status: " + readWrapperStatus());
+			logger.log(Level.INFO, "All done for job " + queueId  + ". Final status: " + getWrapperJobStatus());
 			commander.q_api.putJobLog(queueId, "trace", "JobWrapper exit code: " + code);
 			if (code != 0)
 				logger.log(Level.WARNING, "Error encountered: see the JobWrapper logs in: " + env.getOrDefault("TMPDIR", "/tmp") + "/jalien-jobwrapper.log " + " for more details");
@@ -941,7 +955,7 @@ public class JobAgent implements Runnable {
 			apmon.removeJobToMonitor(wrapperPID);
 			if (code != 0) {
 				// Looks like something went wrong. Let's check the last reported status
-				final String lastStatus = readWrapperStatus();
+				final String lastStatus = getWrapperJobStatus();
 				if ("STARTED".equals(lastStatus) || "RUNNING".equals(lastStatus)) {
 					commander.q_api.putJobLog(queueId, "trace", "ERROR: The JobWrapper was killed before job could complete");
 					changeJobStatus(JobStatus.ERROR_E, null); // JobWrapper was killed before the job could be completed
@@ -1151,7 +1165,7 @@ public class JobAgent implements Runnable {
 			}
 	}
 
-	private String readWrapperStatus() {
+	private String getWrapperJobStatus() {
 		try {
 			return Files.readString(Paths.get(jobWorkdir + "/.jobstatus"));
 		}
@@ -1159,6 +1173,10 @@ public class JobAgent implements Runnable {
 			logger.log(Level.WARNING, "Attempt to read job status failed. Ignoring: " + e.toString());
 			return "";
 		}
+	}
+
+	private Long getWrapperJobStatusTimestamp() {
+		return new File(jobWorkdir + "/.jobstatus").lastModified();
 	}
 
 	private static int convertStringUnitToIntegerMB(final String unit, final String number) {
