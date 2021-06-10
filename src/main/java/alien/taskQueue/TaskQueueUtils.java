@@ -3656,6 +3656,10 @@ public class TaskQueueUtils {
 
 		params.put("cpucores", cpuCores == null || cpuCores.intValue() < 0 || cpuCores.intValue() > 100 ? Integer.valueOf(1) : cpuCores);
 
+		if (cpuCores != null) {
+			params.put("disk", ((Integer) params.get("disk")) * cpuCores);
+		}
+
 		if (logger.isLoggable(Level.FINER))
 			logger.log(Level.FINER, "extracted params: " + params.toString());
 

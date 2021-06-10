@@ -429,7 +429,7 @@ public class JobAgent implements Runnable {
 				else
 					reqCPU = Long.valueOf(1);
 
-				reqDisk = 10 * 1024L;
+				reqDisk = reqCPU * 10 * 1024L;
 				final String workdirMaxSize = jdl.gets("Workdirectorysize");
 
 				final Pattern p = Pattern.compile("\\p{L}");
