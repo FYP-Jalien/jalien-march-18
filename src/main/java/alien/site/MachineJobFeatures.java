@@ -46,7 +46,9 @@ public class MachineJobFeatures {
 		final File f = new File(fullPath);
 
 		if (!f.exists() || !f.isFile() || !f.canRead()) {
-			logger.log(Level.INFO, "Cannot access MJF file: " + fullPath);
+			if (logger.isLoggable(Level.FINE))
+				logger.log(Level.FINE, "Cannot access MJF file: " + fullPath);
+
 			return null;
 		}
 
@@ -54,7 +56,7 @@ public class MachineJobFeatures {
 			output = String.valueOf(fis.readAllBytes());
 		}
 		catch (final IOException e) {
-			logger.log(Level.WARNING, "File does not exist: " + fullPath, e);
+			logger.log(Level.WARNING, "Cannot read content of " + fullPath, e);
 			return null;
 		}
 
@@ -106,7 +108,8 @@ public class MachineJobFeatures {
 
 		final String output = getValueFromFile(resolvedPath);
 
-		logger.log(Level.INFO, "Got value for " + featureString + " = " + output);
+		if (logger.isLoggable(Level.FINER))
+			logger.log(Level.FINER, "Got value for " + featureString + " = " + output);
 
 		return output != null ? Long.valueOf(output) : null;
 	}
