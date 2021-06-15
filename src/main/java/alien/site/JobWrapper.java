@@ -585,12 +585,19 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		logger.log(Level.INFO, "Sandbox populated: " + currentDir.getAbsolutePath());
 
-		// Dump inputDataList XML
-		try {
-			Files.write(Paths.get(currentDir.getAbsolutePath() + "/" + jdl.gets("InputDataList")), inputDataList.getBytes());
-		}
-		catch (final Exception e) {
-			logger.log(Level.SEVERE, "Problem dumping XML: ", e);
+		if (inputDataList != null) {
+			// Dump inputDataList XML
+			try {
+				String collectionName = jdl.gets("InputDataList");
+
+				if (collectionName == null || collectionName.isBlank())
+					collectionName = "wn.xml";
+
+				Files.write(Paths.get(currentDir.getAbsolutePath() + "/" + collectionName), inputDataList.getBytes());
+			}
+			catch (final Exception e) {
+				logger.log(Level.SEVERE, "Problem dumping XML: ", e);
+			}
 		}
 
 		return true;
