@@ -281,20 +281,47 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		return env;
 	}
 
+	private class PackagesResolver extends Thread {
+		private Map<String, String> environment_packages;
+
+		@Override
+		public void run() {
+			environment_packages = getJobPackagesEnvironment();
+		}
+	}
+
+	private class InputFilesDownloader extends Thread {
+		private boolean downloadedOk;
+
+		@Override
+		public void run() {
+			downloadedOk = getInputFiles();
+		}
+	}
+
 	private int runJob() {
 		try {
 			logger.log(Level.INFO, "Started JobWrapper for: " + jdl);
 
 			changeStatus(JobStatus.STARTED);
 
-			if (!getInputFiles()) {
+			final PackagesResolver packResolver = new PackagesResolver();
+			packResolver.start();
+
+			final InputFilesDownloader downloader = new InputFilesDownloader();
+			downloader.start();
+
+			downloader.join();
+			packResolver.join();
+
+			if (!downloader.downloadedOk) {
 				logger.log(Level.SEVERE, "Failed to get inputfiles");
 				changeStatus(JobStatus.ERROR_IB);
 				return -1;
 			}
 
 			// run payload
-			final int execExitCode = execute();
+			final int execExitCode = execute(packResolver.environment_packages);
 
 			getTraceFromFile();
 
@@ -313,7 +340,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				// return execExitCode;
 			}
 
-			final int valExitCode = validate();
+			final int valExitCode = validate(packResolver.environment_packages);
 
 			getTraceFromFile();
 
@@ -359,7 +386,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @return <code>0</code> if everything went fine, a positive number with the process exit code (which would mean a problem) and a negative error code in case of timeout or other supervised
 	 *         execution errors
 	 */
-	private int executeCommand(final String command, final List<String> arguments) {
+	private int executeCommand(final String command, final List<String> arguments, final Map<String, String> environment_packages) {
 
 		logger.log(Level.INFO, "Starting execution of command: " + command);
 
@@ -401,7 +428,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		final ProcessBuilder pBuilder = new ProcessBuilder(cmd);
 
-		final HashMap<String, String> environment_packages = getJobPackagesEnvironment();
 		final Map<String, String> processEnv = pBuilder.environment();
 		final HashMap<String, String> jBoxEnv = ConfigUtils.exportJBoxVariables();
 
@@ -458,23 +484,23 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		return payload.exitValue();
 	}
 
-	private int execute() {
+	private int execute(final Map<String, String> environment_packages) {
 		commander.q_api.putJobLog(queueId, "trace", "Starting execution");
 
 		changeStatus(JobStatus.RUNNING);
-		final int code = executeCommand(jdl.gets("Executable"), jdl.getArguments());
+		final int code = executeCommand(jdl.gets("Executable"), jdl.getArguments(), environment_packages);
 
 		return code;
 	}
 
-	private int validate() {
+	private int validate(final Map<String, String> environment_packages) {
 		int code = 0;
 
 		final String validation = jdl.gets("ValidationCommand");
 
 		if (validation != null) {
 			commander.q_api.putJobLog(queueId, "trace", "Starting validation");
-			code = executeCommand(validation, null);
+			code = executeCommand(validation, null, environment_packages);
 		}
 
 		return code;
