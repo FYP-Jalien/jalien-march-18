@@ -64,7 +64,6 @@ import apmon.ApMonException;
 import apmon.ApMonMonitoringConstants;
 import apmon.BkThread;
 import apmon.MonitoredJob;
-
 import lazyj.ExtProperties;
 import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
@@ -261,6 +260,11 @@ public class JobAgent implements Runnable {
 	protected static final Object requestSync = new Object();
 
 	/**
+	 * Procect access to shared resources
+	 */
+	protected static final Object cpuSync = new Object();
+
+	/**
 	 * How many consecutive answers of "no job for you" we got from the broker
 	 */
 	protected static final AtomicInteger retries = new AtomicInteger(0);
@@ -367,21 +371,25 @@ public class JobAgent implements Runnable {
 				RUNNING_JOBAGENTS = 0;
 
 				collectSystemInformation();
-
-				try {
-					usedCPUs = new int[BkThread.getNumCPUs()];
-					for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
-						usedCPUs[i] = 0;
-					}
-				}
-				catch (final IOException e) {
-					logger.log(Level.WARNING, "Problem with the monitoring objects IO Exception: " + e.toString());
-				}
-				catch (final ApMonException e) {
-					logger.log(Level.WARNING, "Problem with the monitoring objects ApMon Exception: " + e.toString());
-				}
 			}
 		}
+
+		synchronized (cpuSync) {
+			try {
+				usedCPUs = new int[BkThread.getNumCPUs()];
+				for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
+					usedCPUs[i] = 0;
+				}
+			}
+			catch (final IOException e) {
+				logger.log(Level.WARNING, "Problem with the monitoring objects IO Exception: " + e.toString());
+			}
+			catch (final ApMonException e) {
+				logger.log(Level.WARNING, "Problem with the monitoring objects ApMon Exception: " + e.toString());
+			}
+		}
+
+
 
 		hostName = (String) siteMap.get("Localhost");
 		// alienCm = (String) siteMap.get("alienCm");
@@ -570,15 +578,18 @@ public class JobAgent implements Runnable {
 				RUNNING_JOBAGENTS -= 1;
 				setUsedCores(0);
 
+				requestSync.notifyAll();
+			}
+
+			synchronized (cpuSync) {
 				for (int i = 0; i < RES_NOCPUS; i++) {
 					if (usedCPUs[i] == jobNumber) {
 						usedCPUs[i] = 0;
 					}
 				}
-
-
-				requestSync.notifyAll();
 			}
+
+
 		}
 		catch (final Exception e) {
 			if (!(e instanceof EOFException))
@@ -973,31 +984,36 @@ public class JobAgent implements Runnable {
 	}
 
 	synchronized String addIsolation(int cpuSize) {
-		int[] mask = getFreeCPUs();
-		int[] hostMask = getHostMask();
+		int[] mask;
+		int[] hostMask;
 		int ret = 0;
 		String isolatedCPUs = "";
 
-		if (mask == null || hostMask == null)
-			return null;
+		synchronized (cpuSync) {
+			mask = getFreeCPUs();
+			hostMask = getHostMask();
 
-		boolean check = true;
-		for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
-			if (hostMask[i] != 0) {
-				check = false;
-				break;
+			if (mask == null || hostMask == null)
+				return null;
+
+			boolean check = true;
+			for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
+				if (hostMask[i] != 0) {
+					check = false;
+					break;
+				}
 			}
-		}
 
-		if (check == true)
-			isolatedCPUs = pickCPUs(mask);
-		else {
-			isolatedCPUs = pickCPUs(hostMask);
-		}
+			if (check == true)
+				isolatedCPUs = pickCPUs(mask);
+			else {
+				isolatedCPUs = pickCPUs(hostMask);
+			}
 
-		if (ret != 0) {
-			logger.log(Level.SEVERE, "Could not isolate job to " + cpuSize + " CPUs");
-			return null;
+			if (ret != 0) {
+				logger.log(Level.SEVERE, "Could not isolate job to " + cpuSize + " CPUs");
+				return null;
+			}
 		}
 
 		return isolatedCPUs;
