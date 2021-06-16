@@ -9,6 +9,7 @@ import java.lang.ProcessBuilder.Redirect;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,6 +47,7 @@ import alien.user.JAKeyStore;
 import alien.user.UserFactory;
 import apmon.ApMon;
 import lazyj.Format;
+import lia.util.process.ExternalProcesses;
 
 /**
  * Job execution wrapper, running an embedded Tomcat server for in/out-bound communications
@@ -54,6 +56,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 	// Folders and files
 	private final File currentDir = new File(Paths.get(".").toAbsolutePath().normalize().toString());
+	private final String timeFileName = ".jalienTimeTrack";
 	private String defaultOutputDirPrefix;
 
 	// Job variables
@@ -314,6 +317,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			changeStatus(JobStatus.STARTED);
 
+
 			final PackagesResolver packResolver = new PackagesResolver();
 			packResolver.start();
 
@@ -400,6 +404,24 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		logger.log(Level.INFO, "Starting execution of command: " + command);
 
 		final List<String> cmd = new LinkedList<>();
+
+		boolean trackTime = false;
+		try {
+			String supportsTime = ExternalProcesses.getCmdOutput(Arrays.asList("time", "echo"), true, 30L, TimeUnit.SECONDS);
+			System.err.println(supportsTime);
+			if (!supportsTime.contains("command not found"))
+				trackTime = true;
+		}
+		catch (Exception e) {
+			// ignore
+		}
+
+		if (trackTime) {
+			cmd.add("time");
+			cmd.add("-p");
+			cmd.add("-o");
+			cmd.add(currentDir + "/" + timeFileName);
+		}
 
 		final int idx = command.lastIndexOf('/');
 
@@ -488,6 +510,15 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 		catch (final InterruptedException e) {
 			logger.log(Level.INFO, "Interrupted while waiting for process to finish execution" + e);
+		}
+
+		if (trackTime) {
+			try {
+				commander.q_api.putJobLog(queueId, "trace", "Time spent: " + Files.readString(Paths.get(currentDir + "/" + timeFileName)));
+			}
+			catch (Exception te) {
+				// Ignore
+			}
 		}
 
 		return payload.exitValue();
