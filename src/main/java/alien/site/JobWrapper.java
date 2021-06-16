@@ -45,6 +45,7 @@ import alien.taskQueue.JobStatus;
 import alien.user.JAKeyStore;
 import alien.user.UserFactory;
 import apmon.ApMon;
+import lazyj.Format;
 
 /**
  * Job execution wrapper, running an embedded Tomcat server for in/out-bound communications
@@ -601,9 +602,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (inputDataList != null)
 				inputDataList = inputDataList.replace("turl=\"alien://" + entry.getKey().getCanonicalName(), "turl=\"file:///" + f.getAbsolutePath()); // xmlcollection format here does not match AliEn
 
-			commander.q_api.putJobLog(queueId, "trace", "Getting InputFile: " + entry.getKey().getCanonicalName() + " to " + f.getAbsolutePath());
+			commander.q_api.putJobLog(queueId, "trace", "Getting InputFile: " + entry.getKey().getCanonicalName() + " to " + f.getAbsolutePath() + " (" + Format.size(entry.getKey().size) + ")");
 			logger.log(Level.INFO, g + ". entry.getvalue(): " + entry.getValue());
-			commander.q_api.putJobLog(queueId, "trace", g + ". entry.getvalue(): " + entry.getValue());
+			// commander.q_api.putJobLog(queueId, "trace", g + ". entry.getvalue(): " + entry.getValue());
 
 			f = IOUtils.get(g, f, errorMessage);
 
