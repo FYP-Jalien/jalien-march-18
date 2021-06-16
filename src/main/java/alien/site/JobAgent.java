@@ -888,7 +888,7 @@ public class JobAgent implements Runnable {
 		int mask = 0;
 
 		try {
-			String cmd = "ps aux | grep -v \"^root\" | tr -s \" \" | cut -d\" \" -f2 | xargs -L1  taskset -p 2> /dev/null | cut -d \" \" -f 6 | sort | uniq";
+			String cmd = "pgrep -v -U root -u root | xargs -L1 taskset -a -p 2>/dev/null | cut -d' ' -f6 | sort -u";
 
 			final Process affinityCmd = Runtime.getRuntime().exec(new String[] {"/bin/bash", "-c", cmd});
 			affinityCmd.waitFor();
@@ -947,7 +947,7 @@ public class JobAgent implements Runnable {
 	}
 
 	int[] getHostMask() {
-		String cmd = "taskset -p $$ | cut -d\" \" -f6";
+		String cmd = "taskset -p $$ | cut -d' ' -f6";
 
 		try {
 			final String out = ExternalProcesses.getCmdOutput(Arrays.asList("/bin/bash", "-c", cmd), true, 30L, TimeUnit.SECONDS);
