@@ -2443,6 +2443,18 @@ public class TaskQueueUtils {
 	 * @return <code>true</code> if the log was successfully added
 	 */
 	public static boolean putJobLog(final long queueId, final String action, final String message, final HashMap<String, String> joblogtags) {
+		return putJobLog(System.currentTimeMillis(), queueId, action, message, joblogtags);
+	}
+
+	/**
+	 * @param timestamp
+	 * @param queueId
+	 * @param action
+	 * @param message
+	 * @param joblogtags
+	 * @return <code>true</code> if the log was successfully added
+	 */
+	public static boolean putJobLog(final long timestamp, final long queueId, final String action, final String message, final HashMap<String, String> joblogtags) {
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
 				return false;
@@ -2454,7 +2466,7 @@ public class TaskQueueUtils {
 				monitor.incrementCounter("TQ_JOBMESSAGES_insert");
 			}
 
-			final Long now = Long.valueOf(System.currentTimeMillis() / 1000);
+			final Long now = Long.valueOf((timestamp <= 0 ? System.currentTimeMillis() : timestamp) / 1000);
 			final Long qid = Long.valueOf(queueId);
 
 			if (!db.query(JOBMESSAGES_INSERT, false, now, qid, message, action))

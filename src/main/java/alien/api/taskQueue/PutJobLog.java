@@ -1,5 +1,6 @@
 package alien.api.taskQueue;
 
+import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
@@ -20,6 +21,7 @@ public class PutJobLog extends Request {
 	private final long jobnumber;
 	private String tag;
 	private String message;
+	private long timestamp = System.currentTimeMillis();
 
 	/**
 	 * @param jobnumber
@@ -39,12 +41,12 @@ public class PutJobLog extends Request {
 
 	@Override
 	public void run() {
-		TaskQueueUtils.putJobLog(jobnumber, tag, message, null);
+		TaskQueueUtils.putJobLog(timestamp, jobnumber, tag, message, null);
 		tag = message = null;
 	}
 
 	@Override
 	public String toString() {
-		return "Asked to put joblog [" + this.tag + "-" + this.message + "] for job: " + this.jobnumber;
+		return "Asked to put joblog [" + this.tag + "-" + this.message + "] for job: " + this.jobnumber + "@" + this.timestamp;
 	}
 }
