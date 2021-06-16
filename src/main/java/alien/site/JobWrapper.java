@@ -36,6 +36,7 @@ import alien.io.IOUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.MonitoringObject;
+import alien.monitoring.Timing;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.site.packman.CVMFS;
 import alien.site.packman.PackMan;
@@ -193,8 +194,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			legacyToken = (String) inputFromJobAgent.readObject();
 			ttl = ((Long) inputFromJobAgent.readObject()).longValue();
 
-			logger.log(Level.INFO, "We received the following tokenCert: " + tokenCert);
-			logger.log(Level.INFO, "We received the following tokenKey: " + tokenKey);
+			if (logger.isLoggable(Level.FINEST)) {
+				logger.log(Level.FINEST, "We received the following tokenCert: " + tokenCert);
+				logger.log(Level.FINEST, "We received the following tokenKey: " + tokenKey);
+			}
+
 			logger.log(Level.INFO, "We received the following username: " + username);
 			logger.log(Level.INFO, "We received the following CE " + ce);
 
@@ -270,15 +274,19 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			return null;
 		}
 
-		final Map<String, String> env = packMan.installPackage(username, String.join(",", packToInstall), null);
-		if (env == null) {
-			logger.log(Level.INFO, "Error installing the package " + packToInstall);
-			// monitor.sendParameter("ja_status", "ERROR_IP");
-			logger.log(Level.SEVERE, "Error installing " + packToInstall);
-			System.exit(1);
-		}
+		try (Timing t = new Timing()) {
+			final Map<String, String> env = packMan.installPackage(username, String.join(",", packToInstall), null);
+			if (env == null) {
+				logger.log(Level.INFO, "Error installing the package " + packToInstall);
+				// monitor.sendParameter("ja_status", "ERROR_IP");
+				logger.log(Level.SEVERE, "Error installing " + packToInstall);
+				System.exit(1);
+			}
 
-		return env;
+			logger.log(Level.INFO, "It took " + t + " to generate the environment for " + packToInstall);
+
+			return env;
+		}
 	}
 
 	private class PackagesResolver extends Thread {

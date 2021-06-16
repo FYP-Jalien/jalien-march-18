@@ -221,7 +221,7 @@ public class JobAgent implements Runnable {
 
 		monitor.addMonitoring("resource_status", (names, values) -> {
 			names.add("TTL_left");
-			values.add(Integer.valueOf(computeTimeLeft()));
+			values.add(Integer.valueOf(computeTimeLeft(Level.OFF)));
 
 			names.add("ja_status_string");
 			values.add(status.getStringValue());
@@ -610,7 +610,7 @@ public class JobAgent implements Runnable {
 	 * @return false if we can't run because of current conditions, true if positive
 	 */
 	public boolean checkParameters() {
-		final int timeleft = computeTimeLeft();
+		final int timeleft = computeTimeLeft(Level.INFO);
 		if (timeleft <= 0)
 			return false;
 
@@ -629,26 +629,26 @@ public class JobAgent implements Runnable {
 		return true;
 	}
 
-	private int computeTimeLeft() {
+	private int computeTimeLeft(final Level loggingLevel) {
 		final long jobAgentCurrentTime = System.currentTimeMillis();
 		final int time_subs = (int) (jobAgentCurrentTime - jobAgentStartTime) / 1000; // convert to seconds
 		int timeleft = origTtl - time_subs;
 
-		logger.log(Level.INFO, "Still have " + timeleft + " seconds to live (" + jobAgentCurrentTime + "-" + jobAgentStartTime + "=" + time_subs + ")");
+		logger.log(loggingLevel, "Still have " + timeleft + " seconds to live (" + jobAgentCurrentTime + "-" + jobAgentStartTime + "=" + time_subs + ")");
 
 		// we check if the cert timeleft is smaller than the ttl itself
 		final int certTime = getCertTime();
-		logger.log(Level.INFO, "Certificate timeleft is " + certTime);
+		logger.log(loggingLevel, "Certificate timeleft is " + certTime);
 		timeleft = Math.min(timeleft, certTime - 900); // (-15min)
 
 		// safety time for saving, etc
 		timeleft -= 600;
 
-		Long shutdownTime = MachineJobFeatures.getFeatureNumber("shutdowntime",
-				MachineJobFeatures.FeatureType.MACHINEFEATURE);
+		Long shutdownTime = MachineJobFeatures.getFeatureNumber("shutdowntime", MachineJobFeatures.FeatureType.MACHINEFEATURE);
+
 		if (shutdownTime != null) {
 			shutdownTime = Long.valueOf(shutdownTime.longValue() - System.currentTimeMillis() / 1000);
-			logger.log(Level.INFO, "Shutdown is" + shutdownTime);
+			logger.log(loggingLevel, "Shutdown is" + shutdownTime);
 
 			timeleft = Integer.min(timeleft, shutdownTime.intValue());
 		}
@@ -660,7 +660,7 @@ public class JobAgent implements Runnable {
 		logger.log(Level.INFO, "Updating dynamic parameters of jobAgent map");
 
 		// ttl recalculation
-		final int timeleft = computeTimeLeft();
+		final int timeleft = computeTimeLeft(Level.INFO);
 
 		if (checkParameters() == false)
 			return false;
@@ -887,7 +887,7 @@ public class JobAgent implements Runnable {
 		final Timer t = new Timer();
 		t.schedule(killPayload, TimeUnit.MILLISECONDS.convert(ttl, TimeUnit.SECONDS)); // TODO: ttlForJob
 
-		Long lastStatusChange = getWrapperJobStatusTimestamp();
+		long lastStatusChange = getWrapperJobStatusTimestamp();
 
 		int code = 0;
 
@@ -896,7 +896,7 @@ public class JobAgent implements Runnable {
 		int monitor_loops = 0;
 		try {
 			while (p.isAlive()) {
-				logger.log(Level.INFO, "Waiting for the JobWrapper process to finish");
+				logger.log(Level.FINEST, "Waiting for the JobWrapper process to finish");
 
 				if (monitorJob) {
 					monitor_loops++;
@@ -909,15 +909,15 @@ public class JobAgent implements Runnable {
 						// killJobWrapperAndPayload(p);
 						// return 1;
 					}
-					//Send report once every 10 min, or when the job changes state
+					// Send report once every 10 min, or when the job changes state
 					if (monitor_loops == 120) {
 						monitor_loops = 0;
 						sendProcessResources();
 					}
-					else if (!getWrapperJobStatusTimestamp().equals(lastStatusChange)) {
-						final String status = getWrapperJobStatus();
+					else if (getWrapperJobStatusTimestamp() != lastStatusChange) {
+						final String wrapperStatus = getWrapperJobStatus();
 
-						if (!"STARTED".equals(status) && !"RUNNING".equals(status)) {
+						if (!"STARTED".equals(wrapperStatus) && !"RUNNING".equals(wrapperStatus)) {
 							lastStatusChange = getWrapperJobStatusTimestamp();
 							sendProcessResources();
 						}
@@ -933,11 +933,11 @@ public class JobAgent implements Runnable {
 			}
 			code = p.exitValue();
 
-			//Send a final report once the payload completes
+			// Send a final report once the payload completes
 			sendProcessResources();
 
 			logger.log(Level.INFO, "JobWrapper has finished execution. Exit code: " + code);
-			logger.log(Level.INFO, "All done for job " + queueId  + ". Final status: " + getWrapperJobStatus());
+			logger.log(Level.INFO, "All done for job " + queueId + ". Final status: " + getWrapperJobStatus());
 			commander.q_api.putJobLog(queueId, "trace", "JobWrapper exit code: " + code);
 			if (code != 0)
 				logger.log(Level.WARNING, "Error encountered: see the JobWrapper logs in: " + env.getOrDefault("TMPDIR", "/tmp") + "/jalien-jobwrapper.log " + " for more details");
@@ -987,7 +987,7 @@ public class JobAgent implements Runnable {
 
 	private String checkProcessResources() { // checks and maintains sandbox
 		String error = null;
-		logger.log(Level.INFO, "Checking resources usage");
+		// logger.log(Level.INFO, "Checking resources usage");
 
 		try {
 
@@ -1007,7 +1007,7 @@ public class JobAgent implements Runnable {
 
 			if (jobinfo != null) {
 				RES_RMEM = Double.valueOf(jobinfo.get(ApMonMonitoringConstants.LJOB_PSS).doubleValue() / 1024);
-				RES_VMEM = Double.valueOf(jobinfo.get(ApMonMonitoringConstants.LJOB_SWAPPSS).doubleValue() /1024 + RES_RMEM.doubleValue());
+				RES_VMEM = Double.valueOf(jobinfo.get(ApMonMonitoringConstants.LJOB_SWAPPSS).doubleValue() / 1024 + RES_RMEM.doubleValue());
 
 				RES_CPUTIME = jobinfo.get(ApMonMonitoringConstants.LJOB_CPU_TIME);
 				RES_CPUUSAGE = jobinfo.get(ApMonMonitoringConstants.LJOB_CPU_USAGE);
@@ -1136,12 +1136,14 @@ public class JobAgent implements Runnable {
 			props.put("java.util.logging.FileHandler.count", "1");
 			props.put("alien.log.WarningFileHandler.append", "true");
 			props.put("java.util.logging.FileHandler.formatter", "java.util.logging.SimpleFormatter");
-			props.put(".level", "FINEST");
+			props.put(".level", "INFO");
 			props.put("lia.level", "WARNING");
 			props.put("lazyj.level", "WARNING");
 			props.put("apmon.level", "WARNING");
-			props.put("alien.level", "FINEST");
+			props.put("alien.level", "FINE");
+			props.put("alien.api.DispatchSSLClient.level", "INFO");
 			props.put("alien.monitoring.Monitor.level", "WARNING");
+			props.put("org.apache.tomcat.util.level", "WARNING");
 			props.put("use_java_logger", "true");
 		}
 
@@ -1175,7 +1177,7 @@ public class JobAgent implements Runnable {
 		}
 	}
 
-	private Long getWrapperJobStatusTimestamp() {
+	private long getWrapperJobStatusTimestamp() {
 		return new File(jobWorkdir + "/.jobstatus").lastModified();
 	}
 
@@ -1192,10 +1194,11 @@ public class JobAgent implements Runnable {
 
 	/**
 	 * Get LhcbMarks, using a specialized script in CVMFS
+	 * @param logger 
 	 *
 	 * @return script output, or null in case of error
 	 */
-	public Float getLhcbMarks() {
+	public static Float getLhcbMarks(final Logger logger) {
 		if (lhcbMarks > 0)
 			return Float.valueOf(lhcbMarks);
 

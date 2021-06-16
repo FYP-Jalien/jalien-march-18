@@ -185,7 +185,7 @@ public class JAKeyStore {
 			if (iLoaded == 0)
 				try (InputStream classpathTrusts = JAKeyStore.class.getClassLoader().getResourceAsStream("trusted_authorities.jks")) {
 					keystore.load(classpathTrusts, "castore".toCharArray());
-					logger.log(Level.WARNING, "Found " + keystore.size() + " default trusted CAs in classpath");
+					logger.log(Level.INFO, "Found " + keystore.size() + " default trusted CAs in classpath");
 				}
 				catch (final Throwable t) {
 					logger.log(Level.SEVERE, "Cannot load the default trust keystore from classpath", t);
@@ -379,7 +379,7 @@ public class JAKeyStore {
 			return null;
 
 		KeyStore ks = null;
-		logger.log(Level.SEVERE, "Trying to load " + message);
+		logger.log(Level.FINE, "Trying to load " + message);
 
 		try {
 			ks = KeyStore.getInstance("JKS");
@@ -387,7 +387,7 @@ public class JAKeyStore {
 			loadTrusts(ks, false);
 
 			addKeyPairToKeyStore(ks, "User.cert", key, cert);
-			logger.log(Level.SEVERE, "Loaded " + message);
+			logger.log(Level.FINE, "Loaded " + message);
 		}
 		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Error loading " + message, e);
@@ -515,15 +515,17 @@ public class JAKeyStore {
 	 */
 	public static PrivateKey loadPrivX509(final String keyFileLocation, final char[] password) throws IOException, PEMException, OperatorCreationException, PKCSException {
 
-		if (logger.isLoggable(Level.INFO))
-			logger.log(Level.INFO, "Loading private key: " + keyFileLocation);
+		if (logger.isLoggable(Level.FINEST))
+			logger.log(Level.FINEST, "Loading private key: " + keyFileLocation);
 
 		Reader source = null;
 		try {
 			source = new FileReader(keyFileLocation);
+			logger.log(Level.FINE, "Private key loaded from file: " + keyFileLocation);
 		}
 		catch (@SuppressWarnings("unused") final Exception e) {
 			source = new StringReader(keyFileLocation);
+			logger.log(Level.FINE, "Private key is loaded from env");
 		}
 
 		try (PEMParser reader = new PEMParser(new BufferedReader(source))) {
@@ -574,15 +576,17 @@ public class JAKeyStore {
 	 */
 	public static X509Certificate[] loadPubX509(final String certFileLocation, final boolean checkValidity) {
 
-		if (logger.isLoggable(Level.INFO))
-			logger.log(Level.INFO, "Loading public key: " + certFileLocation);
+		if (logger.isLoggable(Level.FINEST))
+			logger.log(Level.FINEST, "Loading public key: " + certFileLocation);
 
 		Reader source = null;
 		try {
 			source = new FileReader(certFileLocation);
+			logger.log(Level.FINE, "Public key loaded from file: " + certFileLocation);
 		}
 		catch (@SuppressWarnings("unused") final Exception e) {
 			source = new StringReader(certFileLocation);
+			logger.log(Level.FINE, "Public key loaded from environment");
 		}
 
 		try (PEMParser reader = new PEMParser(new BufferedReader(source))) {
