@@ -662,7 +662,7 @@ public class JobAgent implements Runnable {
 		// By default the jobs are allowed to use up to 10GB of disk space in the sandbox
 
 		cpuCores = TaskQueueUtils.getCPUCores(jdl);
-		commander.q_api.putJobLog(queueId, "trace", "Job requested " + cpuCores + " to run");
+		commander.q_api.putJobLog(queueId, "trace", "Job requested " + cpuCores + " CPU cores to run");
 
 		workdirMaxSizeMB = TaskQueueUtils.getWorkDirSizeMB(jdl, cpuCores);
 		commander.q_api.putJobLog(queueId, "trace", "Local disk space limit: " + workdirMaxSizeMB + "MB");
