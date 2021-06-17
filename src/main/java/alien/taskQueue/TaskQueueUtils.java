@@ -731,7 +731,7 @@ public class TaskQueueUtils {
 				try {
 					Thread.sleep(1000 * (retries + 1) * (retries + 1));
 				}
-				catch (@SuppressWarnings("unused") InterruptedException e) {
+				catch (@SuppressWarnings("unused") final InterruptedException e) {
 					return false;
 				}
 			}
@@ -804,7 +804,7 @@ public class TaskQueueUtils {
 				try {
 					Thread.sleep(1000 * (retries + 1) * (retries + 1));
 				}
-				catch (@SuppressWarnings("unused") InterruptedException e) {
+				catch (@SuppressWarnings("unused") final InterruptedException e) {
 					return false;
 				}
 			}
@@ -3544,6 +3544,27 @@ public class TaskQueueUtils {
 		}
 	}
 
+	private static final Pattern patNegCloseSE = Pattern.compile("\\!member\\(other.CloseSE,\"\\w+::(\\w+)::\\w+\"\\)");
+
+	private static final Pattern patCloseSE = Pattern.compile("\\s*member\\(other.CloseSE,\"\\w+::(\\w+)::\\w+\"\\)");
+
+	private static final Pattern patNegCloseCE = Pattern.compile("\\!other.CE\\s*==\\s*\"([^\\\"]+)\"");
+
+	private static final Pattern patCloseCE = Pattern.compile("\\s*other.CE\\s*==\\s*\"([^\\\"]+)\"");
+
+	// member(other.Packages,\"VO_ALICE@AliPhysics::vAN-20170813-1\")
+	private static final Pattern patPackages = Pattern.compile("other.Packages,\"([^\"]+)\"");
+
+	private static final Pattern patTTL = Pattern.compile("other.TTL\\s*>\\s*(\\d+)");
+
+	private static final Pattern patPartitions = Pattern.compile("other.GridPartitions,\"([^\"]+)\"");
+
+	private static final Pattern patPrice = Pattern.compile("other.Price\\s*<=\\s*(\\d+)");
+
+	private static final Pattern patCVMFS = Pattern.compile("other.CVMFS_Revision\\s*>=\\s*(\\d+)");
+
+	private static final Pattern patDiskSpace = Pattern.compile("other.LocalDiskSpace\\s*>\\s*(\\d+)");
+
 	/**
 	 * @param jdl
 	 * @return parameters needed for jobagent
@@ -3555,127 +3576,207 @@ public class TaskQueueUtils {
 		if (jdl == null)
 			return null;
 
-		final String reqs = jdl.gets("Requirements");
-		if (reqs == null)
-			return null;
-
 		final HashMap<String, Object> params = new HashMap<>();
 		params.put("counter", Integer.valueOf(1));
-		params.put("ttl", Integer.valueOf(18000));
-		params.put("disk", Integer.valueOf(0));
+
+		final Integer jdlTTL = jdl.getInteger("TTL");
+		params.put("ttl", jdlTTL != null ? jdlTTL : Integer.valueOf(18000));
+
+		final Float jdlPrice = jdl.getFloat("Price");
+		params.put("price", jdlPrice != null ? jdlPrice : Float.valueOf(1));
+
 		params.put("packages", "%");
 		params.put("`partition`", "%");
-		params.put("price", Float.valueOf(1));
 		params.put("revision", Integer.valueOf(0));
+
+		final int cpuCores = getCPUCores(jdl);
+		params.put("cpucores", Integer.valueOf(cpuCores));
+
+		params.put("disk", Integer.valueOf(getWorkDirSizeMB(jdl, cpuCores)));
 
 		// parse the other.CloseSE (and !)
 		final HashSet<String> noses = new HashSet<>();
-		Pattern pat = Pattern.compile("\\!member\\(other.CloseSE,\"\\w+::(\\w+)::\\w+\"\\)");
-		Matcher m = pat.matcher(reqs);
-		while (m.find())
-			noses.add(m.group(1));
 
-		String site = "";
-		pat = Pattern.compile("\\s*member\\(other.CloseSE,\"\\w+::(\\w+)::\\w+\"\\)");
-		m = pat.matcher(reqs);
-		while (m.find()) {
-			final String tmpsite = m.group(1);
-			if (!noses.contains(tmpsite))
-				site += "," + tmpsite;
-		}
-		if (!"".equals(site))
-			site += ",";
+		final String reqs = jdl.gets("Requirements");
+		if (reqs != null && !reqs.isBlank()) {
 
-		params.put("site", site);
+			Matcher m = patNegCloseSE.matcher(reqs);
+			while (m.find())
+				noses.add(m.group(1));
 
-		// parse the other.CE (and !)
-		String noce = "";
-		pat = Pattern.compile("\\!other.CE\\s*==\\s*\"([^\\\"]+)\"");
-		m = pat.matcher(reqs);
-		while (m.find()) {
-			noce += "," + m.group(1);
-		}
-		if (!"".equals(noce))
-			noce += ",";
-
-		params.put("noce", noce);
-
-		String ce = "";
-		pat = Pattern.compile("\\s*other.CE\\s*==\\s*\"([^\\\"]+)\"");
-		m = pat.matcher(reqs);
-		while (m.find()) {
-			ce += "," + m.group(1);
-		}
-		if (!"".equals(ce))
-			ce += ",";
-
-		params.put("ce", ce);
-
-		// parse Packages
-		final HashSet<String> packages = new HashSet<>();
-		pat = Pattern.compile("other.Packages,\"([^\"]+)\""); // member(other.Packages,\"VO_ALICE@AliPhysics::vAN-20170813-1\")
-		m = pat.matcher(reqs);
-		while (m.find())
-			packages.add(m.group(1));
-
-		if (packages.size() > 0) {
-			String packs = "%,";
-			for (final String pkg : packages) {
-				packs += pkg + ",%,";
+			String site = "";
+			m = patCloseSE.matcher(reqs);
+			while (m.find()) {
+				final String tmpsite = m.group(1);
+				if (!noses.contains(tmpsite))
+					site += "," + tmpsite;
 			}
-			packs = packs.substring(0, packs.length() - 1);
+			if (!"".equals(site))
+				site += ",";
 
-			params.put("packages", packs);
-		}
+			params.put("site", site);
 
-		// parse TTL
-		pat = Pattern.compile("other.TTL\\s*>\\s*(\\d+)");
-		m = pat.matcher(reqs);
-		if (m.find())
-			params.put("ttl", Integer.valueOf(m.group(1)));
+			// parse the other.CE (and !)
+			String noce = "";
+			m = patNegCloseCE.matcher(reqs);
+			while (m.find()) {
+				noce += "," + m.group(1);
+			}
+			if (!"".equals(noce))
+				noce += ",";
 
-		// get user
-		final String user = jdl.getUser();
-		if (user != null)
-			params.put("userid", getUserId(user));
+			params.put("noce", noce);
 
-		// parse LocalDiskSpace
-		pat = Pattern.compile("other.LocalDiskSpace\\s*>\\s*(\\d+)");
-		m = pat.matcher(reqs);
-		if (m.find())
-			params.put("disk", Integer.valueOf(m.group(1)));
+			String ce = "";
+			m = patCloseCE.matcher(reqs);
+			while (m.find()) {
+				ce += "," + m.group(1);
+			}
+			if (!"".equals(ce))
+				ce += ",";
 
-		// parse LocalDiskSpace
-		pat = Pattern.compile("other.GridPartitions,\"([^\"]+)\""); // other.GridPartitions,"ultrapower"
-		m = pat.matcher(reqs);
-		if (m.find())
-			params.put("`partition`", m.group(1));
+			params.put("ce", ce);
 
-		// parse Price
-		pat = Pattern.compile("other.Price\\s*<=\\s*(\\d+)");
-		m = pat.matcher(reqs);
-		if (m.find())
-			params.put("price", Float.valueOf(m.group(1)));
+			// parse Packages
+			final HashSet<String> packages = new HashSet<>();
+			m = patPackages.matcher(reqs);
+			while (m.find())
+				packages.add(m.group(1));
 
-		// parse CVMFS_revision
-		pat = Pattern.compile("other.CVMFS_Revision\\s*>=\\s*(\\d+)");
-		m = pat.matcher(reqs);
-		if (m.find())
-			params.put("revision", Integer.valueOf(m.group(1)));
+			if (packages.size() > 0) {
+				String packs = "%,";
+				for (final String pkg : packages) {
+					packs += pkg + ",%,";
+				}
+				packs = packs.substring(0, packs.length() - 1);
 
-		// parse CPU cores
-		final Integer cpuCores = jdl.getInteger("CPUCores");
+				params.put("packages", packs);
+			}
 
-		params.put("cpucores", cpuCores == null || cpuCores.intValue() < 0 || cpuCores.intValue() > 100 ? Integer.valueOf(1) : cpuCores);
+			// parse TTL
+			m = patTTL.matcher(reqs);
+			if (m.find())
+				params.put("ttl", Integer.valueOf(m.group(1)));
 
-		if (cpuCores != null) {
-			params.put("disk", ((Integer) params.get("disk")) * cpuCores);
+			// get user
+			final String user = jdl.getUser();
+			if (user != null)
+				params.put("userid", getUserId(user));
+
+			// parse partition
+			m = patPartitions.matcher(reqs);
+			if (m.find())
+				params.put("`partition`", m.group(1));
+
+			// parse Price
+			m = patPrice.matcher(reqs);
+			if (m.find())
+				params.put("price", Float.valueOf(m.group(1)));
+
+			// parse CVMFS_revision
+			m = patCVMFS.matcher(reqs);
+			if (m.find())
+				params.put("revision", Integer.valueOf(m.group(1)));
 		}
 
 		if (logger.isLoggable(Level.FINER))
 			logger.log(Level.FINER, "extracted params: " + params.toString());
 
 		return params;
+	}
+
+	/**
+	 * @param jdl
+	 * @return how many CPU cores were requested by this JDL
+	 */
+	public static final int getCPUCores(final JDL jdl) {
+		// parse CPU cores
+		if (jdl == null)
+			return 1;
+
+		final Integer cpuCores = jdl.getInteger("CPUCores");
+
+		if (cpuCores == null || cpuCores.intValue() < 0 || cpuCores.intValue() > 100)
+			return 1;
+
+		return cpuCores.intValue();
+	}
+
+	/**
+	 * @param jdl
+	 * @return the requested work directory size (in MB) by this JDL. Cannot be larger than 2x 10GB x number of CPU cores
+	 */
+	public static final int getWorkDirSizeMB(final JDL jdl) {
+		return getWorkDirSizeMB(jdl, getCPUCores(jdl));
+	}
+
+	private static final Pattern pLetter = Pattern.compile("\\p{L}+");
+
+	/**
+	 * @param unit
+	 * @param number
+	 * @return the value converted to MB
+	 */
+	public static int convertStringUnitToIntegerMB(final String unit, final String number) {
+		final int value = Integer.parseInt(number);
+
+		if (unit == null || unit.isBlank())
+			return value;
+
+		if (unit.startsWith("K"))
+			return value / 1024;
+
+		if (unit.startsWith("G"))
+			return value * 1024;
+
+		return value;
+	}
+
+	/**
+	 * @param jdl
+	 * @param cpuCores
+	 * @return the requested work directory size (in MB) by this JDL. Cannot be larger than 2x 10GB x number of CPU cores
+	 */
+	public static final int getWorkDirSizeMB(final JDL jdl, final int cpuCores) {
+		// By default the jobs are allowed to use up to 10GB of disk space * cpuCores in the sandbox
+		final int defaultWorkdirMaxSizeMB = 10 * 1024 * cpuCores;
+
+		if (jdl != null) {
+			final String workdirMaxSize = jdl.gets("Workdirectorysize");
+
+			if (workdirMaxSize != null) {
+				final Matcher m = pLetter.matcher(workdirMaxSize.trim().toUpperCase());
+				try {
+					if (m.find()) {
+						final String number = workdirMaxSize.substring(0, m.start());
+						final String unit = workdirMaxSize.substring(m.start());
+
+						final int value = convertStringUnitToIntegerMB(unit, number);
+
+						if (value > 0 && value <= 2 * defaultWorkdirMaxSizeMB)
+							return value;
+					}
+					else
+						return Integer.parseInt(workdirMaxSize);
+				}
+				catch (@SuppressWarnings("unused") NumberFormatException nfe) {
+					// ignore
+				}
+			}
+
+			final String reqs = jdl.gets("Requirements");
+			if (reqs != null) { // parse LocalDiskSpace
+				final Matcher m = patDiskSpace.matcher(reqs);
+				if (m.find()) {
+					final int otherDiskSpace = Integer.parseInt(m.group(1));
+
+					if (otherDiskSpace > 0 && otherDiskSpace <= 2 * defaultWorkdirMaxSizeMB)
+						return otherDiskSpace;
+				}
+			}
+		}
+
+		return defaultWorkdirMaxSizeMB;
 	}
 
 	private static boolean clearPathAndResultsJDL(final Long queueId) {
@@ -3719,5 +3820,4 @@ public class TaskQueueUtils {
 			return true;
 		}
 	}
-
 }

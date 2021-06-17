@@ -53,6 +53,7 @@ import alien.site.packman.CVMFS;
 import alien.taskQueue.JDL;
 import alien.taskQueue.Job;
 import alien.taskQueue.JobStatus;
+import alien.taskQueue.TaskQueueUtils;
 import apmon.ApMon;
 import apmon.ApMonException;
 import apmon.ApMonMonitoringConstants;
@@ -424,31 +425,9 @@ public class JobAgent implements Runnable {
 				logger.log(Level.INFO, Long.toString(queueId));
 				sendBatchInfo();
 
-				if (jdl.getLong("CPUCores") != null)
-					reqCPU = ((Number) jdl.getLong("CPUCores")).longValue();
-				else
-					reqCPU = Long.valueOf(1);
+				reqCPU = Long.valueOf(TaskQueueUtils.getCPUCores(jdl));
 
-				reqDisk = reqCPU * 10 * 1024L;
-				final String workdirMaxSize = jdl.gets("Workdirectorysize");
-
-				final Pattern p = Pattern.compile("\\p{L}");
-				if (workdirMaxSize != null) {
-					final Matcher m = p.matcher(workdirMaxSize);
-					try {
-						if (m.find()) {
-							final String number = workdirMaxSize.substring(0, m.start());
-							final String unit = workdirMaxSize.substring(m.start());
-
-							reqDisk = Long.valueOf(convertStringUnitToIntegerMB(unit, number));
-						}
-						else
-							reqDisk = Long.parseLong(workdirMaxSize);
-					}
-					catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
-						logger.log(Level.INFO, "Local disk space specs are invalid: '" + workdirMaxSize + "', using the default " + reqDisk + "MB");
-					}
-				}
+				reqDisk = Long.valueOf(TaskQueueUtils.getWorkDirSizeMB(jdl, reqCPU.intValue()));
 
 				logger.log(Level.INFO, "Job requested CPU Disk: " + reqCPU + " " + reqDisk);
 
@@ -680,39 +659,13 @@ public class JobAgent implements Runnable {
 	}
 
 	private void getMemoryRequirements() {
-		// Sandbox size
-		final String workdirMaxSize = jdl.gets("Workdirectorysize");
-
 		// By default the jobs are allowed to use up to 10GB of disk space in the sandbox
-		workdirMaxSizeMB = 10 * 1024;
 
-		final Pattern p = Pattern.compile("\\p{L}");
+		cpuCores = TaskQueueUtils.getCPUCores(jdl);
+		commander.q_api.putJobLog(queueId, "trace", "Job requested " + cpuCores + " to run");
 
-		if (workdirMaxSize != null) {
-			final Matcher m = p.matcher(workdirMaxSize);
-			try {
-				if (m.find()) {
-					final String number = workdirMaxSize.substring(0, m.start());
-					final String unit = workdirMaxSize.substring(m.start());
-
-					workdirMaxSizeMB = convertStringUnitToIntegerMB(unit, number);
-				}
-				else
-					workdirMaxSizeMB = Integer.parseInt(workdirMaxSize);
-
-				commander.q_api.putJobLog(queueId, "trace", "Local disk space limit (JDL): " + workdirMaxSizeMB + "MB");
-			}
-			catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
-				commander.q_api.putJobLog(queueId, "trace", "Local disk space specs are invalid: '" + workdirMaxSize + "', using the default " + workdirMaxSizeMB + "MB");
-			}
-		}
-		else
-			commander.q_api.putJobLog(queueId, "trace", "Local disk space limit (default): " + "Unlimited");
-
-		final Integer requestedCPUCores = jdl.getInteger("CPUCores");
-
-		if (requestedCPUCores != null && requestedCPUCores.intValue() > 0)
-			cpuCores = requestedCPUCores.intValue();
+		workdirMaxSizeMB = TaskQueueUtils.getWorkDirSizeMB(jdl, cpuCores);
+		commander.q_api.putJobLog(queueId, "trace", "Local disk space limit: " + workdirMaxSizeMB + "MB");
 
 		// Memory use
 		final String maxmemory = jdl.gets("Memorysize");
@@ -721,13 +674,15 @@ public class JobAgent implements Runnable {
 		jobMaxMemoryMB = cpuCores * 8 * 1024;
 
 		if (maxmemory != null) {
-			final Matcher m = p.matcher(maxmemory);
+			Pattern pLetter = Pattern.compile("\\p{L}+");
+
+			final Matcher m = pLetter.matcher(maxmemory.trim().toUpperCase());
 			try {
 				if (m.find()) {
 					final String number = maxmemory.substring(0, m.start());
 					final String unit = maxmemory.substring(m.start()).toUpperCase();
 
-					jobMaxMemoryMB = convertStringUnitToIntegerMB(unit, number);
+					jobMaxMemoryMB = TaskQueueUtils.convertStringUnitToIntegerMB(unit, number);
 				}
 				else
 					jobMaxMemoryMB = Integer.parseInt(maxmemory);
@@ -1181,20 +1136,10 @@ public class JobAgent implements Runnable {
 		return new File(jobWorkdir + "/.jobstatus").lastModified();
 	}
 
-	private static int convertStringUnitToIntegerMB(final String unit, final String number) {
-		switch (unit) {
-			case "KB":
-				return Integer.parseInt(number) / 1024;
-			case "GB":
-				return Integer.parseInt(number) * 1024;
-			default: // MB
-				return Integer.parseInt(number);
-		}
-	}
-
 	/**
 	 * Get LhcbMarks, using a specialized script in CVMFS
-	 * @param logger 
+	 * 
+	 * @param logger
 	 *
 	 * @return script output, or null in case of error
 	 */
