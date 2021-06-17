@@ -513,7 +513,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		if (trackTime) {
 			try {
-				commander.q_api.putJobLog(queueId, "trace", "Payload execution completed. Time spent: " + Files.readString(Paths.get(currentDir + "/" + timeFileName)));
+				commander.q_api.putJobLog(queueId, "trace", "Payload execution completed. Time spent: " + Files.readString(Paths.get(currentDir + "/" + timeFileName)).replace("\n", ", "));
 			}
 			catch (Exception te) {
 				// Ignore
