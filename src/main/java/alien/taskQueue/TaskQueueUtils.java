@@ -1490,11 +1490,17 @@ public class TaskQueueUtils {
 		if (jdl.get("OrigRequirements") == null)
 			jdl.set("OrigRequirements", jdl.get("Requirements"));
 
-		if (jdl.get("MemorySize") == null)
-			jdl.set("MemorySize", "8GB");
+		Integer cpuCores = jdl.getInteger("CPUCores");
+		if (cpuCores == null)
+			cpuCores = Integer.valueOf(1);
 
-		if (jdl.getInteger("CPUCores") == null)
-			jdl.set("CPUCores", "1");
+		jdl.set("CPUCores", String.valueOf(cpuCores));
+
+		if (jdl.get("MemorySize") == null)
+			jdl.set("MemorySize", (8 * cpuCores.intValue()) + "GB");
+
+		if (jdl.get("WorkDirectorySize") == null)
+			jdl.set("WorkDirectorySize", (10 * cpuCores.intValue()) + "GB");
 
 		jdl.append("JDLVariables", "CPUCores");
 
