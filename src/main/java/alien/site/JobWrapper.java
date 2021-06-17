@@ -408,7 +408,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		boolean trackTime = false;
 		try {
 			String supportsTime = ExternalProcesses.getCmdOutput(Arrays.asList("time", "echo"), true, 30L, TimeUnit.SECONDS);
-			System.err.println(supportsTime);
 			if (!supportsTime.contains("command not found"))
 				trackTime = true;
 		}
