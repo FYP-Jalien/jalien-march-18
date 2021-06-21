@@ -28,9 +28,7 @@ import alien.api.TomcatServer;
 import alien.api.catalogue.CatalogueApiUtils;
 import alien.api.taskQueue.TaskQueueApiUtils;
 import alien.catalogue.FileSystemUtils;
-import alien.catalogue.GUID;
 import alien.catalogue.LFN;
-import alien.catalogue.PFN;
 import alien.catalogue.XmlCollection;
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
@@ -39,6 +37,7 @@ import alien.monitoring.MonitorFactory;
 import alien.monitoring.MonitoringObject;
 import alien.monitoring.Timing;
 import alien.shell.commands.JAliEnCOMMander;
+import alien.shell.commands.JAliEnCommandcp;
 import alien.site.packman.CVMFS;
 import alien.site.packman.PackMan;
 import alien.taskQueue.JDL;
@@ -317,7 +316,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			changeStatus(JobStatus.STARTED);
 
-
 			final PackagesResolver packResolver = new PackagesResolver();
 			packResolver.start();
 
@@ -411,7 +409,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (!supportsTime.contains("command not found"))
 				trackTime = true;
 		}
-		catch (Exception e) {
+		catch (@SuppressWarnings("unused") Exception e) {
 			// ignore
 		}
 
@@ -515,7 +513,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			try {
 				commander.q_api.putJobLog(queueId, "trace", "Payload execution completed. Time spent: " + Files.readString(Paths.get(currentDir + "/" + timeFileName)).replace("\n", ", "));
 			}
-			catch (Exception te) {
+			catch (@SuppressWarnings("unused") Exception te) {
 				// Ignore
 			}
 		}
@@ -607,16 +605,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		int duplicates = 0;
 		for (final Map.Entry<LFN, File> entry : localFiles.entrySet()) {
-			final List<PFN> pfns = c_api.getPFNsToRead(entry.getKey(), null, null);
-
-			if (pfns == null || pfns.size() == 0) {
-				logger.log(Level.WARNING, "No replicas of " + entry.getKey().getCanonicalName() + " to read from");
-				commander.q_api.putJobLog(queueId, "trace", "ERROR: No replicas of " + entry.getKey().getCanonicalName() + " to read from");
-				return false;
-			}
-
-			final GUID g = pfns.iterator().next().getGuid();
-
 			final StringBuilder errorMessage = new StringBuilder();
 
 			File f = entry.getValue();
@@ -633,12 +621,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				inputDataList = inputDataList.replace("turl=\"alien://" + entry.getKey().getCanonicalName(), "turl=\"file:///" + f.getAbsolutePath()); // xmlcollection format here does not match AliEn
 
 			commander.q_api.putJobLog(queueId, "trace", "Getting InputFile: " + entry.getKey().getCanonicalName() + " to " + f.getAbsolutePath() + " (" + Format.size(entry.getKey().size) + ")");
-			logger.log(Level.INFO, g + ". entry.getvalue(): " + entry.getValue());
-			// commander.q_api.putJobLog(queueId, "trace", g + ". entry.getvalue(): " + entry.getValue());
 
-			f = IOUtils.get(g, f, errorMessage);
+			final JAliEnCommandcp cp = new JAliEnCommandcp(commander, Arrays.asList(entry.getKey().getCanonicalName(), "file:" + f.getAbsolutePath()));
 
-			if (f == null) {
+			final File copyResult = cp.copyGridToLocal(entry.getKey().getCanonicalName(), f);
+
+			if (copyResult == null) {
 				logger.log(Level.WARNING, "Could not download " + entry.getKey().getCanonicalName() + " to " + entry.getValue().getAbsolutePath());
 
 				commander.q_api.putJobLog(queueId, "trace",
