@@ -63,30 +63,35 @@ public class JAliEnCommandmv extends JAliEnBaseCommand {
 			final String fullSource = FileSystemUtils.getAbsolutePath(commander.user.getName(), commander.getCurrentDirName(), sources[0]);
 			final LFN sLFN = commander.c_api.getLFN(fullSource, false);
 
-			if (tLFN != null) {
-				if (sLFN.isFile() && tLFN.isFile()) {
-					// TODO File overwrite mechanism
-					tLFN = commander.c_api.moveLFN(sLFN.getCanonicalName(), fullTarget + "_backup");
-				}
-				else if ((sLFN.isDirectory() && tLFN.isDirectory()) || (sLFN.isFile() && tLFN.isDirectory())) {
-					tLFN = commander.c_api.moveLFN(sLFN.getCanonicalName(), fullTarget + "/" + sLFN.getFileName());
-				}
-				else {
-					commander.setReturnCode(ErrNo.EINVAL,
-							"If there are 2 arguments then only:\n1. File to file\n2. File to directory\n3. Directory to Directory\n is supported\nMost probably a directory to file mv is being attempted");
-				}
+			if (sLFN == null) {
+				commander.setReturnCode(ErrNo.EINVAL, "Source cannot be found: " + fullSource);
 			}
 			else {
-				if (target.contains("/") && target.endsWith("/")) {
-					tLFN = commander.c_api.createCatalogueDirectory(fullTarget, true);
-					tLFN = commander.c_api.moveLFN(sLFN.getCanonicalName(), fullTarget + "/" + sLFN.getFileName());
+				if (tLFN != null) {
+					if (sLFN.isFile() && tLFN.isFile()) {
+						// TODO File overwrite mechanism
+						tLFN = commander.c_api.moveLFN(sLFN.getCanonicalName(), fullTarget + "_backup");
+					}
+					else if ((sLFN.isDirectory() && tLFN.isDirectory()) || (sLFN.isFile() && tLFN.isDirectory())) {
+						tLFN = commander.c_api.moveLFN(sLFN.getCanonicalName(), fullTarget + "/" + sLFN.getFileName());
+					}
+					else {
+						commander.setReturnCode(ErrNo.EINVAL,
+								"If there are 2 arguments then only:\n1. File to file\n2. File to directory\n3. Directory to Directory\n is supported\nMost probably a directory to file mv is being attempted");
+					}
 				}
-				else
-					tLFN = commander.c_api.moveLFN(sLFN.getCanonicalName(), fullTarget);
-			}
+				else {
+					if (target.contains("/") && target.endsWith("/")) {
+						tLFN = commander.c_api.createCatalogueDirectory(fullTarget, true);
+						tLFN = commander.c_api.moveLFN(sLFN.getCanonicalName(), fullTarget + "/" + sLFN.getFileName());
+					}
+					else
+						tLFN = commander.c_api.moveLFN(sLFN.getCanonicalName(), fullTarget);
+				}
 
-			if (tLFN == null)
-				commander.setReturnCode(ErrNo.EIO, "Failed to move " + sources[0] + " to " + fullTarget);
+				if (tLFN == null)
+					commander.setReturnCode(ErrNo.EIO, "Failed to move " + sources[0] + " to " + fullTarget);
+			}
 		}
 		else if (size == 0 || size == 1)
 			printHelp();
