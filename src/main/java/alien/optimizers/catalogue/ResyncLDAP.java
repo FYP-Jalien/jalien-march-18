@@ -193,9 +193,10 @@ public class ResyncLDAP extends Optimizer {
 				final Set<String> dns = LDAPHelper.checkLdapInformation("uid=" + user, ouHosts, "subject", false);
 				final ArrayList<String> currentDns = new ArrayList<>();
 				for (final String dn : dns) {
-					currentDns.add(dn);
+					final String trimmedDN = dn.replaceAll("(^[\\s\\r\\n]+)|([\\s\\r\\n]+$)", "");
+					currentDns.add(trimmedDN);
 					// db.query("REPLACE INTO USERS_LDAP (user, dn, up) VALUES (?, ?, 1)", false, user, dn);
-					db.query("INSERT INTO USERS_LDAP (user, dn, up) VALUES (?, ?, 1)", false, user, dn);
+					db.query("INSERT INTO USERS_LDAP (user, dn, up) VALUES (?, ?, 1)", false, user, trimmedDN);
 				}
 
 				printModifications(modifications, currentDns, originalDns, user, "added", "DNs");
@@ -373,7 +374,8 @@ public class ResyncLDAP extends Optimizer {
 				final String dn = itr.next();
 				if (dn.contains("disabled")) {
 					logger.log(Level.WARNING, "Skipping " + dn + " (it is disabled)");
-				} else {
+				}
+				else {
 					dnsEntries.add(dn);
 					final String[] entries = dn.split("[=,]");
 					if (entries.length >= 8) {
