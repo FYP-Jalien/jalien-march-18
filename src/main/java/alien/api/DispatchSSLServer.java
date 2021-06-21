@@ -273,10 +273,10 @@ public class DispatchSSLServer extends Thread {
 		finally {
 			activeSessions.decrementAndGet();
 
-			try{
+			try {
 				connection.setSoTimeout(15 * 1000);
 			}
-			catch (@SuppressWarnings("unused") final IOException ioe){
+			catch (@SuppressWarnings("unused") final IOException ioe) {
 				// ignore
 			}
 
@@ -462,23 +462,42 @@ public class DispatchSSLServer extends Thread {
 					return;
 				}
 
+				final SSLSocket c;
 				try {
 					// this object is passed to another thread to deal with the
 					// communication
-					final SSLSocket c = (SSLSocket) server.accept();
-
-					acceptorPool.submit(() -> handleOneSSLSocket(c, true));
+					c = (SSLSocket) server.accept();
 				}
 				catch (final IOException ioe) {
-					logger.log(Level.WARNING, "Exception treating a client", ioe);
+					logger.log(Level.WARNING, "Exception accepting a client", ioe);
+
+					if (monitor != null)
+						monitor.incrementCounter("exception_handling_client");
+
+					continue;
+				}
+
+				try {
+					acceptorPool.submit(() -> handleOneSSLSocket(c, true));
+				}
+				catch (final Throwable t) {
+					try {
+						c.close();
+					}
+					catch (final Throwable t2) {
+						logger.log(Level.SEVERE, "Cannot close the socket as cleanup", t2);
+					}
+
+					logger.log(Level.SEVERE, "Problem accepting a client", t);
 
 					if (monitor != null)
 						monitor.incrementCounter("exception_handling_client");
 				}
 			}
-
 		}
-		catch (final Throwable e) {
+		catch (
+
+		final Throwable e) {
 			logger.log(Level.SEVERE, "Could not initiate SSL Server Socket on " + address + ":" + port, e);
 		}
 	}
