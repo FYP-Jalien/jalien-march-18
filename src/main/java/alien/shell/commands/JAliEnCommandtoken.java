@@ -41,6 +41,7 @@ public class JAliEnCommandtoken extends JAliEnBaseCommand {
 			parser.accepts("v").withRequiredArg().ofType(Integer.class);
 			parser.accepts("t").withRequiredArg();
 			parser.accepts("hostname").withRequiredArg();
+			parser.accepts("f");
 
 			final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
 
@@ -109,11 +110,23 @@ public class JAliEnCommandtoken extends JAliEnBaseCommand {
 					}
 					else
 						try {
-							InetAddress.getByName(extension);
+							final InetAddress[] addresses = InetAddress.getAllByName(extension);
+
+							commander.printOut("Addresses of " + extension + ": ");
+
+							for (InetAddress addr : addresses)
+								commander.printOut(addr.getHostAddress() + " ");
+
+							commander.printOutln();
 						}
 						catch (@SuppressWarnings("unused") final Throwable t) {
-							commander.setReturnCode(ErrNo.ENXIO, "hostname `" + extension + "` cannot be resolved");
-							setArgumentsOk(false);
+							if (options.has("f")) {
+								commander.printErrln("The indicated hostname `" + extension + "` cannot be resolved! Generating the certificate as requested, but DNS should be fixed");
+							}
+							else {
+								commander.setReturnCode(ErrNo.ENXIO, "hostname `" + extension + "` cannot be resolved");
+								setArgumentsOk(false);
+							}
 						}
 				}
 				else {
