@@ -1,6 +1,7 @@
 package alien.optimizers;
 
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -9,6 +10,7 @@ import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import lazyj.DBFunctions;
+import lazyj.Format;
 
 /**
  * LFN utilities
@@ -173,9 +175,15 @@ public class DBSyncUtils {
 			}
 			if (db.count() <= 0)
 				return "Introduced class (" + classname + ") did not match any of the contained in the database or allowed patterns";
+
+			final Date lastRan = new Date(db.getl("lastUpdate"));
+
+			String ret = classname + ", last ran " + Format.showNiceDate(lastRan) + " " + Format.showTime(lastRan);
+
 			if (verbose)
-				return "Frequency: " + db.gets("frequency") + " - Timestamp: " + db.gets("lastUpdate") + "\nLog: " + db.gets("lastUpdatedLog") + "\n";
-			return "Timestamp: " + db.gets("lastUpdate") + "\nLog: " + db.gets("lastUpdatedLog") + "\n";
+				ret += " (frequency: " + Format.toInterval(db.getl("frequency")) + ")";
+
+			return ret + "\nLog: " + db.gets("lastUpdatedLog") + "\n";
 		}
 	}
 
@@ -254,15 +262,15 @@ public class DBSyncUtils {
 	 * @param classname Class to update the timestamp
 	 * @return Success of the update query
 	 */
-	public static boolean setLastActive(String classname) {
+	public static boolean setLastActive(final String classname) {
 		logger.log(Level.INFO, "Updating timestamp in DB for class " + classname);
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
 			if (db == null) {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return false;
 			}
-			Long timestamp = Long.valueOf(System.currentTimeMillis());
-			boolean updated = db.query("UPDATE OPTIMIZERS set lastUpdate = ? WHERE class = ?", false, timestamp, classname);
+			final Long timestamp = Long.valueOf(System.currentTimeMillis());
+			final boolean updated = db.query("UPDATE OPTIMIZERS set lastUpdate = ? WHERE class = ?", false, timestamp, classname);
 			return updated;
 		}
 	}
