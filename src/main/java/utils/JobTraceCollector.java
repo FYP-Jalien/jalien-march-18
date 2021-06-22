@@ -133,7 +133,7 @@ public class JobTraceCollector {
 				}
 			}
 
-			final String line = String.format("%d [%-10s]: %s", Long.valueOf(timestamp), action, message);
+			final String line = String.format("%d [%-10s]: %s", Long.valueOf(timestamp / 1000), action, message);
 
 			try (PrintWriter pw = new PrintWriter(new FileWriter(f, true))) {
 				pw.println(line);
