@@ -336,7 +336,7 @@ public class OrphanPFNsCleanup {
 									ok = db.query("SELECT binary2string(guid),size,md5sum,pfn, flags FROM orphan_pfns_" + seNumber
 											+ " WHERE fail_count<10 ORDER BY size/((fail_count * 5) + 1) DESC LIMIT 100000;", true);
 								else
-									ok = db.query("SELECT binary2string(guid) FROM orphan_pfns_0 ORDER BY size DESC LIMIT 1000000;");
+									ok = db.query("SELECT binary2string(guid) FROM orphan_pfns_0 ORDER BY size DESC LIMIT 10000000;");
 							}
 							finally {
 								concurrentQueryies.release();
