@@ -122,7 +122,7 @@ public class JobTraceCollector {
 
 		@Override
 		public void run() {
-			final File f = new File(baseLocation + "/" + (jobid / 10000) + "/" + jobid);
+			final File f = new File(baseLocation + "/" + (jobid / 10000) + "/" + jobid + ".log");
 
 			if (!f.exists()) {
 				final File fDir = f.getParentFile();

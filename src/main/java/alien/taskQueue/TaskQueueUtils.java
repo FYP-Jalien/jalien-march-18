@@ -2462,13 +2462,15 @@ public class TaskQueueUtils {
 	 * @return <code>true</code> if the log was successfully added
 	 */
 	public static boolean putJobLog(final long timestamp, final long queueId, final String action, final String message, final HashMap<String, String> joblogtags) {
+		final Long now = Long.valueOf((timestamp <= 0 ? System.currentTimeMillis() : timestamp) / 1000);
+
 		if (ConfigUtils.getConfig().getb("alien.taskQueue.TaskQueueUtils.sendUDPTraces", false)) {
-			final TraceMessage t = new TraceMessage(timestamp, queueId, action, message);
+			final TraceMessage t = new TraceMessage(now.longValue(), queueId, action, message);
 			t.send();
 
 			if (joblogtags != null && joblogtags.size() > 0)
 				for (final Map.Entry<String, String> entry : joblogtags.entrySet()) {
-					final TraceMessage t2 = new TraceMessage(timestamp, queueId, entry.getValue(), entry.getKey());
+					final TraceMessage t2 = new TraceMessage(now.longValue(), queueId, entry.getValue(), entry.getKey());
 					t2.send();
 				}
 
@@ -2486,7 +2488,6 @@ public class TaskQueueUtils {
 				monitor.incrementCounter("TQ_JOBMESSAGES_insert");
 			}
 
-			final Long now = Long.valueOf((timestamp <= 0 ? System.currentTimeMillis() : timestamp) / 1000);
 			final Long qid = Long.valueOf(queueId);
 
 			if (!db.query(JOBMESSAGES_INSERT, false, now, qid, message, action))
