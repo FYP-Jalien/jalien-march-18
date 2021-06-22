@@ -125,7 +125,7 @@ public class CVMFS extends PackMan {
 		return environment;
 	}
 
-	private String getAliEnPrintenv(final String args) {
+	private static String getAliEnPrintenv(final String args) {
 		final String keyModifier = SystemCommand.bash("lsb_release -s -d").stdout;
 
 		try {

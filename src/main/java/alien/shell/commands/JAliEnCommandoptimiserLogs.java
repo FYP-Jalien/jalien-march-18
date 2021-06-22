@@ -7,7 +7,6 @@ import alien.api.Dispatcher;
 import alien.api.ServerException;
 import alien.api.catalogue.OptimiserLogs;
 import alien.shell.ErrNo;
-import alien.shell.ShellColor;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
 

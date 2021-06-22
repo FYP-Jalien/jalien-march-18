@@ -1,6 +1,5 @@
 package alien.api.taskQueue;
 
-import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
 
