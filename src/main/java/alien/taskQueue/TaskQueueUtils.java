@@ -62,6 +62,7 @@ import lazyj.StringFactory;
 import lazyj.Utils;
 import lazyj.cache.ExpirationCache;
 import lazyj.cache.GenericLastValuesCache;
+import utils.JobTraceCollector.TraceMessage;
 
 /**
  * @author ron
@@ -2461,6 +2462,19 @@ public class TaskQueueUtils {
 	 * @return <code>true</code> if the log was successfully added
 	 */
 	public static boolean putJobLog(final long timestamp, final long queueId, final String action, final String message, final HashMap<String, String> joblogtags) {
+		if (ConfigUtils.getConfig().getb("alien.taskQueue.TaskQueueUtils.sendUDPTraces", false)) {
+			final TraceMessage t = new TraceMessage(timestamp, queueId, action, message);
+			t.send();
+
+			if (joblogtags != null && joblogtags.size() > 0)
+				for (final Map.Entry<String, String> entry : joblogtags.entrySet()) {
+					final TraceMessage t2 = new TraceMessage(timestamp, queueId, entry.getValue(), entry.getKey());
+					t2.send();
+				}
+
+			return true;
+		}
+
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
 				return false;
