@@ -579,7 +579,7 @@ public class ResyncLDAP extends Optimizer {
 				original.put(param, "null");
 			if (current.get(param) == null || current.get(param).isBlank())
 				current.put(param, "null");
-			if (!original.get(param).equals(current.get(param))) {
+			if (!original.get(param).equalsIgnoreCase(current.get(param))) {
 				updatedSEs.add(param + " (new value = " + current.get(param) + ")");
 			}
 		}
