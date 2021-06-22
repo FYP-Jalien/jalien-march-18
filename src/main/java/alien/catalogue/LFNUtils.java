@@ -1317,7 +1317,7 @@ public class LFNUtils {
 	 * @param attempts
 	 * @return transfer IDs to each SE
 	 */
-	public static HashMap<String, Long> mirrorLFN(final String path, final List<String> ses, final List<String> exses, final HashMap<String, Integer> qos, final boolean is_guid,
+	public static HashMap<String, Long> mirrorLFN(final String path, final List<String> ses, final List<String> exses, final Map<String, Integer> qos, final boolean is_guid,
 			final Integer attempts) {
 		LFN lfn;
 		if (is_guid) {

@@ -504,7 +504,7 @@ public final class SEUtils {
 	 *            <code>true</code> for write operations, <code>false</code> for read
 	 * @return the list of SEs
 	 */
-	public static List<SE> getBestSEsOnSpecs(final String site, final List<String> ses, final List<String> exses, final HashMap<String, Integer> qos, final boolean write) {
+	public static List<SE> getBestSEsOnSpecs(final String site, final List<String> ses, final List<String> exses, final Map<String, Integer> qos, final boolean write) {
 
 		if (logger.isLoggable(Level.FINE)) {
 			logger.log(Level.FINE, "got pos: " + ses);

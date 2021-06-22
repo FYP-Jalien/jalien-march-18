@@ -7,6 +7,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -681,7 +682,7 @@ public class LFNCSDUtils {
 	 * @param attempts
 	 * @return transfer IDs to each SE
 	 */
-	public static HashMap<String, Long> mirror(final String path, final List<String> ses, final List<String> exses, final HashMap<String, Integer> qos, final Integer attempts) {
+	public static HashMap<String, Long> mirror(final String path, final List<String> ses, final List<String> exses, final Map<String, Integer> qos, final Integer attempts) {
 		final LFN_CSD lfnc = new LFN_CSD(path, true, null, null, null);
 
 		if (!lfnc.exists || lfnc.pfns.size() <= 0)
