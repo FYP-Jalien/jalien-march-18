@@ -13,6 +13,9 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import alien.api.Dispatcher;
+import alien.api.catalogue.GetAliEnv;
+import alien.api.catalogue.SetAliEnv;
 import alien.config.ConfigUtils;
 import alien.config.Version;
 import alien.site.JobAgent;
@@ -104,7 +107,7 @@ public class CVMFS extends PackMan {
 		if (version != null)
 			args += "/" + version;
 
-		final String source = SystemCommand.bash(ALIEN_BIN_DIR + "/alienv printenv " + args).stdout;
+		final String source = getAliEnPrintenv(args);
 
 		final ArrayList<String> parts = new ArrayList<>(Arrays.asList(source.split(";")));
 		parts.remove(parts.size() - 1);
@@ -122,6 +125,31 @@ public class CVMFS extends PackMan {
 		return environment;
 	}
 
+	private String getAliEnPrintenv(final String args) {
+		final String keyModifier = SystemCommand.bash("lsb_release -s -d").stdout;
+
+		try {
+			final GetAliEnv env = Dispatcher.execute(new GetAliEnv(args, keyModifier));
+
+			if (env.getCachedAliEnOutput() != null)
+				return env.getCachedAliEnOutput();
+		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "Exception executing GetAliEnv", e);
+		}
+
+		final String source = SystemCommand.bash(ALIEN_BIN_DIR + "/alienv printenv " + args).stdout;
+
+		try {
+			Dispatcher.execute(new SetAliEnv(args, keyModifier, source));
+		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "Exception executing SetAliEnv", e);
+		}
+
+		return source;
+	}
+
 	/**
 	 * @return the command to get the full environment to run JAliEn components
 	 */
@@ -129,9 +157,9 @@ public class CVMFS extends PackMan {
 		final String jalienEnvPrint = ALIEN_BIN_DIR + "/alienv printenv JAliEn";
 
 		final String versionFromProps = ConfigUtils.getConfiguration("version").gets("jobagent.version");
-		if ( versionFromProps != null && !versionFromProps.isBlank())
+		if (versionFromProps != null && !versionFromProps.isBlank())
 			return jalienEnvPrint + "/" + versionFromProps + "-1";
-	
+
 		if (!Version.getTagFromEnv().isEmpty())
 			return jalienEnvPrint + Version.getTagFromEnv();
 
