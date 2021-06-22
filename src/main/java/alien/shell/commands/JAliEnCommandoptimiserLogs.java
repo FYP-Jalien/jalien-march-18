@@ -27,7 +27,7 @@ public class JAliEnCommandoptimiserLogs extends JAliEnBaseCommand {
 		try {
 			final OptimiserLogs optimiserLogs = Dispatcher.execute(new OptimiserLogs(classes, frequency, verbose, listClasses));
 
-			commander.printOutln(ShellColor.jobStateRed() + optimiserLogs.getLogOutput().trim() + ShellColor.reset());
+			commander.printOutln(optimiserLogs.getLogOutput().trim());
 		}
 		catch (final ServerException e) {
 			commander.setReturnCode(ErrNo.ENODATA, "Could not get the optimiser db logs from optimiserLogs command : " + e.getMessage());
