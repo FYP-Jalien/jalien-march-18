@@ -133,7 +133,15 @@ public class JobTraceCollector {
 				}
 			}
 
-			final String line = String.format("%d [%-10s]: %s", Long.valueOf(timestamp / 1000), action, message);
+			long writeTime = timestamp;
+
+			if (writeTime > 16244301090L)
+				writeTime /= 1000;
+
+			if (writeTime < 1609455600)
+				writeTime = System.currentTimeMillis() / 1000;
+
+			final String line = String.format("%d [%-10s]: %s", Long.valueOf(writeTime), action, message);
 
 			try (PrintWriter pw = new PrintWriter(new FileWriter(f, true))) {
 				pw.println(line);

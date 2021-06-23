@@ -2465,12 +2465,12 @@ public class TaskQueueUtils {
 		final Long now = Long.valueOf((timestamp <= 0 ? System.currentTimeMillis() : timestamp) / 1000);
 
 		if (ConfigUtils.getConfig().getb("alien.taskQueue.TaskQueueUtils.sendUDPTraces", false)) {
-			final TraceMessage t = new TraceMessage(now.longValue(), queueId, action, message);
+			final TraceMessage t = new TraceMessage(now.longValue() * 1000, queueId, action, message);
 			t.send();
 
 			if (joblogtags != null && joblogtags.size() > 0)
 				for (final Map.Entry<String, String> entry : joblogtags.entrySet()) {
-					final TraceMessage t2 = new TraceMessage(now.longValue(), queueId, entry.getValue(), entry.getKey());
+					final TraceMessage t2 = new TraceMessage(now.longValue() * 1000, queueId, entry.getValue(), entry.getKey());
 					t2.send();
 				}
 
