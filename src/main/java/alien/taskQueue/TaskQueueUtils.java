@@ -2656,6 +2656,8 @@ public class TaskQueueUtils {
 		return ret;
 	}
 
+	private static final ExpirationCache<String, String> siteQueueStatusCache = new ExpirationCache<>();
+
 	/**
 	 * @param ce
 	 * @param status
@@ -2663,6 +2665,11 @@ public class TaskQueueUtils {
 	public static void setSiteQueueStatus(final String ce, final String status) {
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
+				return;
+
+			final String lastStatus = siteQueueStatusCache.get(ce);
+
+			if (status.equals(lastStatus))
 				return;
 
 			// TODO: jdls?
@@ -2678,6 +2685,8 @@ public class TaskQueueUtils {
 				insertSiteQueue(ce);
 			}
 		}
+
+		siteQueueStatusCache.put(ce, status, 1000 * 60);
 	}
 
 	/**
@@ -3780,7 +3789,7 @@ public class TaskQueueUtils {
 					else
 						return Integer.parseInt(workdirMaxSize);
 				}
-				catch (@SuppressWarnings("unused") NumberFormatException nfe) {
+				catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
 					// ignore
 				}
 			}
