@@ -184,7 +184,7 @@ public class JobTraceCollector {
 								for (final Map.Entry<Long, Long> entry : jobsToTouch.entrySet())
 									db.query("UPDATE QUEUEPROC SET procinfotime=? WHERE queueId=?", false, entry.getValue(), entry.getKey());
 
-								setName("QueueProcUpdater: " + jobsToTouch + " updates in " + t);
+								setName("QueueProcUpdater: " + jobsToTouch.size() + " updates in " + t);
 							}
 						}
 						else
