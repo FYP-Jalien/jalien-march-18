@@ -619,7 +619,7 @@ public class DispatchSSLServer extends Thread {
 		@Override
 		public void run() {
 			while (true) {
-				final long threshold = System.currentTimeMillis() - ConfigUtils.getConfig().geti("alien.api.DispatchSSLServer.idleTimeout_seconds", 900);
+				final long threshold = System.currentTimeMillis() - ConfigUtils.getConfig().geti("alien.api.DispatchSSLServer.idleTimeout_seconds", 900) * 1000;
 
 				for (final DispatchSSLServer srv : sessionMap.keySet()) {
 					if (srv.lastActivity < threshold) {
