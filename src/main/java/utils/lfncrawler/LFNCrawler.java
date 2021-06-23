@@ -5,48 +5,110 @@ import alien.catalogue.IndexTableEntry;
 import alien.catalogue.LFN;
 import alien.catalogue.LFNUtils;
 import alien.config.ConfigUtils;
+import alien.optimizers.Optimizer;
+import alien.optimizers.DBSyncUtils;
 import lazyj.DBFunctions;
 
+import java.time.Duration;
+import java.time.Instant;
 import java.util.*;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-public class LFNCrawler {
-    private static Date             currentDate;
-    private static long             directoriesDeleted;
-    private static long             filesDeleted;
-    private static long             reclaimedSpace;
-    private static boolean          dryRun;
+/**
+ * LFN Crawler
+ *
+ * @author ibrinzoi
+ *
+ */
+public class LFNCrawler extends Optimizer {
+    /**
+     * Instance
+     */
     private static final LFNCrawler lfnCrawlerInstance = new LFNCrawler();
-    private static final Logger     logger             = ConfigUtils.getLogger(LFNCrawler.class.getCanonicalName());
 
+    /**
+	 * Logger
+	 */
+    private static final Logger logger = ConfigUtils.getLogger(LFNCrawler.class.getCanonicalName());
+
+    /**
+	 * Crawler Frequency
+	 */
+    private static final int ONE_HOUR  = 3600 * 1000;
+    private static int       frequency = 24 * ONE_HOUR; // one day
+
+    /**
+	 * Dry Run Mode
+	 */
+    private static boolean dryRun;
+
+    /**
+	 * Current Date
+	 */
+    private static Date currentDate;
+
+    /**
+	 * Statistics
+	 */    
+    private static long    directoriesDeleted;
+    private static long    filesDeleted;
+    private static long    reclaimedSpace;
+    private static Instant startTime;
+    private static Instant endTime;
+    private static long    elapsedTime;
+
+
+    /**
+	 * Private Constructor as the class is implemented as a Singleton
+	 */
     private LFNCrawler() {
-
     }
 
+    /**
+	 * Return the instance of the class
+	 */
     public static LFNCrawler getLFNCrawlerInstance() {
         return lfnCrawlerInstance;
     }
 
-    public static void main(String[] args) {
-        dryRun             = false;
-        currentDate        = new Date();
+    @Override
+    public void run() {
         directoriesDeleted = 0;
         filesDeleted       = 0;
         reclaimedSpace     = 0;
+        currentDate        = new Date();
+        dryRun             = ConfigUtils.getConfig().getb("lfn_crawler_dry_run", true);
 
-        for (String s: args) {
-            if (s.equals("--dry-run") || s.equals("-d")) {
-                print("dryRun: the LFNs will not be deleted");
-                dryRun = true;
+        this.setSleepPeriod(ONE_HOUR);
+        DBSyncUtils.checkLdapSyncTable();
+
+        while (true) {
+            final boolean updated = DBSyncUtils.updatePeriodic(frequency, LFNCrawler.class.getCanonicalName());
+
+            if (updated) {
+                print("Starting expired LFN crawling iteration in " + (dryRun ? "DRY-RUN" : "NORMAL") + " mode");
+
+                startCrawler();
+            }
+
+            try {
+                print("LFNCrawler sleeps " + this.getSleepPeriod());
+                sleep(this.getSleepPeriod());
+            }
+            catch (final InterruptedException e) {
+                e.printStackTrace();
             }
         }
-
-        print("Starting expired LFN crawling iteration");
-
-        startCrawler();
     }
 
+    /**
+	 * Iterate through the expired directories and delete
+     * them recursively starting from the top-most parent
+	 *
+	 * @param indextableCollection A collection of indexTables on which to perform the queries
+	 * @return void
+	 */
     private static void removeDirectories(Collection<IndexTableEntry> indextableCollection) {
         LFN currentDirectory = null;
 
@@ -97,9 +159,18 @@ public class LFNCrawler {
             } catch (@SuppressWarnings("unused") final Exception e) {
                 // ignore
             }
+
+            DBSyncUtils.setLastActive(LFNCrawler.class.getCanonicalName());
         }
     }
 
+    /**
+	 * Iterate through a list of LFNs, check if any is an archive so that
+     * the members would be added to the list too and delete the final batch
+	 *
+	 * @param lfnsToDelete A list of LFNs to be parsed and deleted
+	 * @return void
+	 */
     public static void processBatch(ArrayList<LFN> lfnsToDelete) {
         Set<LFN> processedToDelete = new HashSet<>();
 
@@ -141,6 +212,13 @@ public class LFNCrawler {
         filesDeleted += processedToDelete.size();
     }
 
+    /**
+	 * Iterate through the expired files and process
+     * them in batches, parsing one directory at a time
+	 *
+	 * @param indextableCollection A collection of indexTables on which to perform the queries
+	 * @return void
+	 */
     private static void removeFiles(Collection<IndexTableEntry> indextableCollection) {
         String currentDirectory     = null;
         ArrayList<LFN> lfnsToDelete = new ArrayList<>();
@@ -186,14 +264,27 @@ public class LFNCrawler {
             } catch (@SuppressWarnings("unused") final Exception e) {
                 // ignore
             }
+
+            DBSyncUtils.setLastActive(LFNCrawler.class.getCanonicalName());
         }
     }
 
+    /**
+	 * Print a message to Standard Output
+	 *
+	 * @param message The message to print
+	 * @return void
+	 */
     private static void print(String message) {
         logger.log(Level.INFO, message);
     }
 
+    /**
+	 * Start the LFN Crawler
+	 */
     public static void startCrawler() {
+        startTime = Instant.now();
+
         final Collection<IndexTableEntry> indextableCollection = CatalogueUtils.getAllIndexTables();
 
         if (indextableCollection == null) {
@@ -207,15 +298,19 @@ public class LFNCrawler {
         print("========== Files iteration ==========");
         removeFiles(indextableCollection);
 
+        endTime     = Instant.now();
+        elapsedTime = Duration.between(startTime, endTime).toHours();
+
         print("========== Results ==========");
-        if (dryRun) {
-            print("Directories that would have been deleted: " + directoriesDeleted);
-            print("Files that would have been deleted: " + filesDeleted);
-            print("Space that would have been reclaimed: " + reclaimedSpace);
-        } else {
-            print("Directories deleted: " + directoriesDeleted);
-            print("Files deleted: " + filesDeleted);
-            print("Reclaimed space: " + reclaimedSpace);
-        }
+        print("Directories deleted: " + directoriesDeleted);
+        print("Files deleted: "       + filesDeleted);
+        print("Reclaimed space: "     + reclaimedSpace);
+        print("Execution took: "      + elapsedTime + " hours");
+
+        DBSyncUtils.registerLog(LFNCrawler.class.getCanonicalName(),
+                                "Directories deleted: " + directoriesDeleted + "\n" +
+                                "Files deleted: "       + filesDeleted       + "\n" +
+                                "Reclaimed space: "     + reclaimedSpace     + "\n" +
+                                "Execution took: "      + elapsedTime        + " hours");
     }
 }
