@@ -605,8 +605,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		int duplicates = 0;
 		for (final Map.Entry<LFN, File> entry : localFiles.entrySet()) {
-			final StringBuilder errorMessage = new StringBuilder();
-
 			File f = entry.getValue();
 
 			if (f.exists()) {
@@ -622,15 +620,23 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			commander.q_api.putJobLog(queueId, "trace", "Getting InputFile: " + entry.getKey().getCanonicalName() + " to " + f.getAbsolutePath() + " (" + Format.size(entry.getKey().size) + ")");
 
+			commander.clearLastError();
+
 			final JAliEnCommandcp cp = new JAliEnCommandcp(commander, Arrays.asList(entry.getKey().getCanonicalName(), "file:" + f.getAbsolutePath()));
 
 			final File copyResult = cp.copyGridToLocal(entry.getKey().getCanonicalName(), f);
 
 			if (copyResult == null) {
-				logger.log(Level.WARNING, "Could not download " + entry.getKey().getCanonicalName() + " to " + entry.getValue().getAbsolutePath());
+				final String commanderError = commander.getLastErrorMessage();
 
-				commander.q_api.putJobLog(queueId, "trace",
-						"ERROR: Could not download " + entry.getKey().getCanonicalName() + " to " + entry.getValue().getAbsolutePath() + " due to:\n" + errorMessage);
+				logger.log(Level.WARNING, "Could not download " + entry.getKey().getCanonicalName() + " to " + entry.getValue().getAbsolutePath() + ":\n" + commanderError);
+
+				String traceLine = "ERROR: Could not download " + entry.getKey().getCanonicalName() + " to " + entry.getValue().getAbsolutePath();
+
+				if (commanderError != null)
+					traceLine += " due to: " + commanderError;
+
+				commander.q_api.putJobLog(queueId, "trace", traceLine);
 
 				return false;
 			}

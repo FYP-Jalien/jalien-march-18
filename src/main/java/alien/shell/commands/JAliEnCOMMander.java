@@ -589,6 +589,8 @@ public class JAliEnCOMMander implements Runnable {
 			return;
 		}
 
+		clearLastError();
+
 		this.out = out;
 		this.arg = arg;
 
@@ -907,6 +909,45 @@ public class JAliEnCOMMander implements Runnable {
 		printErr(value + "\n");
 	}
 
+	private int lastExitCode = 0;
+	private String lastErrorMessage = null;
+
+	private void setLastError(final int exitCode, final String errorMessage) {
+		this.lastExitCode = exitCode;
+		this.lastErrorMessage = errorMessage;
+	}
+
+	/**
+	 * Reset status for the next command
+	 */
+	public void clearLastError() {
+		setLastError(0, null);
+	}
+
+	/**
+	 * @return exit code set by the last executed command
+	 * @see #setReturnCode(ErrNo)
+	 * @see #setReturnCode(ErrNo, String)
+	 * @see #setReturnCode(int, String)
+	 * @see #clearLastError()
+	 * @see #getLastErrorMessage()
+	 */
+	public int getLastExitCode() {
+		return lastExitCode;
+	}
+
+	/**
+	 * @return message produced by the last executed command
+	 * @see #setReturnCode(ErrNo)
+	 * @see #setReturnCode(ErrNo, String)
+	 * @see #setReturnCode(int, String)
+	 * @see #clearLastError()
+	 * @see #getLastExitCode()
+	 */
+	public String getLastErrorMessage() {
+		return lastErrorMessage;
+	}
+
 	/**
 	 * Set the command's return code and print an error message to the output stream
 	 *
@@ -914,6 +955,8 @@ public class JAliEnCOMMander implements Runnable {
 	 * @param errorMessage
 	 */
 	public void setReturnCode(final int exitCode, final String errorMessage) {
+		setLastError(exitCode, errorMessage);
+
 		if (out != null)
 			out.setReturnCode(exitCode, errorMessage);
 	}
@@ -924,6 +967,8 @@ public class JAliEnCOMMander implements Runnable {
 	 * @param errno
 	 */
 	public void setReturnCode(final ErrNo errno) {
+		setLastError(errno.getErrorCode(), errno.getMessage());
+
 		if (out != null)
 			out.setReturnCode(errno);
 	}
@@ -935,6 +980,8 @@ public class JAliEnCOMMander implements Runnable {
 	 * @param additionalMessage
 	 */
 	public void setReturnCode(final ErrNo errno, final String additionalMessage) {
+		setLastError(errno.getErrorCode(), errno.getMessage() + (additionalMessage != null && !additionalMessage.isBlank() ? " : " + additionalMessage : ""));
+
 		if (out != null)
 			out.setReturnCode(errno, additionalMessage);
 	}
