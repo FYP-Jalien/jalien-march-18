@@ -10,6 +10,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.io.UncheckedIOException;
 import java.lang.ProcessBuilder.Redirect;
 import java.net.URISyntaxException;
 import java.nio.file.Files;
@@ -60,6 +61,8 @@ import apmon.ApMonMonitoringConstants;
 import apmon.BkThread;
 import apmon.MonitoredJob;
 import lazyj.ExtProperties;
+import lazyj.commands.CommandOutput;
+import lazyj.commands.SystemCommand;
 import lia.util.process.ExternalProcesses;
 import utils.ProcessWithTimeout;
 
@@ -525,8 +528,15 @@ public class JobAgent implements Runnable {
 					.sorted(Comparator.reverseOrder()) // or else dir will appear before its contents
 					.forEach(File::delete);
 		}
-		catch (final IOException e) {
-			logger.log(Level.WARNING, "Error deleting the job workdir: " + e.toString());
+		catch (final IOException | UncheckedIOException e) {
+			logger.log(Level.WARNING, "Error deleting the job workdir, using system commands instead", e);
+
+			final CommandOutput rmOutput = SystemCommand.executeCommand(Arrays.asList("rm", "-rf", tempDir.getAbsolutePath()), true);
+
+			if (rmOutput == null)
+				logger.log(Level.SEVERE, "Cannot clean up the job dir even using system commands");
+			else
+				logger.log(Level.INFO, "System command cleaning of job work dir returned " + rmOutput.exitCode + ", full output:\n" + rmOutput.stdout);
 		}
 
 		RES_WORKDIR_SIZE = ZERO;
