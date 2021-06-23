@@ -180,6 +180,8 @@ public class JobTraceCollector {
 
 					try (DBFunctions db = ConfigUtils.getDB("processes")) {
 						if (db != null) {
+							db.setQueryTimeout(1000 * 10);
+
 							try (Timing t = new Timing()) {
 								for (final Map.Entry<Long, Long> entry : jobsToTouch.entrySet())
 									db.query("UPDATE QUEUEPROC SET procinfotime=? WHERE queueId=?", false, entry.getValue(), entry.getKey());
