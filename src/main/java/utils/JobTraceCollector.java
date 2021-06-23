@@ -16,12 +16,17 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
 
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
+import alien.monitoring.Timing;
+import lazyj.DBFunctions;
 
 /**
  * @author costing
@@ -43,6 +48,11 @@ public class JobTraceCollector {
 	private static SocketAddress targetServerAddress;
 
 	private static Monitor monitor = MonitorFactory.getMonitor(JobTraceCollector.class.getCanonicalName());
+
+	/**
+	 * Job ID to last received timestamp (in seconds)
+	 */
+	private static ConcurrentHashMap<Long, Long> aliveJobs = new ConcurrentHashMap<>();
 
 	static {
 		try {
@@ -141,6 +151,8 @@ public class JobTraceCollector {
 			if (writeTime < 1609455600)
 				writeTime = System.currentTimeMillis() / 1000;
 
+			aliveJobs.put(Long.valueOf(jobid), Long.valueOf(writeTime));
+
 			final String line = String.format("%d [%-10s]: %s", Long.valueOf(writeTime), action, message);
 
 			try (PrintWriter pw = new PrintWriter(new FileWriter(f, true))) {
@@ -148,6 +160,45 @@ public class JobTraceCollector {
 			}
 			catch (final IOException ioe) {
 				System.err.println("Cannot write to " + f.getAbsolutePath() + " : " + ioe.getMessage());
+			}
+		}
+	}
+
+	private static class QueueProcUpdater extends Thread {
+		QueueProcUpdater() {
+			setName("QueueProcUpdater");
+			setDaemon(true);
+		}
+
+		@Override
+		public void run() {
+			while (true) {
+				final HashMap<Long, Long> jobsToTouch = new HashMap<>(aliveJobs);
+
+				if (jobsToTouch.size() > 0) {
+					aliveJobs.keySet().removeAll(jobsToTouch.keySet());
+
+					try (DBFunctions db = ConfigUtils.getDB("processes")) {
+						if (db != null) {
+							try (Timing t = new Timing()) {
+								for (final Map.Entry<Long, Long> entry : jobsToTouch.entrySet())
+									db.query("UPDATE QUEUEPROC SET procinfotime=? WHERE queueId=?", false, entry.getValue(), entry.getKey());
+
+								setName("QueueProcUpdater: " + jobsToTouch + " updates in " + t);
+							}
+						}
+						else
+							setName("QueueProcUpdater: no DB connection");
+					}
+				}
+
+				try {
+					sleep(1000 * 60);
+				}
+				catch (@SuppressWarnings("unused") InterruptedException e) {
+					System.err.println("QueueProcUpdater was interrupted, exiting");
+					return;
+				}
 			}
 		}
 	}
@@ -164,6 +215,9 @@ public class JobTraceCollector {
 			t.send();
 			return;
 		}
+
+		final QueueProcUpdater updater = new QueueProcUpdater();
+		updater.start();
 
 		try (DatagramSocket serverSocket = new DatagramSocket(port)) {
 			final byte[] buffer = new byte[65535];
