@@ -631,10 +631,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 				logger.log(Level.WARNING, "Could not download " + entry.getKey().getCanonicalName() + " to " + entry.getValue().getAbsolutePath() + ":\n" + commanderError);
 
-				String traceLine = "ERROR: Could not download " + entry.getKey().getCanonicalName() + " to " + entry.getValue().getAbsolutePath();
+				String traceLine = "ERROR: ";
 
 				if (commanderError != null)
-					traceLine += " due to: " + commanderError;
+					traceLine += commanderError;
+				else
+					traceLine += "Could not download " + entry.getKey().getCanonicalName() + " to " + entry.getValue().getAbsolutePath();
 
 				commander.q_api.putJobLog(queueId, "trace", traceLine);
 
