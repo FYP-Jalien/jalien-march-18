@@ -23,7 +23,6 @@ import lazyj.Utils;
 public class JAliEnCommandcat_csd extends JAliEnBaseCommand {
 
 	private boolean bN = false;
-	private final boolean bG = false;
 	private boolean bE = false;
 	private boolean bB = false;
 	private boolean bT = false;
@@ -196,8 +195,6 @@ public class JAliEnCommandcat_csd extends JAliEnBaseCommand {
 		sb.append("\n { JAliEnCommandcat_csd received\n");
 		sb.append("Arguments: ");
 
-		if (bG)
-			sb.append(" -g ");
 		if (bO)
 			sb.append(" -o ");
 		if (bN)
