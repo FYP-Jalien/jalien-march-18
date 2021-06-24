@@ -1,5 +1,5 @@
 /**
- * 
+ *
  */
 package alien.api.catalogue;
 
@@ -8,6 +8,8 @@ import java.util.List;
 
 import alien.api.Request;
 import alien.config.ConfigUtils;
+import alien.monitoring.Monitor;
+import alien.monitoring.MonitorFactory;
 import lazyj.DBFunctions;
 
 /**
@@ -17,9 +19,11 @@ import lazyj.DBFunctions;
 public class SetAliEnv extends Request {
 	private static final long serialVersionUID = 3114356348162956273L;
 
+	private static final Monitor monitor = MonitorFactory.getMonitor(SetAliEnv.class.getCanonicalName());
+
 	private final String packageNames;
 	private final String keyModifier;
-	private final String cachedAliEnvOutput;
+	private String cachedAliEnvOutput;
 
 	/**
 	 * @param packageNames list of package names
@@ -46,6 +50,11 @@ public class SetAliEnv extends Request {
 		try (DBFunctions db = ConfigUtils.getDB("admin")) {
 			db.query("replace into alienv_cache (packageNames, keyModifier, expires, cachedOutput) values (?, ?, UNIX_TIMESTAMP()+60*60*12, ?);", false, packageNames, keyModifier, cachedAliEnvOutput);
 		}
+
+		monitor.incrementCounter("alienv_cache_set");
+
+		// drop the largest blob of text from the reply
+		this.cachedAliEnvOutput = null;
 	}
 
 	@Override

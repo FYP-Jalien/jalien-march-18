@@ -1,5 +1,5 @@
 /**
- * 
+ *
  */
 package alien.api.catalogue;
 
@@ -9,6 +9,8 @@ import java.util.List;
 import alien.api.Cacheable;
 import alien.api.Request;
 import alien.config.ConfigUtils;
+import alien.monitoring.Monitor;
+import alien.monitoring.MonitorFactory;
 import lazyj.DBFunctions;
 
 /**
@@ -17,6 +19,8 @@ import lazyj.DBFunctions;
  */
 public class GetAliEnv extends Request implements Cacheable {
 	private static final long serialVersionUID = -291036303440798251L;
+
+	private static final Monitor monitor = MonitorFactory.getMonitor(GetAliEnv.class.getCanonicalName());
 
 	private final String packageNames;
 	private final String keyModifier;
@@ -43,11 +47,22 @@ public class GetAliEnv extends Request implements Cacheable {
 	@Override
 	public void run() {
 		try (DBFunctions db = ConfigUtils.getDB("admin")) {
-			db.query("SELECT cachedOutput FROM alienv_cache WHERE packageNames=? AND keyModifier=? AND expires>UNIX_TIMESTAMP();", false, packageNames, keyModifier);
+			if (db != null) {
+				db.query("SELECT cachedOutput FROM alienv_cache WHERE packageNames=? AND keyModifier=? AND expires>UNIX_TIMESTAMP();", false, packageNames, keyModifier);
 
-			if (db.moveNext())
-				cachedAliEnvOutput = db.gets(1);
+				if (db.moveNext()) {
+					cachedAliEnvOutput = db.gets(1);
+
+					if (monitor != null)
+						monitor.incrementCacheHits("alienv");
+
+					return;
+				}
+			}
 		}
+
+		if (monitor != null)
+			monitor.incrementCacheMisses("alienv");
 	}
 
 	@Override
