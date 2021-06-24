@@ -892,12 +892,6 @@ public class TransferBroker {
 
 		reportMonitoring(t);
 
-		// Update the file catalog with the new replica
-		AliEnPrincipal owner = AuthorizationFactory.getDefaultUser();
-
-		if (owner.canBecome("admin"))
-			owner = UserFactory.getByUsername("admin");
-
 		for (final PFN target : t.getSuccessfulTransfers()) {
 			if (!target.getGuid().addPFN(target)) {
 				logger.log(Level.WARNING, "Could not commit booked transfer: " + target);
