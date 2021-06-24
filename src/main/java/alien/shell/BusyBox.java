@@ -9,6 +9,7 @@ import java.io.OutputStream;
 import java.io.PrintWriter;
 import java.net.Socket;
 import java.util.StringTokenizer;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import alien.JSh;
 import alien.api.JBoxServer;
@@ -41,7 +42,7 @@ public class BusyBox {
 
 	private static final String promptSuffix = " > ";
 
-	private static int commNo = 1;
+	private static AtomicInteger commNo = new AtomicInteger(1);
 
 	private ConsoleReader reader;
 	private final PrintWriter out;
@@ -237,9 +238,9 @@ public class BusyBox {
 		reader.addCompleter(new ArgumentCompleter(new StringsCompleter(callJBoxGetString("commandlist -i").split("\\s+")), new GridLocalFileCompletor(this)));
 
 		String prefixCNo = "0";
-		while ((line = reader.readLine(genPromptPrefix() + "[" + prefixCNo + commNo + "] " + currentDir + promptSuffix)) != null) {
+		while ((line = reader.readLine(genPromptPrefix() + "[" + prefixCNo + commNo.intValue() + "] " + currentDir + promptSuffix)) != null) {
 
-			if (commNo == 9)
+			if (commNo.intValue() == 9)
 				prefixCNo = "";
 
 			out.flush();
@@ -251,8 +252,7 @@ public class BusyBox {
 			}
 
 			executeCommand(line);
-			commNo++;
-
+			commNo.incrementAndGet();
 		}
 	}
 
