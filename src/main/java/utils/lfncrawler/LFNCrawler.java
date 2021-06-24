@@ -57,7 +57,7 @@ public class LFNCrawler extends Optimizer {
     /**
 	 * Private Constructor as the class is implemented as a Singleton
 	 */
-    private LFNCrawler() {
+    public LFNCrawler() {
     }
 
     @Override
