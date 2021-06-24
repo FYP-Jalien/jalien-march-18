@@ -18,7 +18,8 @@ public class Optimizer extends Thread {
 
 	private long sleep_period = 60 * 1000L; // 1min
 
-	private static String[] catalogue_optimizers = { "alien.optimizers.catalogue.LTables", "alien.optimizers.catalogue.GuidTable", "alien.optimizers.catalogue.ResyncLDAP", "utils.lfncrawler.LFNCrawler" };
+	private static String[] catalogue_optimizers = { "alien.optimizers.catalogue.LTables", "alien.optimizers.catalogue.GuidTable", "alien.optimizers.catalogue.ResyncLDAP",
+			"utils.lfncrawler.LFNCrawler" };
 
 	@Override
 	public void run() {
@@ -66,7 +67,7 @@ public class Optimizer extends Thread {
 				optclass.start();
 			}
 			catch (final ReflectiveOperationException e) {
-				logger.log(Level.SEVERE, "Can't instantiate optimizer " + opt + "! " + e);
+				logger.log(Level.SEVERE, "Can't instantiate optimizer " + opt + "! ", e);
 			}
 	}
 
