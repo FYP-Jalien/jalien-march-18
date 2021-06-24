@@ -342,7 +342,7 @@ public class JBoxServer extends Thread {
 							// attached to the document
 						}
 						catch (final Exception e) {
-							logger.severe("Parse error " + e.getMessage());
+							logger.log(Level.SEVERE, "Parse error", e);
 						}
 					}
 					else
