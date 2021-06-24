@@ -60,7 +60,7 @@ public class OptimiserLogs extends Request {
 		else {
 			for (final String className : classes) {
 				final String classLog = getLastLogFromDB(className, verbose, false);
-				if (classLog != "") {
+				if (!classLog.isBlank()) {
 					logOutput = logOutput + classLog + "\n";
 				}
 				else {
