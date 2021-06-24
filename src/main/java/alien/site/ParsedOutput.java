@@ -72,6 +72,7 @@ public class ParsedOutput {
 	 * @param jdl
 	 * @param path
 	 * @param tag
+	 * @param checkContent 
 	 */
 	public ParsedOutput(final long queueId, final JDL jdl, final String path, final String tag, final boolean checkContent) {
 		this.jobOutput = new ArrayList<>();
