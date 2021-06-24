@@ -163,11 +163,11 @@ public class DBSyncUtils {
 			if (exactMatch)
 				querySuccess = db.query("SELECT * FROM `OPTIMIZERS` WHERE class = ?", false, classname);
 			else {
-				String log = "";
-				querySuccess = db.query("SELECT * FROM `OPTIMIZERS` WHERE class LIKE concat('%', ?, '%')", false, classname);
+				final StringBuilder log = new StringBuilder();
+				db.query("SELECT class FROM `OPTIMIZERS` WHERE class LIKE concat('%', ?, '%')", false, classname);
 				while (db.moveNext())
-					log = log + getLastLog(db.gets("class"), verbose, true);
-				return log;
+					log.append(getLastLog(db.gets("class"), verbose, true));
+				return log.toString();
 			}
 			if (!querySuccess) {
 				logger.log(Level.SEVERE, "Could not get the last updated logs from the OPTIMIZERS db");
