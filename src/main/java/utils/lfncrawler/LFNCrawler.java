@@ -23,11 +23,6 @@ import java.util.logging.Logger;
  */
 public class LFNCrawler extends Optimizer {
     /**
-     * Instance
-     */
-    private static final LFNCrawler lfnCrawlerInstance = new LFNCrawler();
-
-    /**
 	 * Logger
 	 */
     private static final Logger logger = ConfigUtils.getLogger(LFNCrawler.class.getCanonicalName());
@@ -65,13 +60,6 @@ public class LFNCrawler extends Optimizer {
     private LFNCrawler() {
     }
 
-    /**
-	 * Return the instance of the class
-	 */
-    public static LFNCrawler getLFNCrawlerInstance() {
-        return lfnCrawlerInstance;
-    }
-
     @Override
     public void run() {
         directoriesDeleted = 0;
@@ -107,7 +95,6 @@ public class LFNCrawler extends Optimizer {
      * them recursively starting from the top-most parent
 	 *
 	 * @param indextableCollection A collection of indexTables on which to perform the queries
-	 * @return void
 	 */
     private static void removeDirectories(Collection<IndexTableEntry> indextableCollection) {
         LFN currentDirectory = null;
@@ -169,7 +156,6 @@ public class LFNCrawler extends Optimizer {
      * the members would be added to the list too and delete the final batch
 	 *
 	 * @param lfnsToDelete A list of LFNs to be parsed and deleted
-	 * @return void
 	 */
     public static void processBatch(ArrayList<LFN> lfnsToDelete) {
         Set<LFN> processedToDelete = new HashSet<>();
@@ -217,7 +203,6 @@ public class LFNCrawler extends Optimizer {
      * them in batches, parsing one directory at a time
 	 *
 	 * @param indextableCollection A collection of indexTables on which to perform the queries
-	 * @return void
 	 */
     private static void removeFiles(Collection<IndexTableEntry> indextableCollection) {
         String currentDirectory     = null;
@@ -273,7 +258,6 @@ public class LFNCrawler extends Optimizer {
 	 * Print a message to Standard Output
 	 *
 	 * @param message The message to print
-	 * @return void
 	 */
     private static void print(String message) {
         logger.log(Level.INFO, message);
