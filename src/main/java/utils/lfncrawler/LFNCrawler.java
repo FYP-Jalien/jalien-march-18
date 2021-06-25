@@ -1,19 +1,24 @@
 package utils.lfncrawler;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Date;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 import alien.catalogue.CatalogueUtils;
 import alien.catalogue.IndexTableEntry;
 import alien.catalogue.LFN;
 import alien.catalogue.LFNUtils;
 import alien.config.ConfigUtils;
-import alien.optimizers.Optimizer;
+import alien.monitoring.Timing;
 import alien.optimizers.DBSyncUtils;
+import alien.optimizers.Optimizer;
 import lazyj.DBFunctions;
-
-import java.time.Duration;
-import java.time.Instant;
-import java.util.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
+import lazyj.Format;
 
 /**
  * LFN Crawler
@@ -49,8 +54,6 @@ public class LFNCrawler extends Optimizer {
     private static long    directoriesDeleted;
     private static long    filesDeleted;
     private static long    reclaimedSpace;
-    private static Instant startTime;
-    private static Instant endTime;
     private static long    elapsedTime;
 
 
@@ -267,7 +270,7 @@ public class LFNCrawler extends Optimizer {
 	 * Start the LFN Crawler
 	 */
     public static void startCrawler() {
-        startTime = Instant.now();
+        try(Timing t = new Timing()){
 
         final Collection<IndexTableEntry> indextableCollection = CatalogueUtils.getAllIndexTables();
 
@@ -282,9 +285,6 @@ public class LFNCrawler extends Optimizer {
         print("========== Files iteration ==========");
         removeFiles(indextableCollection);
 
-        endTime     = Instant.now();
-        elapsedTime = Duration.between(startTime, endTime).toHours();
-
         print("========== Results ==========");
         print("Directories deleted: " + directoriesDeleted);
         print("Files deleted: "       + filesDeleted);
@@ -294,7 +294,8 @@ public class LFNCrawler extends Optimizer {
         DBSyncUtils.registerLog(LFNCrawler.class.getCanonicalName(),
                                 "Directories deleted: " + directoriesDeleted + "\n" +
                                 "Files deleted: "       + filesDeleted       + "\n" +
-                                "Reclaimed space: "     + reclaimedSpace     + "\n" +
-                                "Execution took: "      + elapsedTime        + " hours");
+                                "Reclaimed space: "     + Format.size(reclaimedSpace)     + "\n" +
+                                "Execution took: "      + t);
+        }
     }
 }
