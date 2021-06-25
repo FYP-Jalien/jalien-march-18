@@ -265,12 +265,10 @@ public class JAliEnCOMMander implements Runnable {
 				this.curDir = curDir;
 		}
 
-		for (final String s : jAliEnCommandList)
-			userAvailableCommands.add(s);
+		Collections.addAll(userAvailableCommands, jAliEnCommandList);
 
 		if (this.user.canBecome("admin"))
-			for (final String s : jAliEnAdminCommandList)
-				userAvailableCommands.add(s);
+			Collections.addAll(userAvailableCommands, jAliEnAdminCommandList);
 
 		for (final String s : hiddenCommandList)
 			userAvailableCommands.remove(s);
@@ -503,15 +501,18 @@ public class JAliEnCOMMander implements Runnable {
 
 	@Override
 	public void run() {
-		final int counter = incrementCommandCount(certificateSubject);
+		final int counter = incrementCommandCount(certificateSubject, 1);
 
-		if (counter > 100) {
-			final int throttleTime = getThrottleTime(counter);
-			logger.log(Level.FINE, "Sleeping " + throttleTime + " for " + certificateSubject + " having executed " + counter + " commands");
+		final int throttleTime = getThrottleTime(counter);
+
+		if (throttleTime > 0) {
+			if (logger.isLoggable(Level.FINE))
+				logger.log(Level.FINE, "Sleeping " + throttleTime + " for " + certificateSubject + " having executed " + counter + " commands");
+
 			try {
 				Thread.sleep(throttleTime);
 			}
-			catch (@SuppressWarnings("unused") InterruptedException ie) {
+			catch (@SuppressWarnings("unused") final InterruptedException ie) {
 				// ignore
 			}
 		}
@@ -549,7 +550,7 @@ public class JAliEnCOMMander implements Runnable {
 	/**
 	 *
 	 */
-	private void bootMessage(Map<String, Object> userProperties) {
+	private void bootMessage(final Map<String, Object> userProperties) {
 		logger.log(Level.FINE, "Starting Commander");
 
 		try (RequestEvent event = new RequestEvent(getAccessLogTarget())) {
@@ -573,7 +574,7 @@ public class JAliEnCOMMander implements Runnable {
 				event.arguments = certificates;
 				event.userProperties = userProperties;
 
-				incrementCommandCount(certificateSubject);
+				incrementCommandCount(certificateSubject, 10);
 			}
 		}
 		catch (@SuppressWarnings("unused") final IOException ioe) {
@@ -590,7 +591,7 @@ public class JAliEnCOMMander implements Runnable {
 			event.requestId = Long.valueOf(commandCount);
 			event.clientID = clientId;
 
-			incrementCommandCount(certificateSubject);
+			incrementCommandCount(certificateSubject, 1);
 		}
 		catch (@SuppressWarnings("unused") final IOException ioe) {
 			// ignore any exception in writing out the event
@@ -1049,42 +1050,29 @@ public class JAliEnCOMMander implements Runnable {
 
 	private static final int KEY_MEMORY_SIZE = 1024;
 
-	private static final long MEMORY_TIME = 1000 * 60 * 5;
+	private static final long DECAY_TIME = 1000 * 60 * 5;
 
-	private static LRUMap<String, AtomicInteger> commandsPerKey = new LRUMap<>(KEY_MEMORY_SIZE);
+	private static final LRUMap<String, AtomicInteger> commandsPerKey = new LRUMap<>(KEY_MEMORY_SIZE);
 
-	private static LRUMap<String, AtomicInteger> previousCommandsPerKey = new LRUMap<>(KEY_MEMORY_SIZE);
+	private static long nextSwap = System.currentTimeMillis() + DECAY_TIME;
 
-	private static long nextSwap = System.currentTimeMillis() + MEMORY_TIME;
-
-	private static synchronized int incrementCommandCount(final String key) {
-		int value = commandsPerKey.computeIfAbsent(key, (k) -> new AtomicInteger()).incrementAndGet();
-
-		final AtomicInteger previous = previousCommandsPerKey.get(key);
-
-		if (previous != null)
-			value += previous.intValue();
+	private static synchronized int incrementCommandCount(final String key, final int delta) {
+		final int value = commandsPerKey.computeIfAbsent(key, (k) -> new AtomicInteger()).addAndGet(delta);
 
 		if (System.currentTimeMillis() > nextSwap) {
-			previousCommandsPerKey = commandsPerKey;
-			commandsPerKey = new LRUMap<>(KEY_MEMORY_SIZE);
+			for (final AtomicInteger ai : commandsPerKey.values())
+				ai.set(ai.get() / 2);
 
-			nextSwap = System.currentTimeMillis() + MEMORY_TIME;
+			nextSwap = System.currentTimeMillis() + DECAY_TIME;
 		}
 
 		return value;
 	}
 
 	private static final int getThrottleTime(final int counter) {
-		if (counter < 100)
+		if (counter <= 100)
 			return 0;
-		if (counter < 200)
-			return 10;
-		if (counter < 500)
-			return 50;
-		if (counter < 1000)
-			return 500;
 
-		return 2000;
+		return counter - 100;
 	}
 }
