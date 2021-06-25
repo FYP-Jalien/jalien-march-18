@@ -33,7 +33,7 @@ public class HTCONDOR extends BatchQueue {
 	private boolean use_job_router = false;
 	private boolean use_external_cloud = false;
 
-	private static final Pattern pJobNumbers = Pattern.compile("^\\s*([12]).*\\s(\\S+)");
+	private static final Pattern pJobNumbers = Pattern.compile("^\\s*([12]+).*\\s(\\S+)");
 	private static final Pattern pLoadBalancer = Pattern.compile("(\\d+)\\s*\\*\\s*(\\S+)");
 
 	//
@@ -508,7 +508,12 @@ public class HTCONDOR extends BatchQueue {
 			proxy_check_timestamp = now;
 		}
 
-		final String cmd = "condor_q -const 'JobStatus < 3' -af JobStatus GridResource";
+		//
+		// protect against condor_q failing
+		//
+
+		final int bad = 112;
+		final String cmd = "condor_q -const 'JobStatus < 3' -af JobStatus GridResource || (echo " + bad + " x; exit 1)";
 		final ArrayList<String> job_list = executeCommand(cmd);
 
 		tot_running = tot_waiting = 0;
@@ -537,13 +542,17 @@ public class HTCONDOR extends BatchQueue {
 
 					tot_waiting++;
 				}
-				else {
+				else if (job_status == 2) {
 					final AtomicInteger r = running.get(ce);
 
 					if (r != null)
 						r.incrementAndGet();
 
 					tot_running++;
+				}
+				else if (job_status == bad) {
+					tot_waiting = 444444;
+					return false;
 				}
 			}
 		}
