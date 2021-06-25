@@ -83,6 +83,9 @@ public final class ComputingElement extends Thread {
 			queue = getBatchQueue((String) config.get("ce_type"));
 
 			host_logdir_resolved = Functions.resolvePathWithEnv((String) config.get("host_logdir"));
+			if (host_logdir_resolved == null)
+				host_logdir_resolved = Functions.resolvePathWithEnv((String) config.get("host_tmpdir"));
+			
 			logger = LogUtils.redirectToCustomHandler(logger, host_logdir_resolved + "/CE");
 
 			if (config.containsKey("proxy_cache_file")) {
