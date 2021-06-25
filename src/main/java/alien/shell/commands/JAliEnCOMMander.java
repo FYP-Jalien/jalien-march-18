@@ -198,6 +198,8 @@ public class JAliEnCOMMander implements Runnable {
 
 	private String certificateSubject = "unknown";
 
+	private boolean shouldRateLimit = true;
+
 	/**
 	 * @return a commander instance
 	 */
@@ -501,19 +503,21 @@ public class JAliEnCOMMander implements Runnable {
 
 	@Override
 	public void run() {
-		final int counter = incrementCommandCount(certificateSubject, 1);
+		if (shouldRateLimit) {
+			final int counter = incrementCommandCount(certificateSubject, 1);
 
-		final int throttleTime = getThrottleTime(counter);
+			final int throttleTime = getThrottleTime(counter);
 
-		if (throttleTime > 0) {
-			if (logger.isLoggable(Level.FINE))
-				logger.log(Level.FINE, "Sleeping " + throttleTime + " for " + certificateSubject + " having executed " + counter + " commands");
+			if (throttleTime > 0) {
+				if (logger.isLoggable(Level.FINE))
+					logger.log(Level.FINE, "Sleeping " + throttleTime + " for " + certificateSubject + " having executed " + counter + " commands");
 
-			try {
-				Thread.sleep(throttleTime);
-			}
-			catch (@SuppressWarnings("unused") final InterruptedException ie) {
-				// ignore
+				try {
+					Thread.sleep(throttleTime);
+				}
+				catch (@SuppressWarnings("unused") final InterruptedException ie) {
+					// ignore
+				}
 			}
 		}
 
@@ -574,7 +578,10 @@ public class JAliEnCOMMander implements Runnable {
 				event.arguments = certificates;
 				event.userProperties = userProperties;
 
-				incrementCommandCount(certificateSubject, 10);
+				if (certificateSubject.startsWith("OU=alitrain,") || certificateSubject.startsWith("OU=alihyperloop,"))
+					shouldRateLimit = false;
+				else
+					incrementCommandCount(certificateSubject, 10);
 			}
 		}
 		catch (@SuppressWarnings("unused") final IOException ioe) {
