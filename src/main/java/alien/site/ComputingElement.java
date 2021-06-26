@@ -433,12 +433,16 @@ public final class ComputingElement extends Thread {
 
 		final String content_str = before + getStartup() + "\n" + startup_customization(2);
 
-		final String agent_startup_path = host_tempdir_resolved + "/agent.startup." + time;
+		final String agent_startup_path = host_tempdir_resolved + "/agent.startup." + ProcessHandle.current().pid();
 		final File agent_startup_file = new File(agent_startup_path);
 		try {
 			agent_startup_file.createNewFile();
 			agent_startup_file.setExecutable(true);
-			agent_startup_file.deleteOnExit();
+
+			//
+			// rather keep those files for debugging:
+			//
+			// agent_startup_file.deleteOnExit();
 		}
 		catch (final IOException e1) {
 			logger.info("Error creating Agent Startup file: " + e1.toString());
