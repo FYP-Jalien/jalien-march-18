@@ -77,10 +77,12 @@ public class JobAgent implements Runnable {
 
 	// Folders and files
 	private File tempDir;
+	private File jobTmpDir;
 	private static final String defaultOutputDirPrefix = "/alien-job-";
 	private static final String jobWrapperLogName = "jalien-jobwrapper.log";
 	private String jobWorkdir;
 	private String jobWrapperLogDir;
+	private final String jobstatusFile = ".jalienJobstatus";
 
 	// Job variables
 	private JDL jdl;
@@ -1067,9 +1069,9 @@ public class JobAgent implements Runnable {
 
 				return false;
 			}
-			final File jobTmpDir = new File(jobWorkdir + "/tmp");
-			jobTmpDir.mkdir();
 		}
+		jobTmpDir = new File(jobWorkdir + "/tmp");
+		jobTmpDir.mkdir();
 
 		commander.q_api.putJobLog(queueId, "trace", "Created workdir: " + jobWorkdir);
 
@@ -1134,7 +1136,7 @@ public class JobAgent implements Runnable {
 
 	private String getWrapperJobStatus() {
 		try {
-			return Files.readString(Paths.get(jobWorkdir + "/.jobstatus"));
+			return Files.readString(Paths.get(jobTmpDir + "/" + jobstatusFile));
 		}
 		catch (final IOException e) {
 			logger.log(Level.WARNING, "Attempt to read job status failed. Ignoring: " + e.toString());
@@ -1143,7 +1145,7 @@ public class JobAgent implements Runnable {
 	}
 
 	private long getWrapperJobStatusTimestamp() {
-		return new File(jobWorkdir + "/.jobstatus").lastModified();
+		return new File(jobTmpDir + "/" + jobstatusFile).lastModified();
 	}
 
 	/**

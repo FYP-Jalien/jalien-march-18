@@ -55,7 +55,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 	// Folders and files
 	private final File currentDir = new File(Paths.get(".").toAbsolutePath().normalize().toString());
-	private final String timeFileName = ".jalienTimeTrack";
+	private final String tmpDir = currentDir + "/tmp";
+	private final String timeFile= ".jalienTimes";
+	private final String jobstatusFile = ".jalienJobstatus";
 	private String defaultOutputDirPrefix;
 
 	// Job variables
@@ -232,7 +234,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		c_api = new CatalogueApiUtils(commander);
 
 		// use same tmpdir everywhere
-		System.setProperty("java.io.tmpdir", currentDir.getAbsolutePath() + "/tmp");
+		System.setProperty("java.io.tmpdir", tmpDir);
 
 		statusSenderThread.setDaemon(true);
 		statusSenderThread.start();
@@ -417,7 +419,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			cmd.add("time");
 			cmd.add("-p");
 			cmd.add("-o");
-			cmd.add(currentDir + "/" + timeFileName);
+			cmd.add(tmpDir + "/" + timeFile);
 		}
 
 		final int idx = command.lastIndexOf('/');
@@ -511,7 +513,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		if (trackTime) {
 			try {
-				commander.q_api.putJobLog(queueId, "trace", "Payload execution completed. Time spent: " + Files.readString(Paths.get(currentDir + "/" + timeFileName)).replace("\n", ", "));
+				commander.q_api.putJobLog(queueId, "trace", "Payload execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile)).replace("\n", ", "));
 			}
 			catch (@SuppressWarnings("unused") Exception te) {
 				// Ignore
@@ -957,7 +959,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			// TaskQueueApiUtils.setJobStatus(queueId, newStatus, extrafields);
 
 			// Also write status to file for the JobAgent to see
-			Files.writeString(Paths.get(currentDir.getAbsolutePath() + "/.jobstatus"), newStatus.name());
+			Files.writeString(Paths.get(tmpDir + "/" + jobstatusFile), newStatus.name());
 		}
 		catch (final Exception e) {
 			logger.log(Level.WARNING, "An error occurred when attempting to change current job status: " + e);
