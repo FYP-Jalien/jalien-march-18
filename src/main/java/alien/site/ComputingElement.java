@@ -318,14 +318,32 @@ public final class ComputingElement extends Thread {
 		return lastStartupScript;
 	}
 
+	private String startup_customization(int i) {
+		final String custom_file = System.getenv("HOME") + "/JA-custom-" + i + ".sh";
+		String s = "";
+
+		if ((new File(custom_file)).exists()) {
+			s += "\n#\n# customization " + i + " start\n#\n\n";
+
+			try {
+				s += Functions.getFileContent(custom_file);
+			}
+			catch (final Exception e) {
+				logger.info("Error reading " + custom_file + ": "  + e.toString());
+				return "";
+			}
+
+			s += "\n#\n# customization " + i + " end\n#\n\n";
+			logger.info("JA customization " + i + " added from file: " + custom_file);
+		}
+
+		return s;
+	}
+
 	/*
 	 * Creates script to execute on worker nodes
 	 */
 	private String createAgentStartup() {
-		String startup_script = System.getenv("HOME") + "/jalien/jalien ";
-		if (System.getenv("JALIEN_ROOT") != null) {
-			startup_script = System.getenv("JALIEN_ROOT") + "/jalien ";
-		}
 		String before = "";
 
 		final long time = new Timestamp(System.currentTimeMillis()).getTime();
@@ -402,11 +420,18 @@ public final class ComputingElement extends Thread {
 			before += "export CPUCores=\"" + getValuesFromLDAPField(config.get("ce_matcharg")).get("cpucores") + "\"\n";
 		if (siteMap.containsKey("closeSE"))
 			before += "export closeSE=\"" + siteMap.get("closeSE") + "\"\n";
+
+		//
+		// allow any shell code to be inserted for debugging, testing etc.
+		//
+
+		before += startup_customization(0);
+
 		before += "source <( " + CVMFS.getAlienvPrint() + " ); " + "\n";
 
-		startup_script = getStartup() + "\n";
+		before += startup_customization(1);
 
-		final String content_str = before + startup_script;
+		final String content_str = before + getStartup() + "\n" + startup_customization(2);
 
 		final String agent_startup_path = host_tempdir_resolved + "/agent.startup." + time;
 		final File agent_startup_file = new File(agent_startup_path);
