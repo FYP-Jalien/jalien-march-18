@@ -304,7 +304,7 @@ public final class ComputingElement extends Thread {
 
 		// only update the pointer if the new script could be written to disk, otherwise try to reuse the previous one
 		if (newStartupScript != null) {
-			if (lastStartupScript != null) {
+			if (lastStartupScript != null && lastStartupScript != newStartupScript) {
 				final File fPrevious = new File(lastStartupScript);
 
 				if (fPrevious.exists())
