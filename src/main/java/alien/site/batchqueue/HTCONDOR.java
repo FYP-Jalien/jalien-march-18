@@ -30,10 +30,12 @@ public class HTCONDOR extends BatchQueue {
 	private String submitArgs = "";
 	private String htc_logdir = "$HOME/htcondor";
 	private String grid_resource = null;
+	private String local_pool = null;
 	private boolean use_job_router = false;
 	private boolean use_external_cloud = false;
+	private long seq_number = 0;
 
-	private static final Pattern pJobNumbers = Pattern.compile("^\\s*([12]+).*\\s(\\S+)");
+	private static final Pattern pJobNumbers = Pattern.compile("^\\s*([12]+)\\s.*?(\\S+)");
 	private static final Pattern pLoadBalancer = Pattern.compile("(\\d+)\\s*\\*\\s*(\\S+)");
 
 	//
@@ -150,6 +152,14 @@ public class HTCONDOR extends BatchQueue {
 
 					if (!Pattern.matches(".*:.*", ce)) {
 						ce += ":9619";
+					}
+
+					//
+					// hack for job submission to a local pool
+					//
+
+					if (!Pattern.matches(".*\\..*", ce)) {
+						ce = local_pool = "local_pool";
 					}
 
 					logger.info(ce + " --> " + String.format("%5.3f", Double.valueOf(w)));
@@ -333,26 +343,28 @@ public class HTCONDOR extends BatchQueue {
 			}
 		}
 
-		final String file_base_name = String.format("%s/jobagent_%d", log_folder_path, Long.valueOf(System.currentTimeMillis()));
-		final String log_cmd = String.format("log = %s.log%n", file_base_name);
+		final String file_base_name = String.format("%s/jobagent_%d_%d", log_folder_path, ProcessHandle.current().pid(), seq_number++);
+		final String log_cmd = String.format("log = %s.log\n", file_base_name);
 		String out_cmd = "";
 		String err_cmd = "";
 
 		final File enable_sandbox_file = new File(environment.get("HOME") + "/enable-sandbox");
 
 		if (enable_sandbox_file.exists()) {
-			out_cmd = String.format("output = %s.out%n", file_base_name);
-			err_cmd = String.format("error = %s.err%n", file_base_name);
+			out_cmd = String.format("output = %s.out\n", file_base_name);
+			err_cmd = String.format("error = %s.err\n", file_base_name);
 		}
+
+		String per_hold_grid = (local_pool != null) ? "" :
+				"(JobStatus == 1 && GridJobStatus =?= undefined && CurrentTime - EnteredCurrentStatus > 1800) || ";
 
 		String submit_jdl = "cmd = " + script + "\n" +
 				out_cmd +
 				err_cmd +
 				log_cmd +
 				"+TransferOutput = \"\"\n" +
-				"periodic_hold = JobStatus == 1 && " +
-				"GridJobStatus =?= undefined && CurrentTime - EnteredCurrentStatus > 1800 || " +
-				"JobStatus <= 2 && CurrentTime - EnteredCurrentStatus > 172800\n" +
+				"periodic_hold = " + per_hold_grid +
+				"(JobStatus <= 2 && CurrentTime - EnteredCurrentStatus > 172800)\n" +
 				"periodic_remove = CurrentTime - QDate > 259200\n";
 
 		//
@@ -394,11 +406,13 @@ public class HTCONDOR extends BatchQueue {
 			grid_resource = "condor " + h + " " + ce;
 		}
 
-		if (use_job_router) {
+		if (local_pool != null || use_job_router) {
 			submit_jdl += "universe = vanilla\n" +
-					"+WantJobRouter = True\n" +
 					"job_lease_duration = 7200\n" +
 					"ShouldTransferFiles = YES\n";
+			if (use_job_router) {
+				submit_jdl += "+WantJobRouter = True\n";
+			}
 		}
 		else {
 			submit_jdl += "universe = grid\n" +
@@ -413,7 +427,7 @@ public class HTCONDOR extends BatchQueue {
 
 		final String cm = config.get("host_host") + ":" + config.get("host_port");
 		final String env_cmd = String.format("ALIEN_CM_AS_LDAP_PROXY='%s'", cm);
-		submit_jdl += String.format("environment = \"%s\"%n", env_cmd);
+		submit_jdl += String.format("environment = \"%s\"\n", env_cmd);
 
 		//
 		// allow preceding attributes to be overridden and others added if needed
@@ -513,7 +527,9 @@ public class HTCONDOR extends BatchQueue {
 		//
 
 		final int bad = 112;
-		final String cmd = "condor_q -const 'JobStatus < 3' -af JobStatus GridResource || (echo " + bad + " x; exit 1)";
+		final String fmt = (local_pool != null) ? " -format " + local_pool : "";
+		final String cmd = "condor_q -const 'JobStatus < 3' -af JobStatus" +
+				fmt + " GridResource || (echo " + bad + " x; exit 1)";
 		final ArrayList<String> job_list = executeCommand(cmd);
 
 		tot_running = tot_waiting = 0;
