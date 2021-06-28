@@ -343,7 +343,7 @@ public class HTCONDOR extends BatchQueue {
 			}
 		}
 
-		final String file_base_name = String.format("%s/jobagent_%d_%d", log_folder_path, ProcessHandle.current().pid(), seq_number++);
+		final String file_base_name = String.format("%s/jobagent_%d_%d", log_folder_path, Long.valueOf(ProcessHandle.current().pid()), Long.valueOf(seq_number++));
 		final String log_cmd = String.format("log = %s.log\n", file_base_name);
 		String out_cmd = "";
 		String err_cmd = "";
