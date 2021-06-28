@@ -361,6 +361,7 @@ public class ResyncLDAP extends Optimizer {
 		final ArrayList<String> dnsEntries = new ArrayList<>();
 		final ArrayList<String> sites = new ArrayList<>();
 		final HashMap<String, String> modifications = new HashMap<>();
+		ArrayList<String> updatedProtocols = new ArrayList<>();
 
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");DBFunctions dbTransfers = ConfigUtils.getDB("transfers")) {
 			if (db == null || dbTransfers == null) {
@@ -422,6 +423,7 @@ public class ResyncLDAP extends Optimizer {
 						logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
 						return;
 					}
+					updatedProtocols.add(seName+"#"+numTransfers);
 					if (dbTransfers.moveNext())
 						dbTransfers.query("UPDATE PROTOCOLS SET max_transfers=?, updated=1 where sename=? and protocol=?", false, numTransfers, seName, protocol);
 					else
@@ -550,6 +552,16 @@ public class ResyncLDAP extends Optimizer {
 
 				if (ind > updateDBCount)
 					DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".SEs");
+			}
+
+			dbTransfers.query("SELECT seName, protocol from `PROTOCOLS`", false);
+			while (db.moveNext()) {
+				String seName = db.gets("seName");
+				String protocol = db.gets("protocol");
+				String composed = seName + "#" + protocol;
+				if (!updatedProtocols.contains(composed)) {
+					dbTransfers.query("DELETE from `PROTOCOLS` where sename=? and protocol=?", false, seName, protocol);
+				}
 			}
 
 			logger.log(Level.INFO, "Deleting inactive protocols");
