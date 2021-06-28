@@ -782,13 +782,8 @@ public class TransferBroker {
 			db.query("update TRANSFERS_DIRECT set status=?, reason=?, finished=?, attempts=attempts-1 WHERE transferId=?;", false, getTransferStatus(finalExitCode), formattedReason,
 					Long.valueOf(System.currentTimeMillis() / 1000), transfer);
 
-			if (db.getUpdateCount() < 1)
-				return false;
-
-			db.query("update PROTOCOLS set current_transfers=greatest(coalesce(current_transfers,0)-1,0) WHERE sename=(SELECT destination FROM TRANSFERS_DIRECT WHERE transferId=?);", false, transfer);
+			return db.getUpdateCount() > 0;
 		}
-
-		return true;
 	}
 
 	private static final void reportMonitoring(final Transfer t) {
