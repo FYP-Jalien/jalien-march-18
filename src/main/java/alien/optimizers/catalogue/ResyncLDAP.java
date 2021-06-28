@@ -369,7 +369,6 @@ public class ResyncLDAP extends Optimizer {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return;
 			}
-			dbTransfers.query("UPDATE PROTOCOLS set updated=0");
 
 			// From the dn we get the seName and site
 			final Iterator<String> itr = dns.iterator();
@@ -569,9 +568,6 @@ public class ResyncLDAP extends Optimizer {
 				logger.log(Level.INFO, "DBG: Deleting protocol " + element.split("#")[1] + " from SE " + element.split("#")[0]);
 				dbTransfers.query("DELETE from `PROTOCOLS` where sename=? and protocol=?", false, element.split("#")[0], element.split("#")[1]);
 			}
-
-			logger.log(Level.INFO, "Deleting inactive protocols");
-			dbTransfers.query("delete from PROTOCOLS where updated = 0");
 
 			db.query("update SE_VOLUMES set usedspace=0 where usedspace is null");
 			db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
