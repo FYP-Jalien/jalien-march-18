@@ -85,7 +85,8 @@ public class Monitor implements Runnable {
 					component.startsWith("alien.site.") ? "${hostname}:${pid}" : "${hostname}");
 			String temp = Format.replace(pattern, "${hostname}", ConfigUtils.getLocalHostname());
 			nodeName = Format.replace(temp, "${pid}", String.valueOf(MonitorFactory.getSelfProcessID()));
-		} else {
+		}
+		else {
 			final String pattern = MonitorFactory.getConfigString(component, "node_name", "${hostname}:${pid}:${jobnumber}");
 			String temp = Format.replace(pattern, "${hostname}", ConfigUtils.getLocalHostname());
 			temp = Format.replace(temp, "${pid}", String.valueOf(MonitorFactory.getSelfProcessID()));
@@ -252,10 +253,11 @@ public class Monitor implements Runnable {
 		cm.incrementMisses();
 	}
 
-	@Override
-	protected void finalize() throws Throwable {
-		run();
-	}
+	// This should not be needed in fact as Monitor objects live as long as the JVM. And shutdown might be delayed too much because of it.  
+	// @Override
+	// protected void finalize() throws Throwable {
+	// run();
+	// }
 
 	@Override
 	public void run() {
