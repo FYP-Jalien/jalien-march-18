@@ -416,8 +416,16 @@ public class ResyncLDAP extends Optimizer {
 						else
 							numTransfers = Integer.valueOf(transfers.split("=")[1]);
 					}
-					dbTransfers.query("INSERT INTO PROTOCOLS(sename,protocol,max_transfers,updated,deleteprotocol) values (?,?,?,?,?)", false,
-							seName, protocol, numTransfers, Integer.valueOf(1), Integer.valueOf(0));
+
+					boolean querySuccess = dbTransfers.query("SELECT * from `PROTOCOLS` WHERE sename=? and protocol=?", false, seName, protocol);
+					if (!querySuccess) {
+						logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
+						return;
+					}
+					if (dbTransfers.moveNext())
+						dbTransfers.query("UPDATE PROTOCOLS SET max_transfers=?, updated=1 where sename=? and protocol=?", false, numTransfers, seName, protocol);
+					else
+						dbTransfers.query("INSERT INTO PROTOCOLS(sename,protocol,max_transfers) values (?,?,?)", false, seName, protocol, numTransfers);
 				}
 
 				HashMap<String, String> originalSEs = new HashMap<>();
