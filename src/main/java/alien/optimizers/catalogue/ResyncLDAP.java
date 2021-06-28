@@ -362,11 +362,12 @@ public class ResyncLDAP extends Optimizer {
 		final ArrayList<String> sites = new ArrayList<>();
 		final HashMap<String, String> modifications = new HashMap<>();
 
-		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
-			if (db == null) {
+		try (DBFunctions db = ConfigUtils.getDB("alice_users");DBFunctions dbTransfers = ConfigUtils.getDB("transfers")) {
+			if (db == null || dbTransfers == null) {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return;
 			}
+			dbTransfers.query("UPDATE PROTOCOLS set updated=0");
 
 			// From the dn we get the seName and site
 			final Iterator<String> itr = dns.iterator();
@@ -400,6 +401,24 @@ public class ResyncLDAP extends Optimizer {
 
 				final String vo = "ALICE";
 				final String seName = vo + "::" + site + "::" + se;
+
+				final Set<String> ftdprotocols = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "ftdprotocol");
+				for (String ftdprotocol : ftdprotocols) {
+					final String[] temp = ftdprotocol.split("\\s+");
+					String protocol = temp[0];
+					String transfers = null;
+					if (temp.length > 1)
+						transfers = temp[1];
+					Integer numTransfers = null;
+					if (transfers != null) {
+						if (!transfers.matches("transfers=(\\d+)"))
+							logger.log(Level.INFO, "Could not get the number of transfers for " + seName + " (ftdprotocol: " + protocol + ")");
+						else
+							numTransfers = Integer.valueOf(transfers.split("=")[1]);
+					}
+					dbTransfers.query("INSERT INTO PROTOCOLS(sename,protocol,max_transfers,updated,deleteprotocol) values (?,?,?,?,?)", false,
+							seName, protocol, numTransfers, Integer.valueOf(1), Integer.valueOf(0));
+				}
 
 				HashMap<String, String> originalSEs = new HashMap<>();
 
@@ -468,13 +487,13 @@ public class ResyncLDAP extends Optimizer {
 
 					if (!hostName.matches("host=([^:]+)(:.*)?$")) {
 						logger.log(Level.INFO, "Error getting the host name from " + seName);
-						seioDaemons = "NULL";
+						seioDaemons = null;
 					}
 					hostName = hostName.split("=")[1];
 
 					if (!port.matches("port=(\\d+)")) {
 						logger.log(Level.INFO, "Error getting the port for " + seName);
-						seioDaemons = "NULL";
+						seioDaemons = null;
 					}
 					port = port.split("=")[1];
 
@@ -525,6 +544,10 @@ public class ResyncLDAP extends Optimizer {
 					DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".SEs");
 			}
 
+			logger.log(Level.INFO, "Deleting inactive protocols");
+			dbTransfers.query("delete from PROTOCOLS where updated = 0");
+			dbTransfers.query("insert into PROTOCOLS(sename,max_transfers) values ('no_se',10)");
+
 			db.query("update SE_VOLUMES set usedspace=0 where usedspace is null");
 			db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
 			db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
@@ -540,6 +563,7 @@ public class ResyncLDAP extends Optimizer {
 				DBSyncUtils.updateManual(ResyncLDAP.class.getCanonicalName() + ".SEs", sesLog);
 		}
 	}
+
 
 	/**
 	 * Method for building the output for the manual ResyncLDAP for Users and Roles
