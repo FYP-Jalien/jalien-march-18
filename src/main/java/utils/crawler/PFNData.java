@@ -267,12 +267,16 @@ public class PFNData {
 	 * @param jsonObject
 	 * @return PFNData
 	 */
+	@SuppressWarnings("unchecked")
 	public static PFNData fromJSON(final JSONObject jsonObject) {
 		final PFNData pfnData = new PFNData();
 		final Map<String, Object> data = new LinkedHashMap<>();
 
-		for (final Map.Entry<?, ?> entry : (Set<Map.Entry<?, ?>>) jsonObject.entrySet()) {
-			data.put(entry.getKey().toString(), entry.getValue());
+		final Object entries = jsonObject.entrySet();
+		if (entries instanceof Set) {
+			for (final Map.Entry<?, ?> entry : (Set<Map.Entry<?, ?>>) entries) {
+				data.put(entry.getKey().toString(), entry.getValue());
+			}
 		}
 
 		pfnData.setData(data);
