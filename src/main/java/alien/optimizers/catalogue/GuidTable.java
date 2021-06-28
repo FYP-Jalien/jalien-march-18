@@ -26,12 +26,12 @@ public class GuidTable extends Optimizer {
 	/**
 	 * When to switch to a new G table
 	 */
-	final static int maxCount = 50000000; // 50M
+	final static int maxCount = ConfigUtils.getConfig().geti("alien.optimizers.catalogue.GuidTable.rotateCount", 50000000); // 50M
 
 	/**
 	 * At what point to send a warning about the current G table
 	 */
-	final static int warnCount = 40000000; // 40M
+	final static int warnCount = ConfigUtils.getConfig().geti("alien.optimizers.catalogue.GuidTable.warnCount", 0);
 
 	/**
 	 * When to update the lastUpdateTimestamp in the OPTIMIZERS db
@@ -95,7 +95,7 @@ public class GuidTable extends Optimizer {
 					if (count > updateDBCount)
 						DBSyncUtils.setLastActive(GuidTable.class.getCanonicalName());
 
-					if (count > warnCount) {
+					if (warnCount > 0 && count > warnCount) {
 						final String admins = ConfigUtils.getConfig().gets("mail_admins", "grigoras@cern.ch"); // comma separated list of emails in config.properties 'mail_admins'
 						final Mail m = new Mail();
 						m.sBody = "The table G" + tableNumber + "L has passed " + warnCount + " entries and will be soon renewed!";
