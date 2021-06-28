@@ -345,12 +345,7 @@ public final class ComputingElement extends Thread {
 	private String createAgentStartup() {
 		String before = "";
 
-		String host_tempdir = (String) config.get("host_tmpdir");
-		final String host_tempdir_resolved = Functions.resolvePathWithEnv(host_tempdir);
-		if (this.queue.getClass() == alien.site.batchqueue.FORK.class)
-			host_tempdir = host_tempdir_resolved;
-		// final String cert_file = host_tempdir + "/token_cert." + time;
-		// final String key_file = host_tempdir + "/token_key." + time;
+		final String host_tempdir_resolved = Functions.resolvePathWithEnv((String) config.get("host_tmpdir"));
 
 		int ttl_hours = ((Integer) siteMap.get("TTL")).intValue();
 		ttl_hours = ttl_hours / 3600;
