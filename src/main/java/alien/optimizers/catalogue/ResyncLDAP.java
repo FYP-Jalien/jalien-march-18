@@ -2,6 +2,7 @@ package alien.optimizers.catalogue;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -361,7 +362,7 @@ public class ResyncLDAP extends Optimizer {
 		final ArrayList<String> dnsEntries = new ArrayList<>();
 		final ArrayList<String> sites = new ArrayList<>();
 		final HashMap<String, String> modifications = new HashMap<>();
-		ArrayList<String> updatedProtocols = new ArrayList<>();
+		final Set<String> updatedProtocols = new HashSet<>();
 
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");DBFunctions dbTransfers = ConfigUtils.getDB("transfers")) {
 			if (db == null || dbTransfers == null) {
@@ -423,7 +424,7 @@ public class ResyncLDAP extends Optimizer {
 						logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
 						return;
 					}
-					updatedProtocols.add(seName+"#"+numTransfers);
+					updatedProtocols.add(seName+"#"+protocol);
 					if (dbTransfers.moveNext())
 						dbTransfers.query("UPDATE PROTOCOLS SET max_transfers=?, updated=1 where sename=? and protocol=?", false, numTransfers, seName, protocol);
 					else
@@ -554,19 +555,23 @@ public class ResyncLDAP extends Optimizer {
 					DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".SEs");
 			}
 
+			ArrayList<String> toDelete = new ArrayList<>();
 			dbTransfers.query("SELECT seName, protocol from `PROTOCOLS`", false);
-			while (db.moveNext()) {
-				String seName = db.gets("seName");
-				String protocol = db.gets("protocol");
+			while (dbTransfers.moveNext()) {
+				String seName = dbTransfers.gets("seName");
+				String protocol = dbTransfers.gets("protocol");
 				String composed = seName + "#" + protocol;
 				if (!updatedProtocols.contains(composed)) {
-					dbTransfers.query("DELETE from `PROTOCOLS` where sename=? and protocol=?", false, seName, protocol);
+					toDelete.add(composed);
 				}
+			}
+			for (String element : toDelete) {
+				logger.log(Level.INFO, "DBG: Deleting protocol " + element.split("#")[1] + " from SE " + element.split("#")[0]);
+				dbTransfers.query("DELETE from `PROTOCOLS` where sename=? and protocol=?", false, element.split("#")[0], element.split("#")[1]);
 			}
 
 			logger.log(Level.INFO, "Deleting inactive protocols");
 			dbTransfers.query("delete from PROTOCOLS where updated = 0");
-			dbTransfers.query("insert into PROTOCOLS(sename,max_transfers) values ('no_se',10)");
 
 			db.query("update SE_VOLUMES set usedspace=0 where usedspace is null");
 			db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
