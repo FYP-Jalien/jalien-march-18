@@ -12,7 +12,6 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.sql.Timestamp;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Set;
@@ -318,7 +317,7 @@ public final class ComputingElement extends Thread {
 		return lastStartupScript;
 	}
 
-	private String startup_customization(int i) {
+	private static String startup_customization(int i) {
 		final String custom_file = System.getenv("HOME") + "/JA-custom-" + i + ".sh";
 		String s = "";
 
@@ -329,7 +328,7 @@ public final class ComputingElement extends Thread {
 				s += Functions.getFileContent(custom_file);
 			}
 			catch (final Exception e) {
-				logger.info("Error reading " + custom_file + ": "  + e.toString());
+				logger.log(Level.INFO, "Error reading " + custom_file, e);
 				return "";
 			}
 
@@ -346,7 +345,6 @@ public final class ComputingElement extends Thread {
 	private String createAgentStartup() {
 		String before = "";
 
-		final long time = new Timestamp(System.currentTimeMillis()).getTime();
 		String host_tempdir = (String) config.get("host_tmpdir");
 		final String host_tempdir_resolved = Functions.resolvePathWithEnv(host_tempdir);
 		if (this.queue.getClass() == alien.site.batchqueue.FORK.class)
