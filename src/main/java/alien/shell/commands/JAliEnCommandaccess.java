@@ -247,8 +247,8 @@ public class JAliEnCommandaccess extends JAliEnBaseCommand {
 					}
 
 					commander.printOut("guid", pfn.getGuid().getName());
-					commander.printOut("se", pfn.getSE().getName());
-					commander.printOut("tags", pfn.getSE().qos.toString());
+					commander.printOut("se", se.getName());
+					commander.printOut("tags", se.qos.toString());
 					commander.printOut("nSEs", String.valueOf(pfns.size()));
 					commander.printOut("md5", referenceEntity.getMD5());
 					commander.printOut("size", String.valueOf(referenceEntity.getSize()));
