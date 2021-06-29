@@ -754,7 +754,9 @@ public class JDL implements Serializable {
 		int idx = value.indexOf('"');
 
 		if (idx < 0) {
-			ret.add(value);
+			if (!value.isBlank())
+				ret.add(value);
+			
 			return ret;
 		}
 
