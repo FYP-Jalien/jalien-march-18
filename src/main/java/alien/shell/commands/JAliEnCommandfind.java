@@ -313,6 +313,11 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 					offset = 0;
 				}
 			}
+			
+			if (alPaths.size()==0) {
+				setArgumentsOk(false);
+				return;
+			}
 
 			if (alPaths.size() == 1) {
 				// can we infer the path and the pattern from the only argument we have?
