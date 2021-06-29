@@ -12,6 +12,7 @@ import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.Socket;
 import java.net.SocketException;
+import java.net.SocketTimeoutException;
 import java.security.KeyStoreException;
 import java.security.SecureRandom;
 import java.security.Security;
@@ -272,13 +273,20 @@ public class DispatchSSLServer extends Thread {
 							logger.log(Level.WARNING, "I don't know what to do with an object of type " + o.getClass().getCanonicalName());
 				}
 			}
-			catch (
+			catch (final EOFException | SocketTimeoutException e) {
+				if (logger.isLoggable(Level.INFO)) {
+					String message = "Client " + getName();
 
-			@SuppressWarnings("unused") final EOFException e) {
-				if (logger.isLoggable(Level.INFO))
-					logger.log(Level.INFO,
-							"Client " + getName() + " disconnected after sending " + requestCount + " requests that took in total " + Format.toInterval((long) lLasted) + " to process and "
-									+ Format.toInterval((long) lSerialization) + " to serialize");
+					if (e instanceof SocketTimeoutException)
+						message += " timed out ";
+					else
+						message += " disconnected ";
+
+					message += "after sending " + requestCount + " requests that took in total " + Format.toInterval((long) lLasted) + " to process and " + Format.toInterval((long) lSerialization)
+							+ " to serialize";
+
+					logger.log(Level.INFO, message);
+				}
 			}
 			catch (final Throwable e) {
 				logger.log(Level.WARNING, "Main thread for " + getName() + " threw an error after sending " + requestCount + " requests that took in total " + Format.toInterval((long) lLasted)
