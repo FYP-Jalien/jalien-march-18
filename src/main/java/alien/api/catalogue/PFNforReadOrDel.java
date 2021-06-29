@@ -86,6 +86,11 @@ public class PFNforReadOrDel extends Request {
 	public void run() {
 		final GUID guid = entity instanceof GUID ? (GUID) entity : GUIDUtils.getGUID(((LFN) entity));
 
+		if (guid == null) {
+			logger.log(Level.WARNING, "Null GUID for " + entity);
+			return;
+		}
+
 		boolean setArchiveAnchor = false;
 
 		String archiveMemberFileName = null;
