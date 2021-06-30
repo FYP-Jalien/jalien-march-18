@@ -1,6 +1,7 @@
 package alien.site;
 
 import java.io.BufferedReader;
+import java.io.EOFException;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -405,7 +406,7 @@ public class JobAgent implements Runnable {
 
 					setStatus(jaStatus.ERROR_GET_JDL);
 
-					throw new Exception(msg);
+					throw new EOFException(msg);
 				}
 
 				retries.set(0);
@@ -466,7 +467,8 @@ public class JobAgent implements Runnable {
 			}
 		}
 		catch (Exception e) {
-			logger.log(Level.INFO, "Error getting a matching job: " + e);
+			if (!(e instanceof EOFException))
+				logger.log(Level.WARNING, "Another exception matching the job", e);
 
 			setStatus(jaStatus.ERROR_GET_JDL);
 
