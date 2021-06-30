@@ -398,13 +398,14 @@ public class JobAgent implements Runnable {
 
 				// TODELETE
 				if (matchedJob == null || matchedJob.containsKey("Error")) {
-					logger.log(Level.INFO,
-							"We didn't get anything back. Nothing to run right now.");
+					final String msg = "We didn't get anything back. Nothing to run right now.";
+					logger.log(Level.INFO, msg);
+
 					RUNNING_JOBAGENTS -= 1;
 
 					setStatus(jaStatus.ERROR_GET_JDL);
 
-					throw new Exception();
+					throw new Exception(msg);
 				}
 
 				retries.set(0);
@@ -464,8 +465,8 @@ public class JobAgent implements Runnable {
 				requestSync.notifyAll();
 			}
 		}
-		catch (final Exception e) {
-			logger.log(Level.INFO, "Error getting a matching job: ", e);
+		catch (Exception e) {
+			logger.log(Level.INFO, "Error getting a matching job: " + e);
 
 			setStatus(jaStatus.ERROR_GET_JDL);
 
