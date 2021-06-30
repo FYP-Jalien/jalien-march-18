@@ -84,7 +84,7 @@ public class JobRunner extends JobAgent {
 
 				monitor.sendParameter("remainingttl", Long.valueOf(ttlEnd - timestamp));
 
-				if (JobAgent.retries.get() == maxRetries) {
+				if (JobAgent.retries.get() >= maxRetries) {
 					monitor.sendParameter("state", "Last JA cannot get job");
 					monitor.sendParameter("statenumeric", Long.valueOf(2));
 					logger.log(Level.INFO, "JobRunner going to exit from lack of jobs");
