@@ -914,8 +914,12 @@ public class TaskQueueUtils {
 
 			String q;
 
-			if (dbStructure2_20)
-				q = "SELECT origJdl" + (originalJDL ? "" : ",resultsJdl") + " FROM QUEUEJDL WHERE queueId=?;";
+			if (dbStructure2_20) {
+				if (originalJDL)
+					q = "SELECT origJdl FROM QUEUEJDL WHERE queueId=?;";
+				else
+					q = "SELECT ifnull(resultsJdl, origJdl) FROM QUEUEJDL WHERE queueId=?;";
+			}
 			else
 				q = "SELECT jdl FROM QUEUE WHERE queueId=?;";
 
@@ -923,7 +927,11 @@ public class TaskQueueUtils {
 
 			if (!db.query(q, false, Long.valueOf(queueId)) || !db.moveNext()) {
 				final Date d = new Date();
-				q = "SELECT origJdl" + (originalJDL ? "" : ",resultsJdl") + " as JDL FROM QUEUEARCHIVE" + (1900 + d.getYear()) + " WHERE queueId=?";
+				
+				if (originalJDL)
+					q = "SELECT origJdl FROM QUEUEARCHIVE" + (1900 + d.getYear()) + " WHERE queueId=?";
+				else
+					q = "SELECT ifnull(resultsJdl, origJdl) FROM QUEUEARCHIVE" + (1900 + d.getYear()) + " WHERE queueId=?";
 
 				if (!db.query(q, false, Long.valueOf(queueId)) || !db.moveNext()) {
 					final String jdlArchiveDir = ConfigUtils.getConfig().gets("alien.taskQueue.TaskQueueUtils.jdlArchiveDir");
@@ -987,13 +995,6 @@ public class TaskQueueUtils {
 
 					return null;
 				}
-			}
-
-			if (dbStructure2_20 && !originalJDL) {
-				final String jdl = db.gets(2);
-
-				if (jdl.length() > 0)
-					return jdl;
 			}
 
 			return db.gets(1);
@@ -3829,6 +3830,8 @@ public class TaskQueueUtils {
 		}
 	}
 
+	private static final boolean UPDATE_RESULTS_JDL = ConfigUtils.getConfig().getb("alien.taskQueue.TaskQueueUtils.updateResultsJDL", false);
+
 	/**
 	 * Set the QUEUEJDL.resultsJdl field for a completed job
 	 *
@@ -3837,6 +3840,9 @@ public class TaskQueueUtils {
 	 * @return <code>true</code> if the update could be done
 	 */
 	public static boolean addResultsJdl(final JDL jdl, final Long queueId) {
+		if (!UPDATE_RESULTS_JDL)
+			return false;
+
 		if (logger.isLoggable(Level.FINE))
 			logger.log(Level.FINE, "Going to add the following resultsJdl to pid " + queueId + ": " + jdl);
 
