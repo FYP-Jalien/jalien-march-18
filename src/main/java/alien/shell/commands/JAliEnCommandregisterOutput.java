@@ -1,14 +1,10 @@
 package alien.shell.commands;
 
-import java.io.IOException;
 import java.util.Collection;
 import java.util.List;
-import java.util.Set;
-import java.util.logging.Level;
 
 import alien.catalogue.LFN;
 import alien.shell.ErrNo;
-import alien.taskQueue.JDL;
 import alien.taskQueue.Job;
 import alien.taskQueue.JobStatus;
 
@@ -92,36 +88,6 @@ public class JAliEnCommandregisterOutput extends JAliEnBaseCommand {
 		if (!commander.user.canBecome(j.user)) {
 			commander.setReturnCode(ErrNo.EPERM, "You (" + commander.getUsername() + ") are not allowed to work on " + j.user + "'s jobs");
 			return;
-		}
-
-		final String sOriginalJDL = commander.q_api.getJDL(jobId, true);
-		final String sResultsJDL = commander.q_api.getJDL(jobId, false);
-
-		if (sOriginalJDL == null || sOriginalJDL.length() == 0) {
-			commander.setReturnCode(ErrNo.EREMOTEIO, "Cannot retrieve the original JDL of " + jobId);
-			return;
-		}
-
-		if (sResultsJDL == null || sResultsJDL.length() == 0) {
-			commander.setReturnCode(ErrNo.EREMOTEIO, "Cannot retrieve the results JDL of " + jobId);
-			return;
-		}
-
-		Set<String> physicalFiles = null;
-
-		try {
-			final JDL jdl = new JDL(sOriginalJDL);
-
-			physicalFiles = jdl.getOutputFileSet(j.status().equals(JobStatus.ERROR_E) ? "OutputErrorE" : null, false, false);
-
-			if (physicalFiles == null || physicalFiles.size() == 0) {
-				commander.setReturnCode(ErrNo.ENODATA, "No files are expected to be registered by job ID " + jobId + " according to its JDL");
-				return;
-			}
-		}
-		catch (final IOException ioe) {
-			commander.setReturnCode(ErrNo.EBADMSG, "Cannot parse the JDL of " + jobId + ". Check log for full error message");
-			logger.log(Level.WARNING, "Cannot parse the JDL of " + jobId + ":\n" + sOriginalJDL, ioe);
 		}
 
 		final Collection<LFN> bookedLFNs = commander.c_api.registerOutput(jobId);
