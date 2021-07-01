@@ -24,7 +24,7 @@ public class JAliEnCommandfind_csd extends JAliEnBaseCommand {
 	/**
 	 * marker for -x argument : return the LFNCSD list through XmlCollection
 	 */
-	private boolean bX = false;
+	private final boolean bX = false;
 	private boolean bH = false;
 
 	/**
@@ -45,7 +45,7 @@ public class JAliEnCommandfind_csd extends JAliEnBaseCommand {
 	/**
 	 * marker for -j argument : filter files for jobid
 	 */
-	private boolean bJ = false;
+	private final boolean bJ = false;
 
 	/**
 	 * marker for -l argument : long format, optionally human readable file sizes
@@ -114,7 +114,7 @@ public class JAliEnCommandfind_csd extends JAliEnBaseCommand {
 					commander.printOut("user", lfn.owner);
 					commander.printOut("group", lfn.gowner);
 					commander.printOut("size", (bH ? Format.size(lfn.size) : String.valueOf(lfn.size)));
-					commander.printOut("ctime", " " + lfn.ctime);
+					commander.printOut("ctime", lfn.ctime != null ? String.valueOf(lfn.ctime.getTime()) : "");
 
 					// print long
 					commander.printOutln(FileSystemUtils.getFormatedTypeAndPerm(lfn) + padSpace(3) + padLeft(lfn.owner, 8) + padSpace(1) + padLeft(lfn.gowner, 8) + padSpace(1)

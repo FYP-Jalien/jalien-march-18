@@ -124,7 +124,7 @@ public class JAliEnCommandls extends JAliEnBaseCommand {
 							commander.printOut("user", localLFN.owner);
 							commander.printOut("group", localLFN.gowner);
 							commander.printOut("size", String.valueOf(localLFN.size));
-							commander.printOut("ctime", String.valueOf(localLFN.ctime.getTime() / 1000));
+							commander.printOut("ctime", localLFN.ctime != null ? String.valueOf(localLFN.ctime.getTime()) : "");
 							ret += FileSystemUtils.getFormatedTypeAndPerm(localLFN) + padSpace(3) + padLeft(localLFN.owner, 8) + padSpace(1) + padLeft(localLFN.gowner, 8) + padSpace(1)
 									+ padLeft(bH ? Format.size(localLFN.size) : String.valueOf(localLFN.size), 12) + padSpace(1) + format(localLFN.ctime) + padSpace(4) + localLFN.getFileName();
 						}

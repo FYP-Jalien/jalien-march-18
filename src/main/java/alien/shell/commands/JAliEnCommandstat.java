@@ -70,7 +70,7 @@ public class JAliEnCommandstat extends JAliEnBaseCommand {
 		commander.printOut("mtime", String.valueOf(gTime));
 
 		commander.printOutln(prefix + "Last change: " + g.ctime + " (" + g.ctime.getTime() + ")");
-		commander.printOut("ctime", String.valueOf(g.ctime.getTime() / 1000));
+		commander.printOut("ctime", g.ctime != null ? String.valueOf(g.ctime.getTime()) : "");
 
 		final Set<PFN> pfns = g.getPFNs();
 
@@ -149,12 +149,12 @@ public class JAliEnCommandstat extends JAliEnBaseCommand {
 					commander.printOut("tableName", String.valueOf(lfn.indexTableEntry.tableName));
 				}
 
-				commander.printOut("file", lfn.getCanonicalName());
+				commander.printOut("lfn", lfn.getCanonicalName());
 				commander.printOut("type", String.valueOf(lfn.type));
 				commander.printOut("owner", lfn.owner);
 				commander.printOut("gowner", lfn.gowner);
 				commander.printOut("perm", lfn.perm);
-				commander.printOut("ctime", String.valueOf(lfn.ctime.getTime() / 1000));
+				commander.printOut("ctime", lfn.ctime != null ? String.valueOf(lfn.ctime.getTime()) : "");
 
 				if (lfn.jobid > 0) {
 					commander.printOutln("Job ID: " + lfn.jobid);
