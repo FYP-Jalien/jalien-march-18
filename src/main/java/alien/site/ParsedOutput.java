@@ -145,24 +145,21 @@ public class ParsedOutput {
 				System.err.println("Going to parse: " + file);
 				if (file.isBlank())
 					System.err.println("Looks like we have an empty file. Ignoring: " + file);
-				else if (file.contains("*")) {
-					final String[] parts = SystemCommand.bash("find " + pwd + " ! -type d -name \"" + file + "\"").stdout.split("\n");
-					// final String[] parts = SystemCommand.bash("ls " + pwd + file).stdout.split("\n");
+				else if (file.contains("*")){
+					final String[] parts = SystemCommand.bash("find " + file + " ! -type d").stdout.split("\n");
 					if (parts.length > 0)
-						for (String f : parts) {
-							f = f.trim();
-							if (f.length() > 0) {
-								final String fname = new File(f).getName();
-
-								if (!alreadySeen.contains(fname)) {
-									System.err.println("Adding file from ls: " + fname);
-									filesFound.add(fname);
-									alreadySeen.add(fname);
-								}
-								else
-									System.err.println("Ignoring duplicate file: " + fname);
+					for (String f : parts) {
+						f = f.trim();
+						if (f.length() > 0) {
+							if (!alreadySeen.contains(f)) {
+								System.err.println("Adding file from ls: " + f);
+								filesFound.add(f);
+								alreadySeen.add(f);
 							}
+							else
+								System.err.println("Ignoring duplicate file: " + f);
 						}
+					}
 				}
 				else {
 					if (!alreadySeen.contains(file)) {
