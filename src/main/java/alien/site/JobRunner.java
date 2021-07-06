@@ -50,7 +50,7 @@ public class JobRunner extends JobAgent {
 		Thread jaThread;
 		int i = 0;
 
-		final int maxRetries = Integer.parseInt(System.getenv().getOrDefault("MAX_RETRIES", "5"));
+		final int maxRetries = Integer.parseInt(System.getenv().getOrDefault("MAX_RETRIES", "2"));
 
 		while (timestamp < ttlEnd) {
 			synchronized (JobAgent.requestSync) {
@@ -69,7 +69,7 @@ public class JobRunner extends JobAgent {
 						logger.log(Level.INFO, "No new thread");
 					}
 
-					JobAgent.requestSync.wait(5 * 60 * 1000);
+					JobAgent.requestSync.wait(3 * 60 * 1000);
 
 				}
 				catch (final InterruptedException e) {
