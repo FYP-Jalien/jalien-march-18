@@ -19,6 +19,8 @@ import java.util.regex.Pattern;
 
 import alien.site.Functions;
 
+import lia.util.process.ExternalProcess.ExitStatus;
+
 /**
  * @author mmmartin
  */
@@ -258,7 +260,8 @@ public class HTCONDOR extends BatchQueue {
 		logger.info("Checking remaining proxy lifetime");
 
 		final String proxy_info_cmd = "voms-proxy-info -acsubject -actimeleft 2>&1";
-		final ArrayList<String> proxy_info_output = executeCommand(proxy_info_cmd);
+		ExitStatus exitStatus = executeCommand(proxy_info_cmd);
+		final ArrayList<String> proxy_info_output = getStdOut(exitStatus);
 
 		String dn_str = "";
 		String time_left_str = "";
@@ -300,7 +303,8 @@ public class HTCONDOR extends BatchQueue {
 		ArrayList<String> proxy_renewal_output = null;
 
 		try {
-			proxy_renewal_output = executeCommand(proxy_renewal_cmd);
+			exitStatus = executeCommand(proxy_renewal_cmd);
+			proxy_renewal_output = getStdOut(exitStatus);
 		}
 		catch (final Exception e) {
 			logger.info(String.format("[LCG] Problem while executing command: %s", proxy_renewal_cmd));
@@ -465,7 +469,8 @@ public class HTCONDOR extends BatchQueue {
 		}
 
 		final String submit_cmd = submitCmd + " " + submitArgs + " " + submit_file;
-		final ArrayList<String> output = executeCommand(submit_cmd);
+		final ExitStatus exitStatus = executeCommand(submit_cmd);
+		final ArrayList<String> output = getStdOut(exitStatus);
 
 		for (final String line : output) {
 			final String trimmed_line = line.trim();
@@ -530,7 +535,8 @@ public class HTCONDOR extends BatchQueue {
 		final String fmt = (local_pool != null) ? " -format " + local_pool : "";
 		final String cmd = "condor_q -const 'JobStatus < 3' -af JobStatus" +
 				fmt + " GridResource || (echo " + bad + " x; exit 1)";
-		final ArrayList<String> job_list = executeCommand(cmd);
+		final ExitStatus exitStatus = executeCommand(cmd);
+		final ArrayList<String> job_list = getStdOut(exitStatus);
 
 		tot_running = tot_waiting = 0;
 

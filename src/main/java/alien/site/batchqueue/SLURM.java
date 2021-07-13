@@ -21,6 +21,9 @@ import java.util.logging.Logger;
 import alien.site.Functions;
 import lazyj.Utils;
 
+import lia.util.process.ExternalProcess.ExitStatus;
+import lia.util.process.ExternalProcess.ExecutorFinishStatus;
+
 /**
  *
  */
@@ -243,7 +246,8 @@ public class SLURM extends BatchQueue {
 		}
 
 		final String cmd = "cat " + this.temp_file.getAbsolutePath() + " | " + this.submitCmd + " " + this.submitArgs;
-		final ArrayList<String> output = executeCommand(cmd);
+		final ExitStatus exitStatus = executeCommand(cmd);
+		final ArrayList<String> output = getStdOut(exitStatus);
 		for (final String line : output) {
 			final String trimmed_line = line.trim();
 			this.logger.info(trimmed_line);
@@ -256,7 +260,12 @@ public class SLURM extends BatchQueue {
 	@Override
 	public int getNumberActive() {
 		final String status = "R,S,CG";
-		final ArrayList<String> output_list = this.executeCommand(statusCmd + " -t " + status + " " + statusArgs);
+		final ExitStatus exitStatus = executeCommand(statusCmd + " -t " + status + " " + statusArgs);
+		final ArrayList<String> output_list = getStdOut(exitStatus);
+
+		if (exitStatus.getExecutorFinishStatus() != ExecutorFinishStatus.NORMAL)
+			return -1;
+
 		return output_list.size();
 	}
 
@@ -266,15 +275,22 @@ public class SLURM extends BatchQueue {
 	@Override
 	public int getNumberQueued() {
 		final String status = "PD,CF";
-		final ArrayList<String> output_list = this.executeCommand(statusCmd + " -t " + status + " " + statusArgs);
+		final ExitStatus exitStatus = executeCommand(statusCmd + " -t " + status + " " + statusArgs);
+		final ArrayList<String> output_list = getStdOut(exitStatus);
+
+		if (exitStatus.getExecutorFinishStatus() != ExecutorFinishStatus.NORMAL)
+			return -1;
+
 		return output_list.size();
 	}
 
 	@Override
 	public int kill() {
+		final ExitStatus exitStatus;
 		ArrayList<String> kill_cmd_output = null;
 		try {
-			kill_cmd_output = executeCommand(this.killCmd);
+			exitStatus = executeCommand(this.killCmd);
+			kill_cmd_output = getStdOut(exitStatus);
 		}
 		catch (final Exception e) {
 			this.logger.info(String.format("[SLURM] Prolem while executing command: %s", this.killCmd));

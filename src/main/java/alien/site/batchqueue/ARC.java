@@ -30,6 +30,8 @@ import javax.naming.directory.SearchResult;
 
 import alien.site.Functions;
 
+import lia.util.process.ExternalProcess.ExitStatus;
+
 /**
  * @author maarten
  */
@@ -268,7 +270,8 @@ public class ARC extends BatchQueue {
 		logger.info("Checking remaining proxy lifetime");
 
 		final String proxy_info_cmd = "voms-proxy-info -acsubject -actimeleft 2>&1";
-		final ArrayList<String> proxy_info_output = executeCommand(proxy_info_cmd);
+		ExitStatus exitStatus = executeCommand(proxy_info_cmd);
+		final ArrayList<String> proxy_info_output = getStdOut(exitStatus);
 
 		String dn_str = "";
 		String time_left_str = "";
@@ -310,7 +313,8 @@ public class ARC extends BatchQueue {
 		ArrayList<String> proxy_renewal_output = null;
 
 		try {
-			proxy_renewal_output = executeCommand(proxy_renewal_cmd);
+			exitStatus = executeCommand(proxy_renewal_cmd);
+			proxy_renewal_output = getStdOut(exitStatus);
 		}
 		catch (final Exception e) {
 			logger.info(String.format("[LCG] Problem while executing command: %s", proxy_renewal_cmd));
@@ -426,7 +430,8 @@ public class ARC extends BatchQueue {
 			submit_cmd.append(' ').append(s);
 		}
 
-		final ArrayList<String> output = executeCommand(submit_cmd.toString());
+		ExitStatus exitStatus = executeCommand(submit_cmd.toString());
+		final ArrayList<String> output = getStdOut(exitStatus);
 
 		if (logger.isLoggable(Level.INFO)) {
 			for (final String line : output) {
@@ -657,7 +662,8 @@ public class ARC extends BatchQueue {
 				for (final String suffix : suffixes) {
 					final String f = prefix + suffix;
 					final String cmd = String.format("test ! -e %s || mv %s %s.%d", f, f, f, Integer.valueOf(cDay));
-					final ArrayList<String> output = executeCommand(cmd);
+					ExitStatus exitStatus = executeCommand(cmd);
+					final ArrayList<String> output = getStdOut(exitStatus);
 
 					for (final String line : output) {
 						logger.info(line);

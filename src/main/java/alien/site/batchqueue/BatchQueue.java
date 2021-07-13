@@ -1,14 +1,15 @@
 package alien.site.batchqueue;
 
-import java.io.BufferedReader;
-import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
+
 import lia.util.process.ExternalProcess.ExitStatus;
 import utils.ProcessWithTimeout;
 import java.util.logging.Level;
@@ -56,8 +57,8 @@ public abstract class BatchQueue {
 	 * @param cmd
 	 * @return the output of the given command, one array entry per line
 	 */
-	public ArrayList<String> executeCommand(String cmd) {
-		ArrayList<String> proc_output = new ArrayList<>();
+	public ExitStatus executeCommand(String cmd) {
+		ExitStatus exitStatus = null;
 
 		logger.info("Executing: " + cmd);
 
@@ -115,22 +116,23 @@ public abstract class BatchQueue {
 
 			pTimeout.waitFor(60, TimeUnit.SECONDS);
 
-			final ExitStatus exitStatus = pTimeout.getExitStatus();
+			exitStatus = pTimeout.getExitStatus();
 			logger.info("Process exit status: " + exitStatus.getExecutorFinishStatus());
-
-			final BufferedReader reader = new BufferedReader(new StringReader(exitStatus.getStdOut()));
-			String output_str;
-
-			while ((output_str = reader.readLine()) != null) {
-				proc_output.add(output_str.trim());
-			}
 		}
 		catch (final Throwable t) {
 			logger.log(Level.WARNING, "Exception executing command: " + cmd, t);
 		}
 
-		return proc_output;
+		return exitStatus;
 
+	}
+
+	static ArrayList<String> getStdOut(ExitStatus exitStatus) {
+			return new ArrayList<String>(Arrays.asList(exitStatus.getStdOut().split("\n")).stream().map(String::trim).collect(Collectors.toList()));
+	}
+
+	static ArrayList<String> getStdErr(ExitStatus exitStatus) {
+			return new ArrayList<String>(Arrays.asList(exitStatus.getStdOut().split("\n")).stream().map(String::trim).collect(Collectors.toList()));
 	}
 
 	/**
