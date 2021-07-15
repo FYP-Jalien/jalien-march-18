@@ -1022,7 +1022,7 @@ public class JobAgent implements Runnable {
 
 			// check memory usage (with 20% buffer)
 			if (jobMaxMemoryMB != 0 && RES_VMEM.doubleValue() > jobMaxMemoryMB * 1.2)
-				error = "Killing the job (using more than " + jobMaxMemoryMB + " memory (right now " + RES_VMEM + "))";
+				error = "Killing the job (using more than " + jobMaxMemoryMB + " MB memory (right now ~" + Math.round(RES_VMEM) + "MB))";
 
 			// cpu
 			final long time = System.currentTimeMillis();
