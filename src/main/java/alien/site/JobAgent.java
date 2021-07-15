@@ -688,7 +688,17 @@ public class JobAgent implements Runnable {
 		// By default the job is limited to using 8GB of virtual memory per allocated CPU core
 		jobMaxMemoryMB = cpuCores * 8 * 1024;
 
-		if (maxmemory != null) {
+		if (env.containsKey("JALIEN_MEM_LIM")) {
+			try {
+				jobMaxMemoryMB = Integer.parseInt(env.get("JALIEN_MEM_LIM"));
+			}
+			catch (final NumberFormatException en) {
+				final String error = "Could not read limit from JALIEN_MEM_LIM. Using default: " + jobMaxMemoryMB + "MB";
+				logger.log(Level.WARNING, error, en);
+				commander.q_api.putJobLog(queueId, "trace", error);
+			}
+		}
+		else if (maxmemory != null) {
 			Pattern pLetter = Pattern.compile("\\p{L}+");
 
 			final Matcher m = pLetter.matcher(maxmemory.trim().toUpperCase());
@@ -875,9 +885,9 @@ public class JobAgent implements Runnable {
 						logger.log(Level.SEVERE, "Process overusing resources: " + error);
 						commander.q_api.putJobLog(queueId, "trace", "ERROR[FATAL]: Process overusing resources");
 						commander.q_api.putJobLog(queueId, "trace", error);
-						// t.cancel();
-						// killJobWrapperAndPayload(p);
-						// return 1;
+						t.cancel();
+						killJobWrapperAndPayload(p);
+						return 1;
 					}
 					// Send report once every 10 min, or when the job changes state
 					if (monitor_loops == 120) {
@@ -1010,8 +1020,8 @@ public class JobAgent implements Runnable {
 			if (workdirMaxSizeMB != 0 && RES_WORKDIR_SIZE.doubleValue() > workdirMaxSizeMB)
 				error = "Killing the job (using more than " + workdirMaxSizeMB + "MB of diskspace (right now we were using " + RES_WORKDIR_SIZE + "))";
 
-			// check memory usage
-			if (jobMaxMemoryMB != 0 && RES_VMEM.doubleValue() > jobMaxMemoryMB)
+			// check memory usage (with 20% buffer)
+			if (jobMaxMemoryMB != 0 && RES_VMEM.doubleValue() > jobMaxMemoryMB * 1.2)
 				error = "Killing the job (using more than " + jobMaxMemoryMB + " memory (right now " + RES_VMEM + "))";
 
 			// cpu
