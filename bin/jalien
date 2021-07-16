@@ -16,9 +16,10 @@ fi
 if [ $# -eq 0 ]
     then
         JALIEN_MAIN=${JALIEN_MAIN:-alien.JSh}
+        JAVA_OPTS=${JAVA_OPTS:--client -Xms16M -Xmx64M}
+    else
+        JAVA_OPTS=${JAVA_OPTS:--server -Xms64M -Xmx512M}
 fi
-
-JAVA_OPTS=${JAVA_OPTS:--client -Xms16M -Xmx64M}
 
 JAVA_VERSION=`java -version 2>&1 | sed -e 's/.*version "\([[:digit:]]*\)\(.*\)/\1/; 1q'`
 
