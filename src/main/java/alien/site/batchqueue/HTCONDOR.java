@@ -20,6 +20,7 @@ import java.util.regex.Pattern;
 import alien.site.Functions;
 
 import lia.util.process.ExternalProcess.ExitStatus;
+import lia.util.process.ExternalProcess.ExecutorFinishStatus;
 
 /**
  * @author mmmartin
@@ -528,17 +529,11 @@ public class HTCONDOR extends BatchQueue {
 		}
 
 		//
-		// protect against condor_q failing
+		// reset the numbers...
 		//
 
-		final int bad = 112;
-		final String fmt = (local_pool != null) ? " -format " + local_pool : "";
-		final String cmd = "condor_q -const 'JobStatus < 3' -af JobStatus" +
-				fmt + " GridResource || (echo " + bad + " x; exit 1)";
-		final ExitStatus exitStatus = executeCommand(cmd);
-		final ArrayList<String> job_list = getStdOut(exitStatus);
-
-		tot_running = tot_waiting = 0;
+		tot_running = 0;
+		tot_waiting = 444444;   // the traditional safe default...
 
 		// in case the CE list has changed
 		running.clear();
@@ -548,6 +543,49 @@ public class HTCONDOR extends BatchQueue {
 			waiting.put(ce, new AtomicInteger(0));
 			running.put(ce, new AtomicInteger(0));
 		}
+
+		//
+		// hack for job submission to a local pool
+		//
+
+		final String fmt = (local_pool != null) ? " -format " + local_pool : "";
+		final String cmd = "condor_q -const 'JobStatus < 3' -af JobStatus" +
+				fmt + " GridResource";
+		ExitStatus exitStatus = null;
+
+		try {
+			exitStatus = executeCommand(cmd);
+		}
+		catch (final Exception e) {
+			logger.warning(String.format("[LCG] Exception while executing command: %s", cmd));
+			e.printStackTrace();
+			return false;
+		}
+
+		if (exitStatus == null) {
+			logger.warning(String.format("[LCG] Null result for command: %s", cmd));
+			return false;
+		}
+
+		final ArrayList<String> job_list = getStdOut(exitStatus);
+
+		if (exitStatus.getExecutorFinishStatus() != ExecutorFinishStatus.NORMAL) {
+			logger.warning(String.format("[LCG] Abnormal exit status for command: %s", cmd));
+
+			int i = 1;
+
+			for (final String line : job_list) {
+				logger.warning(String.format("[LCG] Line %2d: %s", i, line));
+				if (i++ > 10) {
+					logger.warning(String.format("[LCG] [...]"));
+					break;
+				}
+			}
+
+			return false;
+		}
+
+		tot_waiting = 0;   // start calculating the real number...
 
 		for (final String line : job_list) {
 			final Matcher m = pJobNumbers.matcher(line);
@@ -571,10 +609,6 @@ public class HTCONDOR extends BatchQueue {
 						r.incrementAndGet();
 
 					tot_running++;
-				}
-				else if (job_status == bad) {
-					tot_waiting = 444444;
-					return false;
 				}
 			}
 		}
