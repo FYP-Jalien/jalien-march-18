@@ -756,7 +756,6 @@ public class JobAgent implements Runnable {
 						case "alien.site.JobRunner":
 						case "alien.site.JobAgent":
 							launchCmd.add("-Djobagent.vmid=" + queueId);
-							launchCmd.add("-DAliEnConfig=" + jobWorkdir);
 							launchCmd.add("-cp");
 							launchCmd.add(jarPath + jarName);
 							launchCmd.add("alien.site.JobWrapper");
