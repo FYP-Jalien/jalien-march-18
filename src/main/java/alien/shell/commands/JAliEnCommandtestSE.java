@@ -2,12 +2,20 @@ package alien.shell.commands;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.PrintWriter;
+import java.net.URL;
+import java.net.URLConnection;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
+
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
 
 import alien.api.Dispatcher;
 import alien.api.ServerException;
@@ -21,6 +29,7 @@ import alien.catalogue.LFN;
 import alien.catalogue.PFN;
 import alien.catalogue.access.AccessTicket;
 import alien.catalogue.access.AccessType;
+import alien.catalogue.access.XrootDEnvelope;
 import alien.io.protocols.Factory;
 import alien.io.protocols.SpaceInfo;
 import alien.io.protocols.TempFileManager;
@@ -30,6 +39,7 @@ import alien.se.SE;
 import alien.se.SEUtils;
 import alien.shell.ErrNo;
 import alien.shell.ShellColor;
+import alien.user.JAKeyStore;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -88,6 +98,24 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 		}
 	}
 
+	private void afterCommandPrinting(final Timing t, final String url) {
+		if (showCommand)
+			commander.printOutln("URL: " + url);
+
+		if (showTiming) {
+			final double ms = t.getMillis();
+
+			commander.printOut("Execution time: ");
+
+			if (ms < 1000)
+				commander.printOutln((long) ms + "ms");
+			else if (ms < 10000)
+				commander.printOutln(Format.point(ms / 1000) + "s");
+			else
+				commander.printOutln(Format.toInterval((long) ms));
+		}
+	}
+
 	private void openReadTest(final PFN pTarget, final Xrootd xrootd) {
 		final AccessTicket oldTicket = pTarget.ticket;
 
@@ -115,9 +143,59 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 			}
 
 			afterCommandPrinting(t, xrootd);
+
+			final String httpURL = pTarget.getHttpURL();
+
+			if (httpURL != null) {
+				commander.printOut("  Open HTTP read test: ");
+
+				t.startTiming();
+
+				try {
+					downloadHTTP(httpURL);
+					commander.printOutln("reading worked " + notOK + ", it should request an access envelope too");
+				}
+				catch (final IOException ioe) {
+					commander.printOutln("read back failed " + expected);
+
+					if (verbose)
+						commander.printOutln("  " + ioe.getMessage());
+				}
+
+				afterCommandPrinting(t, httpURL);
+			}
 		}
 		finally {
 			pTarget.ticket = oldTicket;
+		}
+	}
+
+	private static void downloadHTTP(final String address) throws IOException {
+		final URL url = new URL(address);
+
+		final URLConnection conn = url.openConnection();
+
+		if ("https".equals(url.getProtocol())) {
+			try {
+				final SSLContext sc = SSLContext.getInstance("SSL");
+				sc.init(null, JAKeyStore.trusts, new java.security.SecureRandom());
+
+				((HttpsURLConnection) conn).setSSLSocketFactory(sc.getSocketFactory());
+			}
+			catch (NoSuchAlgorithmException | KeyManagementException ae) {
+				throw new IOException("Cannot initialize SSL: " + ae.getMessage());
+			}
+		}
+
+		conn.setConnectTimeout(30000);
+		conn.setReadTimeout(120000);
+
+		final byte[] buff = new byte[1024];
+
+		try (InputStream is = conn.getInputStream()) {
+			while (is.read(buff) > 0) {
+				// consume all bytes from the source
+			}
 		}
 	}
 
@@ -278,10 +356,12 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 					if (readPFNs.size() > 0) {
 						t.startTiming();
 
+						infoPFN = readPFNs.iterator().next();
+
+						final String httpURL = infoPFN.getHttpURL();
+
 						File tempFile = null;
 						try {
-							infoPFN = readPFNs.iterator().next();
-
 							tempFile = xrootd.get(infoPFN, null);
 							commander.printOutln("file read back ok" + expected);
 						}
@@ -296,33 +376,52 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 						}
 
 						afterCommandPrinting(t, xrootd);
+
+						if (httpURL != null) {
+							t.startTiming();
+
+							String authURL = httpURL + "?authz=" + XrootDEnvelope.urlEncodeEnvelope(infoPFN.ticket.envelope.getEncryptedEnvelope());
+
+							commander.printOut("  Authenticated HTTP read access: ");
+							try {
+								downloadHTTP(authURL);
+								commander.printOutln("reading worked " + expected);
+							}
+							catch (final IOException ioe) {
+								commander.printOutln("read back failed " + notOK);
+
+								if (verbose)
+									commander.printOutln("  " + ioe.getMessage());
+							}
+
+							afterCommandPrinting(t, authURL);
+						}
+					}
+					else {
+						commander.printOutln("no PFNs to access");
 					}
 				}
 
-				if (wasAdded && !openDeleteTested) {
-					// with an existing file, try (if not tested before) to delete it without a token
+				if ((wasAdded && !openDeleteTested) && openDeleteTest(pTarget, xrootd)) {
+					wasAdded = false;
 
-					if (openDeleteTest(pTarget, xrootd)) {
-						wasAdded = false;
+					commander.printOutln("  The file is gone, trying to add it back and then try the authenticated delete");
 
-						commander.printOutln("  The file is gone, trying to add it back and then try the authenticated delete");
+					t.startTiming();
 
-						t.startTiming();
+					try {
+						xrootd.put(pTarget, referenceFile);
 
-						try {
-							xrootd.put(pTarget, referenceFile);
-
-							wasAdded = true;
-						}
-						catch (final IOException ioe) {
-							commander.printOutln("    add operation failed, cannot test authenticated delete");
-
-							if (verbose)
-								commander.printOutln("      " + ioe.getMessage());
-						}
-
-						afterCommandPrinting(t, xrootd);
+						wasAdded = true;
 					}
+					catch (final IOException ioe) {
+						commander.printOutln("    add operation failed, cannot test authenticated delete");
+
+						if (verbose)
+							commander.printOutln("      " + ioe.getMessage());
+					}
+
+					afterCommandPrinting(t, xrootd);
 				}
 
 				if (wasAdded) {
@@ -372,9 +471,7 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 				commander.printOutln(se.toString());
 			}
 		}
-		finally
-
-		{
+		finally {
 			commander.c_api.removeLFN(lfn.getCanonicalName());
 		}
 	}
