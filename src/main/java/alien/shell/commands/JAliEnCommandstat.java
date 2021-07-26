@@ -69,8 +69,12 @@ public class JAliEnCommandstat extends JAliEnBaseCommand {
 		commander.printOutln(prefix + "Created: " + (new Date(gTime)) + " (" + gTime + ") by " + GUIDUtils.getMacAddr(g.guid));
 		commander.printOut("mtime", String.valueOf(gTime));
 
-		commander.printOutln(prefix + "Last change: " + g.ctime + " (" + g.ctime.getTime() + ")");
-		commander.printOut("ctime", g.ctime != null ? String.valueOf(g.ctime.getTime()) : "");
+		if (g.ctime != null) {
+			commander.printOutln(prefix + "Last change: " + g.ctime + " (" + g.ctime.getTime() + ")");
+			commander.printOut("ctime", String.valueOf(g.ctime.getTime()));
+		}
+		else
+			commander.printOut("ctime", "");
 
 		final Set<PFN> pfns = g.getPFNs();
 
