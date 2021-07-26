@@ -1501,7 +1501,8 @@ public class TaskQueueUtils {
 		if (jdl.get("MemorySize") == null)
 			jdl.set("MemorySize", (8 * cpuCores.intValue()) + "GB");
 
-		/* Disable setting a default value since the legacy services don't know about the CPUCores-based default
+		/*
+		 * Disable setting a default value since the legacy services don't know about the CPUCores-based default
 		 * if (jdl.get("WorkDirectorySize") == null)
 		 * jdl.set("WorkDirectorySize", (10 * cpuCores.intValue()) + "GB");
 		 */
@@ -1766,6 +1767,7 @@ public class TaskQueueUtils {
 
 			setAction(jobStatus);
 
+			putJobLog(pid.longValue(), "trace", "Job inserted by " + ConfigUtils.getLocalHostname() + ", request came from " + clientAddress, null);
 			putJobLog(pid.longValue(), "state", "Job state transition to " + jobStatus.toString(), null);
 
 			return pid.longValue();
