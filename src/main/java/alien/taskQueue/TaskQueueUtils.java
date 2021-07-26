@@ -927,7 +927,7 @@ public class TaskQueueUtils {
 
 			if (!db.query(q, false, Long.valueOf(queueId)) || !db.moveNext()) {
 				final Date d = new Date();
-				
+
 				if (originalJDL)
 					q = "SELECT origJdl FROM QUEUEARCHIVE" + (1900 + d.getYear()) + " WHERE queueId=?";
 				else
@@ -1501,8 +1501,10 @@ public class TaskQueueUtils {
 		if (jdl.get("MemorySize") == null)
 			jdl.set("MemorySize", (8 * cpuCores.intValue()) + "GB");
 
-		if (jdl.get("WorkDirectorySize") == null)
-			jdl.set("WorkDirectorySize", (10 * cpuCores.intValue()) + "GB");
+		/* Disable setting a default value since the legacy services don't know about the CPUCores-based default
+		 * if (jdl.get("WorkDirectorySize") == null)
+		 * jdl.set("WorkDirectorySize", (10 * cpuCores.intValue()) + "GB");
+		 */
 
 		jdl.append("JDLVariables", "CPUCores");
 
