@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -262,7 +263,7 @@ public class HTCONDOR extends BatchQueue {
 
 		final String proxy_info_cmd = "voms-proxy-info -acsubject -actimeleft 2>&1";
 		ExitStatus exitStatus = executeCommand(proxy_info_cmd);
-		final ArrayList<String> proxy_info_output = getStdOut(exitStatus);
+		final List<String> proxy_info_output = getStdOut(exitStatus);
 
 		String dn_str = "";
 		String time_left_str = "";
@@ -301,7 +302,7 @@ public class HTCONDOR extends BatchQueue {
 		logger.info("Checking proxy renewal service");
 
 		final String proxy_renewal_cmd = String.format("%s start 2>&1", proxy_renewal_svc);
-		ArrayList<String> proxy_renewal_output = null;
+		List<String> proxy_renewal_output = null;
 
 		try {
 			exitStatus = executeCommand(proxy_renewal_cmd);
@@ -360,8 +361,7 @@ public class HTCONDOR extends BatchQueue {
 			err_cmd = String.format("error = %s.err\n", file_base_name);
 		}
 
-		String per_hold_grid = (local_pool != null) ? "" :
-				"(JobStatus == 1 && GridJobStatus =?= undefined && CurrentTime - EnteredCurrentStatus > 1800) || ";
+		String per_hold_grid = (local_pool != null) ? "" : "(JobStatus == 1 && GridJobStatus =?= undefined && CurrentTime - EnteredCurrentStatus > 1800) || ";
 
 		String submit_jdl = "cmd = " + script + "\n" +
 				out_cmd +
@@ -471,7 +471,7 @@ public class HTCONDOR extends BatchQueue {
 
 		final String submit_cmd = submitCmd + " " + submitArgs + " " + submit_file;
 		final ExitStatus exitStatus = executeCommand(submit_cmd);
-		final ArrayList<String> output = getStdOut(exitStatus);
+		final List<String> output = getStdOut(exitStatus);
 
 		for (final String line : output) {
 			final String trimmed_line = line.trim();
@@ -533,7 +533,7 @@ public class HTCONDOR extends BatchQueue {
 		//
 
 		tot_running = 0;
-		tot_waiting = 444444;   // the traditional safe default...
+		tot_waiting = 444444; // the traditional safe default...
 
 		// in case the CE list has changed
 		running.clear();
@@ -567,7 +567,7 @@ public class HTCONDOR extends BatchQueue {
 			return false;
 		}
 
-		final ArrayList<String> job_list = getStdOut(exitStatus);
+		final List<String> job_list = getStdOut(exitStatus);
 
 		if (exitStatus.getExecutorFinishStatus() != ExecutorFinishStatus.NORMAL) {
 			logger.warning(String.format("[LCG] Abnormal exit status for command: %s", cmd));
@@ -575,9 +575,9 @@ public class HTCONDOR extends BatchQueue {
 			int i = 1;
 
 			for (final String line : job_list) {
-				logger.warning(String.format("[LCG] Line %2d: %s", i, line));
+				logger.warning(String.format("[LCG] Line %2d: %s", Integer.valueOf(i), line));
 				if (i++ > 10) {
-					logger.warning(String.format("[LCG] [...]"));
+					logger.warning("[LCG] [...]");
 					break;
 				}
 			}
@@ -585,7 +585,7 @@ public class HTCONDOR extends BatchQueue {
 			return false;
 		}
 
-		tot_waiting = 0;   // start calculating the real number...
+		tot_waiting = 0; // start calculating the real number...
 
 		for (final String line : job_list) {
 			final Matcher m = pJobNumbers.matcher(line);

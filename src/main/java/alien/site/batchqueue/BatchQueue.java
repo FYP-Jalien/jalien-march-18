@@ -3,6 +3,7 @@ package alien.site.batchqueue;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -127,12 +128,12 @@ public abstract class BatchQueue {
 
 	}
 
-	static ArrayList<String> getStdOut(ExitStatus exitStatus) {
-			return new ArrayList<String>(Arrays.asList(exitStatus.getStdOut().split("\n")).stream().map(String::trim).collect(Collectors.toList()));
+	static List<String> getStdOut(ExitStatus exitStatus) {
+			return Arrays.asList(exitStatus.getStdOut().split("\n")).stream().map(String::trim).collect(Collectors.toList());
 	}
 
-	static ArrayList<String> getStdErr(ExitStatus exitStatus) {
-			return new ArrayList<String>(Arrays.asList(exitStatus.getStdOut().split("\n")).stream().map(String::trim).collect(Collectors.toList()));
+	static List<String> getStdErr(ExitStatus exitStatus) {
+			return Arrays.asList(exitStatus.getStdOut().split("\n")).stream().map(String::trim).collect(Collectors.toList());
 	}
 
 	/**

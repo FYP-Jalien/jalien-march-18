@@ -271,7 +271,7 @@ public class ARC extends BatchQueue {
 
 		final String proxy_info_cmd = "voms-proxy-info -acsubject -actimeleft 2>&1";
 		ExitStatus exitStatus = executeCommand(proxy_info_cmd);
-		final ArrayList<String> proxy_info_output = getStdOut(exitStatus);
+		final List<String> proxy_info_output = getStdOut(exitStatus);
 
 		String dn_str = "";
 		String time_left_str = "";
@@ -310,7 +310,7 @@ public class ARC extends BatchQueue {
 		logger.info("Checking proxy renewal service");
 
 		final String proxy_renewal_cmd = String.format("%s start 2>&1", proxy_renewal_svc);
-		ArrayList<String> proxy_renewal_output = null;
+		List<String> proxy_renewal_output = null;
 
 		try {
 			exitStatus = executeCommand(proxy_renewal_cmd);
@@ -431,7 +431,7 @@ public class ARC extends BatchQueue {
 		}
 
 		ExitStatus exitStatus = executeCommand(submit_cmd.toString());
-		final ArrayList<String> output = getStdOut(exitStatus);
+		final List<String> output = getStdOut(exitStatus);
 
 		if (logger.isLoggable(Level.INFO)) {
 			for (final String line : output) {
@@ -663,11 +663,11 @@ public class ARC extends BatchQueue {
 					final String f = prefix + suffix;
 					final String cmd = String.format("test ! -e %s || mv %s %s.%d", f, f, f, Integer.valueOf(cDay));
 					ExitStatus exitStatus = executeCommand(cmd);
-					final ArrayList<String> output = getStdOut(exitStatus);
+					final List<String> output = getStdOut(exitStatus);
 
-					for (final String line : output) {
-						logger.info(line);
-					}
+					if (logger.isLoggable(Level.INFO))
+						for (final String line : output)
+							logger.info(line);
 				}
 			}
 

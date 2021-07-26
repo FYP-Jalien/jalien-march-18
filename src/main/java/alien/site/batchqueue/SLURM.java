@@ -9,7 +9,6 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -20,9 +19,8 @@ import java.util.logging.Logger;
 
 import alien.site.Functions;
 import lazyj.Utils;
-
-import lia.util.process.ExternalProcess.ExitStatus;
 import lia.util.process.ExternalProcess.ExecutorFinishStatus;
+import lia.util.process.ExternalProcess.ExitStatus;
 
 /**
  *
@@ -247,7 +245,7 @@ public class SLURM extends BatchQueue {
 
 		final String cmd = "cat " + this.temp_file.getAbsolutePath() + " | " + this.submitCmd + " " + this.submitArgs;
 		final ExitStatus exitStatus = executeCommand(cmd);
-		final ArrayList<String> output = getStdOut(exitStatus);
+		final List<String> output = getStdOut(exitStatus);
 		for (final String line : output) {
 			final String trimmed_line = line.trim();
 			this.logger.info(trimmed_line);
@@ -261,7 +259,7 @@ public class SLURM extends BatchQueue {
 	public int getNumberActive() {
 		final String status = "R,S,CG";
 		final ExitStatus exitStatus = executeCommand(statusCmd + " -t " + status + " " + statusArgs);
-		final ArrayList<String> output_list = getStdOut(exitStatus);
+		final List<String> output_list = getStdOut(exitStatus);
 
 		if (exitStatus.getExecutorFinishStatus() != ExecutorFinishStatus.NORMAL)
 			return -1;
@@ -276,7 +274,7 @@ public class SLURM extends BatchQueue {
 	public int getNumberQueued() {
 		final String status = "PD,CF";
 		final ExitStatus exitStatus = executeCommand(statusCmd + " -t " + status + " " + statusArgs);
-		final ArrayList<String> output_list = getStdOut(exitStatus);
+		final List<String> output_list = getStdOut(exitStatus);
 
 		if (exitStatus.getExecutorFinishStatus() != ExecutorFinishStatus.NORMAL)
 			return -1;
@@ -287,7 +285,7 @@ public class SLURM extends BatchQueue {
 	@Override
 	public int kill() {
 		final ExitStatus exitStatus;
-		ArrayList<String> kill_cmd_output = null;
+		List<String> kill_cmd_output = null;
 		try {
 			exitStatus = executeCommand(this.killCmd);
 			kill_cmd_output = getStdOut(exitStatus);
