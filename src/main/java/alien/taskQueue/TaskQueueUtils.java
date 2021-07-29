@@ -690,6 +690,8 @@ public class TaskQueueUtils {
 		if (newStatus == null)
 			throw new IllegalArgumentException("The new status code cannot be null");
 
+		long parentPID = 0;
+
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null) {
 				logger.log(Level.SEVERE, "Cannot get the queue database entry");
@@ -700,9 +702,9 @@ public class TaskQueueUtils {
 			String q;
 
 			if (dbStructure2_20)
-				q = "SELECT statusId FROM QUEUE where queueId=?;";
+				q = "SELECT statusId,split FROM QUEUE where queueId=?;";
 			else
-				q = "SELECT status FROM QUEUE where queueId=?;";
+				q = "SELECT status,split FROM QUEUE where queueId=?;";
 
 			db.setReadOnly(true);
 			db.setQueryTimeout(120);
@@ -764,6 +766,8 @@ public class TaskQueueUtils {
 
 				return false;
 			}
+
+			parentPID = db.getl(2);
 
 			Object newstatus;
 
@@ -881,8 +885,32 @@ public class TaskQueueUtils {
 				}
 			}
 
+			if (parentPID > 0 && parentPID != job && JobStatus.finalStates().contains(newStatus))
+				checkMasterjobStatus(parentPID);
+
 			return updated;
 		}
+	}
+
+	private static void checkMasterjobStatus(final long masterjobID) {
+		boolean allDone = true;
+
+		try (DBFunctions db = ConfigUtils.getDB("processes")) {
+			if (!db.query("select distinct statusId from QUEUE where split=?;", false, Long.valueOf(masterjobID)))
+				return;
+
+			while (db.moveNext()) {
+				final JobStatus status = JobStatus.getStatusByAlien(Integer.valueOf(db.geti(1)));
+
+				if (!JobStatus.finalStates().contains(status)) {
+					allDone = false;
+					break;
+				}
+			}
+		}
+
+		if (allDone)
+			setJobStatus(masterjobID, JobStatus.DONE, JobStatus.SPLIT);
 	}
 
 	/**
