@@ -3450,7 +3450,8 @@ public class TaskQueueUtils {
 
 					// we need to clean up the previous output
 					if (pathFromJDL != null || j.path != null) {
-						final Collection<LFN> list = LFNUtils.find(pathFromJDL != null ? pathFromJDL : j.path, "*", LFNUtils.FIND_FILTER_JOBID, null, "", Long.valueOf(queueId));
+						final Collection<LFN> list = LFNUtils.find(pathFromJDL != null ? pathFromJDL : j.path, "*", LFNUtils.FIND_FILTER_JOBID | LFNUtils.FIND_NO_SORT, null, "",
+								Long.valueOf(queueId));
 						if (list != null)
 							for (final LFN l : list) {
 								if (l.jobid == queueId) {

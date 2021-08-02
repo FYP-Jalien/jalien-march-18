@@ -688,7 +688,12 @@ public class LFNUtils {
 			return findByMetadata(path, processedPattern, tag, query);
 		}
 
-		final Set<LFN> ret = new LinkedHashSet<>();
+		final Set<LFN> ret;
+
+		if ((flags & FIND_NO_SORT) != 0)
+			ret = new LinkedHashSet<>();
+		else
+			ret = new TreeSet<>();
 
 		final Collection<IndexTableEntry> matchingTables = CatalogueUtils.getAllMatchingTables(path);
 
@@ -1368,7 +1373,7 @@ public class LFNUtils {
 
 		final LFN parentDir = archive.getParentDir();
 		if (parentDir.exists) {
-			final Collection<LFN> allJobFiles = find(parentDir.getCanonicalName(), "*", "", LFNUtils.FIND_FILTER_JOBID, null, "", Long.valueOf(archive.jobid), 0);
+			final Collection<LFN> allJobFiles = find(parentDir.getCanonicalName(), "*", "", LFNUtils.FIND_FILTER_JOBID | LFNUtils.FIND_NO_SORT, null, "", Long.valueOf(archive.jobid), 0);
 
 			if (allJobFiles == null || allJobFiles.size() == 0)
 				return null;

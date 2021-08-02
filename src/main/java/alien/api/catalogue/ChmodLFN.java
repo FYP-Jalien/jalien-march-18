@@ -63,7 +63,7 @@ public class ChmodLFN extends Request {
 		if (!recursive || !success)
 			return;
 
-		final Collection<LFN> lfns = LFNUtils.find(path, "*", LFNUtils.FIND_INCLUDE_DIRS);
+		final Collection<LFN> lfns = LFNUtils.find(path, "*", LFNUtils.FIND_INCLUDE_DIRS | LFNUtils.FIND_NO_SORT);
 
 		if (lfns == null) {
 			success = false;

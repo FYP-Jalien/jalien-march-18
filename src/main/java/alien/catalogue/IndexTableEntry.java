@@ -414,9 +414,6 @@ public class IndexTableEntry implements Serializable, Comparable<IndexTableEntry
 			if ((flags & LFNUtils.FIND_FILTER_JOBID) != 0 && queueid != null && queueid.longValue() > 0)
 				q += " AND jobid = " + queueid;
 
-			if ((flags & LFNUtils.FIND_NO_SORT) == 0)
-				q += " ORDER BY lfn";
-
 			if (limit > 0)
 				q += " LIMIT " + limit;
 
