@@ -688,12 +688,7 @@ public class LFNUtils {
 			return findByMetadata(path, processedPattern, tag, query);
 		}
 
-		final Set<LFN> ret;
-
-		if ((flags & FIND_NO_SORT) != 0)
-			ret = new LinkedHashSet<>();
-		else
-			ret = new TreeSet<>();
+		final Set<LFN> ret = new LinkedHashSet<>();
 
 		final Collection<IndexTableEntry> matchingTables = CatalogueUtils.getAllMatchingTables(path);
 
