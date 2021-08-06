@@ -54,6 +54,8 @@ public class XrootDEnvelope implements Serializable {
 	 */
 	public final PFN pfn;
 
+	private String archiveAnchorFileName;
+
 	/**
 	 * A LFN that is pointing to this envelope's GUID/PFN us as a guid://
 	 * archive link
@@ -269,6 +271,23 @@ public class XrootDEnvelope implements Serializable {
 	}
 
 	/**
+	 * When the file member name is know, use this method directly
+	 * 
+	 * @param anchor
+	 */
+	public void setArchiveAnchor(final String anchor) {
+		if (anchor != null)
+			archiveAnchorFileName = anchor;
+	}
+
+	/**
+	 * @return the name of the archive member to access
+	 */
+	public String getArchiveAnchorFileName() {
+		return archiveAnchorFileName;
+	}
+
+	/**
 	 * Set the LFN that is pointing to this envelope's GUID/PFN us as a guid://
 	 * archive link
 	 *
@@ -277,6 +296,9 @@ public class XrootDEnvelope implements Serializable {
 	 */
 	public void setArchiveAnchor(final LFN anchor) {
 		archiveAnchorLFN = anchor;
+
+		if (archiveAnchorFileName == null && archiveAnchorLFN != null)
+			archiveAnchorFileName = archiveAnchorLFN.getFileName();
 	}
 
 	/**

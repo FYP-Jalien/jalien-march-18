@@ -171,8 +171,11 @@ public class PFNforReadOrDel extends Request {
 					for (final PFN pfn : pfns)
 						if (pfn.ticket.envelope == null)
 							logger.log(Level.WARNING, "Can't set archive anchor on " + pfn.pfn + " since the envelope is null");
-						else
+						else {
+							pfn.ticket.envelope.setArchiveAnchor(archiveMemberFileName);
+
 							pfn.ticket.envelope.setArchiveAnchor(archiveAnchor);
+						}
 				}
 			}
 			else
