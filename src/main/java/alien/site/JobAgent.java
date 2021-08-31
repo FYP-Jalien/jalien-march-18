@@ -491,7 +491,7 @@ public class JobAgent implements Runnable {
 		}
 
 		setStatus(jaStatus.FINISHING_JA);
-		
+
 		monitor.setMonitoring("resource_status", null);
 
 		logger.log(Level.INFO, "JobAgent finished, id: " + jobAgentId + " totalJobs: " + totalJobs.get());
@@ -537,7 +537,6 @@ public class JobAgent implements Runnable {
 		setStatus(jaStatus.DONE);
 
 		setUsedCores(0);
-		reqCPU = Long.valueOf(0);
 
 		monitor.sendParameter("job_id", Integer.valueOf(0));
 
@@ -852,7 +851,6 @@ public class JobAgent implements Runnable {
 			setStatus(jaStatus.ERROR_START);
 
 			setUsedCores(0);
-			reqCPU = Long.valueOf(0);
 
 			return 1;
 		}
@@ -1107,7 +1105,6 @@ public class JobAgent implements Runnable {
 				setStatus(jaStatus.ERROR_DIRS);
 
 				setUsedCores(0);
-				reqCPU = Long.valueOf(0);
 
 				return false;
 			}
