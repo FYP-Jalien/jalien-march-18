@@ -235,6 +235,14 @@ public class JobAgent implements Runnable {
 
 			names.add("ja_status");
 			values.add(Integer.valueOf(status.getValue()));
+
+			if (reqCPU.longValue() > 0) {
+				names.add(reqCPU+"_cores_jobs");
+				values.add(Long.valueOf(1));
+			}
+
+			names.add("num_cores");
+			values.add(reqCPU);
 		});
 
 		setStatus(jaStatus.STARTING_JA);
@@ -343,6 +351,9 @@ public class JobAgent implements Runnable {
 			logger.log(Level.SEVERE, "Could not obtain AliEn jar path: " + e.toString());
 
 			setStatus(jaStatus.ERROR_IP);
+
+			setUsedCores(0, reqCPU);
+			reqCPU = Long.valueOf(0);
 		}
 	}
 
@@ -433,6 +444,7 @@ public class JobAgent implements Runnable {
 				sendBatchInfo();
 
 				reqCPU = Long.valueOf(TaskQueueUtils.getCPUCores(jdl));
+				setUsedCores(1, reqCPU);
 
 				reqDisk = Long.valueOf(TaskQueueUtils.getWorkDirSizeMB(jdl, reqCPU.intValue()));
 
@@ -524,6 +536,9 @@ public class JobAgent implements Runnable {
 		logger.log(Level.INFO, "Sending monitoring values...");
 
 		setStatus(jaStatus.DONE);
+
+		setUsedCores(0, reqCPU);
+		reqCPU = Long.valueOf(0);
 
 		monitor.sendParameter("job_id", Integer.valueOf(0));
 
@@ -837,6 +852,9 @@ public class JobAgent implements Runnable {
 
 			setStatus(jaStatus.ERROR_START);
 
+			setUsedCores(0, reqCPU);
+			reqCPU = Long.valueOf(0);
+
 			return 1;
 		}
 
@@ -953,6 +971,12 @@ public class JobAgent implements Runnable {
 		status = new_status;
 		monitor.sendParameter("ja_status_string", status.getStringValue());
 		monitor.sendParameter("ja_status", Integer.valueOf(status.getValue()));
+	}
+
+	private void setUsedCores(int jobNumber, Long coresCPU) {
+		if (coresCPU.longValue() > 0)
+			monitor.sendParameter(coresCPU+"_cores_jobs", Integer.valueOf(jobNumber));
+		monitor.sendParameter("num_cores", coresCPU);
 	}
 
 	private void sendProcessResources() {
@@ -1081,6 +1105,9 @@ public class JobAgent implements Runnable {
 
 				setStatus(jaStatus.ERROR_DIRS);
 
+				setUsedCores(0, reqCPU);
+				reqCPU = Long.valueOf(0);
+
 				return false;
 			}
 		}
@@ -1164,7 +1191,7 @@ public class JobAgent implements Runnable {
 
 	/**
 	 * Get LhcbMarks, using a specialized script in CVMFS
-	 * 
+	 *
 	 * @param logger
 	 *
 	 * @return script output, or null in case of error
