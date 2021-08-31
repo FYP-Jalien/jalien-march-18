@@ -883,9 +883,9 @@ public class JobAgent implements Runnable {
 		jao.run();
 	}
 
-	int[] getFreeCPUs() {
-		int newVal;
-		int mask = 0;
+	long[] getFreeCPUs() {
+		long newVal;
+		long mask = 0;
 
 		try {
 			String cmd = "pgrep -v -U root -u root | xargs -L1 taskset -a -p 2>/dev/null | cut -d' ' -f6 | sort -u";
@@ -897,7 +897,7 @@ public class JobAgent implements Runnable {
 				while (cmdScanner.hasNext()) {
 					readArg = (cmdScanner.next());
 
-					newVal = Integer.parseInt(readArg.trim(), 16);
+					newVal = Long.parseLong(readArg.trim(), 16);
 
 					if ((1 << RES_NOCPUS.intValue()) - 1 == newVal)
 						continue;
@@ -918,10 +918,10 @@ public class JobAgent implements Runnable {
 		return null;
 	}
 
-	static int[] valueToArray(int v, int size) {
-		int[] maskArray = new int[size];
+	static long[] valueToArray(long v, int size) {
+		long[] maskArray = new long[size];
 		int count = 0;
-		int vAux = v;
+		long vAux = v;
 
 		while (vAux > 0) {
 			maskArray[count] = vAux & 1;
@@ -932,7 +932,7 @@ public class JobAgent implements Runnable {
 		return maskArray;
 	}
 
-	static String arrayToTaskset(int[] array) {
+	static String arrayToTaskset(long[] array) {
 		String out = "";
 
 		for (int i = (array.length - 1); i >= 0; i--) {
@@ -946,12 +946,12 @@ public class JobAgent implements Runnable {
 		return out;
 	}
 
-	int[] getHostMask() {
+	long[] getHostMask() {
 		String cmd = "taskset -p $$ | cut -d' ' -f6";
 
 		try {
 			final String out = ExternalProcesses.getCmdOutput(Arrays.asList("/bin/bash", "-c", cmd), true, 30L, TimeUnit.SECONDS);
-			return valueToArray((~Integer.parseInt(out.trim(), 16) & (1 << RES_NOCPUS.intValue()) - 1), RES_NOCPUS.intValue());
+			return valueToArray((~Long.parseLong(out.trim(), 16) & (1 << RES_NOCPUS.intValue()) - 1), RES_NOCPUS.intValue());
 		}
 		catch (IOException e) {
 			e.printStackTrace();
@@ -963,9 +963,9 @@ public class JobAgent implements Runnable {
 		return null;
 	}
 
-	String pickCPUs(int[] mask) {
-		int remainingCPU = (int) reqCPU.longValue();
-		int []newMask = new int[RES_NOCPUS.intValue()];
+	String pickCPUs(long[] mask) {
+		long remainingCPU = reqCPU.longValue();
+		long []newMask = new long[RES_NOCPUS.intValue()];
 		for (int i = 0; i < RES_NOCPUS.intValue() && remainingCPU > 0; i++) {
 			if (mask[i] != 1 && usedCPUs[i] == 0) {
 				newMask[i] = 1;
@@ -983,10 +983,10 @@ public class JobAgent implements Runnable {
 		return arrayToTaskset(newMask);
 	}
 
-	synchronized String addIsolation(int cpuSize) {
-		int[] mask;
-		int[] hostMask;
-		int ret = 0;
+	synchronized String addIsolation(long cpuSize) {
+		long[] mask;
+		long[] hostMask;
+		long ret = 0;
 		String isolatedCPUs = "";
 
 		synchronized (cpuSync) {
