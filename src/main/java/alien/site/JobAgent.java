@@ -480,6 +480,8 @@ public class JobAgent implements Runnable {
 		}
 
 		setStatus(jaStatus.FINISHING_JA);
+		
+		monitor.setMonitoring("resource_status", null);
 
 		logger.log(Level.INFO, "JobAgent finished, id: " + jobAgentId + " totalJobs: " + totalJobs.get());
 	}

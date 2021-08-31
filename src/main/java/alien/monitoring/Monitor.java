@@ -144,6 +144,20 @@ public class Monitor implements Runnable {
 	}
 
 	/**
+	 * Set a new value for a monitoring key
+	 * 
+	 * @param key what to modify
+	 * @param obj the new value, or <code>null</code> to remove existing associations
+	 * @return the previous value associated to this key
+	 */
+	public MonitoringObject setMonitoring(final String key, final MonitoringObject obj) {
+		if (obj != null)
+			return monitoringObjects.put(key, obj);
+
+		return monitoringObjects.remove(key);
+	}
+
+	/**
 	 * @param key
 	 * @return the monitoring object for this key
 	 */
@@ -253,7 +267,7 @@ public class Monitor implements Runnable {
 		cm.incrementMisses();
 	}
 
-	// This should not be needed in fact as Monitor objects live as long as the JVM. And shutdown might be delayed too much because of it.  
+	// This should not be needed in fact as Monitor objects live as long as the JVM. And shutdown might be delayed too much because of it.
 	// @Override
 	// protected void finalize() throws Throwable {
 	// run();
