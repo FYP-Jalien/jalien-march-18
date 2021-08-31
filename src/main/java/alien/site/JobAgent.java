@@ -352,8 +352,7 @@ public class JobAgent implements Runnable {
 
 			setStatus(jaStatus.ERROR_IP);
 
-			setUsedCores(0, reqCPU);
-			reqCPU = Long.valueOf(0);
+			setUsedCores(0);
 		}
 	}
 
@@ -444,7 +443,7 @@ public class JobAgent implements Runnable {
 				sendBatchInfo();
 
 				reqCPU = Long.valueOf(TaskQueueUtils.getCPUCores(jdl));
-				setUsedCores(1, reqCPU);
+				setUsedCores(1);
 
 				reqDisk = Long.valueOf(TaskQueueUtils.getWorkDirSizeMB(jdl, reqCPU.intValue()));
 
@@ -537,7 +536,7 @@ public class JobAgent implements Runnable {
 
 		setStatus(jaStatus.DONE);
 
-		setUsedCores(0, reqCPU);
+		setUsedCores(0);
 		reqCPU = Long.valueOf(0);
 
 		monitor.sendParameter("job_id", Integer.valueOf(0));
@@ -852,7 +851,7 @@ public class JobAgent implements Runnable {
 
 			setStatus(jaStatus.ERROR_START);
 
-			setUsedCores(0, reqCPU);
+			setUsedCores(0);
 			reqCPU = Long.valueOf(0);
 
 			return 1;
@@ -973,10 +972,12 @@ public class JobAgent implements Runnable {
 		monitor.sendParameter("ja_status", Integer.valueOf(status.getValue()));
 	}
 
-	private void setUsedCores(int jobNumber, Long coresCPU) {
-		if (coresCPU.longValue() > 0)
-			monitor.sendParameter(coresCPU+"_cores_jobs", Integer.valueOf(jobNumber));
-		monitor.sendParameter("num_cores", coresCPU);
+	private void setUsedCores(int jobNumber) {
+		if (reqCPU.longValue() > 0)
+			monitor.sendParameter(reqCPU+"_cores_jobs", Integer.valueOf(jobNumber));
+		if (jobNumber == 0)
+			reqCPU = Long.valueOf(0);
+		monitor.sendParameter("num_cores", reqCPU);
 	}
 
 	private void sendProcessResources() {
@@ -1105,7 +1106,7 @@ public class JobAgent implements Runnable {
 
 				setStatus(jaStatus.ERROR_DIRS);
 
-				setUsedCores(0, reqCPU);
+				setUsedCores(0);
 				reqCPU = Long.valueOf(0);
 
 				return false;
