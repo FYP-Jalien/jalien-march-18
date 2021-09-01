@@ -13,7 +13,7 @@ import joptsimple.OptionSet;
 
 /**
  * @author costing
- * @since 2018-08-15
+ * @since 2021-09-02
  */
 public class JAliEnCommandguidinfo extends JAliEnBaseCommand {
 	private ArrayList<String> alPaths = null;
@@ -59,8 +59,7 @@ public class JAliEnCommandguidinfo extends JAliEnBaseCommand {
 	@Override
 	public void printHelp() {
 		commander.printOutln();
-		commander.printOutln(helpUsage("stat", "[-v] <filename1> [<or uuid>] ..."));
-		commander.printOutln(helpOption("-v", "More details on the status."));
+		commander.printOutln(helpUsage("guidinfo", "<uuid> ..."));
 		commander.printOutln();
 	}
 
