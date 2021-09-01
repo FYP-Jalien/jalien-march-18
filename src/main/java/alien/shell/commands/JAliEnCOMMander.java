@@ -122,7 +122,7 @@ public class JAliEnCOMMander implements Runnable {
 	 */
 	private static final String[] jAliEnCommandList = new String[] {
 			"cd", "pwd", "mkdir", "rmdir",
-			"ls", "find", "toXml", "cat", "whereis", "cp", "rm", "mv", "touch", "type", "lfn2guid", "guid2lfn", "access", "commit", "chown", "chmod", "deleteMirror", "md5sum", "mirror",
+			"ls", "find", "toXml", "cat", "whereis", "cp", "rm", "mv", "touch", "type", "lfn2guid", "guid2lfn", "guidinfo", "access", "commit", "chown", "chmod", "deleteMirror", "md5sum", "mirror",
 			"grep",
 			"changeDiff",
 			"listFilesFromCollection",
