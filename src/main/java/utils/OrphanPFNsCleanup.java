@@ -207,7 +207,7 @@ public class OrphanPFNsCleanup {
 
 	/**
 	 * Start a new thread to deal with a particular SE
-	 * 
+	 *
 	 * @param theSE
 	 */
 	static synchronized void startSEThread(final SE theSE) {
@@ -281,7 +281,7 @@ public class OrphanPFNsCleanup {
 					final String message = "Removed: " + removed + " (" + Format.size(reclaimedSpace.longValue()) + "), failed to remove: " + failed + " (delta: " + count + " files, "
 							+ Format.size(size) + "), sem. status: " + concurrentQueryies.availablePermits();
 
-					System.err.println(message);
+					syslog(message);
 
 					pw.println((new Date()) + " : " + message);
 					pw.flush();
@@ -525,10 +525,10 @@ public class OrphanPFNsCleanup {
 			try (DBFunctions db = h.getDB()) {
 				final Set<GUID> guids = GUIDUtils.getGUIDs(uuids.toArray(new UUID[0]));
 
-				for (GUID g : guids)
+				for (final GUID g : guids)
 					g.delete(true);
 
-				for (UUID u : uuids)
+				for (final UUID u : uuids)
 					db.query("DELETE FROM orphan_pfns_0 WHERE guid=string2binary(?);", false, u.toString());
 			}
 			finally {
@@ -578,7 +578,7 @@ public class OrphanPFNsCleanup {
 			final SE se = SEUtils.getSE(seNumber);
 
 			if (se == null) {
-				System.err.println("Cannot find any se with seNumber=" + seNumber);
+				syslog("Cannot find any se with seNumber=" + seNumber);
 				kept.incrementAndGet();
 				return;
 			}
@@ -594,7 +594,7 @@ public class OrphanPFNsCleanup {
 				pfn = knownPFN == null || knownPFN.length() == 0 ? new PFN(guid, se) : new PFN(knownPFN, guid, se);
 			}
 			catch (final Throwable t) {
-				System.err.println("Cannot generate the entry for " + seNumber + " (" + se.getName() + ") and " + sGUID);
+				syslog("Cannot generate the entry for " + seNumber + " (" + se.getName() + ") and " + sGUID);
 				t.printStackTrace();
 
 				kept.incrementAndGet();
@@ -628,7 +628,7 @@ public class OrphanPFNsCleanup {
 
 			try (DBFunctions db2 = h.getDB()) {
 				if (!Factory.xrootd.delete(pfn)) {
-					System.err.println("Could not delete from " + se.getName());
+					syslog("Could not delete from " + se.getName());
 
 					concurrentQueryies.acquireUninterruptibly();
 					try {
@@ -644,7 +644,7 @@ public class OrphanPFNsCleanup {
 					concurrentQueryies.acquireUninterruptibly();
 
 					try {
-						System.err.println("Successfully deleted the replica of " + guid.guid + " (" + Format.size(guid.size) + ") from " + se.getName());
+						syslog("Successfully deleted the replica of " + guid.guid + " (" + Format.size(guid.size) + ") from " + se.getName());
 
 						if (guid.exists()) {
 							successOne(se, guid.size);
@@ -654,21 +654,21 @@ public class OrphanPFNsCleanup {
 								if (guid.getPFNs().size() == 0) {
 									// already purged all entries
 									if (guid.delete(false))
-										System.err.println("  Deleted the GUID " + guid.guid + " since this was the last replica");
+										syslog("  Deleted the GUID " + guid.guid + " since this was the last replica");
 									else
-										System.err.println("  Failed to delete the GUID even if this was the last replica:\n" + guid);
+										syslog("  Failed to delete the GUID even if this was the last replica:\n" + guid);
 								}
 								else
-									System.err.println("  Kept the GUID " + guid.guid + " since it still has " + guid.getPFNs().size() + " replicas");
+									syslog("  Kept the GUID " + guid.guid + " since it still has " + guid.getPFNs().size() + " replicas");
 							}
 							else
-								System.err.println("  Failed to remove the replica on " + se.getName() + " from " + guid.guid);
+								syslog("  Failed to remove the replica on " + se.getName() + " from " + guid.guid);
 						}
 						else {
 							successOne(se, size);
 
 							if ((flags & 1) == 0)
-								System.err.println("  GUID " + guid.guid + " doesn't exist in the catalogue any more");
+								syslog("  GUID " + guid.guid + " doesn't exist in the catalogue any more");
 						}
 
 						db2.query("DELETE FROM orphan_pfns_" + seNumber + " WHERE guid=string2binary(?);", false, sGUID);
@@ -683,7 +683,7 @@ public class OrphanPFNsCleanup {
 
 				failOne(se);
 
-				System.err.println("Exception deleting " + guid.guid + " from " + se.getName() + " : " + e.getMessage());
+				syslog("Exception deleting " + guid.guid + " from " + se.getName() + " : " + e.getMessage());
 
 				if (logger.isLoggable(Level.FINER))
 					logger.log(Level.FINER, "Exception deleting from " + se.getName(), e);
@@ -698,6 +698,10 @@ public class OrphanPFNsCleanup {
 				}
 			}
 		}
+	}
+
+	private static void syslog(final String message) {
+		System.err.println(System.currentTimeMillis() + " " + message);
 	}
 
 }
