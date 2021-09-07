@@ -16,6 +16,7 @@ import org.apache.catalina.authenticator.SSLAuthenticator;
 import org.apache.catalina.connector.Connector;
 import org.apache.catalina.servlets.DefaultServlet;
 import org.apache.catalina.startup.Tomcat;
+import org.apache.catalina.util.ServerInfo;
 import org.apache.coyote.ProtocolHandler;
 import org.apache.coyote.http11.Http11NioProtocol;
 import org.apache.tomcat.util.descriptor.web.LoginConfig;
@@ -115,6 +116,9 @@ public class TomcatServer {
 
 				names.add("max_threads");
 				values.add(Double.valueOf(tpe.getMaximumPoolSize()));
+
+				names.add("tomcat_version");
+				values.add(ServerInfo.getServerNumber());
 			});
 		}
 		else if (executor instanceof org.apache.tomcat.util.threads.ThreadPoolExecutor) {
@@ -126,6 +130,9 @@ public class TomcatServer {
 
 				names.add("max_threads");
 				values.add(Double.valueOf(tpe.getMaximumPoolSize()));
+				
+				names.add("tomcat_version");
+				values.add(ServerInfo.getServerNumber());
 			});
 		}
 		else
