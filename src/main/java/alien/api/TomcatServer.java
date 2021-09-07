@@ -117,6 +117,17 @@ public class TomcatServer {
 				values.add(Double.valueOf(tpe.getMaximumPoolSize()));
 			});
 		}
+		else if (executor instanceof org.apache.tomcat.util.threads.ThreadPoolExecutor) {
+			final org.apache.tomcat.util.threads.ThreadPoolExecutor tpe = (org.apache.tomcat.util.threads.ThreadPoolExecutor) executor;
+
+			monitor.addMonitoring("server_status", (names, values) -> {
+				names.add("active_threads");
+				values.add(Double.valueOf(tpe.getActiveCount()));
+
+				names.add("max_threads");
+				values.add(Double.valueOf(tpe.getMaximumPoolSize()));
+			});
+		}
 		else
 			logger.log(Level.SEVERE, "Cannot monitor Tomcat executor of type " + executor.getClass().getCanonicalName());
 
