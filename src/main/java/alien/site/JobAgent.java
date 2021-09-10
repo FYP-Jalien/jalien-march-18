@@ -473,6 +473,7 @@ public class JobAgent implements Runnable {
 				RUNNING_CPU += reqCPU;
 				RUNNING_DISK += reqDisk;
 				RUNNING_JOBAGENTS -= 1;
+				setUsedCores(0);
 
 				requestSync.notifyAll();
 			}
@@ -535,8 +536,6 @@ public class JobAgent implements Runnable {
 		logger.log(Level.INFO, "Sending monitoring values...");
 
 		setStatus(jaStatus.DONE);
-
-		setUsedCores(0);
 
 		monitor.sendParameter("job_id", Integer.valueOf(0));
 
