@@ -495,6 +495,8 @@ public class JobAgent implements Runnable {
 
 		monitor.setMonitoring("resource_status", null);
 
+		MonitorFactory.stopMonitor(monitor);
+
 		logger.log(Level.INFO, "JobAgent finished, id: " + jobAgentId + " totalJobs: " + totalJobs.get());
 	}
 
