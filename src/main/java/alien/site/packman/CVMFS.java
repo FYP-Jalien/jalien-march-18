@@ -193,4 +193,11 @@ public class CVMFS extends PackMan {
 	public static String getContainerPath() {
 		return CVMFS_BASE_DIR + "/containers/fs/singularity/centos7";
 	}
+
+	/**
+	 * @return path to Singularity runtime in CVMFS
+	 */
+	public static String getSingularityPath() {
+		return CVMFS_BASE_DIR + "/containers/bin/singularity/current/bin";
+	}
 }

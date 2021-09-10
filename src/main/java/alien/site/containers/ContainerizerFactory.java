@@ -17,13 +17,17 @@ public class ContainerizerFactory {
 	 */
 	enum Containerizers {
 		/**
+		 * Entry for Singularity (CVMFS)
+		 */
+		SingularityCVMFS,
+		/**
+		 * Entry for Singularity (local)
+		 */
+		Singularity,
+		/**
 		 * Entry for Docker
 		 */
-		Docker, 
-		/**
-		 * Entry for Singularity
-		 */
-		Singularity
+		Docker
 	}
 
 	/**
