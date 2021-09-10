@@ -128,6 +128,19 @@ public final class MonitorFactory {
 	}
 
 	/**
+	 * Cancel a monitoring task
+	 * 
+	 * @param m the Monitor object to stop calling periodically
+	 */
+	public static void stopMonitor(final Monitor m) {
+		synchronized (monitors) {
+			monitors.values().remove(m);
+		}
+		
+		m.future.cancel(false);
+	}
+	
+	/**
 	 * Enable periodic sending of background host monitoring
 	 */
 	public static synchronized void enableSystemMonitoring() {
