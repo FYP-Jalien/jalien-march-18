@@ -154,8 +154,8 @@ public class SLURM extends BatchQueue {
 		workdir_file.mkdir();
 
 		submit_cmd += String.format("#SBATCH -J %s%n", name);
-		// submit_cmd += String.format("#SBATCH -D %s\n", workdir_path_resolved);
-		submit_cmd += String.format("#SBATCH -D /tmp%n");
+		submit_cmd += String.format("#SBATCH -D %s\n", workdir_path_resolved);
+		//submit_cmd += String.format("#SBATCH -D /tmp%n");
 		submit_cmd += "#SBATCH -N 1\n";
 		submit_cmd += "#SBATCH -n 1\n";
 		submit_cmd += "#SBATCH --no-requeue\n";
