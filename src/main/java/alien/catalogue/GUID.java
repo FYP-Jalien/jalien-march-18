@@ -675,7 +675,7 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 			final Integer iId = Integer.valueOf(guidId);
 
 			if (purge && (pfnCache == null || pfnCache.size() > 0)) {
-				final String purgeQuery = "INSERT IGNORE INTO orphan_pfns (flags,guid,se,md5sum,size) SELECT 1,guid,seNumber,md5,size FROM G" + tableName + "L INNER JOIN G" + tableName
+				final String purgeQuery = "INSERT IGNORE INTO orphan_pfns (flags,guid,se,md5sum,size,pfn) SELECT 1,guid,seNumber,md5,size,pfn FROM G" + tableName + "L INNER JOIN G" + tableName
 						+ "L_PFN USING (guidId) INNER JOIN SE using(seNumber) WHERE guidId=? AND seName!='no_se' AND seIoDaemons IS NOT NULL AND pfn LIKE 'root://%';";
 
 				if (db.query(purgeQuery, false, iId)) {
