@@ -8,7 +8,7 @@ import java.util.concurrent.atomic.AtomicLong;
  *
  * @author costing
  */
-public final class Counter implements MonitoringObject {
+public final class Counter implements MonitoringObject, DerivedDataProducer {
 	private final AtomicLong counter = new AtomicLong(0);
 
 	private long oldValue = 0;

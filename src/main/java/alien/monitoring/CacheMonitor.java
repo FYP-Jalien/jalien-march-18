@@ -5,10 +5,10 @@ import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * Access counters
- * 
+ *
  * @author costing
  */
-public final class CacheMonitor implements MonitoringObject {
+public final class CacheMonitor implements MonitoringObject, DerivedDataProducer {
 	private final String name;
 
 	private final AtomicLong hits = new AtomicLong(0);
@@ -23,7 +23,7 @@ public final class CacheMonitor implements MonitoringObject {
 
 	/**
 	 * Default constructor
-	 * 
+	 *
 	 * @param name
 	 */
 	public CacheMonitor(final String name) {
@@ -32,7 +32,7 @@ public final class CacheMonitor implements MonitoringObject {
 
 	/**
 	 * Increment the number of hits
-	 * 
+	 *
 	 * @return new absolute value of hits
 	 */
 	public long incrementHits() {
@@ -50,7 +50,7 @@ public final class CacheMonitor implements MonitoringObject {
 
 	/**
 	 * Increment the number of misses
-	 * 
+	 *
 	 * @return new absolute value of misses
 	 */
 	public long incrementMisses() {
@@ -68,7 +68,7 @@ public final class CacheMonitor implements MonitoringObject {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see alien.monitoring.MonitoringObject#fillValues(java.util.Vector, java.util.Vector)
 	 */
 	@Override
@@ -158,7 +158,7 @@ public final class CacheMonitor implements MonitoringObject {
 
 	/*
 	 * (non-Javadoc)
-	 * 
+	 *
 	 * @see java.lang.Object#toString()
 	 */
 	@Override

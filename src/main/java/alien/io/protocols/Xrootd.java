@@ -172,12 +172,23 @@ public class Xrootd extends Protocol {
 				final ProcessWithTimeout timeout = new ProcessWithTimeout(p, pBuilder);
 
 				if (timeout.waitFor(15, TimeUnit.SECONDS) && timeout.exitValue() == 0) {
-					final String version = timeout.getStdout().toString();
+					final String version = timeout.getStdout().toString().trim();
 
-					logger.log(Level.FINE, "Local Xrootd version is " + version);
+					if (version.indexOf('.') > 0) {
+						String tok = version.substring(0, version.indexOf('.')).trim();
 
-					if (version.indexOf('.') > 0)
-						newerThan4 = version.substring(0, version.indexOf('.')).compareTo("v4") >= 0;
+						while (tok.startsWith("v") || tok.startsWith("\""))
+							tok = tok.substring(1);
+
+						try {
+							newerThan4 = Integer.parseInt(tok) >= 4;
+						}
+						catch (final NumberFormatException nfe) {
+							logger.log(Level.WARNING, "Unrecognized xrootd version string: " + version, nfe);
+						}
+					}
+
+					logger.log(Level.FINE, "Local Xrootd version is " + version + ", newer than 4: " + newerThan4);
 				}
 			}
 			catch (final IOException | InterruptedException ie) {

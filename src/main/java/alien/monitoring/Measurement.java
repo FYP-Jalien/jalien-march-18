@@ -9,7 +9,7 @@ import java.util.Vector;
  * @author costing
  * @since Nov 10, 2010
  */
-public class Measurement implements MonitoringObject {
+public class Measurement implements MonitoringObject, DerivedDataProducer {
 
 	private final String name;
 

@@ -2,7 +2,9 @@ package alien.monitoring;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.Vector;
@@ -81,6 +83,13 @@ public final class MonitorFactory {
 
 		t.setDaemon(true);
 		t.start();
+
+		Runtime.getRuntime().addShutdownHook(new Thread() {
+			@Override
+			public void run() {
+				shutdown();
+			}
+		});
 	}
 
 	private MonitorFactory() {
@@ -129,17 +138,69 @@ public final class MonitorFactory {
 
 	/**
 	 * Cancel a monitoring task
-	 * 
+	 *
 	 * @param m the Monitor object to stop calling periodically
 	 */
 	public static void stopMonitor(final Monitor m) {
 		synchronized (monitors) {
 			monitors.values().remove(m);
 		}
-		
+
 		m.future.cancel(false);
+
+		if (canRun()) {
+			// send once more all the parameters
+			m.run();
+
+			if (m.hasAnyDerivedDataProducer()) {
+				try {
+					Thread.sleep(100);
+				}
+				catch (final InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+
+				m.callMonitoringObjects(true);
+			}
+		}
 	}
-	
+
+	private static void shutdown() {
+		final List<Monitor> toCleanup = new ArrayList<>(monitors.size());
+		synchronized (monitors) {
+			toCleanup.addAll(monitors.values());
+			monitors.clear();
+		}
+
+		for (final Monitor m : toCleanup)
+			m.future.cancel(false);
+
+		if (canRun()) {
+			final List<Monitor> derivedProducers = new ArrayList<>(toCleanup.size());
+
+			for (final Monitor m : toCleanup) {
+				m.run();
+
+				if (m.hasAnyDerivedDataProducer())
+					derivedProducers.add(m);
+			}
+
+			if (derivedProducers.size() > 0) {
+				try {
+					Thread.sleep(1000);
+				}
+				catch (final InterruptedException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+
+				for (final Monitor m : derivedProducers)
+					m.callMonitoringObjects(true);
+			}
+		}
+	}
+
 	/**
 	 * Enable periodic sending of background host monitoring
 	 */
@@ -464,5 +525,32 @@ public final class MonitorFactory {
 		// selfProcessID = -1;
 
 		return selfProcessID;
+	}
+
+	static boolean canRun() {
+		final MonitorDataSender sender = getMonitorDataSender();
+
+		if (sender.isEmpty())
+			return false;
+
+		return true;
+	}
+
+	/**
+	 * Debug method
+	 *
+	 * @param args
+	 * @throws InterruptedException
+	 */
+	public static void main(final String[] args) throws InterruptedException {
+		final Monitor m = getMonitor(MonitorFactory.class.getCanonicalName());
+
+		for (int i = 0; i < 15; i++) {
+			m.addMeasurement("key", 1);
+			Thread.sleep(1000);
+			System.err.print(".");
+		}
+
+		System.err.println("\nExiting");
 	}
 }

@@ -83,7 +83,7 @@ public class Monitor implements Runnable {
 		if (jobNumber < 0) {
 			final String pattern = MonitorFactory.getConfigString(component, "node_name",
 					component.startsWith("alien.site.") ? "${hostname}:${pid}" : "${hostname}");
-			String temp = Format.replace(pattern, "${hostname}", ConfigUtils.getLocalHostname());
+			final String temp = Format.replace(pattern, "${hostname}", ConfigUtils.getLocalHostname());
 			nodeName = Format.replace(temp, "${pid}", String.valueOf(MonitorFactory.getSelfProcessID()));
 		}
 		else {
@@ -145,7 +145,7 @@ public class Monitor implements Runnable {
 
 	/**
 	 * Set a new value for a monitoring key
-	 * 
+	 *
 	 * @param key what to modify
 	 * @param obj the new value, or <code>null</code> to remove existing associations
 	 * @return the previous value associated to this key
@@ -275,9 +275,7 @@ public class Monitor implements Runnable {
 
 	@Override
 	public void run() {
-		final MonitorDataSender sender = MonitorFactory.getMonitorDataSender();
-
-		if (sender.isEmpty())
+		if (!MonitorFactory.canRun())
 			return;
 
 		final List<Object> values = new ArrayList<>();
@@ -305,15 +303,29 @@ public class Monitor implements Runnable {
 
 		sendResults(values);
 
+		callMonitoringObjects(false);
+	}
+
+	void callMonitoringObjects(final boolean lastCall) {
 		if (monitoringObjects.size() > 0) {
 			final Vector<String> paramNames = new Vector<>(monitoringObjects.size());
 			final Vector<Object> paramValues = new Vector<>(monitoringObjects.size());
 
-			for (final MonitoringObject mo : monitoringObjects.values())
-				mo.fillValues(paramNames, paramValues);
+			for (final MonitoringObject mo : monitoringObjects.values()) {
+				if (!lastCall || mo instanceof DerivedDataProducer)
+					mo.fillValues(paramNames, paramValues);
+			}
 
 			sendParameters(paramNames, paramValues);
 		}
+	}
+
+	boolean hasAnyDerivedDataProducer() {
+		for (final MonitoringObject mo : monitoringObjects.values())
+			if (mo instanceof DerivedDataProducer)
+				return true;
+
+		return false;
 	}
 
 	/**
