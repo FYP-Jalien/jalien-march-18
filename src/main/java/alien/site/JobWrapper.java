@@ -344,7 +344,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				if (execExitCode < 0)
 					commander.q_api.putJobLog(queueId, "trace", "Failed to start execution of payload. Exit code: " + Math.abs(execExitCode));
 				else
-					commander.q_api.putJobLog(queueId, "trace", "Marking the job as ERROR_E since executable exit code was " + execExitCode);
+					commander.q_api.putJobLog(queueId, "trace", "Warning: executable exit code was " + execExitCode);
 
 				// if (jdl.gets("OutputErrorE") != null)
 				return uploadOutputFiles(JobStatus.ERROR_E) ? execExitCode : -1;
@@ -513,7 +513,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		if (trackTime) {
 			try {
-				commander.q_api.putJobLog(queueId, "trace", "Payload execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile)).replace("\n", ", "));
+				commander.q_api.putJobLog(queueId, "trace", "Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile)).replace("\n", ", "));
 			}
 			catch (@SuppressWarnings("unused") Exception te) {
 				// Ignore
