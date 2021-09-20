@@ -33,6 +33,10 @@ if [ ! -z "$TMPDIR" ]; then
     JAVA_OPTS="$JAVA_OPTS -Djava.io.tmpdir=$TMPDIR"
 fi
 
+if [ ! -z "$JALIEN_CONF_DIR" ]; then
+    JAVA_OPTS="$JAVA_OPTS -DAliEnConfig=${JALIEN_CONF_DIR}"
+fi
+
 export CLASSPATH JAVA_OPTS
 
 exec java $JAVA_OPTS $JALIEN_MAIN "$@"
