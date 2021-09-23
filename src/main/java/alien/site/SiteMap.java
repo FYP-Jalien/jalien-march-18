@@ -90,7 +90,7 @@ public class SiteMap {
 			origTtl = Integer.min(origTtl, shutdownTime.intValue());
 		}
 
-		logger.log(Level.INFO, "TTL is" + origTtl);
+		logger.log(Level.INFO, "TTL is " + origTtl);
 
 		siteMap.put("TTL", Integer.valueOf(origTtl));
 
