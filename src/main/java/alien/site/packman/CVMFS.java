@@ -158,7 +158,7 @@ public class CVMFS extends PackMan {
 
 		final String versionFromProps = ConfigUtils.getConfiguration("version").gets("jobagent.version");
 		if (versionFromProps != null && !versionFromProps.isBlank())
-			return jalienEnvPrint + "/" + versionFromProps + "-1";
+			return jalienEnvPrint + "/" + versionFromProps;
 
 		if (!Version.getTagFromEnv().isEmpty())
 			return jalienEnvPrint + Version.getTagFromEnv();
@@ -198,6 +198,6 @@ public class CVMFS extends PackMan {
 	 * @return path to Singularity runtime in CVMFS
 	 */
 	public static String getSingularityPath() {
-		return CVMFS_BASE_DIR + "/containers/bin/singularity/current/bin";
+		return CVMFS_BASE_DIR + "/containers/bin/singularity/3.8.3/bin";
 	}
 }
