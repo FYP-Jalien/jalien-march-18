@@ -198,6 +198,6 @@ public class CVMFS extends PackMan {
 	 * @return path to Singularity runtime in CVMFS
 	 */
 	public static String getSingularityPath() {
-		return CVMFS_BASE_DIR + "/containers/bin/singularity/3.8.3/bin";
+		return CVMFS_BASE_DIR + "/containers/bin/singularity/current/bin";
 	}
 }
