@@ -801,9 +801,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			}
 			catch (final NullPointerException ex) {
 				logger.log(Level.SEVERE,
-						"A required outputfile for an archive was NOT found! Aborting: " + ex.getMessage());
+						"A required outputfile was NOT found! Aborting: " + ex.getMessage());
 				commander.q_api.putJobLog(queueId, "trace",
-						"Error: A required outputfile for an archive was NOT found! Aborting: " + ex.getMessage());
+						"Error: A required outputfile was NOT found! Aborting: " + ex.getMessage());
 				if (noError)
 					changeStatus(JobStatus.ERROR_S);
 				return false;

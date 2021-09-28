@@ -114,7 +114,7 @@ public class ParsedOutput {
 
 				System.err.println("Archparts: " + archparts[0] + " " + archparts[1]);
 
-				final ArrayList<String> filesincluded = parsePatternFiles(archparts[1].split(","), processedFiles);
+				final ArrayList<String> filesincluded = parsePatternFiles(archparts[0], archparts[1].split(","), processedFiles);
 
 				System.err.println("Adding archive: " + archparts[0] + " and opt: " + options);
 				jobOutput.add(new OutputEntry(archparts[0], filesincluded, options, Long.valueOf(queueId), true));
@@ -122,7 +122,7 @@ public class ParsedOutput {
 			else {
 				// file(s)
 				System.err.println("Single file: " + parts[0]);
-				final ArrayList<String> filesincluded = parsePatternFiles(parts[0].split(","), processedFiles);
+				final ArrayList<String> filesincluded = parsePatternFiles(null, parts[0].split(","), processedFiles);
 				for (final String f : filesincluded) {
 					System.err.println("Adding single: [" + f + "] and opt: [" + options + "]");
 					jobOutput.add(new OutputEntry(f, null, options, Long.valueOf(queueId), false));
@@ -135,7 +135,7 @@ public class ParsedOutput {
 		return;
 	}
 
-	private ArrayList<String> parsePatternFiles(final String[] files, final Set<String> alreadySeen) {
+	private ArrayList<String> parsePatternFiles(final String archive, final String[] files, final Set<String> alreadySeen) {
 		System.err.println("Files to parse patterns: " + Arrays.asList(files).toString());
 
 		final ArrayList<String> filesFound = new ArrayList<>();
@@ -171,8 +171,12 @@ public class ParsedOutput {
 
 					if (checkContent) {
 						File fsFile = new File(file);
-						if (!fsFile.exists())
-							throw new NullPointerException("File " + file + " for archive " + "?" + " doesn't exist or cannot be read!");
+						if (!fsFile.exists()) {
+							String error = "File " + file + " doesn't exist or cannot be read!";
+							if (archive != null)
+								error += " Required by the following archive: " + archive;
+							throw new NullPointerException(error);
+						}
 					}
 
 				}
