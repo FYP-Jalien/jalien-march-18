@@ -106,6 +106,11 @@ public class RequestEvent implements Closeable {
 		this.os = os;
 	}
 
+	/**
+	 * Notify Cristi to update the ElasticSearch index structure if new fields are added to the log lines
+	 * 
+	 * @return
+	 */
 	private Map<String, Object> getValues() {
 		final Map<String, Object> values = new LinkedHashMap<>();
 
