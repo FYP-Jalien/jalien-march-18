@@ -3608,9 +3608,9 @@ public class TaskQueueUtils {
 		}
 	}
 
-	private static final Pattern patNegCloseSE = Pattern.compile("\\!member\\(other.CloseSE,\"\\w+::(\\w+)::\\w+\"\\)");
+	private static final Pattern patNegCloseSE = Pattern.compile("\\!member\\(other.CloseSE,\"(\\w+::[\\w-]+::[\\w-]+)\"\\)");
 
-	private static final Pattern patCloseSE = Pattern.compile("\\s*member\\(other.CloseSE,\"\\w+::(\\w+)::\\w+\"\\)");
+	private static final Pattern patCloseSE = Pattern.compile("(^|[^!])member\\(other.CloseSE,\"(\\w+::[\\w-]+::[\\w+-]+)\"\\)");
 
 	private static final Pattern patNegCloseCE = Pattern.compile("\\!other.CE\\s*==\\s*\"([^\\\"]+)\"");
 
@@ -3628,6 +3628,17 @@ public class TaskQueueUtils {
 	private static final Pattern patCVMFS = Pattern.compile("other.CVMFS_Revision\\s*>=\\s*(\\d+)");
 
 	private static final Pattern patDiskSpace = Pattern.compile("other.LocalDiskSpace\\s*>\\s*(\\d+)");
+
+	private static Set<String> getSiteCloseToSE(final String seName) {
+		final Set<String> ret = new HashSet<>();
+
+		for (final String s : LDAPHelper.checkLdapInformation("(&(closese=" + seName + "))", "ou=Sites,", "ou"))
+			ret.add(s.toUpperCase());
+
+		ret.add(seName.substring(seName.indexOf("::") + 2, seName.lastIndexOf("::")).toUpperCase());
+
+		return ret;
+	}
 
 	/**
 	 * @param jdl
@@ -3659,24 +3670,27 @@ public class TaskQueueUtils {
 		params.put("disk", Integer.valueOf(getWorkDirSizeMB(jdl, cpuCores)));
 
 		// parse the other.CloseSE (and !)
-		final HashSet<String> noses = new HashSet<>();
 
 		final String reqs = jdl.gets("Requirements");
 		if (reqs != null && !reqs.isBlank()) {
+			final HashSet<String> noses = new HashSet<>();
 
 			Matcher m = patNegCloseSE.matcher(reqs);
 			while (m.find())
-				noses.add(m.group(1));
+				noses.addAll(getSiteCloseToSE(m.group(1)));
 
 			String site = "";
 			m = patCloseSE.matcher(reqs);
-			while (m.find()) {
-				final String tmpsite = m.group(1);
-				if (!noses.contains(tmpsite))
-					site += "," + tmpsite;
-			}
-			if (!"".equals(site))
-				site += ",";
+
+			final Set<String> closeSESites = new HashSet<>();
+
+			while (m.find())
+				closeSESites.addAll(getSiteCloseToSE(m.group(2)));
+
+			closeSESites.removeAll(noses);
+
+			if (closeSESites.size() > 0)
+				site = "," + String.join(",", closeSESites) + ",";
 
 			params.put("site", site);
 
