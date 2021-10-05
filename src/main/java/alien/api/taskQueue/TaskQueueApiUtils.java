@@ -5,7 +5,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Level;
 
 import alien.api.Dispatcher;
 import alien.api.ServerException;
@@ -204,7 +203,7 @@ public class TaskQueueApiUtils {
 	 *
 	 * @return a list with the successfully updated CEs
 	 */
-	public List<String> setCEStatus(final String status, List<String> ceNames) {
+	public List<String> setCEStatus(final String status, final List<String> ceNames) {
 
 		try {
 			final CEStatusSetter statusSetter = Dispatcher.execute(new CEStatusSetter(commander.getUser(), status, ceNames));

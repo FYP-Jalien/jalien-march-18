@@ -24,7 +24,6 @@ public class CEStatusSetter extends Request {
 	 */
 	private static final long serialVersionUID = -3575992501982425989L;
 
-
 	/**
 	 * Logger
 	 */
@@ -34,14 +33,14 @@ public class CEStatusSetter extends Request {
 
 	List<String> ceNames;
 
-	ArrayList<String> updatedCEs = new ArrayList<String>();
+	ArrayList<String> updatedCEs = new ArrayList<>();
 
 	/**
 	 * @param user
 	 * @param status
 	 * @param ceNames
 	 */
-	public CEStatusSetter(final AliEnPrincipal user, final String status, List<String> ceNames) {
+	public CEStatusSetter(final AliEnPrincipal user, final String status, final List<String> ceNames) {
 		setRequestUser(user);
 		this.status = status;
 		this.ceNames = ceNames;
@@ -53,7 +52,7 @@ public class CEStatusSetter extends Request {
 	}
 
 	@Override
-	public void run() throws SecurityException{
+	public void run() throws SecurityException {
 		if (!getEffectiveRequester().canBecome("admin"))
 			throw new SecurityException("Only administrators can do it");
 
@@ -64,15 +63,15 @@ public class CEStatusSetter extends Request {
 
 			while (db.moveNext()) {
 				if (ceNames != null && ceNames.size() > 0) {
-					for (String ceName : ceNames) {
+					for (final String ceName : ceNames) {
 						if (db.gets("site").toUpperCase().contains(ceName.toUpperCase())) {
-							updatedCEs.add("\'" + db.gets("site") + "\'" );
+							updatedCEs.add("\'" + db.gets("site") + "\'");
 							continue;
 						}
 					}
 				}
 			}
-			String ceList = String.join(",", updatedCEs);
+			final String ceList = String.join(",", updatedCEs);
 			logger.log(Level.INFO, "Updating CEs " + ceList + " with status " + status);
 
 			db.query("UPDATE SITEQUEUES SET blocked=\'" + status + "\' WHERE site IN (" + ceList + ")", false);
@@ -82,7 +81,7 @@ public class CEStatusSetter extends Request {
 	/**
 	 * @return successfully updated ces
 	 */
-	public List<String> getUpdatedCEs () {
+	public List<String> getUpdatedCEs() {
 		return this.updatedCEs;
 	}
 

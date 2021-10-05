@@ -16,7 +16,7 @@ import joptsimple.OptionSet;
  */
 public class JAliEnCommandlistCEs extends JAliEnBaseCommand {
 	private List<String> cesToQuery = new ArrayList<>();
-	private List<String> partitionsToFilter = new ArrayList<>();
+	private final List<String> partitionsToFilter = new ArrayList<>();
 
 	private boolean printSummary = false;
 	private boolean printVerbose = false;
@@ -40,9 +40,9 @@ public class JAliEnCommandlistCEs extends JAliEnBaseCommand {
 		}
 
 		if (!partitionsToFilter.isEmpty()) {
-			ArrayList<CE> cesToExclude = new ArrayList<CE>();
-			for (CE candidateCE : filteredCEs) {
-				for (String partition : partitionsToFilter) {
+			final ArrayList<CE> cesToExclude = new ArrayList<>();
+			for (final CE candidateCE : filteredCEs) {
+				for (final String partition : partitionsToFilter) {
 					if (!candidateCE.partitions.contains(partition)) {
 						cesToExclude.add(candidateCE);
 					}

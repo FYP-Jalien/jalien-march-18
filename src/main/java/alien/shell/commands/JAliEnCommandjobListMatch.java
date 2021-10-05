@@ -91,7 +91,8 @@ public class JAliEnCommandjobListMatch extends JAliEnBaseCommand {
 				try {
 					jobId = Long.parseLong(alArguments.get(0));
 				}
-				catch (final NumberFormatException e) {
+				catch (@SuppressWarnings("unused") final NumberFormatException e) {
+					commander.printErrln("Invalid job id specification: " + jobId);
 					setArgumentsOk(false);
 				}
 			}

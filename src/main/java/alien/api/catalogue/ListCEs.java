@@ -20,11 +20,11 @@ public class ListCEs extends Request {
 	 */
 	private static final long serialVersionUID = 4476411896853649872L;
 	private final List<String> requestedCEs;
-	private List<CE> ces = new ArrayList<CE>();
+	private final List<CE> ces = new ArrayList<>();
 
 	/**
 	 * @param user
-	 * @param requestedSEs
+	 * @param requestedCEs
 	 */
 	public ListCEs(final AliEnPrincipal user, final List<String> requestedCEs) {
 		setRequestUser(user);
@@ -52,7 +52,7 @@ public class ListCEs extends Request {
 
 				while (db.moveNext()) {
 					if (requestedCEs != null && requestedCEs.size() > 0) {
-						for (String ceName : requestedCEs) {
+						for (final String ceName : requestedCEs) {
 							if (db.gets("site").toUpperCase().contains(ceName.toUpperCase())) {
 								addCEToList(db.gets("site"), db.geti("maxrunning"), db.geti("maxqueued"), db.gets("blocked"));
 								continue;
@@ -66,8 +66,8 @@ public class ListCEs extends Request {
 		}
 	}
 
-	private void addCEToList(String site, int maxrunning, int maxqueued, String status) {
-		CE ceEntry = new CE(site, maxrunning, maxqueued, status);
+	private void addCEToList(final String site, final int maxrunning, final int maxqueued, final String status) {
+		final CE ceEntry = new CE(site, maxrunning, maxqueued, status);
 		this.ces.add(ceEntry);
 	}
 }

@@ -95,12 +95,12 @@ public class CE implements Serializable, Comparable<CE> {
 	/**
 	 * Allowed users
 	 */
-	public List<String> users = new ArrayList<String>();
+	public List<String> users = new ArrayList<>();
 
 	/**
 	 * Disallowed users
 	 */
-	public List<String> nousers = new ArrayList<String>();
+	public List<String> nousers = new ArrayList<>();
 
 	/**
 	 * Build an arbitrary CE from the corresponding fields
@@ -108,6 +108,7 @@ public class CE implements Serializable, Comparable<CE> {
 	 * @param ceName
 	 * @param maxjobs
 	 * @param maxqueued
+	 * @param status
 	 */
 	public CE(final String ceName, final int maxjobs, final int maxqueued, final String status) {
 		this.ceName = ceName.toUpperCase();
@@ -123,7 +124,7 @@ public class CE implements Serializable, Comparable<CE> {
 	 *
 	 */
 	private void getLDAPFields() {
-		String[] ceUnits = ceName.split("::");
+		final String[] ceUnits = ceName.split("::");
 		this.site = ceUnits[1];
 		String name;
 		if (ceUnits.length > 2)
@@ -151,7 +152,7 @@ public class CE implements Serializable, Comparable<CE> {
 		if (this.matcharg.contains("CPUCORES")) {
 			this.matchCpuCores = Integer.parseInt(SiteMap.getFieldContentsFromCerequirements(this.matcharg, SiteMap.CE_FIELD.MatchCpuCores).get(0));
 		}
-		String partitionList = ConfigUtils.getPartitions(ceName);
+		final String partitionList = ConfigUtils.getPartitions(ceName);
 		this.partitions = Arrays.asList(partitionList.split(","));
 
 	}
@@ -190,12 +191,13 @@ public class CE implements Serializable, Comparable<CE> {
 	}
 
 	@Override
-	public int compareTo(CE ceToCompare) {
+	public int compareTo(final CE ceToCompare) {
 		return ceToCompare.ceName.compareTo(this.ceName);
 	}
 
-	public boolean equals(CE ceToCompare) {
-		return ceToCompare.ceName.equals(this.ceName);
+	@Override
+	public boolean equals(final Object ceToCompare) {
+		return ((CE) ceToCompare).ceName.equals(this.ceName);
 	}
 
 	@Override

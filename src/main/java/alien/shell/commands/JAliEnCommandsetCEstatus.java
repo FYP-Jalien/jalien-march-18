@@ -1,8 +1,8 @@
 package alien.shell.commands;
 
-import java.util.Arrays;
 import java.util.List;
 
+import alien.shell.ErrNo;
 import alien.shell.ShellColor;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -13,7 +13,7 @@ import joptsimple.OptionSet;
  */
 public class JAliEnCommandsetCEstatus extends JAliEnBaseCommand {
 	private String statusValue;
-	private List<String> ceNames;
+	private final List<String> ceNames;
 
 	@Override
 	public void run() {
@@ -53,19 +53,31 @@ public class JAliEnCommandsetCEstatus extends JAliEnBaseCommand {
 
 		final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
 
+		ceNames = optionToString(options.nonOptionArguments());
+
 		if (options.has("status")) {
 			statusValue = String.valueOf(options.valueOf("status"));
+		}
+		else {
+			setArgumentsOk(false);
+			commander.setReturnCode(ErrNo.EINVAL, "You must specify a `-status` parameter to this command");
+			return;
 		}
 
 		if (statusValue.toLowerCase().contains("open") || "open".contains(statusValue.toLowerCase()))
 			statusValue = "open";
 		else if (statusValue.toLowerCase().contains("locked") || "locked".contains(statusValue.toLowerCase()))
 			statusValue = "locked";
-		else
-			throw new Exception("The status can only be defined to open and locked");
+		else {
+			setArgumentsOk(false);
+			commander.setReturnCode(ErrNo.EINVAL, "You have to specify a `-status` option with either `open` or `locked`");
+			return;
+		}
 
-		ceNames = optionToString(options.nonOptionArguments());
-		if (ceNames.isEmpty())
-			throw new Exception("The list of given CE names should not be empty");
+		if (ceNames.isEmpty()) {
+			commander.setReturnCode(ErrNo.EINVAL, "The list of given CE names should not be empty");
+			setArgumentsOk(false);
+			return;
+		}
 	}
 }

@@ -25,12 +25,12 @@ public class JAliEnCommandlistpartitions extends JAliEnBaseCommand {
 	@Override
 	public void run() {
 
-		final HashMap<String, String> partitions = new HashMap<String, String>();
-		String partitionList = ConfigUtils.getPartitions("*");
+		final HashMap<String, String> partitions = new HashMap<>();
+		final String partitionList = ConfigUtils.getPartitions("*");
 		logger.log(Level.INFO, "A total of " + partitionList.length() + " partitions were obtained from LDAP.");
-		for (String partition : partitionList.split(",")) {
+		for (final String partition : partitionList.split(",")) {
 			if (((partitionsToQuery.size() > 0 && partitionsToQuery.contains(partition)) || partitionsToQuery.size() == 0)) {
-				String ceList = getCEListFromPartition(partition);
+				final String ceList = getCEListFromPartition(partition);
 				partitions.put(partition, ceList);
 			}
 		}
@@ -47,7 +47,7 @@ public class JAliEnCommandlistpartitions extends JAliEnBaseCommand {
 		}
 	}
 
-	public static String getCEListFromPartition(String partition) {
+	private static String getCEListFromPartition(final String partition) {
 		final Set<String> ceList = LDAPHelper.checkLdapInformation("name=" + partition, "ou=Partitions,", "CEname");
 		return String.join(",", ceList);
 	}
