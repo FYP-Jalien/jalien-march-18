@@ -299,7 +299,7 @@ public class JobBroker {
 							jep.addVariable("cpucores", db.geti("cpucores"));
 							jep.addStandardFunctions();
 							jep.parseExpression("if (cpucores" + candidateCE.requiredCpuCores + ", 1, 0)");
-							if (jep.getValueAsObject() == Integer.valueOf(0)) {
+							if (Integer.valueOf(0).equals(jep.getValueAsObject())) {
 								logger.log(Level.INFO, "CE " + candidateCE.ceName + " was discarded. The required CPU cores of the CE were not met (" + candidateCE.requiredCpuCores + ")");
 								continue;
 							}
