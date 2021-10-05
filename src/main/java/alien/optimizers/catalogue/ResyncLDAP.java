@@ -48,7 +48,7 @@ public class ResyncLDAP extends Optimizer {
 	 */
 	private static AtomicBoolean periodic = new AtomicBoolean(true);
 
-	private static String[] classnames = { "users", "roles", "SEs" };
+	private static String[] classnames = { "users", "roles", "SEs", "CEs" };
 
 	private static String logOutput = "";
 
@@ -135,6 +135,9 @@ public class ResyncLDAP extends Optimizer {
 						break;
 					case "SEs":
 						updateSEs();
+						break;
+					case "CEs":
+						updateCEs();
 						break;
 					default:
 						break;
@@ -349,6 +352,118 @@ public class ResyncLDAP extends Optimizer {
 	}
 
 	/**
+	 * Updates the CEs from the LDAP database
+	 *
+	 * @param Database instance
+	 */
+	private static void updateCEs() {
+		logger.log(Level.INFO, "Synchronising DB CEs with LDAP");
+		final String ouSites = "ou=Sites,";
+
+		final Set<String> dns = LDAPHelper.checkLdapInformation("(objectClass=AliEnCE)", ouSites, "dn", true);
+		final ArrayList<String> ceNames = new ArrayList<>();
+		final ArrayList<String> dnsEntries = new ArrayList<>();
+		final ArrayList<String> sites = new ArrayList<>();
+		final HashMap<String, String> modifications = new HashMap<>();
+		final Set<String> updatedCEs = new HashSet<>();
+
+		if (!dns.isEmpty()) {
+			try (DBFunctions db = ConfigUtils.getDB("processes")) {
+				if (db == null) {
+					logger.log(Level.INFO, "Could not get DBs!");
+					return;
+				}
+
+				// From the dn we get the ceName and site
+				final Iterator<String> itr = dns.iterator();
+				while (itr.hasNext()) {
+					final String dn = itr.next();
+					dnsEntries.add(dn);
+					final String[] entries = dn.split("[=,]");
+					if (entries.length >= 8) {
+						ceNames.add(entries[1]);
+						sites.add(entries[entries.length - 1]);
+					}
+				}
+
+				final int length = ceNames.size();
+				if (length == 0)
+					logger.log(Level.WARNING, "No CEs gotten from LDAP");
+
+				HashMap<String, String> originalCEs = new HashMap<>();
+
+				for (int ind = 0; ind < sites.size(); ind++) {
+					final String site = sites.get(ind);
+					final String ce = ceNames.get(ind);
+					final String dnsEntry = dnsEntries.get(ind);
+
+					// This will be the base dn for the CE
+					final String ouCE = dnsEntry + ",ou=Sites,";
+
+					final String vo = "ALICE";
+					final String ceName = vo + "::" + site + "::" + ce;
+					updatedCEs.add(ceName);
+
+					final String maxjobs = getLdapContentSE(ouCE, ce, "maxjobs", null);
+
+					final String maxqueuedjobs = getLdapContentSE(ouCE, ce, "maxqueuedjobs", null);
+
+					int siteId = -1;
+					boolean querySuccess = db.query("SELECT * from `SITEQUEUES` WHERE site=?", false, ceName);
+					if (!querySuccess) {
+						logger.log(Level.SEVERE, "Error getting CE from DB");
+						return;
+					}
+
+					if (db.moveNext()) {
+						siteId = db.geti("siteId");
+						db.gets("site");
+						originalCEs = populateCERegistry(db.gets("site"), db.gets("maxrunning"), db.gets("maxqueued"));
+					}
+
+					logger.log(Level.INFO, "Inserting or updating database entry for CE " + ceName);
+					if (siteId != -1) {
+						db.query("UPDATE SITEQUEUES SET maxrunning=?, maxqueued=? WHERE site=?", false,
+								maxjobs, maxqueuedjobs, ceName);
+					}
+					else {
+						db.query("INSERT INTO SITEQUEUES(site,maxrunning,maxqueued) values (?,?,?)", false,
+								ceName, Integer.valueOf(maxjobs), Integer.valueOf(maxqueuedjobs));
+					}
+
+					final HashMap<String, String> currentCEs = populateCERegistry(ceName, maxjobs, maxqueuedjobs);
+					printModificationsSEs(modifications, originalCEs, currentCEs, ceName, "CEs");
+				}
+
+				ArrayList<String> toDelete = new ArrayList<>();
+				db.query("SELECT site from `SITEQUEUES`", false);
+				while (db.moveNext()) {
+					String ce = db.gets("site");
+					if (!updatedCEs.contains(ce) && !ce.equals("unassigned::site")) {
+						toDelete.add(ce);
+					}
+				}
+				for (String element : toDelete) {
+					logger.log(Level.INFO, "Deleting CE " + element + " from CE database");
+					db.query("DELETE from `SITEQUEUES` where site=?", false, element);
+				}
+
+				final String cesLog = "CEs: " + length + " synchronized. " + modifications.size() + " changes. \n" + String.join("\n", modifications.values());
+
+				logOutput = logOutput + "\n" + cesLog;
+
+				if (periodic.get())
+					DBSyncUtils.registerLog(ResyncLDAP.class.getCanonicalName() + ".ces", cesLog);
+				else if (modifications.size() > 0)
+					DBSyncUtils.updateManual(ResyncLDAP.class.getCanonicalName() + ".ces", cesLog);
+			}
+		}
+		else {
+			logger.log(Level.WARNING, "Could not synchronize CEs with LDAP. LDAP is not responding.");
+		}
+	}
+
+	/**
 	 * Updates the SEs and SE_VOLUMES in the LDAP database
 	 *
 	 * @param Database instance
@@ -363,228 +478,230 @@ public class ResyncLDAP extends Optimizer {
 		final ArrayList<String> sites = new ArrayList<>();
 		final HashMap<String, String> modifications = new HashMap<>();
 		final Set<String> updatedProtocols = new HashSet<>();
-
-		try (DBFunctions db = ConfigUtils.getDB("alice_users");DBFunctions dbTransfers = ConfigUtils.getDB("transfers")) {
-			if (db == null || dbTransfers == null) {
-				logger.log(Level.INFO, "Could not get DBs!");
-				return;
-			}
-
-			// From the dn we get the seName and site
-			final Iterator<String> itr = dns.iterator();
-			while (itr.hasNext()) {
-				final String dn = itr.next();
-				if (dn.contains("disabled")) {
-					logger.log(Level.WARNING, "Skipping " + dn + " (it is disabled)");
-				}
-				else {
-					dnsEntries.add(dn);
-					final String[] entries = dn.split("[=,]");
-					if (entries.length >= 8) {
-						seNames.add(entries[1]);
-						sites.add(entries[entries.length - 1]);
-					}
-				}
-			}
-
-			final int length = seNames.size();
-			if (length == 0)
-				logger.log(Level.WARNING, "No SEs gotten from LDAP");
-
-			for (int ind = 0; ind < sites.size(); ind++) {
-				final String site = sites.get(ind);
-				final String se = seNames.get(ind);
-				final String dnsEntry = dnsEntries.get(ind);
-				int seNumber = -1;
-
-				// This will be the base dn for the SE
-				final String ouSE = dnsEntry + ",ou=Sites,";
-
-				final String vo = "ALICE";
-				final String seName = vo + "::" + site + "::" + se;
-
-				final Set<String> ftdprotocols = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "ftdprotocol");
-				for (String ftdprotocol : ftdprotocols) {
-					final String[] temp = ftdprotocol.split("\\s+");
-					String protocol = temp[0];
-					String transfers = null;
-					if (temp.length > 1)
-						transfers = temp[1];
-					Integer numTransfers = null;
-					if (transfers != null) {
-						if (!transfers.matches("transfers=(\\d+)"))
-							logger.log(Level.INFO, "Could not get the number of transfers for " + seName + " (ftdprotocol: " + protocol + ")");
-						else
-							numTransfers = Integer.valueOf(transfers.split("=")[1]);
-					}
-
-					boolean querySuccess = dbTransfers.query("SELECT * from `PROTOCOLS` WHERE sename=? and protocol=?", false, seName, protocol);
-					if (!querySuccess) {
-						logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
-						return;
-					}
-					updatedProtocols.add(seName+"#"+protocol);
-					if (dbTransfers.moveNext())
-						dbTransfers.query("UPDATE PROTOCOLS SET max_transfers=?, updated=1 where sename=? and protocol=?", false, numTransfers, seName, protocol);
-					else
-						dbTransfers.query("INSERT INTO PROTOCOLS(sename,protocol,max_transfers) values (?,?,?)", false, seName, protocol, numTransfers);
-				}
-
-				HashMap<String, String> originalSEs = new HashMap<>();
-
-				boolean querySuccess = db.query("SELECT * from `SE` WHERE seName = ?", false, seName);
-				if (!querySuccess) {
-					logger.log(Level.SEVERE, "Error getting SEs from DB");
+		if (!dns.isEmpty()) {
+			try (DBFunctions db = ConfigUtils.getDB("alice_users"); DBFunctions dbTransfers = ConfigUtils.getDB("transfers")) {
+				if (db == null || dbTransfers == null) {
+					logger.log(Level.INFO, "Could not get DBs!");
 					return;
 				}
 
-				while (db.moveNext()) {
-					originalSEs = populateSERegistry(db.gets("seName"), db.gets("seioDaemons"), db.gets("seStoragePath"), db.gets("seMinSize"), db.gets("seType"), db.gets("seQoS"),
-							db.gets("seExclusiveWrite"), db.gets("seExclusiveRead"), db.gets("seVersion"));
-					seNumber = db.geti("seNumber");
+				// From the dn we get the seName and site
+				final Iterator<String> itr = dns.iterator();
+				while (itr.hasNext()) {
+					final String dn = itr.next();
+					if (dn.contains("disabled")) {
+						logger.log(Level.WARNING, "Skipping " + dn + " (it is disabled)");
+					}
+					else {
+						dnsEntries.add(dn);
+						final String[] entries = dn.split("[=,]");
+						if (entries.length >= 8) {
+							seNames.add(entries[1]);
+							sites.add(entries[entries.length - 1]);
+						}
+					}
 				}
-				if (originalSEs.isEmpty())
-					modifications.put(seName, seName + " : new storage element, ");
 
-				final String t = getLdapContentSE(ouSE, se, "mss", null);
-				final String host = getLdapContentSE(ouSE, se, "host", null);
+				final int length = seNames.size();
+				if (length == 0)
+					logger.log(Level.WARNING, "No SEs gotten from LDAP");
 
-				final Set<String> savedir = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "savedir");
-				for (String path : savedir) {
-					HashMap<String, String> originalSEVolumes = new HashMap<>();
+				for (int ind = 0; ind < sites.size(); ind++) {
+					final String site = sites.get(ind);
+					final String se = seNames.get(ind);
+					final String dnsEntry = dnsEntries.get(ind);
+					int seNumber = -1;
 
-					long size = -1;
-					logger.log(Level.INFO, "Checking the path of " + path);
+					// This will be the base dn for the SE
+					final String ouSE = dnsEntry + ",ou=Sites,";
+
+					final String vo = "ALICE";
+					final String seName = vo + "::" + site + "::" + se;
+
+					final Set<String> ftdprotocols = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "ftdprotocol");
+					for (String ftdprotocol : ftdprotocols) {
+						final String[] temp = ftdprotocol.split("\\s+");
+						String protocol = temp[0];
+						String transfers = null;
+						if (temp.length > 1)
+							transfers = temp[1];
+						Integer numTransfers = null;
+						if (transfers != null) {
+							if (!transfers.matches("transfers=(\\d+)"))
+								logger.log(Level.INFO, "Could not get the number of transfers for " + seName + " (ftdprotocol: " + protocol + ")");
+							else
+								numTransfers = Integer.valueOf(transfers.split("=")[1]);
+						}
+
+						boolean querySuccess = dbTransfers.query("SELECT * from `PROTOCOLS` WHERE sename=? and protocol=?", false, seName, protocol);
+						if (!querySuccess) {
+							logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
+							return;
+						}
+						updatedProtocols.add(seName + "#" + protocol);
+						if (dbTransfers.moveNext())
+							dbTransfers.query("UPDATE PROTOCOLS SET max_transfers=?, updated=1 where sename=? and protocol=?", false, numTransfers, seName, protocol);
+						else
+							dbTransfers.query("INSERT INTO PROTOCOLS(sename,protocol,max_transfers) values (?,?,?)", false, seName, protocol, numTransfers);
+					}
+
+					HashMap<String, String> originalSEs = new HashMap<>();
+
+					boolean querySuccess = db.query("SELECT * from `SE` WHERE seName = ?", false, seName);
+					if (!querySuccess) {
+						logger.log(Level.SEVERE, "Error getting SEs from DB");
+						return;
+					}
+
+					while (db.moveNext()) {
+						originalSEs = populateSERegistry(db.gets("seName"), db.gets("seioDaemons"), db.gets("seStoragePath"), db.gets("seMinSize"), db.gets("seType"), db.gets("seQoS"),
+								db.gets("seExclusiveWrite"), db.gets("seExclusiveRead"), db.gets("seVersion"));
+						seNumber = db.geti("seNumber");
+					}
+					if (originalSEs.isEmpty())
+						modifications.put(seName, seName + " : new storage element, ");
+
+					final String t = getLdapContentSE(ouSE, se, "mss", null);
+					final String host = getLdapContentSE(ouSE, se, "host", null);
+
+					final Set<String> savedir = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "savedir");
+					for (String path : savedir) {
+						HashMap<String, String> originalSEVolumes = new HashMap<>();
+
+						long size = -1;
+						logger.log(Level.INFO, "Checking the path of " + path);
+						if (path.matches(".*,\\d+")) {
+							size = Long.parseLong(path.split(",")[1]);
+							path = path.split(",")[0];
+						}
+						logger.log(Level.INFO, "Need to add the volume " + path);
+						final String method = t.toLowerCase() + "://" + host;
+
+						int volumeId = -1;
+						querySuccess = db.query("SELECT * from `SE_VOLUMES` WHERE seName=? and mountpoint=?", false, seName, path);
+						if (!querySuccess) {
+							logger.log(Level.SEVERE, "Error getting SE volumes from DB");
+							return;
+						}
+						while (db.moveNext()) {
+							originalSEVolumes = populateSEVolumesRegistry(db.gets("sename"), db.gets("volume"), db.gets("method"), db.gets("mountpoint"), db.gets("size"));
+							volumeId = db.geti("volumeId");
+						}
+
+						if (volumeId != -1)
+							db.query("UPDATE SE_VOLUMES SET volume=?, method=?, size=? WHERE seName=? AND mountpoint=? and volumeId=?", false,
+									path, method, Long.valueOf(size), seName, path, Integer.valueOf(volumeId));
+						else
+							db.query("INSERT INTO SE_VOLUMES(sename,volume,method,mountpoint,size) values (?,?,?,?,?)", false,
+									seName, path, method, path, Long.valueOf(size));
+
+						final HashMap<String, String> currentSEVolumes = populateSEVolumesRegistry(seName, path, method, path, String.valueOf(size));
+						printModificationsSEs(modifications, originalSEVolumes, currentSEVolumes, seName, "SE Volumes");
+
+					}
+
+					final String iodaemons = getLdapContentSE(ouSE, se, "ioDaemons", null);
+					final String[] temp = iodaemons.split(":");
+					String seioDaemons = "";
+					if (temp.length > 2) {
+						String proto = temp[0];
+						proto = proto.replace("xrootd", "root");
+
+						String hostName = temp[1].matches("host=([^:]+)(:.*)?$") ? temp[1] : temp[2];
+						String port = temp[2].matches("port=(\\d+)") ? temp[2] : temp[1];
+
+						if (!hostName.matches("host=([^:]+)(:.*)?$")) {
+							logger.log(Level.INFO, "Error getting the host name from " + seName);
+							seioDaemons = null;
+						}
+						hostName = hostName.split("=")[1];
+
+						if (!port.matches("port=(\\d+)")) {
+							logger.log(Level.INFO, "Error getting the port for " + seName);
+							seioDaemons = null;
+						}
+						port = port.split("=")[1];
+
+						if (!"NULL".equals(seioDaemons)) {
+							seioDaemons = proto + "://" + hostName + ":" + port;
+							logger.log(Level.INFO, "Using proto = " + proto + " host = " + hostName + " and port = " + port + " for " + seName);
+						}
+					}
+
+					String path = getLdapContentSE(ouSE, se, "savedir", null);
+					if ("".equals(path)) {
+						logger.log(Level.INFO, "Error getting the savedir for " + seName);
+						return;
+					}
+
 					if (path.matches(".*,\\d+")) {
-						size = Long.parseLong(path.split(",")[1]);
 						path = path.split(",")[0];
 					}
-					logger.log(Level.INFO, "Need to add the volume " + path);
-					final String method = t.toLowerCase() + "://" + host;
 
-					int volumeId = -1;
-					querySuccess = db.query("SELECT * from `SE_VOLUMES` WHERE seName=? and mountpoint=?", false, seName, path);
-					if (!querySuccess) {
-						logger.log(Level.SEVERE, "Error getting SE volumes from DB");
-						return;
-					}
-					while (db.moveNext()) {
-						originalSEVolumes = populateSEVolumesRegistry(db.gets("sename"), db.gets("volume"), db.gets("method"), db.gets("mountpoint"), db.gets("size"));
-						volumeId = db.geti("volumeId");
+					int minSize = 0;
+
+					final Set<String> options = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "options");
+					for (final String option : options) {
+						if (option.matches("min_size\\s*=\\s*(\\d+)")) {
+							minSize = Integer.parseInt(option.split("=")[1]);
+						}
 					}
 
-					if (volumeId != -1)
-						db.query("UPDATE SE_VOLUMES SET volume=?, method=?, size=? WHERE seName=? AND mountpoint=? and volumeId=?", false,
-								path, method, Long.valueOf(size), seName, path, Integer.valueOf(volumeId));
+					final String mss = getLdapContentSE(ouSE, se, "mss", null);
+					final String qos = "," + getLdapContentSE(ouSE, se, "Qos", null) + ",";
+					final String seExclusiveWrite = getLdapContentSE(ouSE, se, "seExclusiveWrite", "");
+					final String seExclusiveRead = getLdapContentSE(ouSE, se, "seExclusiveRead", "");
+					final String seVersion = getLdapContentSE(ouSE, se, "seVersion", "");
+
+					final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, String.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion);
+					printModificationsSEs(modifications, originalSEs, currentSEs, seName, "SEs");
+
+					if (seNumber != -1)
+						db.query("UPDATE SE SET seMinSize=?, seType=?, seQoS=?, seExclusiveWrite=?, seExclusiveRead=?, seVersion=?, seStoragePath=?, seioDaemons=?"
+								+ "WHERE seNumber=? and seName=?", false, Integer.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
+								seioDaemons, Integer.valueOf(seNumber), seName);
 					else
-						db.query("INSERT INTO SE_VOLUMES(sename,volume,method,mountpoint,size) values (?,?,?,?,?)", false,
-								seName, path, method, path, Long.valueOf(size));
+						db.query("INSERT INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
+								+ "values (?,?,?,?,?,?,?,?,?)", false, seName, Integer.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path, seioDaemons);
+					logger.log(Level.INFO, "Added or updated entry for SE " + seName);
 
-					final HashMap<String, String> currentSEVolumes = populateSEVolumesRegistry(seName, path, method, path, String.valueOf(size));
-					printModificationsSEs(modifications, originalSEVolumes, currentSEVolumes, seName, "SE Volumes");
-
+					if (ind > updateDBCount)
+						DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".SEs");
 				}
 
-				final String iodaemons = getLdapContentSE(ouSE, se, "ioDaemons", null);
-				final String[] temp = iodaemons.split(":");
-				String seioDaemons = "";
-				if (temp.length > 2) {
-					String proto = temp[0];
-					proto = proto.replace("xrootd", "root");
-
-					String hostName = temp[1].matches("host=([^:]+)(:.*)?$") ? temp[1] : temp[2];
-					String port = temp[2].matches("port=(\\d+)") ? temp[2] : temp[1];
-
-					if (!hostName.matches("host=([^:]+)(:.*)?$")) {
-						logger.log(Level.INFO, "Error getting the host name from " + seName);
-						seioDaemons = null;
-					}
-					hostName = hostName.split("=")[1];
-
-					if (!port.matches("port=(\\d+)")) {
-						logger.log(Level.INFO, "Error getting the port for " + seName);
-						seioDaemons = null;
-					}
-					port = port.split("=")[1];
-
-					if (!"NULL".equals(seioDaemons)) {
-						seioDaemons = proto + "://" + hostName + ":" + port;
-						logger.log(Level.INFO, "Using proto = " + proto + " host = " + hostName + " and port = " + port + " for " + seName);
+				ArrayList<String> toDelete = new ArrayList<>();
+				dbTransfers.query("SELECT seName, protocol from `PROTOCOLS`", false);
+				while (dbTransfers.moveNext()) {
+					String seName = dbTransfers.gets("seName");
+					String protocol = dbTransfers.gets("protocol");
+					String composed = seName + "#" + protocol;
+					if (!updatedProtocols.contains(composed)) {
+						toDelete.add(composed);
 					}
 				}
-
-				String path = getLdapContentSE(ouSE, se, "savedir", null);
-				if ("".equals(path)) {
-					logger.log(Level.INFO, "Error getting the savedir for " + seName);
-					return;
+				for (String element : toDelete) {
+					dbTransfers.query("DELETE from `PROTOCOLS` where sename=? and protocol=?", false, element.split("#")[0], element.split("#")[1]);
 				}
 
-				if (path.matches(".*,\\d+")) {
-					path = path.split(",")[0];
-				}
+				db.query("update SE_VOLUMES set usedspace=0 where usedspace is null");
+				db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
+				db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
 
-				int minSize = 0;
+				// TODO: Delete inactive SEs
 
-				final Set<String> options = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "options");
-				for (final String option : options) {
-					if (option.matches("min_size\\s*=\\s*(\\d+)")) {
-						minSize = Integer.parseInt(option.split("=")[1]);
-					}
-				}
+				final String sesLog = "SEs: " + length + " synchronized. " + modifications.size() + " changes. \n" + String.join("\n", modifications.values());
 
-				final String mss = getLdapContentSE(ouSE, se, "mss", null);
-				final String qos = "," + getLdapContentSE(ouSE, se, "Qos", null) + ",";
-				final String seExclusiveWrite = getLdapContentSE(ouSE, se, "seExclusiveWrite", "");
-				final String seExclusiveRead = getLdapContentSE(ouSE, se, "seExclusiveRead", "");
-				final String seVersion = getLdapContentSE(ouSE, se, "seVersion", "");
-
-				final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, String.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion);
-				printModificationsSEs(modifications, originalSEs, currentSEs, seName, "SEs");
-
-				if (seNumber != -1)
-					db.query("UPDATE SE SET seMinSize=?, seType=?, seQoS=?, seExclusiveWrite=?, seExclusiveRead=?, seVersion=?, seStoragePath=?, seioDaemons=?"
-							+ "WHERE seNumber=? and seName=?", false, Integer.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
-							seioDaemons, Integer.valueOf(seNumber), seName);
-				else
-					db.query("INSERT INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
-							+ "values (?,?,?,?,?,?,?,?,?)", false, seName, Integer.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path, seioDaemons);
-				logger.log(Level.INFO, "Added or updated entry for SE " + seName);
-
-				if (ind > updateDBCount)
-					DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".SEs");
+				logOutput = logOutput + "\n" + sesLog;
+				if (periodic.get())
+					DBSyncUtils.registerLog(ResyncLDAP.class.getCanonicalName() + ".SEs", sesLog);
+				else if (modifications.size() > 0)
+					DBSyncUtils.updateManual(ResyncLDAP.class.getCanonicalName() + ".SEs", sesLog);
 			}
-
-			ArrayList<String> toDelete = new ArrayList<>();
-			dbTransfers.query("SELECT seName, protocol from `PROTOCOLS`", false);
-			while (dbTransfers.moveNext()) {
-				String seName = dbTransfers.gets("seName");
-				String protocol = dbTransfers.gets("protocol");
-				String composed = seName + "#" + protocol;
-				if (!updatedProtocols.contains(composed)) {
-					toDelete.add(composed);
-				}
-			}
-			for (String element : toDelete) {
-				logger.log(Level.INFO, "DBG: Deleting protocol " + element.split("#")[1] + " from SE " + element.split("#")[0]);
-				dbTransfers.query("DELETE from `PROTOCOLS` where sename=? and protocol=?", false, element.split("#")[0], element.split("#")[1]);
-			}
-
-			db.query("update SE_VOLUMES set usedspace=0 where usedspace is null");
-			db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
-			db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
-
-			// TODO: Delete inactive SEs
-
-			final String sesLog = "SEs: " + length + " synchronized. " + modifications.size() + " changes. \n" + String.join("\n", modifications.values());
-
-			logOutput = logOutput + "\n" + sesLog;
-			if (periodic.get())
-				DBSyncUtils.registerLog(ResyncLDAP.class.getCanonicalName() + ".SEs", sesLog);
-			else if (modifications.size() > 0)
-				DBSyncUtils.updateManual(ResyncLDAP.class.getCanonicalName() + ".SEs", sesLog);
+		}
+		else {
+			logger.log(Level.WARNING, "Could not synchronize SEs with LDAP. LDAP is not responding.");
 		}
 	}
-
 
 	/**
 	 * Method for building the output for the manual ResyncLDAP for Users and Roles
@@ -658,6 +775,14 @@ public class ResyncLDAP extends Optimizer {
 		ses.put("seStoragePath", path);
 		ses.put("seioDaemons", seioDaemons);
 		return ses;
+	}
+
+	private static HashMap<String, String> populateCERegistry(final String ceName, final String maxjobs, final String maxqueued) {
+		final HashMap<String, String> ces = new HashMap<>();
+		ces.put("ceName", ceName);
+		ces.put("maxjobs", String.valueOf(maxjobs));
+		ces.put("maxqueued", String.valueOf(maxqueued));
+		return ces;
 	}
 
 	private static String getLdapContentSE(final String ouSE, final String se, final String parameter, final String defaultString) {

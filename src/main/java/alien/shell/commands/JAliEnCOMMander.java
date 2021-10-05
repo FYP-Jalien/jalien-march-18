@@ -127,6 +127,7 @@ public class JAliEnCOMMander implements Runnable {
 			"changeDiff",
 			"listFilesFromCollection",
 			"packages",
+			"listCEs", "jobListMatch", "listpartitions", "setCEstatus",
 			"submit", "ps", "masterjob", "kill", "w", "uptime", "resubmit", "top", "registerOutput",
 			"df", "du", "fquota", "jquota",
 			"listSEs", "listSEDistance", "setSite", "testSE", "listTransfer", "uuid", "stat", "xrdstat", "randomPFNs", "resyncLDAP", "optimiserLogs",

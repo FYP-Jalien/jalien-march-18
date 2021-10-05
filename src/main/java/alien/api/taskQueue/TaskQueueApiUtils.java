@@ -5,6 +5,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.logging.Level;
 
 import alien.api.Dispatcher;
 import alien.api.ServerException;
@@ -171,6 +172,47 @@ public class TaskQueueApiUtils {
 		}
 		catch (final ServerException e) {
 			System.out.println("Could get not the Jobs: " + e.getMessage());
+			e.getCause().printStackTrace();
+		}
+		return null;
+
+	}
+
+	/**
+	 * @param jobId
+	 * @return a CE listing
+	 */
+	public HashMap<CE, Object> getMatchingCEs(final long jobId) {
+
+		try {
+			final GetMatchingCEs matchingCEs = Dispatcher.execute(new GetMatchingCEs(commander.getUser(), jobId));
+
+			return matchingCEs.getMatchingCEs();
+
+		}
+		catch (final ServerException e) {
+			System.out.println("Could not get a matching CEs listing: ");
+			e.getCause().printStackTrace();
+		}
+		return null;
+
+	}
+
+	/**
+	 * @param status Status to set the CE
+	 * @param ceNames CEs to set the status to
+	 *
+	 * @return a list with the successfully updated CEs
+	 */
+	public List<String> setCEStatus(final String status, List<String> ceNames) {
+
+		try {
+			final CEStatusSetter statusSetter = Dispatcher.execute(new CEStatusSetter(commander.getUser(), status, ceNames));
+			return statusSetter.getUpdatedCEs();
+
+		}
+		catch (final ServerException e) {
+			System.out.println("Could not update status ");
 			e.getCause().printStackTrace();
 		}
 		return null;

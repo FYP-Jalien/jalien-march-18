@@ -16,6 +16,7 @@ import java.util.logging.Logger;
 
 import alien.api.Dispatcher;
 import alien.api.ServerException;
+import alien.api.taskQueue.CE;
 import alien.catalogue.BookingTable.BOOKING_STATE;
 import alien.catalogue.CatalogEntity;
 import alien.catalogue.FileSystemUtils;
@@ -561,6 +562,26 @@ public class CatalogueApiUtils {
 		}
 		catch (final ServerException e) {
 			logger.log(Level.WARNING, "Could not list SEs: " + ses);
+			e.getCause().printStackTrace();
+		}
+
+		return null;
+	}
+
+	/**
+	 * Get the CEs matching the given set of names. The argument can be null or empty, in which case all defined CEs are returned. Invalid SEs are silently skipped, so the returned list could have a
+	 * different size (and order) than the given argument.
+	 *
+	 * @param ceNames
+	 * @return the CEs matching the request or <code>null</code> if failed to get the CE
+	 */
+	public List<CE> getCEs(final List<String> ceNames) {
+		try {
+			List<CE> ces = Dispatcher.execute(new ListCEs(commander.getUser(), ceNames)).getCEs();
+			return ces;
+		}
+		catch (final ServerException e) {
+			logger.log(Level.WARNING, "Could not list CEs: " + ceNames);
 			e.getCause().printStackTrace();
 		}
 

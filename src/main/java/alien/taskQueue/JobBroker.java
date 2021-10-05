@@ -16,7 +16,10 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.nfunk.jep.JEP;
+
 import alien.api.Dispatcher;
+import alien.api.taskQueue.CE;
 import alien.api.token.GetTokenCertificate;
 import alien.api.token.TokenCertificateType;
 import alien.config.ConfigUtils;
@@ -229,6 +232,85 @@ public class JobBroker {
 
 			return matchAnswer;
 		}
+	}
+
+	/**
+	 * @param jobId
+	 * @return the list of matching CEs
+	 */
+	public static HashMap<CE, Object> getMatchingCEs(final long jobId) {
+		HashMap<CE, Object> matchingCEs = new HashMap<>();
+		logger.log(Level.INFO, "Getting matching CEs for jobId " + jobId);
+		try (DBFunctions db = TaskQueueUtils.getQueueDB(); DBFunctions db2 = TaskQueueUtils.getQueueDB()) {
+			if (db == null || db2 == null)
+				return null;
+			db.query("SELECT agentId FROM QUEUE WHERE queueId = " + jobId + ";");
+			if (db.moveNext()) {
+				int jobAgentId = db.geti("agentId");
+				logger.log(Level.INFO, "Job " + jobId + " has the agentID " + jobAgentId);
+				db.query("SELECT entryId, ce, noce, ttl,  user, packages, cpucores, site, `partition` FROM JOBAGENT join QUEUE_USER on JOBAGENT.userId=QUEUE_USER.userId WHERE entryId = " + jobAgentId
+						+ ";");
+				if (db.moveNext()) {
+					db2.query("SELECT site, maxrunning, maxqueued, blocked FROM SITEQUEUES WHERE blocked='open';", false);
+					while (db2.moveNext()) {
+						CE candidateCE = new CE(db2.gets("site"), db2.geti("maxrunning"), db2.geti("maxqueued"), db2.gets("blocked"));
+						if (db.gets("noce").toUpperCase().contains("," + candidateCE.ceName + ",")) {
+							logger.log(Level.INFO, "CE " + candidateCE.ceName + " was discarded. It is in the noce list.");
+							continue;
+						}
+
+						if (candidateCE.TTL < db.geti("ttl")) {
+							logger.log(Level.INFO, "CE " + candidateCE.ceName + " was discarded. TTL too small (" + candidateCE.TTL + ")");
+							continue;
+						}
+
+						if (!(db.gets("partition").equals("%") || candidateCE.partitions.contains(db.gets("partition")))) {
+							logger.log(Level.INFO, "CE " + candidateCE.ceName + " was discarded. Partition not matched (" + candidateCE.partitions + ")");
+							continue;
+						}
+
+						if (db.geti("cpucores") > candidateCE.matchCpuCores && candidateCE.matchCpuCores != 0) {
+							logger.log(Level.INFO, "CE " + candidateCE.ceName + " was discarded. Requested CPU cores not available (" + candidateCE.matchCpuCores + ")");
+							continue;
+						}
+
+						if (!(db.gets("site").isBlank() || db.gets("site").toUpperCase().contains(candidateCE.site))) {
+							logger.log(Level.INFO, "CE " + candidateCE.ceName + " was discarded. Site not matched (" + candidateCE.site + ")");
+							continue;
+						}
+
+						if (!(db.gets("ce").equals("") || db.gets("ce").toUpperCase().contains("," + candidateCE.ceName + ","))) {
+							logger.log(Level.INFO, "CE " + candidateCE.ceName + " was discarded. It is in the noce list.");
+							continue;
+						}
+
+						if (!(candidateCE.nousers.isEmpty() || !candidateCE.nousers.contains(db.gets("user")))) {
+							logger.log(Level.INFO, "CE " + candidateCE.ceName + " was discarded. The user is not allowed in the CE (" + db.gets("user") + ")");
+							continue;
+						}
+
+						if (!(candidateCE.users.isEmpty() || candidateCE.users.contains(db.gets("user")))) {
+							logger.log(Level.INFO, "CE " + candidateCE.ceName + " was discarded. The user is not in the allowed users list (" + db.gets("user") + ")");
+							continue;
+						}
+
+						if (!candidateCE.requiredCpuCores.equals("")) {
+							JEP jep = new JEP();
+							jep.addVariable("cpucores", db.geti("cpucores"));
+							jep.addStandardFunctions();
+							jep.parseExpression("if (cpucores" + candidateCE.requiredCpuCores + ", 1, 0)");
+							if (jep.getValueAsObject() == Integer.valueOf(0)) {
+								logger.log(Level.INFO, "CE " + candidateCE.ceName + " was discarded. The required CPU cores of the CE were not met (" + candidateCE.requiredCpuCores + ")");
+								continue;
+							}
+						}
+						logger.log(Level.INFO, "The CE " + candidateCE.ceName + " would be able to run the job. Including it in the list");
+						matchingCEs.put(candidateCE, null);
+					}
+				}
+			}
+		}
+		return matchingCEs;
 	}
 
 	private static HashMap<String, Object> getWaitingJobForAgentId(final HashMap<String, Object> waiting) {

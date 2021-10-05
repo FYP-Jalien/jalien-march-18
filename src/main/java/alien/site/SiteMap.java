@@ -118,7 +118,7 @@ public class SiteMap {
 		final ArrayList<String> nousers = getFieldContentsFromCerequirements(ceRequirements, CE_FIELD.NoUsers);
 
 		// Get required cpu cores from cerequirements field
-		final ArrayList<String> requiredCpus = getFieldContentsFromCerequirements(ceRequirements, CE_FIELD.CpuCores);
+		final ArrayList<String> requiredCpus = getFieldContentsFromCerequirements(ceRequirements, CE_FIELD.RequiredCpuCores);
 
 		// Workdir
 		String workdir = UserFactory.getUserHome();
@@ -254,9 +254,14 @@ public class SiteMap {
 		NoUsers(Pattern.compile("\\s*other.user\\s*!=\\s*\"(\\w+)\"")),
 
 		/**
-		 * CPU Cores pattern
+		 * CPU Cores pattern in ceRequirements
 		 */
-		CpuCores(Pattern.compile("\\s*other.cpucores\\s*(>=|<=|>|<|==|=|!=)\\s*([0-9]+)"));
+		RequiredCpuCores(Pattern.compile("\\s*other.cpucores\\s*(>=|<=|>|<|==|=|!=)\\s*([0-9]+)")),
+
+		/**
+		 * CPU Cores pattern in matcharg
+		 */
+		MatchCpuCores(Pattern.compile("\\s*CPUCORES\\s*=\\s*([0-9]+)"));
 
 		private final Pattern pattern;
 
@@ -277,7 +282,7 @@ public class SiteMap {
 			final Matcher m = field.pattern.matcher(cereqs);
 
 			while (m.find())
-				if (field == CE_FIELD.CpuCores)
+				if (field == CE_FIELD.RequiredCpuCores)
 					fieldContents.add(m.group(1) + m.group(2));
 				else
 					fieldContents.add(m.group(1));
