@@ -122,7 +122,7 @@ public class ParsedOutput {
 			else {
 				// file(s)
 				System.err.println("Single file: " + parts[0]);
-				final ArrayList<String> filesincluded = parsePatternFiles(null, parts[0].split(","), processedFiles);
+				final ArrayList<String> filesincluded = parsePatternFiles(parts[0].split(","), processedFiles);
 				for (final String f : filesincluded) {
 					System.err.println("Adding single: [" + f + "] and opt: [" + options + "]");
 					jobOutput.add(new OutputEntry(f, null, options, Long.valueOf(queueId), false));
@@ -133,6 +133,10 @@ public class ParsedOutput {
 		System.err.println(jobOutput.toString());
 
 		return;
+	}
+
+	private ArrayList<String> parsePatternFiles(final String[] files, final Set<String> alreadySeen) {
+		return parsePatternFiles(null, files, alreadySeen);
 	}
 
 	private ArrayList<String> parsePatternFiles(final String archive, final String[] files, final Set<String> alreadySeen) {
