@@ -763,8 +763,8 @@ public class TransferBroker {
 
 			String formattedReason = reason;
 
-			if (formattedReason != null && formattedReason.length() > 250)
-				formattedReason = formattedReason.substring(0, 250);
+			if (formattedReason != null && formattedReason.length() > 4000)
+				formattedReason = formattedReason.substring(0, 4000);
 
 			int finalExitCode = exitCode;
 
