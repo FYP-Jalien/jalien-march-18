@@ -1105,8 +1105,15 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 */
 	private void registerEntries(final ArrayList<OutputEntry> entries, final String outputDir) {
 		for (final OutputEntry entry : entries) {
-			final boolean status = CatalogueApiUtils.registerEntry(entry, outputDir + "/", UserFactory.getByUsername(username));
-			commander.q_api.putJobLog(queueId, "trace", "Registering: " + entry.getName() + ". Return status: " + status);
+			try {
+				final boolean status = CatalogueApiUtils.registerEntry(entry, outputDir + "/", UserFactory.getByUsername(username));
+				commander.q_api.putJobLog(queueId, "trace", "Registering: " + entry.getName() + ". Return status: " + status);
+			}
+			catch (final NullPointerException npe) {
+				logger.log(Level.WARNING, "An error occurred while registering " + entry + ". Bad connection?", npe);
+				commander.q_api.putJobLog(queueId, "trace", "An error occurred while registering " + entry + ". Bad connection?");
+
+			}
 		}
 	}
 
