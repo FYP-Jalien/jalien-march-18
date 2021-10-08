@@ -877,10 +877,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			return false;
 		} // else
 			// changeStatus(JobStatus.SAVED); TODO: To be put back later if still needed
-		if (exitStatus == JobStatus.DONE) {
-			registerEntries(toUpload, outputDir);
-
-			if (uploadedNotAllCopies)
+		if (exitStatus == JobStatus.DONE) {	
+			if(!registerEntries(toUpload, outputDir))
+				changeStatus(JobStatus.ERROR_SV);
+			else if (uploadedNotAllCopies)
 				changeStatus(JobStatus.DONE_WARN);
 			else
 				changeStatus(JobStatus.DONE);
@@ -1103,7 +1103,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @param entries
 	 * @param outputDir
 	 */
-	private void registerEntries(final ArrayList<OutputEntry> entries, final String outputDir) {
+	private boolean registerEntries(final ArrayList<OutputEntry> entries, final String outputDir) {
 		for (final OutputEntry entry : entries) {
 			try {
 				final boolean status = CatalogueApiUtils.registerEntry(entry, outputDir + "/", UserFactory.getByUsername(username));
@@ -1113,8 +1113,40 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				logger.log(Level.WARNING, "An error occurred while registering " + entry + ". Bad connection?", npe);
 				commander.q_api.putJobLog(queueId, "trace", "An error occurred while registering " + entry + ". Bad connection?");
 
+				final int retries = 3;
+				for (int i = 1; i <= retries; i++) {
+					try {
+						final boolean wasRegistered = CatalogueApiUtils.registerEntry(entry, outputDir + "/", UserFactory.getByUsername(username));
+						if (wasRegistered) {
+							logger.log(Level.INFO, "Entry " + entry + " successfully registered on attempt " + i);
+							commander.q_api.putJobLog(queueId, "trace", "Entry " + entry + " successfully registered on attempt " + i);
+							break;
+						}
+						else {
+							logger.log(Level.INFO, "Looks like entry " + entry + " is registered despite error. All good.");
+							commander.q_api.putJobLog(queueId, "trace", "Looks like entry " + entry + " is registered despite error. All good.");
+							break;
+						}
+					}
+					catch (final NullPointerException npe2) {
+						logger.log(Level.WARNING, "Retry " + i + " failed.");
+						if (i == 3) {
+							logger.log(Level.SEVERE, "Registration of entry " + entry + " failed after 3 attempts. Aborting.");
+							commander.q_api.putJobLog(queueId, "trace", "Registration of entry " + entry + " failed after 3 attempts. Aborting.");
+							return false;
+						}
+						else
+							try {
+								Thread.sleep(30 * 1000);
+							}
+							catch (final InterruptedException ie) {
+								// ignore
+							}
+					}
+				}
 			}
 		}
+		return true;
 	}
 
 	private ArrayList<String> getOutputTags(final JobStatus exitStatus) {
