@@ -187,6 +187,9 @@ public final class AuthorizationFactory {
 			// PFN must be a part of the ones registered to the GUID
 
 			if (access == AccessType.DELETE) {
+				if (user.isJob() || user.isJobAgent())
+					return "A job is not allowed this operation";
+				
 				if (!AuthorizationChecker.canWrite(guid, user))
 					return "User is not allowed to delete this entry";
 			}
