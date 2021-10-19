@@ -453,9 +453,9 @@ public class ResyncLDAP extends Optimizer {
 				logOutput = logOutput + "\n" + cesLog;
 
 				if (periodic.get())
-					DBSyncUtils.registerLog(ResyncLDAP.class.getCanonicalName() + ".ces", cesLog);
+					DBSyncUtils.registerLog(ResyncLDAP.class.getCanonicalName() + ".CEs", cesLog);
 				else if (modifications.size() > 0)
-					DBSyncUtils.updateManual(ResyncLDAP.class.getCanonicalName() + ".ces", cesLog);
+					DBSyncUtils.updateManual(ResyncLDAP.class.getCanonicalName() + ".CEs", cesLog);
 			}
 		}
 		else {

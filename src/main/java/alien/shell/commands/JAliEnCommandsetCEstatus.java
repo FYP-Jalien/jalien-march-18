@@ -17,20 +17,22 @@ public class JAliEnCommandsetCEstatus extends JAliEnBaseCommand {
 
 	@Override
 	public void run() {
-
-		final List<String> updatedCEs = commander.q_api.setCEStatus(statusValue, ceNames);
-		if (updatedCEs.size() > 0)
-			commander.printOutln(ShellColor.jobStateGreen() + "Success: " + ShellColor.reset() + " Status " + statusValue + " correctly set to CEs " + updatedCEs);
-		else
-			commander.printOutln(ShellColor.jobStateRed() + "Error: " + ShellColor.reset() + " Could not set status " + statusValue + " to CEs " + ceNames);
-
+		try {
+			final List<String> updatedCEs = commander.q_api.setCEStatus(statusValue, ceNames);
+			if (updatedCEs.size() > 0)
+				commander.printOutln(ShellColor.jobStateGreen() + "Success: " + ShellColor.reset() + " Status " + statusValue + " correctly set to CEs " + updatedCEs);
+			else
+				commander.printOutln(ShellColor.jobStateRed() + "Error: " + ShellColor.reset() + " Could not set status " + statusValue + " to CEs " + ceNames);
+		} catch (Exception e) {
+			commander.printOutln("Users must have the admin role to perform this action");
+		}
 	}
 
 	@Override
 	public void printHelp() {
 		commander.printOutln();
 		commander.printOutln("setCEstatus: Sets the status of a set of Computing Elements");
-		commander.printOutln(helpUsage("listpartitions", " [-status status] [CE name]  [CE name]  ..."));
+		commander.printOutln(helpUsage("setCEstatus", " [-status status] [CE name]  [CE name]  ..."));
 		commander.printOutln(helpStartOptions());
 		commander.printOutln(helpOption("-status", "Status to be set for the CEs (open / locked)"));
 	}

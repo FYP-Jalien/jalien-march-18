@@ -192,7 +192,7 @@ public class CE implements Serializable, Comparable<CE> {
 
 	@Override
 	public int compareTo(final CE ceToCompare) {
-		return ceToCompare.ceName.compareTo(this.ceName);
+		return this.ceName.compareTo(ceToCompare.ceName);
 	}
 
 	@Override

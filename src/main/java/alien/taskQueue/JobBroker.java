@@ -72,6 +72,7 @@ public class JobBroker {
 				logger.log(Level.SEVERE, "getMatchJob: AliEnPrincipal field missing");
 				matchAnswer.put("Error", "AliEnPrincipal field missing");
 				matchAnswer.put("Code", Integer.valueOf(-1));
+				setRejectionReason(String.valueOf(matchAnswer.get("Error")), String.valueOf(matchRequest.get("CE")));
 			}
 
 			// Checking if the CE is open
@@ -79,6 +80,7 @@ public class JobBroker {
 			if (openQueue != 1) {
 				logger.log(Level.INFO, "Queue is not open! Check queueinfo");
 				matchAnswer.put("Error", "Queue is not open! Check queueinfo");
+				setRejectionReason(String.valueOf(matchAnswer.get("Error")), String.valueOf(matchRequest.get("CE")));
 				return matchAnswer;
 			}
 
@@ -92,6 +94,7 @@ public class JobBroker {
 			if (!TaskQueueUtils.updateHostStatus((String) matchRequest.get("Host"), "ACTIVE")) {
 				logger.log(Level.INFO, "Updating host failed!");
 				matchAnswer.put("Error", "Updating host failed");
+				setRejectionReason(String.valueOf(matchAnswer.get("Error")), String.valueOf(matchRequest.get("CE")));
 				return matchAnswer;
 			}
 
@@ -101,6 +104,8 @@ public class JobBroker {
 			if (waiting.containsKey("entryId")) {
 				logger.log(Level.INFO, "We have a job back");
 				matchAnswer = getWaitingJobForAgentId(waiting);
+				if (matchAnswer.containsKey("Error"))
+					setRejectionReason(String.valueOf(matchAnswer.get("Error")), String.valueOf(matchRequest.get("CE")));
 			}
 			else {
 				String installedPackages = null;
@@ -127,6 +132,7 @@ public class JobBroker {
 					matchAnswer.put("Error", "Packages needed to install: " + list.toString());
 					matchAnswer.put("Packages", list);
 					matchAnswer.put("Code", Integer.valueOf(-3));
+					setRejectionReason(String.valueOf(matchAnswer.get("Error")), String.valueOf(matchRequest.get("CE")));
 				}
 				else {
 					// try remote access (no site)
@@ -167,12 +173,14 @@ public class JobBroker {
 							matchAnswer.put("Error", "Packages needed to install (remote): " + list.toString());
 							matchAnswer.put("Packages", list);
 							matchAnswer.put("Code", Integer.valueOf(-3));
+							setRejectionReason(String.valueOf(matchAnswer.get("Error")), String.valueOf(matchRequest.get("CE")));
 						}
 						else {
 							logger.log(Level.INFO, "Removing site and packages requirements hasn't been enough. Nothing to run!");
 							matchAnswer.put("Error", "Nothing to run :-(");
 							matchAnswer.put("Code", Integer.valueOf(-2));
 							TaskQueueUtils.setSiteQueueStatus((String) matchRequest.get("CE"), "jobagent-no-match");
+							setRejectionReason(String.valueOf(matchAnswer.get("Error")), String.valueOf(matchRequest.get("CE")));
 						}
 					}
 				}
@@ -214,6 +222,7 @@ public class JobBroker {
 					TaskQueueUtils.setJobStatus(queueId.longValue(), JobStatus.ERROR_A);
 					matchAnswer.put("Code", Integer.valueOf(-1));
 					matchAnswer.put("Error", "Error getting the TokenCertificate of the job " + queueId);
+					setRejectionReason(String.valueOf(matchAnswer.get("Error")), String.valueOf(matchRequest.get("CE")));
 					if (jobToken != null)
 						jobToken.destroy(db);
 				}
@@ -228,9 +237,20 @@ public class JobBroker {
 				matchAnswer.put("Error", "Nothing to run :-( (no waiting jobs?) ");
 				matchAnswer.put("Code", Integer.valueOf(-2));
 				TaskQueueUtils.setSiteQueueStatus((String) matchRequest.get("CE"), "jobagent-no-match");
+				setRejectionReason(String.valueOf(matchAnswer.get("Error")), String.valueOf(matchRequest.get("CE")));
 			}
 
 			return matchAnswer;
+		}
+	}
+
+	private static void setRejectionReason(String error, String ce) {
+		try (DBFunctions db = TaskQueueUtils.getQueueDB()){
+			if (db == null )
+				return;
+			long timestamp = System.currentTimeMillis();
+			String q = "update SITEQUEUES set lastRejectionTime=" + timestamp + ", lastRejectionReason=\'" + error + "\' where site=\'" + ce + "\'";
+			db.query(q);
 		}
 	}
 

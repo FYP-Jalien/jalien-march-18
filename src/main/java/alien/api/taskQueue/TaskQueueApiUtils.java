@@ -203,7 +203,7 @@ public class TaskQueueApiUtils {
 	 *
 	 * @return a list with the successfully updated CEs
 	 */
-	public List<String> setCEStatus(final String status, final List<String> ceNames) {
+	public List<String> setCEStatus(final String status, final List<String> ceNames) throws SecurityException {
 
 		try {
 			final CEStatusSetter statusSetter = Dispatcher.execute(new CEStatusSetter(commander.getUser(), status, ceNames));

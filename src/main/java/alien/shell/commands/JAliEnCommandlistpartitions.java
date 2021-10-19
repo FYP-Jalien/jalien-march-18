@@ -1,10 +1,10 @@
 package alien.shell.commands;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.logging.Level;
 
 import alien.config.ConfigUtils;
@@ -25,7 +25,7 @@ public class JAliEnCommandlistpartitions extends JAliEnBaseCommand {
 	@Override
 	public void run() {
 
-		final HashMap<String, String> partitions = new HashMap<>();
+		final TreeMap<String, String> partitions = new TreeMap<>();
 		final String partitionList = ConfigUtils.getPartitions("*");
 		logger.log(Level.INFO, "A total of " + partitionList.length() + " partitions were obtained from LDAP.");
 		for (final String partition : partitionList.split(",")) {
@@ -34,6 +34,7 @@ public class JAliEnCommandlistpartitions extends JAliEnBaseCommand {
 				partitions.put(partition, ceList);
 			}
 		}
+
 		commander.printOutln("Partition listing");
 		if (!verboseOutput) {
 			commander.printOutln(padLeft("Partition name", 15));

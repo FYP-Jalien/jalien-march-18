@@ -1,6 +1,7 @@
 package alien.shell.commands;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.logging.Level;
@@ -36,6 +37,8 @@ public class JAliEnCommandjobListMatch extends JAliEnBaseCommand {
 
 			filteredCEs.add(ce);
 		}
+		Collections.sort(filteredCEs);
+
 		commander.printOutln("CE Listing ");
 		commander.printOutln(padLeft("CE name", maxCENameLength) + "\t" + padRight("Status", 4) + "\tMax running\t Max queued\t  TTL\t    Type\tHost");
 		logger.log(Level.INFO, "Found " + filteredCEs.size() + " that could potentially run the job");

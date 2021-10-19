@@ -2,6 +2,7 @@ package alien.shell.commands;
 
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.List;
 
 import alien.api.taskQueue.CE;
@@ -38,6 +39,7 @@ public class JAliEnCommandlistCEs extends JAliEnBaseCommand {
 
 			filteredCEs.add(ce);
 		}
+		Collections.sort(filteredCEs);
 
 		if (!partitionsToFilter.isEmpty()) {
 			final ArrayList<CE> cesToExclude = new ArrayList<>();
