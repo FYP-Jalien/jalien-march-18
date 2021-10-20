@@ -390,7 +390,6 @@ public class DispatchSSLClient {
 			port = defaultPort;
 		}
 		else {
-
 			final String address = addr;
 			final int idx = address.indexOf(':');
 
@@ -403,6 +402,8 @@ public class DispatchSSLClient {
 					addr = defaultHost;
 					port = defaultPort;
 				}
+			else
+				port = defaultPort;
 		}
 	}
 
