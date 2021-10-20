@@ -61,14 +61,18 @@ public class ResyncLDAP extends Optimizer {
 		while (true) {
 			try {
 				resyncLDAP();
+			}
+			catch (final Exception e) {
+				logger.log(Level.WARNING, "Exception running the LDAP resync", e);
+			}
+			finally {
+				periodic.set(true);
+
 				synchronized (backRequestSync) {
 					backRequestSync.notifyAll();
 				}
-				periodic.set(true);
 			}
-			catch (final Exception e) {
-				e.printStackTrace();
-			}
+
 			try {
 				synchronized (requestSync) {
 					logger.log(Level.INFO, "Periodic sleeps " + this.getSleepPeriod());
@@ -433,6 +437,9 @@ public class ResyncLDAP extends Optimizer {
 
 					final HashMap<String, String> currentCEs = populateCERegistry(ceName, maxjobs, maxqueuedjobs);
 					printModificationsSEs(modifications, originalCEs, currentCEs, ceName, "CEs");
+
+					if (ind > updateDBCount)
+						DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".CEs");
 				}
 
 				ArrayList<String> toDelete = new ArrayList<>();
@@ -670,17 +677,21 @@ public class ResyncLDAP extends Optimizer {
 				}
 
 				ArrayList<String> toDelete = new ArrayList<>();
-				dbTransfers.query("SELECT seName, protocol from `PROTOCOLS`", false);
+				dbTransfers.query("SELECT concat(seName, '#', protocol) from `PROTOCOLS` where protocol is not null;", false);
 				while (dbTransfers.moveNext()) {
-					String seName = dbTransfers.gets("seName");
-					String protocol = dbTransfers.gets("protocol");
-					String composed = seName + "#" + protocol;
+					String composed = dbTransfers.gets(1);
 					if (!updatedProtocols.contains(composed)) {
 						toDelete.add(composed);
 					}
 				}
+
 				for (String element : toDelete) {
-					dbTransfers.query("DELETE from `PROTOCOLS` where sename=? and protocol=?", false, element.split("#")[0], element.split("#")[1]);
+					try {
+						dbTransfers.query("DELETE from `PROTOCOLS` where sename=? and protocol=?", false, element.split("#")[0], element.split("#")[1]);
+					}
+					catch (Exception e) {
+						logger.log(Level.WARNING, "Could not split SE and protocol string `" + element + "`");
+					}
 				}
 
 				db.query("update SE_VOLUMES set usedspace=0 where usedspace is null");
