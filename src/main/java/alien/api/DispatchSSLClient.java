@@ -470,7 +470,7 @@ public class DispatchSSLClient {
 		}
 
 		if (logger.isLoggable(Level.FINE)) {
-			logger.log(Level.FINE, "Got back an object of type " + o.getClass().getCanonicalName() + " : " + o);
+			logger.log(Level.FINE, "Got back an object of type " + o.getClass().getCanonicalName());
 
 			if (logger.isLoggable(Level.FINEST))
 				logger.log(Level.FINEST, "Call stack is: ", new Throwable());
