@@ -458,7 +458,7 @@ public class WebsocketEndpoint extends Endpoint {
 				}
 				else {
 					// this is XMLPrintWriter or some other type of writer
-					logger.log(Level.SEVERE, "Tried to use unsopported writer " + this.out.getClass().getCanonicalName() + " in the websocket endpoint");
+					logger.log(Level.SEVERE, "Tried to use unsupported writer " + this.out.getClass().getCanonicalName() + " in the websocket endpoint");
 					return;
 				}
 			}
