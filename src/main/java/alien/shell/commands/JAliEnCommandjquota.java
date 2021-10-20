@@ -41,6 +41,7 @@ public class JAliEnCommandjquota extends JAliEnBaseCommand {
 			commander.printOut("username", q.user);
 
 			commander.printOut("nominalparallelJobs", String.valueOf(q.nominalparallelJobs));
+			commander.printOut("running", String.valueOf(q.running));
 			commander.printOut("waiting", String.valueOf(q.waiting));
 			commander.printOut("totalCpuCostLast24h", String.valueOf(q.totalCpuCostLast24h));
 			commander.printOut("totalRunningTimeLast24h", String.valueOf(q.totalRunningTimeLast24h));
@@ -49,7 +50,7 @@ public class JAliEnCommandjquota extends JAliEnBaseCommand {
 			commander.printOut("maxUnfinishedJobs", String.valueOf(q.maxUnfinishedJobs));
 			commander.printOut("maxTotalCpuCost", String.valueOf(q.maxTotalCpuCost));
 			commander.printOut("maxTotalRunningTime", String.valueOf(q.maxTotalRunningTime));
-
+			
 			commander.printOutln(q.toString());
 			return;
 		}
