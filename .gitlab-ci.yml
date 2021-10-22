@@ -18,5 +18,4 @@ e2e-test:
   script:
     - export
     - echo "API TOKEN = $API_TOKEN , CI JOB TOKEN = $CI_JOB_TOKEN , JALIEN REPO = $CI_REPOSITORY_URL , JALIEN BRANCH = $CI_COMMIT_REF_NAME"
-    - trigger -h gitlab.cern.ch -a "$API_TOKEN" -p "$CI_JOB_TOKEN" -t dev -e JALIEN_REPO=$CI_REPOSITORY_URL -e JALIEN_BRANCH=$CI_COMMIT_REF_NAME 46440
-
+    - curl -X POST -F token=429b27d63b3bd0b2734079cf78d31f -F ref=$CI_COMMIT_REF_NAME https://gitlab.cern.ch/api/v4/projects/50/trigger/pipeline
