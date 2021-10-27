@@ -20,9 +20,4 @@ e2e-test:
 #    JALIEN_BRANCH: $CI_COMMIT_REF_NAME
 #  trigger: gitlab.cern.ch/bertranf/jalien-ci
   script:
-     - 'curl -X POST \
-          -F token="d79b2a53a9969c97d314b26a41ad91" \
-          -F "ref=dev" \
-          -F "variables[JALIEN_REPO]=$CI_REPOSITORY_URL" \
-          -F "variables[JALIEN_BRANCH]=$CI_COMMIT_REF_NAME" \
-          "https://gitlab.cern.ch/api/v4/projects/124456/trigger/pipeline"'
+     - 'curl -X POST -F token=${CI_JOB_TOKEN} -F ref="dev" -F "variables[JALIEN_REPO]=$CI_REPOSITORY_URL" -F "variables[JALIEN_BRANCH]=$CI_COMMIT_REF_NAME" https://gitlab.cern.ch/api/v4/projects/124456/trigger/pipeline'
