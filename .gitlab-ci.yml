@@ -11,13 +11,13 @@ unit-test:
             junit: build/test-results/test/TEST-*.xml
 
 e2e-test:
-#  image: registry.gitlab.com/finestructure/pipeline-trigger
+  image: registry.gitlab.com/finestructure/pipeline-trigger
   stage: e2e
-#  script:
-#    - trigger -h gitlab.cern.ch -a "$API_TOKEN" -p "$CI_JOB_TOKEN" -t dev -e JALIEN_REPO=$CI_REPOSITORY_URL -e JALIEN_BRANCH=$CI_COMMIT_REF_NAME 124456
+  script:
+    - trigger -h gitlab.cern.ch -a "$API_TOKEN" -p "$CI_JOB_TOKEN" -t dev -e JALIEN_REPO=$CI_REPOSITORY_URL -e JALIEN_BRANCH=$CI_COMMIT_REF_NAME 124456
 #  variables:
 #    JALIEN_REPO: $CI_REPOSITORY_URL
 #    JALIEN_BRANCH: $CI_COMMIT_REF_NAME
 #  trigger: gitlab.cern.ch/bertranf/jalien-ci
-  script:
-     - 'curl -X POST -F token=${CI_JOB_TOKEN} -F ref="dev" -F "variables[JALIEN_REPO]=$CI_REPOSITORY_URL" -F "variables[JALIEN_BRANCH]=$CI_COMMIT_REF_NAME" https://gitlab.cern.ch/api/v4/projects/124456/trigger/pipeline'
+#  script:
+#     - 'curl -X POST -F token=${CI_JOB_TOKEN} -F ref="dev" -F "variables[JALIEN_REPO]=$CI_REPOSITORY_URL" -F "variables[JALIEN_BRANCH]=$CI_COMMIT_REF_NAME" https://gitlab.cern.ch/api/v4/projects/124456/trigger/pipeline'
