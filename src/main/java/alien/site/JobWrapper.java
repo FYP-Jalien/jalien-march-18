@@ -1104,11 +1104,16 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @param outputDir
 	 */
 	private boolean registerEntries(final ArrayList<OutputEntry> entries, final String outputDir) {
+		boolean registeredAll = true;
 		for (final OutputEntry entry : entries) {
 			try {
-				final boolean status = CatalogueApiUtils.registerEntry(entry, outputDir + "/", UserFactory.getByUsername(username));
-				commander.q_api.putJobLog(queueId, "trace", "Registering: " + entry.getName() + ". Return status: " + status);
+				final boolean registered = CatalogueApiUtils.registerEntry(entry, outputDir + "/", UserFactory.getByUsername(username));
+				commander.q_api.putJobLog(queueId, "trace", "Registering: " + entry.getName() + ". Return status: " + registered);
+
+				if (!registered)
+					registeredAll = false;
 			}
+			// TODO: Move up a layer, as this is not unique to registerEntry
 			catch (final NullPointerException npe) {
 				logger.log(Level.WARNING, "An error occurred while registering " + entry + ". Bad connection?", npe);
 				commander.q_api.putJobLog(queueId, "trace", "An error occurred while registering " + entry + ". Bad connection?");
@@ -1116,8 +1121,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				final int retries = 3;
 				for (int i = 1; i <= retries; i++) {
 					try {
-						final boolean wasRegistered = CatalogueApiUtils.registerEntry(entry, outputDir + "/", UserFactory.getByUsername(username));
-						if (wasRegistered) {
+						final boolean retrySuccess = CatalogueApiUtils.registerEntry(entry, outputDir + "/", UserFactory.getByUsername(username));
+						if (retrySuccess) {
 							logger.log(Level.INFO, "Entry " + entry + " successfully registered on attempt " + i);
 							commander.q_api.putJobLog(queueId, "trace", "Entry " + entry + " successfully registered on attempt " + i);
 							break;
@@ -1146,7 +1151,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				}
 			}
 		}
-		return true;
+		return registeredAll;
 	}
 
 	private ArrayList<String> getOutputTags(final JobStatus exitStatus) {
