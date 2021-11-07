@@ -12,6 +12,7 @@ import java.util.logging.Logger;
 
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleState;
+import org.apache.catalina.Wrapper;
 import org.apache.catalina.authenticator.SSLAuthenticator;
 import org.apache.catalina.connector.Connector;
 import org.apache.catalina.servlets.DefaultServlet;
@@ -32,6 +33,7 @@ import alien.user.JAKeyStore;
 import alien.user.LdapCertificateRealm;
 import alien.user.UserFactory;
 import alien.websockets.WebsocketListener;
+import alien.websockets.WebsocketServlet;
 
 /**
  * @author vyurchen
@@ -83,6 +85,9 @@ public class TomcatServer {
 		Tomcat.addServlet(ctx, "default", new DefaultServlet());
 		ctx.addServletMappingDecoded("/", "default");
 
+		final Wrapper wrapper = Tomcat.addServlet(ctx, "WebsocketServlet", WebsocketServlet.class.getName());
+		wrapper.addMapping("/websocket/*");
+
 		// Set security constraints in order to use AlienUserPrincipal later
 		final SecurityCollection securityCollection = new SecurityCollection();
 		securityCollection.addPattern("/*");
@@ -130,7 +135,7 @@ public class TomcatServer {
 
 				names.add("max_threads");
 				values.add(Double.valueOf(tpe.getMaximumPoolSize()));
-				
+
 				names.add("tomcat_version");
 				values.add(ServerInfo.getServerNumber());
 			});

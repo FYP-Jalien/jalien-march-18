@@ -46,8 +46,8 @@ public class WebsocketListener extends WsContextListener {
 		final ServerContainer sc = (ServerContainer) sce.getServletContext().getAttribute(Constants.SERVER_CONTAINER_SERVLET_CONTEXT_ATTRIBUTE);
 
 		try {
-			sc.addEndpoint(ServerEndpointConfig.Builder.create(WebsocketEndpoint.class, "/websocket/json").configurator(new JAliEnConfigurator()).build());
-			sc.addEndpoint(ServerEndpointConfig.Builder.create(WebsocketEndpoint.class, "/websocket/plain").configurator(new JAliEnConfigurator()).build());
+			sc.addEndpoint(ServerEndpointConfig.Builder.create(WebsocketEndpoint.class, "/websocketImpl/json").configurator(new JAliEnConfigurator()).build());
+			sc.addEndpoint(ServerEndpointConfig.Builder.create(WebsocketEndpoint.class, "/websocketImpl/plain").configurator(new JAliEnConfigurator()).build());
 		}
 		catch (final DeploymentException e) {
 			throw new RuntimeException(e);

@@ -81,9 +81,9 @@ public class WebsocketEndpoint extends Endpoint {
 	private OutputStream os = null;
 
 	private void setShellPrintWriter(final OutputStream os, final String shelltype) {
-		if (shelltype.equals("plain"))
+		if ("plain".equals(shelltype))
 			out = new JShPrintWriter(os);
-		else if (shelltype.equals("json"))
+		else if ("json".equals(shelltype))
 			out = new JSONPrintWriter(os);
 		else
 			out = new XMLPrintWriter(os);
@@ -120,7 +120,7 @@ public class WebsocketEndpoint extends Endpoint {
 		}
 
 		@Override
-		public boolean equals(Object obj) {
+		public boolean equals(final Object obj) {
 			return super.equals(obj);
 		}
 
@@ -129,7 +129,7 @@ public class WebsocketEndpoint extends Endpoint {
 			return endpoint.hashCode() + session.hashCode();
 		}
 
-		final long getRunningDeadline() {
+		long getRunningDeadline() {
 			return Math.min(absoluteRunningDeadline, lastActivityTime + 15 * 60 * 1000L);
 		}
 
@@ -194,7 +194,7 @@ public class WebsocketEndpoint extends Endpoint {
 	public static Collection<WebSocketInfo> getActiveConnections() {
 		final List<WebSocketInfo> ret = new ArrayList<>(sessionQueue.size());
 
-		for (SessionContext ctx : sessionQueue) {
+		for (final SessionContext ctx : sessionQueue) {
 			final WebsocketEndpoint endpoint = ctx.endpoint;
 
 			if (endpoint != null) {
@@ -218,7 +218,7 @@ public class WebsocketEndpoint extends Endpoint {
 
 		os = new ByteArrayOutputStream();
 		final ServerEndpointConfig serverConfig = (ServerEndpointConfig) endpointConfig;
-		if (serverConfig.getPath().equals("/websocket/json"))
+		if (serverConfig.getPath().endsWith("/json"))
 			setShellPrintWriter(os, "json");
 		else
 			setShellPrintWriter(os, "plain");
@@ -307,6 +307,11 @@ public class WebsocketEndpoint extends Endpoint {
 	 * @return IP address and port
 	 */
 	private static InetSocketAddress getRemoteIP(final Session session) {
+		final List<String> remoteAddr = session.getRequestParameterMap().get("remoteAddr");
+
+		if (remoteAddr != null && remoteAddr.size() == 2)
+			return new InetSocketAddress(remoteAddr.get(0), Integer.parseInt(remoteAddr.get(1)));
+
 		try {
 			Object obj = session.getAsyncRemote();
 
@@ -450,10 +455,10 @@ public class WebsocketEndpoint extends Endpoint {
 
 			// Parse incoming command
 			try {
-				if (this.out.getClass().getCanonicalName().equals("alien.shell.commands.JSONPrintWriter")) {
+				if ("alien.shell.commands.JSONPrintWriter".equals(this.out.getClass().getCanonicalName())) {
 					fullCmd = parseJSON(message);
 				}
-				else if (this.out.getClass().getCanonicalName().equals("alien.shell.commands.JShPrintWriter")) {
+				else if ("alien.shell.commands.JShPrintWriter".equals(this.out.getClass().getCanonicalName())) {
 					fullCmd = parsePlainText(message);
 				}
 				else {
@@ -509,7 +514,7 @@ public class WebsocketEndpoint extends Endpoint {
 			}
 
 			// Filter out cp commands
-			if (jsonObject.get("command").toString().equals("cp")) {
+			if ("cp".equals(jsonObject.get("command").toString())) {
 				synchronized (remoteEndpointBasic) {
 					remoteEndpointBasic.sendText(
 							"{\"metadata\":{\"exitcode\":\"-1\",\"error\":\"'cp' grid command is not implemented. Please use native client's Cp() method\"},\"results\":[]}", true);
@@ -545,7 +550,7 @@ public class WebsocketEndpoint extends Endpoint {
 				fullCmd.add(st.nextToken());
 
 			// Filter out cp commands
-			if (fullCmd.get(0).equals("cp")) {
+			if ("cp".equals(fullCmd.get(0))) {
 				synchronized (remoteEndpointBasic) {
 					remoteEndpointBasic.sendText("'cp' grid command is not implemented. Please use native client's Cp() method", true);
 				}
