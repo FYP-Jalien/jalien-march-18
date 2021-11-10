@@ -1128,9 +1128,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 							break;
 						}
 						else {
-							logger.log(Level.INFO, "Looks like entry " + entry + " is registered despite error. All good.");
-							commander.q_api.putJobLog(queueId, "trace", "Looks like entry " + entry + " is registered despite error. All good.");
-							break;
+							throw new NullPointerException();
 						}
 					}
 					catch (final NullPointerException npe2) {

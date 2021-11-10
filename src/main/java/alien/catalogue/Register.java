@@ -93,17 +93,17 @@ public class Register {
 			throw new IOException("No such SE " + seName);
 		}
 
-		final UUID uuid = guid != null && guid.length() > 0 ? UUID.fromString(guid) : GUIDUtils.generateTimeUUID();
-
 		final LFN name = LFNUtils.getLFN(lfn, true);
 
 		// sanity check
 		if (name.exists) {
-			if (!name.guid.equals(uuid) || name.size != size || !name.md5.equals(md5)) {
+			if ( name.jobid != jobId || name.size != size || !md5.equals(name.md5)) {
 				System.err
-						.println("Register : LFN exists for " + name.lfn + " and the details don't match:\n" + name + "\nwhile the new guid = " + uuid + ", size = " + size + " and the md5 is " + md5);
+						.println("Register : LFN exists for " + name.lfn + " and the details don't match:\n" + name + "\nwhile the identified jobId = " + jobId + ", size = " + size + " and the md5 is " + md5);
 				throw new IOException("The details don't match the existing LFN fields for " + name.lfn);
-			}
+			} 
+			// already registered
+			return true;
 		}
 		else {
 			LFN check = name.getParentDir(true);
@@ -117,6 +117,7 @@ public class Register {
 			}
 		}
 
+		final UUID uuid = guid != null && guid.length() > 0 ? UUID.fromString(guid) : GUIDUtils.generateTimeUUID();
 		GUID g = GUIDUtils.getGUID(uuid, true);
 
 		// sanity check
