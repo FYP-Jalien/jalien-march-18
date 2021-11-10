@@ -689,7 +689,11 @@ public class DispatchSSLServerNIO implements Runnable {
 				for (DispatchSSLServerNIO instance : sessionMap.values()) {
 					if (instance.lastActive < referenceTime && !instance.isActive.get()) {
 						try {
-							logger.log(Level.WARNING, "Closing idle connection: " + instance.remoteIdentity.getName() + "@" + instance.remoteIdentity.getRemoteEndpoint());
+							if (instance.remoteIdentity != null)
+								logger.log(Level.WARNING, "Closing idle connection: " + instance.remoteIdentity.getName() + "@" + instance.remoteIdentity.getRemoteEndpoint());
+							else
+								logger.log(Level.WARNING, "Closing idle connection for a `null` identity");
+
 							instance.cleanup();
 						}
 						catch (Throwable t) {
