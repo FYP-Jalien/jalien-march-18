@@ -580,7 +580,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		if (iFiles.size() != filesToDownload.size()) {
 			logger.log(Level.WARNING, "Not all requested files could be located");
-			commander.q_api.putJobLog(queueId, "trace", "ERROR: Not all requested files could be located. Located files " + iFiles.size() + ", but expected " + filesToDownload.size());
+
+			// diff
+			while (!iFiles.isEmpty()) {
+				filesToDownload.removeIf(slfn -> (slfn.contains(iFiles.get(iFiles.size() - 1).lfn)));
+				iFiles.remove(iFiles.size() - 1);
+			}
+			commander.q_api.putJobLog(queueId, "trace", "ERROR: Not all requested files could be located in the catalogue. Missing files: " + Arrays.toString(filesToDownload.toArray()));
 			return false;
 		}
 
