@@ -380,7 +380,7 @@ public class TextCache extends HttpServlet {
 	protected void doGet(final HttpServletRequest request, final HttpServletResponse response) throws ServletException, IOException {
 		try (Timing timing = new Timing(monitor, "ms_to_answer")) {
 			try (PrintWriter pwOut = response.getWriter()) {
-				execRealGet(new RequestWrapper(request), response, pwOut);
+				execRealGet(new RequestWrapper(request), request, response, pwOut);
 			}
 
 			timing.endTiming();
@@ -396,7 +396,7 @@ public class TextCache extends HttpServlet {
 		}
 	}
 
-	private static final void execRealGet(final RequestWrapper rw, final HttpServletResponse response, final PrintWriter pwOut) {
+	private static final void execRealGet(final RequestWrapper rw, final HttpServletRequest request, final HttpServletResponse response, final PrintWriter pwOut) {
 		final String ns = rw.gets("ns", "default");
 
 		final String key = rw.gets("key");
@@ -628,6 +628,10 @@ public class TextCache extends HttpServlet {
 			}
 
 			pwOut.println("OK: removed " + removed + " values from ns '" + ns + "' matching " + Arrays.toString(rw.getValues("key")));
+
+			if (removed > 100)
+				System.err.println("Removed " + removed + " matching values from ns '" + ns + "' matching " + Arrays.toString(rw.getValues("key")) + ", request issued by " + request.getRemoteAddr()
+						+ " / " + request.getHeader("User-Agent"));
 
 			return;
 		}
