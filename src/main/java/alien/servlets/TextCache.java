@@ -152,7 +152,7 @@ public class TextCache extends HttpServlet {
 								final long expires = entry.getValue().expires;
 
 								if (expires < now) {
-									notifyEntryRemoved(namespace, entry.getKey(), entry.getValue(), true);
+									notifyEntryRemoved(namespace, entry.getKey(), entry.getValue(), true, "EXPIRED_");
 
 									it.remove();
 								}
@@ -215,7 +215,7 @@ public class TextCache extends HttpServlet {
 
 				synchronized (namespace) {
 					for (final Map.Entry<String, CacheValue> entryToDelete : namespace.cache.entrySet())
-						notifyEntryRemoved(namespace, entryToDelete.getKey(), entryToDelete.getValue(), false);
+						notifyEntryRemoved(namespace, entryToDelete.getKey(), entryToDelete.getValue(), false, "SHUTDOWN_");
 				}
 			}
 
@@ -255,9 +255,12 @@ public class TextCache extends HttpServlet {
 	 * @param value
 	 * @param removeFromKeysSet
 	 */
-	static synchronized void notifyEntryRemoved(final Namespace namespace, final String key, final CacheValue value, final boolean removeFromKeysSet) {
+	static synchronized void notifyEntryRemoved(final Namespace namespace, final String key, final CacheValue value, final boolean removeFromKeysSet, final String monitorPrefix) {
 		if (removeFromKeysSet)
 			namespace.keys.remove(key);
+
+		if (monitor != null)
+			monitor.incrementCounter(monitorPrefix + namespace.name);
 
 		if (requestLogger == null)
 			try {
@@ -308,7 +311,7 @@ public class TextCache extends HttpServlet {
 			final boolean ret = super.removeEldestEntry(eldest);
 
 			if (ret)
-				notifyEntryRemoved(namespace, eldest.getKey(), eldest.getValue(), true);
+				notifyEntryRemoved(namespace, eldest.getKey(), eldest.getValue(), true, "EVICTED_");
 
 			return ret;
 		}
@@ -404,18 +407,22 @@ public class TextCache extends HttpServlet {
 		response.setContentType("text/plain");
 
 		if (key.length() == 0) {
-			if (rw.gets("clean", null) != null)
+			if (rw.gets("clean", null) != null) {
 				for (final Map.Entry<String, Namespace> entry : namespaces.entrySet()) {
 					final Namespace namespace = entry.getValue();
 
 					synchronized (namespace) {
 						for (final Map.Entry<String, CacheValue> entryToDelete : namespace.cache.entrySet())
-							notifyEntryRemoved(namespace, entryToDelete.getKey(), entryToDelete.getValue(), false);
+							notifyEntryRemoved(namespace, entryToDelete.getKey(), entryToDelete.getValue(), false, "CLEAN_");
 
 						namespace.cache.clear();
 						namespace.keys.clear();
 					}
 				}
+
+				if (monitor != null)
+					monitor.incrementCounter("CLEAN");
+			}
 			else if (rw.gets("ns").length() == 0) {
 				for (final Map.Entry<String, Namespace> entry : namespaces.entrySet()) {
 					final Namespace namespace = entry.getValue();
@@ -543,7 +550,7 @@ public class TextCache extends HttpServlet {
 			}
 
 			if (old != null)
-				notifyEntryRemoved(namespace, key, old, false);
+				notifyEntryRemoved(namespace, key, old, false, "OVERWRITE_");
 			else
 				namespace.keys.add(key);
 
@@ -570,12 +577,9 @@ public class TextCache extends HttpServlet {
 					}
 
 					if (old != null) {
-						notifyEntryRemoved(namespace, keyValue, old, true);
+						notifyEntryRemoved(namespace, keyValue, old, true, "CLEAR_");
 						removed++;
 					}
-
-					if (monitor != null)
-						monitor.incrementCounter("CLEAR_" + ns);
 
 					continue;
 				}
@@ -615,16 +619,13 @@ public class TextCache extends HttpServlet {
 						}
 
 						if (old != null) {
-							notifyEntryRemoved(namespace, itKey, old, false);
+							notifyEntryRemoved(namespace, itKey, old, false, "CLEARPATTERN_");
 							removed++;
 						}
 
 						it.remove();
 					}
 				}
-
-				if (monitor != null)
-					monitor.incrementCounter("CLEARPATTERN_" + ns);
 			}
 
 			pwOut.println("OK: removed " + removed + " values from ns '" + ns + "' matching " + Arrays.toString(rw.getValues("key")));
