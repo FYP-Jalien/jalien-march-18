@@ -422,6 +422,8 @@ public class TextCache extends HttpServlet {
 
 				if (monitor != null)
 					monitor.incrementCounter("CLEAN");
+
+				System.err.println("Clean request came from " + request.getRemoteAddr() + " / " + request.getHeader("User-Agent"));
 			}
 			else if (rw.gets("ns").length() == 0) {
 				for (final Map.Entry<String, Namespace> entry : namespaces.entrySet()) {
