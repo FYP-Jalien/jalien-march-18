@@ -411,19 +411,17 @@ public class TextCache extends HttpServlet {
 				for (final Map.Entry<String, Namespace> entry : namespaces.entrySet()) {
 					final Namespace namespace = entry.getValue();
 
-					synchronized (namespace) {
-						for (final Map.Entry<String, CacheValue> entryToDelete : namespace.cache.entrySet())
-							notifyEntryRemoved(namespace, entryToDelete.getKey(), entryToDelete.getValue(), false, "CLEAN_");
+					if ("default".equals(ns) || namespace.name.equals(ns))
+						synchronized (namespace) {
+							for (final Map.Entry<String, CacheValue> entryToDelete : namespace.cache.entrySet())
+								notifyEntryRemoved(namespace, entryToDelete.getKey(), entryToDelete.getValue(), false, "CLEAN_");
 
-						namespace.cache.clear();
-						namespace.keys.clear();
-					}
+							namespace.cache.clear();
+							namespace.keys.clear();
+						}
 				}
 
-				if (monitor != null)
-					monitor.incrementCounter("CLEAN");
-
-				System.err.println("Clean request came from " + request.getRemoteAddr() + " / " + request.getHeader("User-Agent"));
+				System.err.println("Clean request came from " + request.getRemoteAddr() + " / " + request.getHeader("User-Agent") + " for ns " + ns);
 			}
 			else if (rw.gets("ns").length() == 0) {
 				for (final Map.Entry<String, Namespace> entry : namespaces.entrySet()) {
