@@ -56,7 +56,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	// Folders and files
 	private final File currentDir = new File(Paths.get(".").toAbsolutePath().normalize().toString());
 	private final String tmpDir = currentDir + "/tmp";
-	private final String timeFile= ".jalienTimes";
+	private final String timeFile = ".jalienTimes";
 	private final String jobstatusFile = ".jalienJobstatus";
 	private String defaultOutputDirPrefix;
 
@@ -623,8 +623,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				// commander.q_api.putJobLog(queueId, "trace", "Warning: Could not download to " + entry.getValue().getAbsolutePath() + ". Already exists. Will instead use: " + f.getAbsolutePath());
 			}
 
-			if (inputDataList != null)
-				inputDataList = inputDataList.replace("turl=\"alien://" + entry.getKey().getCanonicalName(), "turl=\"file:///" + f.getAbsolutePath()); // xmlcollection format here does not match AliEn
+			if (inputDataList != null) {
+				if (inputDataList.startsWith("<?xml"))
+					inputDataList = inputDataList.replace("turl=\"alien://" + entry.getKey().getCanonicalName(), "turl=\"file:///" + f.getAbsolutePath()); // xmlcollection format here does not match AliEn
+				else
+					inputDataList = Format.replace(inputDataList, "alien://" + entry.getKey().getCanonicalName() + "\n", "file:///" + f.getAbsolutePath() + "\n");
+			}
 
 			commander.q_api.putJobLog(queueId, "trace", "Getting InputFile: " + entry.getKey().getCanonicalName() + " to " + f.getAbsolutePath() + " (" + Format.size(entry.getKey().size) + ")");
 
@@ -683,17 +687,26 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				logger.log(Level.WARNING, "XML List is NULL!");
 				return null;
 			}
-			logger.log(Level.INFO, "Going to create XML: " + list);
+			logger.log(Level.INFO, "Going to create: " + list);
 
 			final String format = jdl.gets("InputDataListFormat");
-			if (format == null || !"xml-single".equals(format)) {
-				logger.log(Level.WARNING, "XML format not understood");
+			if (!"xml-single".equals(format) && !"txt-list".equals(format)) {
+				logger.log(Level.WARNING, "Data list format not understood: " + format);
 				return null;
+			}
+
+			final List<String> datalist = jdl.getInputData(true);
+
+			if ("txt-list".equals(format)) {
+				final StringBuilder sb = new StringBuilder();
+				for (final String s : datalist)
+					sb.append("alien://").append(s).append('\n');
+
+				return sb.toString();
 			}
 
 			final XmlCollection c = new XmlCollection();
 			c.setName("jobinputdata");
-			final List<String> datalist = jdl.getInputData(true);
 
 			// TODO: Change
 			for (final String s : datalist) {
@@ -883,8 +896,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			return false;
 		} // else
 			// changeStatus(JobStatus.SAVED); TODO: To be put back later if still needed
-		if (exitStatus == JobStatus.DONE) {	
-			if(!registerEntries(toUpload, outputDir))
+		if (exitStatus == JobStatus.DONE) {
+			if (!registerEntries(toUpload, outputDir))
 				changeStatus(JobStatus.ERROR_SV);
 			else if (uploadedNotAllCopies)
 				changeStatus(JobStatus.DONE_WARN);
@@ -1133,24 +1146,23 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 							commander.q_api.putJobLog(queueId, "trace", "Entry " + entry + " successfully registered on attempt " + i);
 							break;
 						}
-						else {
-							throw new NullPointerException();
-						}
+
+						throw new NullPointerException("registerEntry returned `false`");
 					}
 					catch (final NullPointerException npe2) {
-						logger.log(Level.WARNING, "Retry " + i + " failed.");
+						logger.log(Level.WARNING, "Retry " + i + " failed.", npe2);
 						if (i == 3) {
 							logger.log(Level.SEVERE, "Registration of entry " + entry + " failed after 3 attempts. Aborting.");
 							commander.q_api.putJobLog(queueId, "trace", "Registration of entry " + entry + " failed after 3 attempts. Aborting.");
 							return false;
 						}
-						else
-							try {
-								Thread.sleep(30 * 1000);
-							}
-							catch (final InterruptedException ie) {
-								// ignore
-							}
+
+						try {
+							Thread.sleep(30 * 1000);
+						}
+						catch (@SuppressWarnings("unused") final InterruptedException ie) {
+							return false;
+						}
 					}
 				}
 			}
