@@ -233,6 +233,9 @@ public class JobAgent implements Runnable {
 			names.add("ja_status_string");
 			values.add(status.getStringValue());
 
+			names.add("ja_status");
+			values.add(Integer.valueOf(status.getValue()));
+
 			names.add("ja_status_" + status.getValue());
 			values.add(Integer.valueOf(1));
 
@@ -972,6 +975,7 @@ public class JobAgent implements Runnable {
 		status = new_status;
 		monitor.sendParameter("ja_status_string", status.getStringValue());
 		monitor.sendParameter("ja_status_" + status.getValue(), Integer.valueOf(1));
+		monitor.sendParameter("ja_status", Integer.valueOf(status.getValue()));
 	}
 
 	private void setUsedCores(int jobNumber) {
