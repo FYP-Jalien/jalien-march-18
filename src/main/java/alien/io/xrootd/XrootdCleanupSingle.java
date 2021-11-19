@@ -61,7 +61,7 @@ public class XrootdCleanupSingle extends Thread {
 	final boolean setSE;
 
 	private static DBFunctions getDB() {
-		final DBFunctions db = ConfigUtils.getDB("alice_users_master");
+		final DBFunctions db = ConfigUtils.getDB("alice_users");
 
 		db.setQueryTimeout(600);
 
