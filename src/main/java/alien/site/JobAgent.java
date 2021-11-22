@@ -42,6 +42,7 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.math.BigInteger;
 
 import alien.api.DispatchSSLClient;
 import alien.api.Request;
@@ -884,8 +885,8 @@ public class JobAgent implements Runnable {
 	}
 
 	long[] getFreeCPUs() {
-		long newVal;
-		long mask = 0;
+		BigInteger newVal;
+		BigInteger mask = BigInteger.ZERO;
 
 		try {
 			String cmd = "pgrep -v -U root -u root | xargs -L1 taskset -a -p 2>/dev/null | cut -d' ' -f6 | sort -u";
@@ -897,12 +898,12 @@ public class JobAgent implements Runnable {
 				while (cmdScanner.hasNext()) {
 					readArg = (cmdScanner.next());
 
-					newVal = Long.parseLong(readArg.trim(), 16);
+					newVal = new BigInteger(readArg.trim(), 16);
 
-					if ((1 << RES_NOCPUS.intValue()) - 1 == newVal)
+					if (BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE).equals(newVal))
 						continue;
 
-					mask |= newVal;
+					mask.or(newVal);
 
 				}
 				return valueToArray(mask, RES_NOCPUS.intValue());
@@ -918,14 +919,14 @@ public class JobAgent implements Runnable {
 		return null;
 	}
 
-	static long[] valueToArray(long v, int size) {
+	static long[] valueToArray(BigInteger v, int size) {
 		long[] maskArray = new long[size];
 		int count = 0;
-		long vAux = v;
+		BigInteger vAux = v;
 
-		while (vAux > 0) {
-			maskArray[count] = vAux & 1;
-			vAux = vAux >> 1;
+		while (vAux.compareTo(BigInteger.ZERO) < 0) {
+			maskArray[count] = vAux.testBit(1) ? 1 : 0;
+			vAux = vAux.shiftLeft(1);
 			count++;
 		}
 
@@ -951,7 +952,8 @@ public class JobAgent implements Runnable {
 
 		try {
 			final String out = ExternalProcesses.getCmdOutput(Arrays.asList("/bin/bash", "-c", cmd), true, 30L, TimeUnit.SECONDS);
-			return valueToArray((~Long.parseLong(out.trim(), 16) & (1 << RES_NOCPUS.intValue()) - 1), RES_NOCPUS.intValue());
+			//return valueToArray((~Long.parseLong(out.trim(), 16) & (1 << RES_NOCPUS.intValue()) - 1), RES_NOCPUS.intValue());
+			return valueToArray((new BigInteger(out.trim(), 16)).not().and(BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE)), RES_NOCPUS.intValue());
 		}
 		catch (IOException e) {
 			e.printStackTrace();
@@ -1057,9 +1059,11 @@ public class JobAgent implements Runnable {
 
 			// Run jobs in isolated environment
 			String isolCmd = addIsolation((int) reqCPU.longValue());
+			logger.log(Level.SEVERE, "IsolCmd command" + isolCmd);
 			if (isolCmd != null && isolCmd.compareTo("") != 0)
 				launchCmd.addAll(0, Arrays.asList("taskset", "-c", isolCmd));
 
+			logger.log(Level.SEVERE, "Launching command" + launchCmd);
 			return launchCmd;
 		}
 		catch (final IOException e) {
