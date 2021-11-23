@@ -37,7 +37,7 @@ public class Register {
 		final GUID g = GUIDUtils.getGUID(LFNUtils.getLFN(outputDir + entry.getName()));
 		final String base_pfn = "guid:///" + g.guid.toString() + "?ZIP=";
 
-		for (String member : members) {
+		for (final String member : members) {
 			// We register and lfn-guid set for each archive member
 			if (!sizes.containsKey(member)) {
 				TaskQueueUtils.putJobLog(entry.getQueueId().longValue(), "error", "File " + member + ": doesn't exist or has 0 size. Skip.", null);
@@ -49,8 +49,8 @@ public class Register {
 			}
 
 			// we have size and md5!
-			boolean r = register(outputDir + member, base_pfn + member, null, md5s.get(member), sizes.get(member).longValue(), "no_se", user, entry.getQueueId().longValue());
-			if (r == false)
+			final boolean r = register(outputDir + member, base_pfn + member, null, md5s.get(member), sizes.get(member).longValue(), "no_se", user, entry.getQueueId().longValue());
+			if (!r)
 				ret = false;
 		}
 
@@ -97,24 +97,24 @@ public class Register {
 
 		// sanity check
 		if (name.exists) {
-			if ( name.jobid != jobId || name.size != size || !md5.equals(name.md5)) {
+			if (name.jobid != jobId || name.size != size || !md5.equals(name.md5)) {
 				System.err
-						.println("Register : LFN exists for " + name.lfn + " and the details don't match:\n" + name + "\nwhile the identified jobId = " + jobId + ", size = " + size + " and the md5 is " + md5);
+						.println("Register : LFN exists for " + name.lfn + " and the details don't match:\n" + name + "\nwhile the identified jobId = " + jobId + ", size = " + size
+								+ " and the md5 is " + md5);
 				throw new IOException("The details don't match the existing LFN fields for " + name.lfn);
-			} 
+			}
 			// already registered
 			return true;
 		}
-		else {
-			LFN check = name.getParentDir(true);
 
-			while (check != null && !check.exists) {
-				check = check.getParentDir();
-			}
+		LFN check = name.getParentDir(true);
 
-			if (!AuthorizationChecker.canWrite(check, user)) {
-				throw new IOException("User " + user.getName() + " is not allowed to write LFN " + lfn);
-			}
+		while (check != null && !check.exists) {
+			check = check.getParentDir();
+		}
+
+		if (!AuthorizationChecker.canWrite(check, user)) {
+			throw new IOException("User " + user.getName() + " is not allowed to write LFN " + lfn);
 		}
 
 		final UUID uuid = guid != null && guid.length() > 0 ? UUID.fromString(guid) : GUIDUtils.generateTimeUUID();
@@ -178,7 +178,7 @@ public class Register {
 		}
 
 		if (!g.seStringList.contains(Integer.valueOf(se.seNumber))) {
-			PFN p = new PFN(g, se);
+			final PFN p = new PFN(g, se);
 			p.pfn = pfn;
 
 			if (!g.addPFN(p)) {
