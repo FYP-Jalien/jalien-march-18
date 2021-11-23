@@ -197,6 +197,9 @@ public class CE implements Serializable, Comparable<CE> {
 
 	@Override
 	public boolean equals(final Object ceToCompare) {
+		if (ceToCompare == null)
+			return false;
+
 		return ((CE) ceToCompare).ceName.equals(this.ceName);
 	}
 
