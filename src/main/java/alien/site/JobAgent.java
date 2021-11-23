@@ -542,6 +542,7 @@ public class JobAgent implements Runnable {
 		monitor.sendParameter("job_id", Integer.valueOf(0));
 
 		logger.log(Level.INFO, "Cleaning up after execution...");
+		commander.q_api.putJobLog(queueId, "trace", "Cleaning up after execution...");
 
 		try {
 			Files.walk(tempDir.toPath())
@@ -782,7 +783,7 @@ public class JobAgent implements Runnable {
 				}
 			}
 
-			// Check if there is container support at present on site. If yes, add to launchCmd
+			// Check if there is container support present on site. If yes, add to launchCmd
 			final Containerizer cont = ContainerizerFactory.getContainerizer();
 			if (cont != null) {
 				commander.q_api.putJobLog(queueId, "trace", "Support for containers detected. Will use: " + cont.getContainerizerName());
