@@ -666,16 +666,17 @@ public class CatalogueApiUtils {
 	 * @param qos
 	 * @param useLFNasGuid
 	 * @param attempts
+	 * @param removeReplica SE to remove from, after the transfer is successful (making it a `move` operation)
 	 * @return command result for each lfn or <code>null</code>
 	 */
 	public HashMap<String, Long> mirrorLFN(final String lfn_name, final List<String> ses, final List<String> exses, final HashMap<String, Integer> qos, final boolean useLFNasGuid,
-			final Integer attempts) {
+			final Integer attempts, final String removeReplica) {
 
 		if (lfn_name == null || lfn_name.length() == 0)
 			throw new IllegalArgumentException("Empty LFN name");
 
 		try {
-			final MirrorLFN ml = Dispatcher.execute(new MirrorLFN(commander.getUser(), lfn_name, ses, exses, qos, useLFNasGuid, attempts));
+			final MirrorLFN ml = Dispatcher.execute(new MirrorLFN(commander.getUser(), lfn_name, ses, exses, qos, useLFNasGuid, attempts, removeReplica));
 			return ml.getResultHashMap();
 		}
 		catch (final SecurityException e) {

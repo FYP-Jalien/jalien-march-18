@@ -25,6 +25,7 @@ public class MirrorLFN extends Request {
 	private final HashMap<String, Integer> qos;
 	private final boolean useGUID;
 	private final Integer attempts;
+	private final String removeReplica;
 	private HashMap<String, Long> results;
 
 	/**
@@ -35,10 +36,11 @@ public class MirrorLFN extends Request {
 	 * @param qos
 	 * @param useLFNasGuid
 	 * @param attempts_cnt
+	 * @param removeReplica SE to remove after a successful transfer to the destination SE(s)
 	 * @throws ServerException
 	 */
 	public MirrorLFN(final AliEnPrincipal user, final String lfn_name, final List<String> ses, final List<String> exses, final HashMap<String, Integer> qos, final boolean useLFNasGuid,
-			final Integer attempts_cnt) throws ServerException {
+			final Integer attempts_cnt, final String removeReplica) throws ServerException {
 		setRequestUser(user);
 		this.path = lfn_name;
 		this.useGUID = useLFNasGuid;
@@ -46,12 +48,13 @@ public class MirrorLFN extends Request {
 		this.ses = ses;
 		this.exses = exses;
 		this.qos = qos;
+		this.removeReplica = removeReplica;
 	}
 
 	@Override
 	public List<String> getArguments() {
 		return Arrays.asList(this.path, String.valueOf(this.useGUID), String.valueOf(this.attempts), this.ses != null ? this.ses.toString() : null, this.exses != null ? this.exses.toString() : null,
-				this.qos != null ? this.qos.toString() : null);
+				this.qos != null ? this.qos.toString() : null, removeReplica);
 	}
 
 	@Override
@@ -61,7 +64,7 @@ public class MirrorLFN extends Request {
 		if (!AuthorizationChecker.isOwner(c, getEffectiveRequester()))
 			throw new SecurityException("You do not own this file: " + c + ", requester: " + getEffectiveRequester());
 
-		this.results = LFNUtils.mirrorLFN(this.path, this.ses, this.exses, this.qos, this.useGUID, this.attempts);
+		this.results = LFNUtils.mirrorLFN(this.path, this.ses, this.exses, this.qos, this.useGUID, this.attempts, this.removeReplica);
 
 		this.success = this.results != null ? this.results.size() : -1;
 	}

@@ -24,6 +24,7 @@ public class JAliEnCommandmirror extends JAliEnBaseCommand {
 	private Integer attempts;
 	private String lfn;
 	private String dstSE;
+	private String removeSourceSE;
 
 	private int referenceCount = 0;
 	private final List<String> ses = new ArrayList<>();
@@ -41,6 +42,7 @@ public class JAliEnCommandmirror extends JAliEnBaseCommand {
 			final OptionParser parser = new OptionParser();
 			parser.accepts("try").withRequiredArg().ofType(Integer.class);
 			parser.accepts("S").withRequiredArg();
+			parser.accepts("r").withRequiredArg();
 			parser.accepts("g");
 
 			final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
@@ -56,6 +58,8 @@ public class JAliEnCommandmirror extends JAliEnBaseCommand {
 				attempts = (Integer) options.valueOf("try");
 			else
 				attempts = Integer.valueOf(5);
+
+			removeSourceSE = options.has("r") ? options.valueOf("r").toString() : null;
 
 			if (options.has("S") && options.hasArgument("S")) {
 				if ((String) options.valueOf("S") != null) {
@@ -135,10 +139,10 @@ public class JAliEnCommandmirror extends JAliEnBaseCommand {
 				}
 
 				for (final String toMirror : toMirrorEntries) {
-					results = commander.c_api.mirrorLFN(toMirror, this.ses, this.exses, this.qos, this.useLFNasGuid, this.attempts);
+					results = commander.c_api.mirrorLFN(toMirror, this.ses, this.exses, this.qos, this.useLFNasGuid, this.attempts, this.removeSourceSE);
 
 					if (results == null && !this.useLFNasGuid && GUIDUtils.isValidGUID(this.lfn))
-						results = commander.c_api.mirrorLFN(this.lfn, this.ses, this.exses, this.qos, true, this.attempts);
+						results = commander.c_api.mirrorLFN(this.lfn, this.ses, this.exses, this.qos, true, this.attempts, this.removeSourceSE);
 
 					if (results != null) {
 						for (final Map.Entry<String, Long> entry : results.entrySet()) {
@@ -228,12 +232,13 @@ public class JAliEnCommandmirror extends JAliEnBaseCommand {
 	@Override
 	public void printHelp() {
 		commander.printOutln();
-		commander.printOutln("mirror Copies a file into another SE");
+		commander.printOutln("mirror Copies/moves a file to one or more other SEs");
 		commander.printOutln(" Usage:");
-		commander.printOutln("	mirror [-g] [-try <number>] [-S [se[,se2[,!se3[,qos:count]]]]] <lfn> [<SE>]");
-		commander.printOutln("                 -g:      Use the lfn as a guid");
-		commander.printOutln("                 -S:     specifies the destination SEs to be used");
-		commander.printOutln("                 -try <NumOfAttempts>     Specifies the number of attempts to try and mirror the file");
+		commander.printOutln("	mirror [-g] [-try <number>] [-r SE] [-S [se[,se2[,!se3[,qos:count]]]]] <lfn> [<SE>]");
+		commander.printOutln("                 -g:     Use the lfn as a guid");
+		commander.printOutln("                 -S:     specifies the destination SEs/tags to be used");
+		commander.printOutln("                 -r:     remove this source replica after a successful transfer (a `move` operation)");
+		commander.printOutln("                 -try <attempts>     Specifies the number of attempts to try and mirror the file (default 5)");
 		commander.printOutln();
 	}
 

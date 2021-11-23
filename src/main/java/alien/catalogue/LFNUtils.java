@@ -1315,10 +1315,11 @@ public class LFNUtils {
 	 * @param qos
 	 * @param is_guid
 	 * @param attempts
+	 * @param removeReplica remove this source after a successful transfer
 	 * @return transfer IDs to each SE
 	 */
 	public static HashMap<String, Long> mirrorLFN(final String path, final List<String> ses, final List<String> exses, final Map<String, Integer> qos, final boolean is_guid,
-			final Integer attempts) {
+			final Integer attempts, final String removeReplica) {
 		LFN lfn;
 		if (is_guid) {
 			final GUID g = GUIDUtils.getGUID(UUID.fromString(path), false);
@@ -1350,7 +1351,7 @@ public class LFNUtils {
 		final List<SE> found_ses = SEUtils.getBestSEsOnSpecs(site, ses, excludedSEs, qos, true);
 		final HashMap<String, Long> resmap = new HashMap<>();
 		for (final SE s : found_ses) {
-			final long transferID = attempts != null && attempts.intValue() > 0 ? TransferUtils.mirror(lfn, s, null, attempts.intValue()) : TransferUtils.mirror(lfn, s);
+			final long transferID = attempts != null && attempts.intValue() > 0 ? TransferUtils.mirror(lfn, s, removeReplica, attempts.intValue()) : TransferUtils.mirror(lfn, s, removeReplica);
 			resmap.put(s.getName(), Long.valueOf(transferID));
 		}
 
