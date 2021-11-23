@@ -416,7 +416,7 @@ public class JDL implements Serializable {
 		boolean possibleInt = true;
 		boolean possibleDouble = true;
 
-		for (char c : value.toCharArray()) {
+		for (final char c : value.toCharArray()) {
 			if (c >= '0' && c <= '9')
 				continue;
 
@@ -561,8 +561,19 @@ public class JDL implements Serializable {
 
 		final List<LFN> tempList = LFNUtils.getLFNs(true, otherInputFiles);
 
-		if (tempList != null && tempList.size() > 0)
-			ret.addAll(tempList);
+		if (tempList != null && tempList.size() > 0) {
+			for (final LFN l : tempList)
+				if (l.isCollection()) {
+					final Collection<String> collectionListing = l.listCollection();
+
+					final List<LFN> sublist = LFNUtils.getLFNs(true, collectionListing);
+
+					if (sublist != null)
+						ret.addAll(sublist);
+				}
+				else
+					ret.add(l);
+		}
 
 		return ret;
 	}
@@ -756,7 +767,7 @@ public class JDL implements Serializable {
 		if (idx < 0) {
 			if (!value.isBlank())
 				ret.add(value);
-			
+
 			return ret;
 		}
 
@@ -1512,7 +1523,7 @@ public class JDL implements Serializable {
 
 	/**
 	 * Get the set of files (and patterns!) that the job is expected to register
-	 * 
+	 *
 	 * @param tag if indicated then parse the given tag name instead of the default tag set (Output, OutputArchive, OutputFile)
 	 *
 	 * @param includeArchiveMembers
