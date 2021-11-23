@@ -468,7 +468,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		processEnv.put("JALIEN_TOKEN_KEY", tokenKey);
 		processEnv.put("ALIEN_JOB_TOKEN", legacyToken); // add legacy token
 		processEnv.put("ALIEN_PROC_ID", String.valueOf(queueId));
+		processEnv.put("ALIEN_MASTERJOB_ID", String.valueOf(masterjobID != null ? masterjobID.longValue() : queueId));
 		processEnv.put("ALIEN_SITE", siteMap.get("Site").toString());
+		processEnv.put("ALIEN_USER", username);
 
 		processEnv.put("HOME", currentDir.getAbsolutePath());
 		processEnv.put("TMP", currentDir.getAbsolutePath() + "/tmp");
