@@ -765,6 +765,27 @@ public class CatalogueApiUtils {
 		return false;
 	}
 
+
+	/**
+	 * Book the LFNs contained in the OutputEntry in catalogue
+	 *
+	 * @param entry
+	 * @param entry_lfn
+	 * @param outputDir
+	 * @param user
+	 * @return <code>true</code> if no errors
+	 */
+	public static boolean bookArchiveEntries(final OutputEntry entry, final LFN entry_lfn, final String outputDir, final AliEnPrincipal user) {
+		try {
+			return Dispatcher.execute(new BookArchiveEntries(entry, entry_lfn, outputDir, user)).wasBooked();
+		}
+		catch (final ServerException e) {
+			logger.log(Level.WARNING, "Could not book entry " + entry.getName());
+			e.getCause().printStackTrace();
+		}
+		return false;
+	}
+
 	/**
 	 * Upload a local file to the Grid
 	 *

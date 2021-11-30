@@ -2,7 +2,9 @@ package alien.catalogue;
 
 import java.io.IOException;
 import java.sql.ResultSet;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.UUID;
@@ -16,6 +18,8 @@ import alien.quotas.FileQuota;
 import alien.quotas.QuotaUtilities;
 import alien.se.SE;
 import alien.se.SEUtils;
+import alien.site.OutputEntry;
+import alien.taskQueue.TaskQueueUtils;
 import alien.user.AliEnPrincipal;
 import alien.user.AuthorizationChecker;
 import lazyj.DBFunctions;
@@ -165,7 +169,7 @@ public class BookingTable {
 			else {
 				// make sure a previously queued deletion request for this file is wiped before giving out a new token
 				db.query("DELETE FROM orphan_pfns WHERE guid=string2binary(?) AND se=?;", false, requestedGUID.guid.toString(), Integer.valueOf(se.seNumber));
-				db.query("DELETE FROM orphan_pfns_" + se.seNumber + " WHERE guid=string2binary(?);", true, requestedGUID.guid.toString());
+			 	db.query("DELETE FROM orphan_pfns_" + se.seNumber + " WHERE guid=string2binary(?);", true, requestedGUID.guid.toString());
 
 				final String reason = AuthorizationFactory.fillAccess(user, pfn, AccessType.WRITE);
 
@@ -506,5 +510,64 @@ public class BookingTable {
 		}
 
 		return ret;
+	}
+
+	/**
+	 * 
+	 * Books the members of an archive for writing
+	 * 
+	 * @param archive
+	 * @param outputDir
+	 * @param user
+	 * @return true for no IOExceptions
+	 * @throws IOException
+	 */
+	public static boolean bookArchiveContents(final OutputEntry archive, final LFN archive_lfn, final String outputDir, final AliEnPrincipal user) throws IOException {
+		final ArrayList<String> members = archive.getFilesIncluded();
+		final HashMap<String, Long> sizes = archive.getSizesIncluded();
+		final HashMap<String, String> md5s = archive.getMD5sIncluded();
+
+		final SE se = SEUtils.getSE("no_se");
+
+		try {
+			final String base_pfn = "guid:///" + archive_lfn.guid.toString() + "?ZIP=";
+
+			for (String member : members) {
+				if (!sizes.containsKey(member)) {
+					TaskQueueUtils.putJobLog(archive.getQueueId().longValue(), "error", "File " + member + ": doesn't exist or has 0 size. Skip.", null);
+					continue;
+				}
+				else if (!md5s.containsKey(member)) {
+					TaskQueueUtils.putJobLog(archive.getQueueId().longValue(), "error", "File " + member + ": unable to calculate MD5. Skip.", null);
+					continue;
+				}
+				
+				// GUID
+				final UUID uuid = GUIDUtils.generateTimeUUID();
+				GUID member_g = GUIDUtils.getGUID(uuid, true);
+				member_g.owner = user.getName();
+
+				// PFN
+				String member_spfn = base_pfn + member;
+				PFN member_pfn = new PFN(member_g, se);
+				member_pfn.pfn = member_spfn;
+
+				// LFN
+				String member_slfn = outputDir + member;
+				LFN member_lfn = LFNUtils.getLFN(member_slfn, true);
+				member_lfn.guid = uuid;
+				member_lfn.md5 = md5s.get(member);
+				member_lfn.size = sizes.get(member);
+				member_lfn.jobid = archive.getQueueId();
+				member_lfn.type = 'f';
+				member_lfn.owner = user.getName();
+
+				bookForWriting(user, member_lfn, member_g, member_pfn, se);
+			}
+		}
+		catch (final IOException e) {
+			return false;
+		}
+		return true;
 	}
 }

@@ -879,6 +879,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					}
 					else
 						commander.q_api.putJobLog(queueId, "trace", uploadResult.getCanonicalName() + ": uploaded as requested");
+
+					// archive entries are only booked when committed, so we have to do it ourselves since -nc
+					if ((exitStatus == JobStatus.ERROR_E || exitStatus == JobStatus.ERROR_V) && entry.isArchive())
+						CatalogueApiUtils.bookArchiveEntries(entry, uploadResult, outputDir + "/", UserFactory.getByUsername(username));
 				}
 				else {
 					logger.log(Level.WARNING, "Can't upload output file " + localFile.getName() + ", does not exist or has zero size.");
@@ -995,7 +999,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @param exitStatus the target job status, affecting the booked directory (`~/recycle` if any error)
 	 * @return job output dir (as indicated in the JDL if OK, or the recycle path if not)
 	 */
-	public String getJobOutputDir(final JobStatus exitStatus) {
+    public String getJobOutputDir(final JobStatus exitStatus) {
 		String outputDir = jdl.getOutputDir();
 
 		if (exitStatus == JobStatus.ERROR_V || exitStatus == JobStatus.ERROR_E)
