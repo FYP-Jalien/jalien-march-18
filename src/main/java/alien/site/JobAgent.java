@@ -970,12 +970,17 @@ public class JobAgent implements Runnable {
 	}
 
 	private void setStatus(final jaStatus new_status) {
-		// Reset old status
-		monitor.sendParameter("ja_status_" + status.getValue(), Integer.valueOf(0));
-		status = new_status;
-		monitor.sendParameter("ja_status_string", status.getStringValue());
-		monitor.sendParameter("ja_status_" + status.getValue(), Integer.valueOf(1));
-		monitor.sendParameter("ja_status", Integer.valueOf(status.getValue()));
+		try {
+			// Reset old status
+			monitor.sendParameter("ja_status_" + status.getValue(), Integer.valueOf(0));
+			status = new_status;
+			monitor.sendParameter("ja_status_string", status.getStringValue());
+			monitor.sendParameter("ja_status_" + status.getValue(), Integer.valueOf(1));
+			monitor.sendParameter("ja_status", Integer.valueOf(status.getValue()));
+		}
+		catch (NullPointerException npe) {
+			System.err.println("Error setting status: " + npe);
+		}
 	}
 
 	private void setUsedCores(int jobNumber) {
