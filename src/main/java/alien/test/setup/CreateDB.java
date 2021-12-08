@@ -361,6 +361,9 @@ public class CreateDB {
 				"CREATE TABLE `INDEXTABLE` (" + "  `indexId` int(11) NOT NULL AUTO_INCREMENT," + "  `hostIndex` int(11) NOT NULL," + "  `tableName` int(11) NOT NULL,"
 						+ "  `lfn` varchar(255) COLLATE latin1_general_cs DEFAULT NULL," + "  PRIMARY KEY (`indexId`)," + "  UNIQUE KEY `lfn` (`lfn`)"
 						+ ") ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=latin1 COLLATE=latin1_general_cs;",
+				
+				"DROP TABLE IF EXISTS `INDEXTABLE_UPDATE`;",
+				"CREATE TABLE `INDEXTABLE_UPDATE` (" + " `entryId` ENUM(" + "`1`) NOT NULL PRIMARY KEY," + " `last_updated` TIMESTAMP);",
 
 				"DROP TABLE IF EXISTS `L0L`;",
 				"CREATE TABLE `L0L` (" + "  `entryId` bigint(11) NOT NULL AUTO_INCREMENT," + "  `owner` varchar(20) COLLATE latin1_general_cs NOT NULL,"
@@ -443,6 +446,12 @@ public class CreateDB {
 				"USE `" + TestConfig.userDB + "`;", "LOCK TABLES `INDEXTABLE` WRITE;", "INSERT INTO `INDEXTABLE` VALUES (0," + hostIndex + "," + tableName + ",'" + lfn + "')", "UNLOCK TABLES;" });
 	}
 
+	private static void addToINDEXTABLE_UPDATE() throws Exception {
+		fillDatabase(new String[] { "USE `" + TestConfig.systemDB + "`;", "LOCK TABLES `INDEXTABLE_UPDATE` WRITE;", "INSERT INTO `INDEXTABLE_UPDATE` (" + "`last_updated`) VALUES (NOW())",
+				"USE `" + TestConfig.dataDB + "`;", "LOCK TABLES `INDEXTABLE_UPDATE` WRITE;", "INSERT INTO `INDEXTABLE_UPDATE` (" + "`last_updated`) VALUES (NOW())",
+				"USE `" + TestConfig.userDB + "`;", "LOCK TABLES `INDEXTABLE_UPDATE` WRITE;", "INSERT INTO `INDEXTABLE_UPDATE` (" + "`last_updated`) VALUES (NOW())", "UNLOCK TABLES;" });
+	}
+
 	private static void addToHOSTSTABLE(final String hostIndex, final String address, final String db) throws Exception {
 		fillDatabase(new String[] { "USE `" + TestConfig.systemDB + "`;", "LOCK TABLES `HOSTS` WRITE;", "INSERT INTO `HOSTS` VALUES (" + hostIndex + ",'" + address + "','" + db + "','mysql',NULL);",
 				"USE `" + TestConfig.dataDB + "`;", "LOCK TABLES `HOSTS` WRITE;", "INSERT INTO `HOSTS` VALUES (" + hostIndex + ",'" + address + "','" + db + "','mysql',NULL);",
@@ -462,6 +471,7 @@ public class CreateDB {
 		addToGUIDINDEXTABLE("1", "1", "0", "", "");
 		addToINDEXTABLE("1", "0", "/");
 		addToINDEXTABLE("2", "0", TestConfig.base_home_dir);
+		addToINDEXTABLE_UPDATE();
 		addToHOSTSTABLE("1", TestConfig.VO_name + ":" + TestConfig.sql_port, TestConfig.dataDB);
 		addToHOSTSTABLE("2", TestConfig.VO_name + ":" + TestConfig.sql_port, TestConfig.userDB);
 

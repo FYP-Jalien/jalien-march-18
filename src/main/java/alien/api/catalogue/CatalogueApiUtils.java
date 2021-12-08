@@ -1127,4 +1127,17 @@ public class CatalogueApiUtils {
 		}
 
 	}
+
+	/**
+	 * @param path the path to the directory
+	 */
+	public void moveDirectory(final String path) {
+		try {
+			Dispatcher.execute(new MoveDirectory(commander.getUser(), path));
+		}
+		catch (final ServerException e) {
+			e.printStackTrace();
+		}
+
+	}
 }
