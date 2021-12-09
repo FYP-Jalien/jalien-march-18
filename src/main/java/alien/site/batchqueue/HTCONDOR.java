@@ -350,15 +350,15 @@ public class HTCONDOR extends BatchQueue {
 		}
 
 		final String file_base_name = String.format("%s/jobagent_%d_%d", log_folder_path, Long.valueOf(ProcessHandle.current().pid()), Long.valueOf(seq_number++));
-		final String log_cmd = String.format("log = %s.log\n", file_base_name);
+		final String log_cmd = String.format("log = %s.log%n", file_base_name);
 		String out_cmd = "";
 		String err_cmd = "";
 
 		final File enable_sandbox_file = new File(environment.get("HOME") + "/enable-sandbox");
 
 		if (enable_sandbox_file.exists()) {
-			out_cmd = String.format("output = %s.out\n", file_base_name);
-			err_cmd = String.format("error = %s.err\n", file_base_name);
+			out_cmd = String.format("output = %s.out%n", file_base_name);
+			err_cmd = String.format("error = %s.err%n", file_base_name);
 		}
 
 		String per_hold_grid = (local_pool != null) ? "" : "(JobStatus == 1 && GridJobStatus =?= undefined && CurrentTime - EnteredCurrentStatus > 1800) || ";
@@ -432,7 +432,7 @@ public class HTCONDOR extends BatchQueue {
 
 		final String cm = config.get("host_host") + ":" + config.get("host_port");
 		final String env_cmd = String.format("ALIEN_CM_AS_LDAP_PROXY='%s'", cm);
-		submit_jdl += String.format("environment = \"%s\"\n", env_cmd);
+		submit_jdl += String.format("environment = \"%s\"%n", env_cmd);
 
 		//
 		// allow preceding attributes to be overridden and others added if needed

@@ -272,11 +272,9 @@ public class PFNData {
 		final PFNData pfnData = new PFNData();
 		final Map<String, Object> data = new LinkedHashMap<>();
 
-		final Object entries = jsonObject.entrySet();
-		if (entries instanceof Set) {
-			for (final Map.Entry<?, ?> entry : (Set<Map.Entry<?, ?>>) entries) {
-				data.put(entry.getKey().toString(), entry.getValue());
-			}
+		final Set<?> entries = jsonObject.entrySet();
+		for (final Map.Entry<?, ?> entry : (Set<Map.Entry<?, ?>>) entries) {
+			data.put(entry.getKey().toString(), entry.getValue());
 		}
 
 		pfnData.setData(data);

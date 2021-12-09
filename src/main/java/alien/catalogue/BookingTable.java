@@ -517,6 +517,7 @@ public class BookingTable {
 	 * Books the members of an archive for writing
 	 * 
 	 * @param archive
+	 * @param archive_lfn 
 	 * @param outputDir
 	 * @param user
 	 * @return true for no IOExceptions
@@ -557,8 +558,8 @@ public class BookingTable {
 				LFN member_lfn = LFNUtils.getLFN(member_slfn, true);
 				member_lfn.guid = uuid;
 				member_lfn.md5 = md5s.get(member);
-				member_lfn.size = sizes.get(member);
-				member_lfn.jobid = archive.getQueueId();
+				member_lfn.size = sizes.get(member).longValue();
+				member_lfn.jobid = archive.getQueueId().longValue();
 				member_lfn.type = 'f';
 				member_lfn.owner = user.getName();
 
