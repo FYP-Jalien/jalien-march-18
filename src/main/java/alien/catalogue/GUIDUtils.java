@@ -385,7 +385,7 @@ public final class GUIDUtils {
 	 * @return a time UUID with the reference time set to now
 	 */
 	public static synchronized UUID generateTimeUUID() {
-		final long time = System.currentTimeMillis() * 10000 + 122192928000000000L;
+		final long time = System.currentTimeMillis() * 10000 + 122192928000000000L + System.nanoTime() % 10000;
 
 		if (time <= lastTimestamp) {
 			clockSequence++;
@@ -404,7 +404,7 @@ public final class GUIDUtils {
 	 * @return a time UUID with the time field set to the reference time
 	 */
 	public static synchronized UUID generateTimeUUID(final long referenceTime) {
-		final long time = referenceTime * 10000 + 122192928000000000L;
+		final long time = referenceTime * 10000 + 122192928000000000L + System.nanoTime() % 10000;
 
 		if (time <= lastTimestamp2 || time <= lastTimestamp) {
 			clockSequence++;
