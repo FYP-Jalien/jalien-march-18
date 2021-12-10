@@ -42,8 +42,10 @@ import alien.catalogue.GUIDUtils;
 import alien.catalogue.Host;
 import alien.catalogue.PFN;
 import alien.config.ConfigUtils;
+import io.netty.util.internal.ThreadLocalRandom;
 import lazyj.DBFunctions;
 import lazyj.Format;
+import lia.Monitor.Store.Fast.DB;
 import lia.util.ShutdownManager;
 
 /**
@@ -1204,5 +1206,37 @@ public final class SEUtils {
 		}
 
 		return pfns;
+	}
+
+	/**
+	 * @return A random site, weighted with the average number of jobs ran in the last month
+	 */
+	public static String getRandomSite() {
+		updateSEDistanceCache();
+
+		if (seDistance == null || seDistance.size() == 0)
+			return "CERN";
+
+		final StringBuilder sb = new StringBuilder();
+
+		for (final String site : seDistance.keySet()) {
+			if (sb.length() > 0)
+				sb.append(',');
+
+			sb.append('\'').append(Format.escSQL(site)).append('\'');
+		}
+
+		final DB db = new DB();
+
+		db.query("SELECT sum(avgjobs_1m) FROM running_jobs_cache WHERE name in (" + sb + ");");
+
+		final int randomJobs = ThreadLocalRandom.current().nextInt(db.geti(1));
+
+		db.query("SELECT name FROM (SELECT name, sum(avgjobs_1m) OVER (ORDER BY name) S FROM running_jobs_cache WHERE name in (" + sb + ")) Q WHERE S>" + randomJobs + " ORDER BY name LIMIT 1;");
+
+		if (db.moveNext())
+			return db.gets(1);
+
+		return "CERN";
 	}
 }
