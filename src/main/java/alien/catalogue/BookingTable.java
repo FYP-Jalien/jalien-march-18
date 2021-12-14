@@ -499,8 +499,10 @@ public class BookingTable {
 					if (pfn != null) {
 						final LFN l = mark(user, pfn, BOOKING_STATE.COMMITED);
 
-						if (l != null)
-							ret.add(l);
+						if (l != null) {
+							l.setExpireTime(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 14));
+							ret.add(l);							
+						}
 					}
 				}
 				catch (@SuppressWarnings("unused") final IOException e) {
