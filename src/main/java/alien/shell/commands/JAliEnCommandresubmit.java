@@ -23,7 +23,7 @@ public class JAliEnCommandresubmit extends JAliEnBaseCommand {
 			final Entry<Integer, String> rc = (rj != null ? rj.resubmitEntry() : null);
 
 			if (rc == null) {
-				commander.setReturnCode(ErrNo.EREMOTEIO, "Problem with the resubmit request" + queueId);
+				commander.setReturnCode(ErrNo.EREMOTEIO, "Problem with the resubmit request of job ID " + queueId);
 			}
 			else {
 				switch (rc.getKey().intValue()) {
@@ -64,14 +64,18 @@ public class JAliEnCommandresubmit extends JAliEnBaseCommand {
 
 		queueIds = new ArrayList<>(alArguments.size());
 
-		for (final String id : alArguments)
-			try {
-				queueIds.add(Long.valueOf(id));
+		for (final String arg : alArguments) {
+			for (final String id : arg.split("\\D+")) {
+				if (id.length() > 0)
+					try {
+						queueIds.add(Long.valueOf(id));
+					}
+					catch (@SuppressWarnings("unused") final NumberFormatException e) {
+						commander.setReturnCode(ErrNo.EINVAL, "Invalid job ID: " + id);
+						setArgumentsOk(false);
+						return;
+					}
 			}
-			catch (@SuppressWarnings("unused") final NumberFormatException e) {
-				commander.setReturnCode(ErrNo.EINVAL, "Invalid job ID: " + id);
-				setArgumentsOk(false);
-				return;
-			}
+		}
 	}
 }

@@ -2,7 +2,6 @@ package alien.shell.commands;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.StringTokenizer;
 
 import alien.shell.ErrNo;
 import alien.taskQueue.Job;
@@ -80,20 +79,17 @@ public class JAliEnCommandkill extends JAliEnBaseCommand {
 
 		queueIds = new ArrayList<>(alArguments.size());
 
-		for (final String id : alArguments) {
-			final StringTokenizer st = new StringTokenizer(id, " \r\n\t,;");
-
-			while (st.hasMoreTokens()) {
-				final String tok = st.nextToken();
-
-				try {
-					queueIds.add(Long.valueOf(tok));
-				}
-				catch (@SuppressWarnings("unused") final NumberFormatException e) {
-					commander.setReturnCode(ErrNo.EINVAL, "Invalid job ID: " + id);
-					setArgumentsOk(false);
-					return;
-				}
+		for (final String arg : alArguments) {
+			for (final String id : arg.split("\\D+")) {
+				if (id.length() > 0)
+					try {
+						queueIds.add(Long.valueOf(id));
+					}
+					catch (@SuppressWarnings("unused") final NumberFormatException e) {
+						commander.setReturnCode(ErrNo.EINVAL, "Invalid job ID: " + id);
+						setArgumentsOk(false);
+						return;
+					}
 			}
 		}
 	}
