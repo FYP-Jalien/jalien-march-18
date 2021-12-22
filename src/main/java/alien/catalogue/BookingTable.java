@@ -549,6 +549,11 @@ public class BookingTable {
 				final UUID uuid = GUIDUtils.generateTimeUUID();
 				GUID member_g = GUIDUtils.getGUID(uuid, true);
 				member_g.owner = user.getName();
+				member_g.md5 = md5s.get(member);
+				member_g.size = sizes.get(member).longValue();
+				member_g.type = 'f';
+				member_g.owner = user.getName();
+
 
 				// PFN
 				String member_spfn = base_pfn + member;
