@@ -5,8 +5,10 @@ import java.util.HashMap;
 import java.util.List;
 
 import alien.api.Request;
+import alien.api.ServerException;
 import alien.taskQueue.JobStatus;
 import alien.taskQueue.TaskQueueUtils;
+import alien.user.AliEnPrincipal;
 
 /**
  * Get a JDL object
@@ -56,6 +58,18 @@ public class SetJobStatus extends Request {
 
 	@Override
 	public void run() {
+		final AliEnPrincipal requester = getEffectiveRequester();
+
+		if (!requester.isJobAgent() && !requester.isJob()) {
+			setException(new ServerException("You are not allowed to modify the status of a job", null));
+			return;
+		}
+
+		if (requester.isJob() && (!Long.valueOf(this.jobnumber).equals(requester.getJobID()) || !Integer.valueOf(this.resubmission).equals(requester.getResubmissionCount()))) {
+			setException(new ServerException("A job is not allowed to set the status of another job", null));
+			return;
+		}
+
 		if (TaskQueueUtils.getResubmission(Long.valueOf(this.jobnumber)) != resubmission) {
 			setException(new JobKilledException("This job is not supposed to be running any more", null));
 			return;
