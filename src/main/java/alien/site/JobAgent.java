@@ -88,6 +88,7 @@ public class JobAgent implements Runnable {
 	// Job variables
 	private JDL jdl;
 	private long queueId;
+	private int resubmission;
 	private String username;
 	private String tokenCert;
 	private String tokenKey;
@@ -240,7 +241,7 @@ public class JobAgent implements Runnable {
 			values.add(Integer.valueOf(1));
 
 			if (reqCPU.longValue() > 0) {
-				names.add(reqCPU+"_cores_jobs");
+				names.add(reqCPU + "_cores_jobs");
 				values.add(Long.valueOf(1));
 			}
 
@@ -387,7 +388,7 @@ public class JobAgent implements Runnable {
 		}
 	}
 
-	@SuppressWarnings({"boxing","unchecked"})
+	@SuppressWarnings({ "boxing", "unchecked" })
 	@Override
 	public void run() {
 		logger.log(Level.INFO, "Starting JobAgent " + jobNumber + " in " + hostName);
@@ -437,6 +438,7 @@ public class JobAgent implements Runnable {
 				jdl = new JDL(Job.sanitizeJDL((String) matchedJob.get("JDL")));
 
 				queueId = ((Long) matchedJob.get("queueId")).longValue();
+				resubmission = ((Integer) matchedJob.get("Resubmission")).intValue();
 				username = (String) matchedJob.get("User");
 				tokenCert = (String) matchedJob.get("TokenCertificate");
 				tokenKey = (String) matchedJob.get("TokenKey");
@@ -527,8 +529,7 @@ public class JobAgent implements Runnable {
 			logger.log(Level.INFO, "Started JA with: " + jdl);
 
 			final String version = !Version.getTagFromEnv().isEmpty() ? Version.getTagFromEnv() : "/Git: " + Version.getGitHash() + ". Builddate: " + Version.getCompilationTimestamp();
-			commander.q_api.putJobLog(queueId, "trace", "Running JAliEn JobAgent" + version);
-			commander.q_api.putJobLog(queueId, "trace", "Job preparing to run in: " + hostName);
+			putJobTrace("Running JAliEn JobAgent " + version + " on " + hostName);
 
 			// Set up constraints
 			getMemoryRequirements();
@@ -537,7 +538,7 @@ public class JobAgent implements Runnable {
 
 			setupJobWrapperLogging();
 
-			commander.q_api.putJobLog(queueId, "trace", "Starting JobWrapper");
+			putJobTrace("Starting JobWrapper");
 
 			launchJobWrapper(launchCommand, true);
 
@@ -555,7 +556,7 @@ public class JobAgent implements Runnable {
 		monitor.sendParameter("job_id", Integer.valueOf(0));
 
 		logger.log(Level.INFO, "Cleaning up after execution...");
-		commander.q_api.putJobLog(queueId, "trace", "Cleaning up after execution...");
+		putJobTrace("Cleaning up after execution...");
 
 		try {
 			Files.walk(tempDir.toPath())
@@ -707,10 +708,10 @@ public class JobAgent implements Runnable {
 		// By default the jobs are allowed to use up to 10GB of disk space in the sandbox
 
 		cpuCores = TaskQueueUtils.getCPUCores(jdl);
-		commander.q_api.putJobLog(queueId, "trace", "Job requested " + cpuCores + " CPU cores to run");
+		putJobTrace("Job requested " + cpuCores + " CPU cores to run");
 
 		workdirMaxSizeMB = TaskQueueUtils.getWorkDirSizeMB(jdl, cpuCores);
-		commander.q_api.putJobLog(queueId, "trace", "Local disk space limit: " + workdirMaxSizeMB + "MB");
+		putJobTrace("Local disk space limit: " + workdirMaxSizeMB + "MB");
 
 		// Memory use
 		final String maxmemory = jdl.gets("Memorysize");
@@ -725,7 +726,7 @@ public class JobAgent implements Runnable {
 			catch (final NumberFormatException en) {
 				final String error = "Could not read limit from JALIEN_MEM_LIM. Using default: " + jobMaxMemoryMB + "MB";
 				logger.log(Level.WARNING, error, en);
-				commander.q_api.putJobLog(queueId, "trace", error);
+				putJobTrace(error);
 			}
 		}
 		else if (maxmemory != null) {
@@ -742,14 +743,14 @@ public class JobAgent implements Runnable {
 				else
 					jobMaxMemoryMB = Integer.parseInt(maxmemory);
 
-				commander.q_api.putJobLog(queueId, "trace", "Virtual memory limit (JDL): " + jobMaxMemoryMB + "MB");
+				putJobTrace("Virtual memory limit (JDL): " + jobMaxMemoryMB + "MB");
 			}
 			catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
-				commander.q_api.putJobLog(queueId, "trace", "Virtual memory limit specs are invalid: '" + maxmemory + "', using the default " + jobMaxMemoryMB + "MB");
+				putJobTrace("Virtual memory limit specs are invalid: '" + maxmemory + "', using the default " + jobMaxMemoryMB + "MB");
 			}
 		}
 		else
-			commander.q_api.putJobLog(queueId, "trace", "Virtual memory limit (default): " + jobMaxMemoryMB + "MB");
+			putJobTrace("Virtual memory limit (default): " + jobMaxMemoryMB + "MB");
 	}
 
 	/**
@@ -799,7 +800,7 @@ public class JobAgent implements Runnable {
 			// Check if there is container support present on site. If yes, add to launchCmd
 			final Containerizer cont = ContainerizerFactory.getContainerizer();
 			if (cont != null) {
-				commander.q_api.putJobLog(queueId, "trace", "Support for containers detected. Will use: " + cont.getContainerizerName());
+				putJobTrace("Support for containers detected. Will use: " + cont.getContainerizerName());
 				monitor.sendParameter("canRunContainers", Integer.valueOf(1));
 				monitor.sendParameter("containerLayer", Integer.valueOf(1));
 				cont.setWorkdir(jobWorkdir);
@@ -840,6 +841,7 @@ public class JobAgent implements Runnable {
 				stdinObj.writeObject(jdl);
 				stdinObj.writeObject(username);
 				stdinObj.writeObject(Long.valueOf(queueId));
+				stdinObj.writeObject(Integer.valueOf(resubmission));
 				stdinObj.writeObject(tokenCert);
 				stdinObj.writeObject(tokenKey);
 				stdinObj.writeObject(ce);
@@ -852,7 +854,7 @@ public class JobAgent implements Runnable {
 			}
 
 			logger.log(Level.INFO, "JDL info sent to JobWrapper");
-			commander.q_api.putJobLog(queueId, "trace", "JobWrapper started");
+			putJobTrace("JobWrapper started");
 
 			// Wait for JobWrapper to start
 			try (InputStream stdout = p.getInputStream()) {
@@ -873,7 +875,7 @@ public class JobAgent implements Runnable {
 		if (monitorJob) {
 			final String process_res_format = "FRUNTIME | RUNTIME | CPUUSAGE | MEMUSAGE | CPUTIME | RMEM | VMEM | NOCPUS | CPUFAMILY | CPUMHZ | RESOURCEUSAGE | RMEMMAX | VMEMMAX";
 			logger.log(Level.INFO, process_res_format);
-			commander.q_api.putJobLog(queueId, "procfmt", process_res_format);
+			putJobLog("procfmt", process_res_format);
 
 			wrapperPID = (int) p.pid();
 
@@ -890,7 +892,7 @@ public class JobAgent implements Runnable {
 			@Override
 			public void run() {
 				logger.log(Level.SEVERE, "Timeout has occurred. Killing job!");
-				commander.q_api.putJobLog(queueId, "trace", "Killing the job (it was running for longer than its TTL)");
+				putJobTrace("Killing the job (it was running for longer than its TTL)");
 				killJobWrapperAndPayload(p);
 			}
 		};
@@ -914,8 +916,8 @@ public class JobAgent implements Runnable {
 					final String error = checkProcessResources();
 					if (error != null) {
 						logger.log(Level.SEVERE, "Process overusing resources: " + error);
-						commander.q_api.putJobLog(queueId, "trace", "ERROR[FATAL]: Process overusing resources");
-						commander.q_api.putJobLog(queueId, "trace", error);
+						putJobTrace("ERROR[FATAL]: Process overusing resources");
+						putJobTrace(error);
 						t.cancel();
 						killJobWrapperAndPayload(p);
 						return 1;
@@ -949,7 +951,7 @@ public class JobAgent implements Runnable {
 
 			logger.log(Level.INFO, "JobWrapper has finished execution. Exit code: " + code);
 			logger.log(Level.INFO, "All done for job " + queueId + ". Final status: " + getWrapperJobStatus());
-			commander.q_api.putJobLog(queueId, "trace", "JobWrapper exit code: " + code);
+			putJobTrace("JobWrapper exit code: " + code);
 			if (code != 0)
 				logger.log(Level.WARNING, "Error encountered: see the JobWrapper logs in: " + env.getOrDefault("TMPDIR", "/tmp") + "/jalien-jobwrapper.log " + " for more details");
 
@@ -968,11 +970,11 @@ public class JobAgent implements Runnable {
 				// Looks like something went wrong. Let's check the last reported status
 				final String lastStatus = getWrapperJobStatus();
 				if ("STARTED".equals(lastStatus) || "RUNNING".equals(lastStatus)) {
-					commander.q_api.putJobLog(queueId, "trace", "ERROR: The JobWrapper was killed before job could complete");
+					putJobTrace("ERROR: The JobWrapper was killed before job could complete");
 					changeJobStatus(JobStatus.ERROR_E, null); // JobWrapper was killed before the job could be completed
 				}
 				else if ("SAVING".equals(lastStatus)) {
-					commander.q_api.putJobLog(queueId, "trace", "ERROR: The JobWrapper was killed during saving");
+					putJobTrace("ERROR: The JobWrapper was killed during saving");
 					changeJobStatus(JobStatus.ERROR_SV, null); // JobWrapper was killed during saving
 				}
 			}
@@ -995,7 +997,7 @@ public class JobAgent implements Runnable {
 
 	private void setUsedCores(int jobNumber) {
 		if (reqCPU.longValue() > 0)
-			monitor.sendParameter(reqCPU+"_cores_jobs", Integer.valueOf(jobNumber));
+			monitor.sendParameter(reqCPU + "_cores_jobs", Integer.valueOf(jobNumber));
 		if (jobNumber == 0)
 			reqCPU = Long.valueOf(0);
 		monitor.sendParameter("num_cores", reqCPU);
@@ -1009,10 +1011,31 @@ public class JobAgent implements Runnable {
 		logger.log(Level.INFO, "+++++ Sending resources info +++++");
 		logger.log(Level.INFO, procinfo);
 
-		commander.q_api.putJobLog(queueId, "proc", procinfo);
+		putJobLog("proc", procinfo);
+	}
+
+	private boolean jobKilled = false;
+
+	private boolean putJobLog(final String key, final String value) {
+		if (jobKilled)
+			return false;
+
+		if (!commander.q_api.putJobLog(queueId, resubmission, key, value)) {
+			jobKilled = true;
+			return false;
+		}
+
+		return true;
+	}
+
+	private boolean putJobTrace(final String value) {
+		return putJobLog("trace", value);
 	}
 
 	private String checkProcessResources() { // checks and maintains sandbox
+		if (jobKilled)
+			return "Job was killed";
+
 		String error = null;
 		// logger.log(Level.INFO, "Checking resources usage");
 
@@ -1102,13 +1125,13 @@ public class JobAgent implements Runnable {
 		final Integer iTTL = jdl.getInteger("TTL");
 
 		int ttl = (iTTL != null ? iTTL.intValue() : 3600);
-		commander.q_api.putJobLog(queueId, "trace", "Job asks for a TTL of " + ttl + " seconds");
+		putJobTrace("Job asks for a TTL of " + ttl + " seconds");
 		ttl += 300; // extra time (saving)
 
 		final String proxyttl = jdl.gets("ProxyTTL");
 		if (proxyttl != null) {
 			ttl = ((Integer) siteMap.get("TTL")).intValue() - 600;
-			commander.q_api.putJobLog(queueId, "trace", "ProxyTTL enabled, running for " + ttl + " seconds");
+			putJobTrace("ProxyTTL enabled, running for " + ttl + " seconds");
 		}
 
 		return ttl;
@@ -1135,7 +1158,7 @@ public class JobAgent implements Runnable {
 		jobTmpDir = new File(jobWorkdir + "/tmp");
 		jobTmpDir.mkdir();
 
-		commander.q_api.putJobLog(queueId, "trace", "Created workdir: " + jobWorkdir);
+		putJobTrace("Created workdir: " + jobWorkdir);
 
 		// chdir
 		System.setProperty("user.dir", jobWorkdir);
@@ -1184,8 +1207,11 @@ public class JobAgent implements Runnable {
 		}
 	}
 
-	private void changeJobStatus(final JobStatus newStatus, final HashMap<String, Object> extrafields) {
-		TaskQueueApiUtils.setJobStatus(queueId, newStatus, extrafields);
+	private boolean changeJobStatus(final JobStatus newStatus, final HashMap<String, Object> extrafields) {
+		if (!TaskQueueApiUtils.setJobStatus(queueId, resubmission, newStatus, extrafields)) {
+			jobKilled = true;
+			return false;
+		}
 
 		if (apmon != null)
 			try {
@@ -1194,6 +1220,8 @@ public class JobAgent implements Runnable {
 			catch (final Exception e) {
 				logger.log(Level.WARNING, "JA cannot update ML of the job status change", e);
 			}
+
+		return true;
 	}
 
 	private String getWrapperJobStatus() {
@@ -1341,7 +1369,7 @@ public class JobAgent implements Runnable {
 						final List<String> lines = Files.readAllLines(Paths.get(env.get(var)));
 						for (final String line : lines) {
 							if (line.contains("GlobalJobId"))
-								commander.q_api.putJobLog(queueId, "trace", "BatchId " + line);
+								putJobTrace("BatchId " + line);
 						}
 					}
 					catch (final IOException e) {
@@ -1349,7 +1377,7 @@ public class JobAgent implements Runnable {
 					}
 				}
 				else
-					commander.q_api.putJobLog(queueId, "trace", "BatchId " + var + ": " + env.get(var));
+					putJobTrace("BatchId " + var + ": " + env.get(var));
 			}
 		}
 	}

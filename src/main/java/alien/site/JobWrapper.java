@@ -67,6 +67,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 */
 	private JDL jdl;
 	private long queueId;
+	private int resubmission;
 	private String username;
 	private String tokenCert;
 	private String tokenKey;
@@ -134,7 +135,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (apmon == null)
 				return;
 
-			while (true) {
+			while (!jobKilled) {
 				final Vector<String> paramNames = new Vector<>(5);
 				final Vector<Object> paramValues = new Vector<>(5);
 
@@ -191,6 +192,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			jdl = (JDL) inputFromJobAgent.readObject();
 			username = (String) inputFromJobAgent.readObject();
 			queueId = ((Long) inputFromJobAgent.readObject()).longValue();
+			resubmission = ((Integer) inputFromJobAgent.readObject()).intValue();
 			tokenCert = (String) inputFromJobAgent.readObject();
 			tokenKey = (String) inputFromJobAgent.readObject();
 			ce = (String) inputFromJobAgent.readObject();
@@ -265,7 +267,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		final int runCode = runJob();
 
 		logger.log(Level.INFO, "JobWrapper has finished execution");
-		commander.q_api.putJobLog(queueId, "trace", "JobWrapper has finished execution");
+		putJobTrace("JobWrapper has finished execution");
 
 		if (runCode > 0)
 			System.exit(0); // Positive runCodes originate from the payload. Ignore. All OK here as far as we're concerned.
@@ -342,9 +344,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				logger.log(Level.SEVERE, "Failed to run payload");
 
 				if (execExitCode < 0)
-					commander.q_api.putJobLog(queueId, "trace", "Failed to start execution of payload. Exit code: " + Math.abs(execExitCode));
+					putJobTrace("Failed to start execution of payload. Exit code: " + Math.abs(execExitCode));
 				else
-					commander.q_api.putJobLog(queueId, "trace", "Warning: executable exit code was " + execExitCode);
+					putJobTrace("Warning: executable exit code was " + execExitCode);
 
 				// if (jdl.gets("OutputErrorE") != null)
 				return uploadOutputFiles(JobStatus.ERROR_E) ? execExitCode : -1;
@@ -361,9 +363,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				logger.log(Level.SEVERE, "Validation failed");
 
 				if (valExitCode < 0)
-					commander.q_api.putJobLog(queueId, "trace", "Failed to start validation. Exit code: " + Math.abs(valExitCode));
+					putJobTrace("Failed to start validation. Exit code: " + Math.abs(valExitCode));
 				else
-					commander.q_api.putJobLog(queueId, "trace", "Validation failed. Exit code: " + valExitCode);
+					putJobTrace("Validation failed. Exit code: " + valExitCode);
 
 				final int valUploadExitCode = uploadOutputFiles(JobStatus.ERROR_V) ? valExitCode : -1;
 
@@ -387,7 +389,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				sb.append(elem);
 				sb.append("\n\r");
 			}
-			commander.q_api.putJobLog(queueId, "trace", sb.toString());
+			putJobTrace(sb.toString());
 			return -1;
 		}
 	}
@@ -515,7 +517,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		if (trackTime) {
 			try {
-				commander.q_api.putJobLog(queueId, "trace", "Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile)).replace("\n", ", "));
+				putJobTrace("Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile)).replace("\n", ", "));
 			}
 			catch (@SuppressWarnings("unused") Exception te) {
 				// Ignore
@@ -526,7 +528,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	}
 
 	private int execute(final Map<String, String> environment_packages) {
-		commander.q_api.putJobLog(queueId, "trace", "Starting execution");
+		putJobTrace("Starting execution");
 
 		changeStatus(JobStatus.RUNNING);
 		final int code = executeCommand(jdl.gets("Executable"), jdl.getArguments(), environment_packages);
@@ -540,7 +542,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		final String validation = jdl.gets("ValidationCommand");
 
 		if (validation != null) {
-			commander.q_api.putJobLog(queueId, "trace", "Starting validation");
+			putJobTrace("Starting validation");
 			code = executeCommand(validation, null, environment_packages);
 		}
 
@@ -576,7 +578,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		if (iFiles == null) {
 			logger.log(Level.WARNING, "No requested files could be located");
-			commander.q_api.putJobLog(queueId, "trace", "ERROR: No requested files could be located: getLFNs returned null");
+			putJobTrace("ERROR: No requested files could be located: getLFNs returned null");
 			return false;
 		}
 
@@ -588,7 +590,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				filesToDownload.removeIf(slfn -> (slfn.contains(iFiles.get(iFiles.size() - 1).lfn)));
 				iFiles.remove(iFiles.size() - 1);
 			}
-			commander.q_api.putJobLog(queueId, "trace", "ERROR: Not all requested files could be located in the catalogue. Missing files: " + Arrays.toString(filesToDownload.toArray()));
+			putJobTrace("ERROR: Not all requested files could be located in the catalogue. Missing files: " + Arrays.toString(filesToDownload.toArray()));
 			return false;
 		}
 
@@ -606,7 +608,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			if (localFile.exists()) {
 				logger.log(Level.WARNING, "Too many occurences of " + l.getFileName() + " in " + currentDir.getAbsolutePath());
-				commander.q_api.putJobLog(queueId, "trace", "ERROR: Too many occurences of " + l.getFileName() + " in " + currentDir.getAbsolutePath());
+				putJobTrace("ERROR: Too many occurences of " + l.getFileName() + " in " + currentDir.getAbsolutePath());
 				return false;
 			}
 
@@ -622,7 +624,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				f = new File(currentDir + "/" + duplicates, f.getName());
 				f.mkdir();
 				logger.log(Level.WARNING, "Warning: Could not download to " + entry.getValue().getAbsolutePath() + ". Already exists. Will instead use: " + f.getAbsolutePath());
-				// commander.q_api.putJobLog(queueId, "trace", "Warning: Could not download to " + entry.getValue().getAbsolutePath() + ". Already exists. Will instead use: " + f.getAbsolutePath());
+				// putJobTrace("Warning: Could not download to " + entry.getValue().getAbsolutePath() + ". Already exists. Will instead use: " + f.getAbsolutePath());
 			}
 
 			if (inputDataList != null) {
@@ -632,7 +634,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					inputDataList = Format.replace(inputDataList, "alien://" + entry.getKey().getCanonicalName() + "\n", "file:///" + f.getAbsolutePath() + "\n");
 			}
 
-			commander.q_api.putJobLog(queueId, "trace", "Getting InputFile: " + entry.getKey().getCanonicalName() + " to " + f.getAbsolutePath() + " (" + Format.size(entry.getKey().size) + ")");
+			putJobTrace("Getting InputFile: " + entry.getKey().getCanonicalName() + " to " + f.getAbsolutePath() + " (" + Format.size(entry.getKey().size) + ")");
 
 			commander.clearLastError();
 
@@ -652,7 +654,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				else
 					traceLine += "Could not download " + entry.getKey().getCanonicalName() + " to " + entry.getValue().getAbsolutePath();
 
-				commander.q_api.putJobLog(queueId, "trace", traceLine);
+				putJobTrace(traceLine);
 
 				return false;
 			}
@@ -767,18 +769,19 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		final String outputDir = getJobOutputDir(exitStatus);
 
-		commander.q_api.putJobLog(queueId, "trace", "Going to uploadOutputFiles(exitStatus=" + exitStatus + ", outputDir=" + outputDir + ")");
+		putJobTrace("Going to uploadOutputFiles(exitStatus=" + exitStatus + ", outputDir=" + outputDir + ")");
 
 		boolean noError = true;
 		if (exitStatus.toString().contains("ERROR")) {
-			commander.q_api.putJobLog(queueId, "trace", "Registering temporary log files in " + outputDir
-					+ ". You must do 'registerOutput " + queueId + "' within 24 hours of the job termination to preserve them. After this period, they are automatically deleted.");
+			putJobTrace("Registering temporary log files in " + outputDir + ". You must do 'registerOutput " + queueId
+					+ "' within 24 hours of the job termination to preserve them. After this period, they are automatically deleted.");
 			noError = false;
 		}
 
 		changeStatus(JobStatus.SAVING);
 
 		logger.log(Level.INFO, "queueId: " + queueId);
+		logger.log(Level.INFO, "resubmission: " + resubmission);
 		logger.log(Level.INFO, "outputDir: " + outputDir);
 		logger.log(Level.INFO, "We are the current user: " + commander.getUser().getName());
 
@@ -796,7 +799,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 						final ArrayList<String> archiveEntries = entry.createZip(currentDir.getAbsolutePath());
 						if (archiveEntries.size() == 0) {
 							logger.log(Level.WARNING, "Ignoring empty archive: " + entry.getName());
-							commander.q_api.putJobLog(queueId, "trace", "Ignoring empty archive: " + entry.getName());
+							putJobTrace("Ignoring empty archive: " + entry.getName());
 						}
 						else {
 							for (final String archiveEntry : archiveEntries) {
@@ -811,7 +814,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 						final File entryFile = new File(currentDir.getAbsolutePath() + "/" + entry.getName());
 						if (entryFile.length() <= 0) { // archive files are checked for this during createZip, but standalone files still need to be checked
 							logger.log(Level.WARNING, "The following file has size 0 and will be ignored: " + entry.getName());
-							commander.q_api.putJobLog(queueId, "trace", "The following file has size 0 and will be ignored: " + entry.getName());
+							putJobTrace("The following file has size 0 and will be ignored: " + entry.getName());
 						}
 						else {
 							standaloneFilesToUpload.add(entry);
@@ -821,10 +824,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				}
 			}
 			catch (final NullPointerException ex) {
-				logger.log(Level.SEVERE,
-						"A required outputfile was NOT found! Aborting: " + ex.getMessage());
-				commander.q_api.putJobLog(queueId, "trace",
-						"Error: A required outputfile was NOT found! Aborting: " + ex.getMessage());
+				logger.log(Level.SEVERE, "A required outputfile was NOT found! Aborting: " + ex.getMessage());
+				putJobTrace("Error: A required outputfile was NOT found! Aborting: " + ex.getMessage());
 				if (noError)
 					changeStatus(JobStatus.ERROR_S);
 				return false;
@@ -838,7 +839,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				logger.log(Level.INFO, "Processing output file: " + localFile);
 
 				if (localFile.exists() && localFile.isFile() && localFile.canRead() && localFile.length() > 0) {
-					commander.q_api.putJobLog(queueId, "trace", "Uploading: " + entry.getName() + " to " + outputDir);
+					putJobTrace("Uploading: " + entry.getName() + " to " + outputDir);
 
 					final List<String> cpOptions = new ArrayList<>();
 					cpOptions.add("-w");
@@ -867,7 +868,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					if (uploadResult == null) {
 						// complete failure to upload the file, mark the job as failed, not trying further to upload anything
 						uploadedAllOutFiles = false;
-						commander.q_api.putJobLog(queueId, "trace", "Failed to upload to " + outputDir + "/" + entry.getName() + ": " + out.toString());
+						putJobTrace("Failed to upload to " + outputDir + "/" + entry.getName() + ": " + out.toString());
 						break;
 					}
 
@@ -875,10 +876,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					if (output_upload.contains("requested replicas could be uploaded")) {
 						// partial success, will lead to a DONE_WARN state
 						uploadedNotAllCopies = true;
-						commander.q_api.putJobLog(queueId, "trace", output_upload);
+						putJobTrace(output_upload);
 					}
 					else
-						commander.q_api.putJobLog(queueId, "trace", uploadResult.getCanonicalName() + ": uploaded as requested");
+						putJobTrace(uploadResult.getCanonicalName() + ": uploaded as requested");
 
 					// archive entries are only booked when committed, so we have to do it ourselves since -nc
 					if ((exitStatus == JobStatus.ERROR_E || exitStatus == JobStatus.ERROR_V) && entry.isArchive())
@@ -886,16 +887,15 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				}
 				else {
 					logger.log(Level.WARNING, "Can't upload output file " + localFile.getName() + ", does not exist or has zero size.");
-					commander.q_api.putJobLog(queueId, "trace", "Can't upload output file " + localFile.getName() + ", does not exist or has zero size.");
+					putJobTrace("Can't upload output file " + localFile.getName() + ", does not exist or has zero size.");
 				}
 			}
 			catch (final IOException e) {
 				logger.log(Level.WARNING, "IOException received while attempting to upload " + entry.getName(), e);
-				commander.q_api.putJobLog(queueId, "trace", "Failed to upload " + entry.getName() + " due to: " + e.getMessage());
+				putJobTrace("Failed to upload " + entry.getName() + " due to: " + e.getMessage());
 				uploadedAllOutFiles = false;
 			}
 		}
-		createAndAddResultsJDL(null); // Not really used. Set to null for now.
 
 		if (!uploadedAllOutFiles && exitStatus == JobStatus.DONE) {
 			changeStatus(JobStatus.ERROR_SV);
@@ -959,8 +959,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * Updates the current state of the job.
 	 *
 	 * @param newStatus
+	 * @return <code>false</code> if the job was killed and execution should not continue
 	 */
-	public void changeStatus(final JobStatus newStatus) {
+	public boolean changeStatus(final JobStatus newStatus) {
+		if (jobKilled)
+			return false;
+
 		jobStatus = newStatus;
 
 		final HashMap<String, Object> extrafields = new HashMap<>();
@@ -976,7 +980,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		try {
 			// Set the updated status
-			TaskQueueApiUtils.setJobStatus(queueId, newStatus, extrafields);
+			if (!TaskQueueApiUtils.setJobStatus(queueId, resubmission, newStatus, extrafields)) {
+				jobKilled = true;
+				return false;
+			}
 
 			// TODO: Confirm(?) and remove
 			// Wait 10s, and set status once more, in case the first attempt was not registered (high load?)
@@ -993,13 +1000,15 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		synchronized (statusSenderThread) {
 			statusSenderThread.notifyAll();
 		}
+
+		return true;
 	}
 
 	/**
 	 * @param exitStatus the target job status, affecting the booked directory (`~/recycle` if any error)
 	 * @return job output dir (as indicated in the JDL if OK, or the recycle path if not)
 	 */
-    public String getJobOutputDir(final JobStatus exitStatus) {
+	public String getJobOutputDir(final JobStatus exitStatus) {
 		String outputDir = jdl.getOutputDir();
 
 		if (exitStatus == JobStatus.ERROR_V || exitStatus == JobStatus.ERROR_E)
@@ -1018,7 +1027,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				final String trace = new String(Files.readAllBytes(traceFile.toPath()));
 
 				if (!trace.isBlank())
-					commander.q_api.putJobLog(queueId, "trace", trace);
+					putJobTrace(trace);
 
 				traceFile.delete();
 			}
@@ -1030,54 +1039,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		logger.log(Level.INFO, ".alienValidation.trace does not exist.");
 	}
 
-	private void createAndAddResultsJDL(@SuppressWarnings("unused") final ParsedOutput filesTable) {
-
-		/*
-		 * final ArrayList<String> jdlOutput = new ArrayList<>();
-		 * for (final OutputEntry entry : filesTable.getEntries()) {
-		 *
-		 * String entryString = entry.getName();
-		 * File entryFile = new File(currentDir.getAbsolutePath() + "/" + entryString);
-		 *
-		 * entryString += ";" + String.valueOf(entryFile.length());
-		 *
-		 * try {
-		 * entryString += ";" + IOUtils.getMD5(entryFile);
-		 * }
-		 * catch (IOException e) {
-		 * logger.log(Level.WARNING, "Could not generate MD5 for a file: " + e);
-		 * }
-		 *
-		 * jdlOutput.add(entryString);
-		 *
-		 * // Also add the archive files to outputlist
-		 * if (entry.isArchive()) {
-		 *
-		 * final ArrayList<String> archiveFiles = entry.getFilesIncluded();
-		 * final HashMap<String, Long> archiveSizes = entry.getSizesIncluded();
-		 * final HashMap<String, String> archiveMd5s = entry.getMD5sIncluded();
-		 * for (final String archiveEntry : archiveFiles) {
-		 *
-		 * String archiveEntryString = archiveEntry;
-		 *
-		 * archiveEntryString += ";" + archiveSizes.get(archiveEntry);
-		 * archiveEntryString += ";" + archiveMd5s.get(archiveEntry);
-		 * archiveEntryString += ";" + entry.getName(); // name of its archive
-		 *
-		 * jdlOutput.add(archiveEntryString);
-		 * }
-		 * }
-		 *
-		 * }
-		 * jdl.set("OutputFiles", "\n" + String.join("\n", jdlOutput));
-		 */
-
-		TaskQueueApiUtils.addResultsJdl(jdl, queueId);
-	}
-
 	@Override
 	public void fillValues(final Vector<String> paramNames, final Vector<Object> paramValues) {
-		if (queueId > 0) {
+		if (queueId > 0 && !jobKilled) {
 			paramNames.add("jobID");
 			paramValues.add(Double.valueOf(queueId));
 
@@ -1133,7 +1097,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		for (final OutputEntry entry : entries) {
 			try {
 				final boolean registered = CatalogueApiUtils.registerEntry(entry, outputDir + "/", UserFactory.getByUsername(username));
-				commander.q_api.putJobLog(queueId, "trace", "Registering: " + entry.getName() + ". Return status: " + registered);
+				putJobTrace("Registering: " + entry.getName() + ". Return status: " + registered);
 
 				if (!registered)
 					registeredAll = false;
@@ -1141,7 +1105,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			// TODO: Move up a layer, as this is not unique to registerEntry
 			catch (final NullPointerException npe) {
 				logger.log(Level.WARNING, "An error occurred while registering " + entry + ". Bad connection?", npe);
-				commander.q_api.putJobLog(queueId, "trace", "An error occurred while registering " + entry + ". Bad connection?");
+				putJobTrace("An error occurred while registering " + entry + ". Bad connection?");
 
 				final int retries = 3;
 				for (int i = 1; i <= retries; i++) {
@@ -1149,7 +1113,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 						final boolean retrySuccess = CatalogueApiUtils.registerEntry(entry, outputDir + "/", UserFactory.getByUsername(username));
 						if (retrySuccess) {
 							logger.log(Level.INFO, "Entry " + entry + " successfully registered on attempt " + i);
-							commander.q_api.putJobLog(queueId, "trace", "Entry " + entry + " successfully registered on attempt " + i);
+							putJobTrace("Entry " + entry + " successfully registered on attempt " + i);
 							break;
 						}
 
@@ -1159,7 +1123,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 						logger.log(Level.WARNING, "Retry " + i + " failed.", npe2);
 						if (i == 3) {
 							logger.log(Level.SEVERE, "Registration of entry " + entry + " failed after 3 attempts. Aborting.");
-							commander.q_api.putJobLog(queueId, "trace", "Registration of entry " + entry + " failed after 3 attempts. Aborting.");
+							putJobTrace("Registration of entry " + entry + " failed after 3 attempts. Aborting.");
 							return false;
 						}
 
@@ -1181,7 +1145,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		if (exitStatus == JobStatus.ERROR_E) {
 			if (jdl.gets("OutputErrorE") == null) {
-				commander.q_api.putJobLog(queueId, "trace", "No output given for ERROR_E in JDL. Defaulting to std*");
+				putJobTrace("No output given for ERROR_E in JDL. Defaulting to std*");
 				jdl.set("OutputErrorE", "log_archive.zip:std*@disk=1"); // set a default if nothing is provided
 			}
 			tags.add("OutputErrorE");
@@ -1208,4 +1172,21 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		return fileList;
 	}
 
+	private boolean jobKilled = false;
+
+	private boolean putJobLog(final String key, final String value) {
+		if (jobKilled)
+			return false;
+
+		if (!commander.q_api.putJobLog(queueId, resubmission, key, value)) {
+			jobKilled = true;
+			return false;
+		}
+
+		return true;
+	}
+
+	private boolean putJobTrace(final String value) {
+		return putJobLog("trace", value);
+	}
 }
