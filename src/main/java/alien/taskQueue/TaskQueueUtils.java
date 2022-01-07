@@ -2276,8 +2276,14 @@ public class TaskQueueUtils {
 
 		if (j.status() != newStatus) {
 			try (DBFunctions db = getQueueDB()) {
-				if (!db.query("UPDATE QUEUE SET statusId=? WHERE queueId=? and statusId=?;", false, Integer.valueOf(newStatus.getAliEnLevel()), Long.valueOf(j.queueId),
-						Integer.valueOf(j.status().getAliEnLevel())))
+				final String query;
+
+				if (newStatus == JobStatus.KILLED)
+					query = "UPDATE QUEUE SET statusId=?, resubmission=resubmission+1 WHERE queueId=? and statusId=?;";
+				else
+					query = "UPDATE QUEUE SET statusId=? WHERE queueId=? and statusId=?;";
+
+				if (!db.query(query, false, Integer.valueOf(newStatus.getAliEnLevel()), Long.valueOf(j.queueId), Integer.valueOf(j.status().getAliEnLevel())))
 					return false;
 
 				if (db.getUpdateCount() > 0) {
@@ -2287,10 +2293,8 @@ public class TaskQueueUtils {
 						final int siteId = getSiteId(j.site);
 
 						if (siteId > 0)
-							db.query(
-									"UPDATE SITEQUEUES SET " + j.status().toSQL() + "=GREATEST(" + j.status().toSQL() + "-1,0), " + newStatus.toSQL() + "=GREATEST(" + newStatus
-											+ ",0)+1 WHERE siteId=?",
-									false, Integer.valueOf(siteId));
+							db.query("UPDATE SITEQUEUES SET " + j.status().toSQL() + "=GREATEST(" + j.status().toSQL() + "-1,0), " + newStatus.toSQL() + "=GREATEST(" + newStatus
+									+ ",0)+1 WHERE siteId=?", false, Integer.valueOf(siteId));
 					}
 				}
 				else
