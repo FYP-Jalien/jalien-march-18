@@ -78,7 +78,7 @@ public class AliEnPrincipal implements Principal, Serializable {
 
 	/**
 	 * Get user, who initialized connection
-	 * 
+	 *
 	 * @return initial user
 	 */
 	public String getDefaultUser() {
@@ -87,7 +87,7 @@ public class AliEnPrincipal implements Principal, Serializable {
 
 	/**
 	 * Retrieve user certificate
-	 * 
+	 *
 	 * @return user certificate
 	 */
 	public X509Certificate[] getUserCert() {
@@ -96,10 +96,10 @@ public class AliEnPrincipal implements Principal, Serializable {
 
 	/**
 	 * Store user certificate in principal
-	 * 
+	 *
 	 * @param cert
 	 */
-	public void setUserCert(X509Certificate[] cert) {
+	public void setUserCert(final X509Certificate[] cert) {
 		usercert = cert;
 	}
 
@@ -117,7 +117,7 @@ public class AliEnPrincipal implements Principal, Serializable {
 
 	/**
 	 * Set the initial user name
-	 * 
+	 *
 	 * @param name
 	 */
 	public void setDefaultUser(final String name) {
@@ -274,13 +274,13 @@ public class AliEnPrincipal implements Principal, Serializable {
 
 	/**
 	 * Set extension information for job
-	 * 
+	 *
 	 * @param key
 	 *            extension tag
 	 * @param value
 	 *            string value of key
 	 */
-	public void setExtension(String key, String value) {
+	public void setExtension(final String key, final String value) {
 		if (extensions == null)
 			extensions = new HashMap<>();
 
@@ -289,12 +289,12 @@ public class AliEnPrincipal implements Principal, Serializable {
 
 	/**
 	 * Retrieve information about job extensions
-	 * 
+	 *
 	 * @param key
 	 *            extension tag
 	 * @return string value of key
 	 */
-	public String getExtension(String key) {
+	public String getExtension(final String key) {
 		if (extensions != null)
 			if (extensions.containsKey(key))
 				return extensions.get(key);
@@ -310,6 +310,36 @@ public class AliEnPrincipal implements Principal, Serializable {
 			return extensions.containsKey("queueid");
 
 		return false;
+	}
+
+	/**
+	 * @return the job ID, extracted from the certificate subject
+	 */
+	public Long getJobID() {
+		if (extensions == null)
+			return null;
+
+		final String queueId = extensions.get("queueid");
+
+		if (queueId == null)
+			return null;
+
+		return Long.valueOf(queueId);
+	}
+
+	/**
+	 * @return the resubmission count, extracted from the certificate subject
+	 */
+	public Integer getResubmissionCount() {
+		if (extensions == null)
+			return null;
+
+		final String resubmission = extensions.get("resubmission");
+
+		if (resubmission == null)
+			return null;
+
+		return Integer.valueOf(resubmission);
 	}
 
 	/**
@@ -330,10 +360,7 @@ public class AliEnPrincipal implements Principal, Serializable {
 		if (names == null || names.size() == 0)
 			return false;
 
-		if (names.contains(role))
-			return true;
-
-		if (userRole.equals(role))
+		if (names.contains(role) || userRole.equals(role))
 			return true;
 
 		final Set<String> sRoles = getRoles();
@@ -406,7 +433,7 @@ public class AliEnPrincipal implements Principal, Serializable {
 
 	/**
 	 * Set complete client details from the socket address
-	 * 
+	 *
 	 * @param socketAddress
 	 */
 	public void setRemoteEndpoint(final InetSocketAddress socketAddress) {
@@ -421,8 +448,9 @@ public class AliEnPrincipal implements Principal, Serializable {
 	 * @return list of users
 	 */
 	public static Set<String> getRoleMembers(final String role) {
-		if (role == null || role.equals(""))
+		if (role == null || role.isBlank())
 			return null;
+
 		final Set<String> sUsers = LDAPHelper.checkLdapInformation("uid=" + role, "ou=Roles,", "users");
 		return sUsers;
 	}
