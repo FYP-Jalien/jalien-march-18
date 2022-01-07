@@ -221,9 +221,11 @@ public final class UserFactory {
 							final StringTokenizer st = new StringTokenizer(extensions, "/");
 							while (st.hasMoreElements()) {
 								final String spec = st.nextToken();
-								if (spec.contains("=")) {
-									p.setExtension(spec.substring(0, spec.indexOf('=')), spec.substring(spec.indexOf('=') + 1));
-								}
+
+								final int idx = spec.indexOf('=');
+
+								if (idx > 0)
+									p.setExtension(spec.substring(0, spec.charAt(idx - 1) == '\\' ? idx - 1 : idx), spec.substring(idx + 1));
 							}
 						}
 
