@@ -20,26 +20,31 @@ public class SetJobStatus extends Request {
 	 */
 	private static final long serialVersionUID = -6330031807464568209L;
 	private final long jobnumber;
+	private final int resubmission;
 	private final JobStatus status;
 	private final HashMap<String, Object> extrafields;
 
 	/**
 	 * @param jobnumber
+	 * @param resubmission
 	 * @param status
 	 */
-	public SetJobStatus(final long jobnumber, final JobStatus status) {
+	public SetJobStatus(final long jobnumber, final int resubmission, final JobStatus status) {
 		this.jobnumber = jobnumber;
+		this.resubmission = resubmission;
 		this.status = status;
 		this.extrafields = null;
 	}
 
 	/**
 	 * @param jobnumber
+	 * @param resubmission
 	 * @param status
 	 * @param extrafields
 	 */
-	public SetJobStatus(final long jobnumber, final JobStatus status, final HashMap<String, Object> extrafields) {
+	public SetJobStatus(final long jobnumber, final int resubmission, final JobStatus status, final HashMap<String, Object> extrafields) {
 		this.jobnumber = jobnumber;
+		this.resubmission = resubmission;
 		this.status = status;
 		this.extrafields = extrafields;
 	}
@@ -51,6 +56,11 @@ public class SetJobStatus extends Request {
 
 	@Override
 	public void run() {
+		if (TaskQueueUtils.getResubmission(Long.valueOf(this.jobnumber)) != resubmission) {
+			setException(new JobKilledException("This job is not supposed to be running any more", null));
+			return;
+		}
+
 		TaskQueueUtils.setJobStatus(this.jobnumber, this.status, null, this.extrafields);
 
 		if (this.extrafields != null)

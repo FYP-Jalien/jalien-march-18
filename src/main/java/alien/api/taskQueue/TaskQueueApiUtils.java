@@ -202,6 +202,7 @@ public class TaskQueueApiUtils {
 	 * @param ceNames CEs to set the status to
 	 *
 	 * @return a list with the successfully updated CEs
+	 * @throws SecurityException
 	 */
 	public List<String> setCEStatus(final String status, final List<String> ceNames) throws SecurityException {
 
@@ -224,10 +225,9 @@ public class TaskQueueApiUtils {
 	 * @param jobnumber
 	 * @param status
 	 */
-	public static void setJobStatus(final long jobnumber, final JobStatus status) {
+	public static void setJobStatus(final long jobnumber, final int resubmission, final JobStatus status) {
 		try {
-			Dispatcher.execute(new SetJobStatus(jobnumber, status));
-
+			Dispatcher.execute(new SetJobStatus(jobnumber, resubmission, status));
 		}
 		catch (final ServerException e) {
 			System.out.println("Could get not a Job's status: " + e.getMessage());
@@ -239,18 +239,24 @@ public class TaskQueueApiUtils {
 	 * Set a job's status and sets extra fields on the DB
 	 *
 	 * @param jobnumber
+	 * @param resubmission
 	 * @param status
 	 * @param extrafields
+	 * @return <code>false</code> if the job is not supposed to be running any more
 	 */
-	public static void setJobStatus(final long jobnumber, final JobStatus status, final HashMap<String, Object> extrafields) {
+	public static boolean setJobStatus(final long jobnumber, final int resubmission, final JobStatus status, final HashMap<String, Object> extrafields) {
 		try {
-			Dispatcher.execute(new SetJobStatus(jobnumber, status, extrafields));
-
+			Dispatcher.execute(new SetJobStatus(jobnumber, resubmission, status, extrafields));
 		}
 		catch (final ServerException e) {
 			System.out.println("Could get not a Job's status: " + e.getMessage());
 			e.getCause().printStackTrace();
+
+			if (e instanceof JobKilledException)
+				return false;
 		}
+
+		return true;
 	}
 
 	/**
@@ -338,17 +344,22 @@ public class TaskQueueApiUtils {
 	 * @param jobid
 	 * @param tag
 	 * @param message
+	 * @return <code>false</code> if the job was killed
 	 */
 	@SuppressWarnings("static-method")
-	public void putJobLog(final long jobid, final String tag, final String message) {
+	public boolean putJobLog(final long jobid, final int resubmission, final String tag, final String message) {
 		try {
-			final PutJobLog sq = new PutJobLog(jobid, tag, message);
+			final PutJobLog sq = new PutJobLog(jobid, resubmission, tag, message);
 			Dispatcher.execute(sq);
 		}
 		catch (final Exception e) {
 			System.out.println("Exception in putJobLog: " + e.getMessage());
+
+			if (e instanceof JobKilledException)
+				return false;
 		}
-		return;
+
+		return true;
 	}
 
 	/**
