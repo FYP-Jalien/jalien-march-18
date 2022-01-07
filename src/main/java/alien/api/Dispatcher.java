@@ -5,6 +5,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import alien.api.taskQueue.GetMatchJob;
+import alien.api.taskQueue.JobKilledException;
 import alien.api.taskQueue.PutJobLog;
 import alien.api.taskQueue.SetJobStatus;
 import alien.api.token.GetTokenCertificate;
@@ -12,6 +13,8 @@ import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
+import alien.taskQueue.TaskQueueUtils;
+import alien.user.AliEnPrincipal;
 import lazyj.cache.ExpirationCache;
 
 /**
@@ -125,6 +128,28 @@ public class Dispatcher {
 		return ret;
 	}
 
+	private static final ExpirationCache<Long, Integer> jobResubmissionsCache = new ExpirationCache<>(10000);
+
+	private static final boolean isJobStillValid(final Long queueId, final Integer resubmissionCounter) {
+		if (queueId == null || resubmissionCounter == null || queueId.longValue() <= 0 || resubmissionCounter.intValue() < 0)
+			return false;
+
+		Integer cachedResubmissionCounter = jobResubmissionsCache.get(queueId);
+
+		if (cachedResubmissionCounter == null) {
+			cachedResubmissionCounter = Integer.valueOf(TaskQueueUtils.getResubmission(queueId));
+
+			jobResubmissionsCache.put(queueId, cachedResubmissionCounter, 1000 * 60);
+		}
+
+		if (!resubmissionCounter.equals(cachedResubmissionCounter)) {
+			logger.log(Level.WARNING, "Resubmission counter of " + queueId + " is " + resubmissionCounter + " while the current status is " + cachedResubmissionCounter);
+			return false;
+		}
+
+		return true;
+	}
+
 	/**
 	 * Check if the request should be allowed run
 	 *
@@ -132,7 +157,13 @@ public class Dispatcher {
 	 * @return <code>true</code> if it can be run, <code>false</code> if not
 	 */
 	private static final boolean passesFirewallRules(final Request r) {
-		if (r.getEffectiveRequester().isJobAgent() && !(r instanceof GetMatchJob)) {
+		final AliEnPrincipal requester = r.getEffectiveRequester();
+
+		if (requester.isJobAgent()) {
+			// Main JobAgent functionality - getting a job from the task queue to run
+			if (r instanceof GetMatchJob)
+				return true;
+
 			// Allowing the JobAgent to change the job status enables it to act on possible JobWrapper terminations/faults
 			if (r instanceof SetJobStatus)
 				return true;
@@ -152,7 +183,12 @@ public class Dispatcher {
 			return false;
 		}
 
-		if (r.getEffectiveRequester().isJob()) {
+		if (requester.isJob()) {
+			if (!isJobStillValid(requester.getJobID(), requester.getResubmissionCount())) {
+				r.setException(new JobKilledException("This job is not supposed to still be running", null));
+				return false;
+			}
+
 			// TODO : firewall all the commands that the job can have access to (whereis, access (read only for anything but the output directory ...))
 		}
 
