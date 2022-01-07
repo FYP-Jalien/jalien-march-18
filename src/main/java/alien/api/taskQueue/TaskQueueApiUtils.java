@@ -223,6 +223,7 @@ public class TaskQueueApiUtils {
 	 * Set a job's status
 	 *
 	 * @param jobnumber
+	 * @param resubmission 
 	 * @param status
 	 */
 	public static void setJobStatus(final long jobnumber, final int resubmission, final JobStatus status) {
@@ -342,6 +343,7 @@ public class TaskQueueApiUtils {
 
 	/**
 	 * @param jobid
+	 * @param resubmission 
 	 * @param tag
 	 * @param message
 	 * @return <code>false</code> if the job was killed
