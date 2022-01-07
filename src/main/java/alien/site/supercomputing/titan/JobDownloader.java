@@ -54,6 +54,7 @@ public class JobDownloader extends Thread {
 	private String dbname;
 	private JDL jdl;
 	private Long queueId;
+	private Integer resubmission;
 	private String username;
 	private String jobToken;
 	private String masterJobId;
@@ -138,6 +139,7 @@ public class JobDownloader extends Thread {
 				jdl = new JDL(Job.sanitizeJDL((String) matchedJob.get("JDL")));
 				// queueId = ((Long) matchedJob.get("queueId")).intValue();
 				queueId = ((Long) matchedJob.get("queueId"));
+				resubmission = ((Integer) matchedJob.get("Resubmission"));
 				username = (String) matchedJob.get("User");
 				jobToken = (String) matchedJob.get("jobToken");
 				masterJobId = jdl.gets("MasterJobID");
@@ -199,9 +201,9 @@ public class JobDownloader extends Thread {
 		try {
 			logger.log(Level.INFO, "Started JA with: " + jdl);
 
-			commander.q_api.putJobLog(queueId.longValue(), "trace", "Job preparing to run in: " + hostName);
+			commander.q_api.putJobLog(queueId.longValue(), resubmission.intValue(), "trace", "Job preparing to run in: " + hostName);
 
-			changeStatus(queueId, JobStatus.STARTED);
+			changeStatus(queueId, resubmission, JobStatus.STARTED);
 
 			Vector<String> varnames = new Vector<>();
 			varnames.add("host");
@@ -214,7 +216,7 @@ public class JobDownloader extends Thread {
 			apmon.sendParameters(ce + "_Jobs", String.format("%d", queueId), 2, varnames, varvalues);
 
 			if (!createWorkDir() || !getInputFiles()) {
-				changeStatus(queueId, JobStatus.ERROR_IB);
+				changeStatus(queueId, resubmission, JobStatus.ERROR_IB);
 				varnames = new Vector<>();
 				varnames.add("host");
 				varnames.add("statusID");
@@ -237,7 +239,7 @@ public class JobDownloader extends Thread {
 			}
 
 			// run payload
-			changeStatus(queueId, JobStatus.RUNNING);
+			changeStatus(queueId, resubmission, JobStatus.RUNNING);
 			// also send Apmon message to alimonitor
 			System.out.println("============== now running apmon call =========");
 			try {
@@ -260,7 +262,7 @@ public class JobDownloader extends Thread {
 			}
 
 			if (execute() < 0) {
-				changeStatus(queueId, JobStatus.ERROR_E);
+				changeStatus(queueId, resubmission, JobStatus.ERROR_E);
 				varnames = new Vector<>();
 				varnames.add("host");
 				varnames.add("statusID");
@@ -280,7 +282,7 @@ public class JobDownloader extends Thread {
 	}
 
 	private int execute() {
-		commander.q_api.putJobLog(queueId.longValue(), "trace", "Starting execution");
+		commander.q_api.putJobLog(queueId.longValue(), resubmission.intValue(), "trace", "Starting execution");
 		int numRetries = 20;
 		// EXPERIMENTAL
 		// for ORNL Titan
@@ -385,7 +387,7 @@ public class JobDownloader extends Thread {
 		// chdir
 		System.setProperty("user.dir", jobWorkdir);
 
-		commander.q_api.putJobLog(queueId.longValue(), "trace", "Created workdir: " + jobWorkdir);
+		commander.q_api.putJobLog(queueId.longValue(), resubmission.intValue(), "trace", "Created workdir: " + jobWorkdir);
 		// TODO: create the extra directories
 
 		return true;
@@ -415,7 +417,7 @@ public class JobDownloader extends Thread {
 			}
 			else
 				workdirMaxSizeMB = Integer.parseInt(workdirMaxSize);
-			commander.q_api.putJobLog(queueId.longValue(), "trace", "Disk requested: " + workdirMaxSizeMB);
+			commander.q_api.putJobLog(queueId.longValue(), resubmission.intValue(), "trace", "Disk requested: " + workdirMaxSizeMB);
 		}
 		else
 			workdirMaxSizeMB = 0;
@@ -444,7 +446,7 @@ public class JobDownloader extends Thread {
 			else
 				jobMaxMemoryMB = Integer.parseInt(maxmemory);
 
-			commander.q_api.putJobLog(queueId.longValue(), "trace", "Memory requested: " + jobMaxMemoryMB);
+			commander.q_api.putJobLog(queueId.longValue(), resubmission.intValue(), "trace", "Memory requested: " + jobMaxMemoryMB);
 		}
 		else
 			jobMaxMemoryMB = 0;
@@ -794,6 +796,7 @@ public class JobDownloader extends Thread {
 
 	/**
 	 * @param queueId
+	 * @param resubmission 
 	 * @param newStatus
 	 */
 	/*
@@ -848,7 +851,7 @@ public class JobDownloader extends Thread {
 	 * }
 	 */
 
-	public static void changeStatus(final Long queueId, final JobStatus newStatus) {
+	public static void changeStatus(final Long queueId, final Integer resubmission, final JobStatus newStatus) {
 		final HashMap<String, Object> extrafields = new HashMap<>();
 		System.out.println("Exechost for changeStatus: " + ce);
 		// extrafields.put("exechost", ce);
@@ -858,16 +861,16 @@ public class JobDownloader extends Thread {
 			// extrafields.put("path", getJobOutputDir());
 			extrafields.put("path", "/tmp");
 
-			TaskQueueApiUtils.setJobStatus(queueId.longValue(), newStatus, extrafields);
+			TaskQueueApiUtils.setJobStatus(queueId.longValue(), resubmission.intValue(), newStatus, extrafields);
 		}
 		else if (newStatus == JobStatus.RUNNING) {
 			extrafields.put("spyurl", hostName + ":" + JBoxServer.getPort());
 			extrafields.put("node", hostName);
 
-			TaskQueueApiUtils.setJobStatus(queueId.longValue(), newStatus, extrafields);
+			TaskQueueApiUtils.setJobStatus(queueId.longValue(), resubmission.intValue(), newStatus, extrafields);
 		}
 		else
-			TaskQueueApiUtils.setJobStatus(queueId.longValue(), newStatus);
+			TaskQueueApiUtils.setJobStatus(queueId.longValue(), resubmission.intValue(), newStatus);
 
 		// jobStatus = newStatus;
 

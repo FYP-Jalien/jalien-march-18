@@ -14,6 +14,10 @@ public class TitanJobStatus {
 	 */
 	public Long queueId;
 	/**
+	 * Resubmission counter
+	 */
+	public Integer resubmission;
+	/**
 	 * folder
 	 */
 	String jobFolder;
@@ -45,9 +49,10 @@ public class TitanJobStatus {
 	 * @param val_code
 	 * @param bi
 	 */
-	public TitanJobStatus(final int r, final Long qid, final String job_folder, final String st, final int exec_code, final int val_code, final TitanBatchInfo bi) {
+	public TitanJobStatus(final int r, final Long qid, final Integer resubmission, final String job_folder, final String st, final int exec_code, final int val_code, final TitanBatchInfo bi) {
 		rank = r;
 		queueId = qid;
+		this.resubmission = resubmission;
 		jobFolder = job_folder;
 		status = st;
 		executionCode = exec_code;

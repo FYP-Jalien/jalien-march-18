@@ -83,6 +83,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 	// Job variables
 	private JDL jdl = null;
 	private long queueId;
+	private int resubmission;
 	private String jobToken;
 	private String username;
 	private String jobAgentId = "";
@@ -229,7 +230,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 
 				statement.executeUpdate("DROP TABLE IF EXISTS alien_jobs");
 				statement.executeUpdate(
-						"CREATE TABLE alien_jobs (rank INTEGER NOT NULL, queue_id VARCHAR(20), job_folder VARCHAR(256) NOT NULL, status CHAR(1), executable VARCHAR(256), validation VARCHAR(256),"
+						"CREATE TABLE alien_jobs (rank INTEGER NOT NULL, queue_id VARCHAR(20), resubmission INTEGER, job_folder VARCHAR(256) NOT NULL, status CHAR(1), executable VARCHAR(256), validation VARCHAR(256),"
 								+ "environment TEXT," + "exec_code INTEGER DEFAULT -1, val_code INTEGER DEFAULT -1)");
 				statement.executeUpdate("CREATE TEMPORARY TABLE numbers(n INTEGER)");
 				statement.executeUpdate("INSERT INTO numbers " + "select 1 " + "from (" + "select 0 union select 1 union select 2 " + ") a, ("
@@ -238,7 +239,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 						+ "select 0 union select 1 union select 2 union select 3 " + "union select 4 union select 5 union select 6 " + "union select 7 union select 8 union select 9" + ") d, ("
 						+ "select 0 union select 1 union select 2 union select 3 " + "union select 4 union select 5 union select 6 " + "union select 7 union select 8 union select 9" + ") e, ("
 						+ "select 0 union select 1 union select 2 union select 3 " + "union select 4 union select 5 union select 6 " + "union select 7 union select 8 union select 9" + ") f");
-				statement.executeUpdate(String.format("INSERT INTO alien_jobs SELECT rowid-1, 0, '', 'I', '', '', '', 0, 0 FROM numbers LIMIT %d", Integer.valueOf(numCores)));
+				statement.executeUpdate(String.format("INSERT INTO alien_jobs SELECT rowid-1, 0, '', 0, 'I', '', '', '', 0, 0 FROM numbers LIMIT %d", Integer.valueOf(numCores)));
 				statement.executeUpdate("DROP TABLE numbers");
 			}
 
@@ -247,7 +248,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 			try (Connection connection = DriverManager.getConnection(monitoring_dbname); Statement statement = connection.createStatement();) {
 				// creating monitoring db
 				statement.executeUpdate("DROP TABLE IF EXISTS alien_jobs_monitoring");
-				statement.executeUpdate("CREATE TABLE alien_jobs_monitoring (queue_id VARCHAR(20), resources VARCHAR(100))");
+				statement.executeUpdate("CREATE TABLE alien_jobs_monitoring (queue_id VARCHAR(20), resubmission INTEGER, resources VARCHAR(100))");
 				connection.close();
 
 				dblink = "/lustre/atlas/scratch/psvirin/csc108/workdir/database.lnk";
@@ -316,14 +317,16 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 		class TitanJobStatus {
 			public int rank;
 			public Long aliEnId;
+			public Integer resubmissionCount;
 			public String jobFolder;
 			public String status;
 			public int executionCode;
 			public int validationCode;
 
-			public TitanJobStatus(int r, Long qid, String job_folder, String st, int exec_code, int val_code) {
+			public TitanJobStatus(int r, Long qid, final Integer resubmission, String job_folder, String st, int exec_code, int val_code) {
 				rank = r;
 				aliEnId = qid;
+				this.resubmissionCount = resubmission;
 				jobFolder = job_folder;
 				status = st;
 				executionCode = exec_code;
@@ -340,10 +343,10 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 			LinkedList<TitanJobStatus> idleRanks = new LinkedList<>();
 			try (Connection connection = DriverManager.getConnection(dbname);
 					Statement statement = connection.createStatement();
-					ResultSet rs = statement.executeQuery("SELECT rank, queue_id, job_folder, status, exec_code, val_code FROM alien_jobs WHERE status='D' OR status='I'")) {
+					ResultSet rs = statement.executeQuery("SELECT rank, queue_id, resubmission, job_folder, status, exec_code, val_code FROM alien_jobs WHERE status='D' OR status='I'")) {
 				while (rs.next()) {
-					idleRanks.add(new TitanJobStatus(rs.getInt("rank"), Long.valueOf(rs.getLong("queue_id")), rs.getString("job_folder"), rs.getString("status"), rs.getInt("exec_code"),
-							rs.getInt("val_code")));
+					idleRanks.add(new TitanJobStatus(rs.getInt("rank"), Long.valueOf(rs.getLong("queue_id")), Integer.valueOf(rs.getInt("resubmission")), rs.getString("job_folder"),
+							rs.getString("status"), rs.getInt("exec_code"), rs.getInt("val_code")));
 				}
 			}
 			catch (SQLException e) {
@@ -370,6 +373,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 			for (TitanJobStatus js : idleRanks) {
 				if (js.status.equals("D")) {
 					queueId = js.aliEnId.longValue();
+					resubmission = js.resubmissionCount.intValue();
 					System.err.println(String.format("Uploading job: %d", js.aliEnId));
 					jobWorkdir = js.jobFolder;
 					tempDir = new File(js.jobFolder);
@@ -432,6 +436,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 					if (matchedJob != null && !matchedJob.containsKey("Error")) {
 						jdl = new JDL(Job.sanitizeJDL((String) matchedJob.get("JDL")));
 						queueId = ((Long) matchedJob.get("queueId")).intValue();
+						resubmission = ((Integer) matchedJob.get("Resubmission")).intValue();
 						username = (String) matchedJob.get("User");
 						jobToken = (String) matchedJob.get("jobToken");
 
@@ -683,7 +688,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 		try {
 			logger.log(Level.INFO, "Started JA with: " + jdl);
 
-			commander.q_api.putJobLog(queueId, "trace", "Job preparing to run in: " + hostName);
+			commander.q_api.putJobLog(queueId, resubmission, "trace", "Job preparing to run in: " + hostName);
 
 			changeStatus(JobStatus.STARTED);
 
@@ -925,10 +930,12 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 		// for ORNL Titan
 		class ProcInfoPair {
 			public final long queue_id;
+			public final int resubmissionCount;
 			public final String procinfo;
 
-			public ProcInfoPair(String queue_id, String procinfo) {
+			public ProcInfoPair(String queue_id, String resubmission, String procinfo) {
 				this.queue_id = Long.parseLong(queue_id);
+				this.resubmissionCount = Integer.parseInt(resubmission);
 				this.procinfo = procinfo;
 			}
 		}
@@ -939,7 +946,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 				ResultSet rs = statement.executeQuery("SELECT * FROM alien_jobs_monitoring");) {
 			// read all
 			while (rs.next()) {
-				job_resources.add(new ProcInfoPair(rs.getString("queue_id"), rs.getString("resources")));
+				job_resources.add(new ProcInfoPair(rs.getString("queue_id"), rs.getString("resubmission"), rs.getString("resources")));
 				// idleRanks.add(new TitanJobStatus(rs.getInt("rank"), rs.getLong("queue_id"), rs.getString("job_folder"),
 				// rs.getString("status"), rs.getInt("exec_code"), rs.getInt("val_code")));
 			}
@@ -957,7 +964,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 		// System.out.println("+++++ Sending resources info +++++");
 		// System.out.println(procinfo);
 		for (ProcInfoPair pi : job_resources) {
-			commander.q_api.putJobLog(pi.queue_id, "proc", pi.procinfo);
+			commander.q_api.putJobLog(pi.queue_id, pi.resubmissionCount, "proc", pi.procinfo);
 		}
 	}
 
@@ -1063,7 +1070,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 			}
 			else
 				workdirMaxSizeMB = Integer.parseInt(workdirMaxSize);
-			commander.q_api.putJobLog(queueId, "trace", "Disk requested: " + workdirMaxSizeMB);
+			commander.q_api.putJobLog(queueId, resubmission, "trace", "Disk requested: " + workdirMaxSizeMB);
 		}
 		else
 			workdirMaxSizeMB = 0;
@@ -1091,7 +1098,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 			}
 			else
 				jobMaxMemoryMB = Integer.parseInt(maxmemory);
-			commander.q_api.putJobLog(queueId, "trace", "Memory requested: " + jobMaxMemoryMB);
+			commander.q_api.putJobLog(queueId, resubmission, "trace", "Memory requested: " + jobMaxMemoryMB);
 		}
 		else
 			jobMaxMemoryMB = 0;
@@ -1099,7 +1106,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 	}
 
 	private int execute() {
-		commander.q_api.putJobLog(queueId, "trace", "Starting execution");
+		commander.q_api.putJobLog(queueId, resubmission, "trace", "Starting execution");
 
 		// final int code = executeCommand(jdl.gets("Executable"), jdl.getArguments(), ttlForJob(), TimeUnit.SECONDS, true);
 		// final int code = executeCommand(jdl.gets("Executable"), jdl.getArguments(), ttlForJob(), TimeUnit.SECONDS, false);
@@ -1131,9 +1138,10 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 			}
 
 			String validationCommand = jdl.gets("ValidationCommand");
-			statement.executeUpdate(String.format("UPDATE alien_jobs SET queue_id=%d, job_folder='%s', status='%s', executable='%s', validation='%s', environment='%s' " + "WHERE rank=%d",
-					Long.valueOf(queueId), tempDir, "Q", getLocalCommand(jdl.gets("Executable"), jdl.getArguments()), validationCommand != null ? getLocalCommand(validationCommand, null) : "", "",
-					Integer.valueOf(current_rank)));
+			statement.executeUpdate(
+					String.format("UPDATE alien_jobs SET queue_id=%d, resubmission=%d, job_folder='%s', status='%s', executable='%s', validation='%s', environment='%s' " + "WHERE rank=%d",
+							Long.valueOf(queueId), Integer.valueOf(resubmission), tempDir, "Q", getLocalCommand(jdl.gets("Executable"), jdl.getArguments()),
+							validationCommand != null ? getLocalCommand(validationCommand, null) : "", "", Integer.valueOf(current_rank)));
 		}
 		catch (SQLException e) {
 			System.err.println("Failed to insert job: " + e.getMessage());
@@ -1222,7 +1230,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 
 			final GUID g = pfns.iterator().next().getGuid();
 
-			commander.q_api.putJobLog(queueId, "trace", "Getting InputFile: " + entry.getKey().getCanonicalName());
+			commander.q_api.putJobLog(queueId, resubmission, "trace", "Getting InputFile: " + entry.getKey().getCanonicalName());
 
 			final StringBuilder errorMessage = new StringBuilder();
 
@@ -1310,7 +1318,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 		boolean uploadedAllOutFiles = true;
 		boolean uploadedNotAllCopies = false;
 
-		commander.q_api.putJobLog(queueId, "trace", "Going to uploadOutputFiles");
+		commander.q_api.putJobLog(queueId, resubmission, "trace", "Going to uploadOutputFiles");
 
 		// EXPERIMENTAL
 		final String outputDir = getJobOutputDir();
@@ -1330,7 +1338,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 		if (outDir == null) {
 			uploadedAllOutFiles = false;
 			logger.log(Level.SEVERE, "Error creating the OutputDir [" + outputDir + "].");
-			commander.q_api.putJobLog(queueId, "trace", "Can't create the output directory " + outputDir);
+			commander.q_api.putJobLog(queueId, resubmission, "trace", "Can't create the output directory " + outputDir);
 			changeStatus(JobStatus.ERROR_SV);
 			return false;
 		}
@@ -1386,7 +1394,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 
 					System.out.println("LFN :" + lfn + "\npfns: " + pfns);
 
-					commander.q_api.putJobLog(queueId, "trace", "Uploading: " + lfn.getName());
+					commander.q_api.putJobLog(queueId, resubmission, "trace", "Uploading: " + lfn.getName());
 
 					if (pfns != null && !pfns.isEmpty()) {
 						final ArrayList<String> envelopes = new ArrayList<>(pfns.size());
@@ -1458,7 +1466,7 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 		// chdir
 		System.setProperty("user.dir", jobWorkdir);
 
-		commander.q_api.putJobLog(queueId, "trace", "Created workdir: " + jobWorkdir);
+		commander.q_api.putJobLog(queueId, resubmission, "trace", "Created workdir: " + jobWorkdir);
 		// TODO: create the extra directories
 
 		return true;
@@ -1523,17 +1531,17 @@ public class JobAgentProxy extends Thread implements MonitoringObject {
 			final HashMap<String, Object> extrafields = new HashMap<>();
 			extrafields.put("path", getJobOutputDir());
 
-			TaskQueueApiUtils.setJobStatus(queueId, newStatus, extrafields);
+			TaskQueueApiUtils.setJobStatus(queueId, resubmission, newStatus, extrafields);
 		}
 		else if (newStatus == JobStatus.RUNNING) {
 			final HashMap<String, Object> extrafields = new HashMap<>();
 			extrafields.put("spyurl", hostName + ":" + JBoxServer.getPort());
 			extrafields.put("node", hostName);
 
-			TaskQueueApiUtils.setJobStatus(queueId, newStatus, extrafields);
+			TaskQueueApiUtils.setJobStatus(queueId, resubmission, newStatus, extrafields);
 		}
 		else
-			TaskQueueApiUtils.setJobStatus(queueId, newStatus);
+			TaskQueueApiUtils.setJobStatus(queueId, resubmission, newStatus);
 
 		jobStatus = newStatus;
 

@@ -44,6 +44,7 @@ public class JobUploader extends Thread {
 	private TitanJobStatus js;
 	private String dbname;
 	private Long queueId;
+	private Integer resubmission;
 	private JDL jdl;
 
 	private String jobWorkdir;
@@ -88,6 +89,7 @@ public class JobUploader extends Thread {
 	@Override
 	public void run() {
 		queueId = js.queueId;
+		resubmission = js.resubmission;
 		System.err.println(String.format("Uploading job: %d", queueId));
 		jobWorkdir = js.jobFolder;
 		// File tempDir = new File(js.jobFolder);
@@ -110,7 +112,7 @@ public class JobUploader extends Thread {
 			}
 			if (jdl != null) {
 				if (js.executionCode != 0) {
-					changeStatus(queueId.longValue(), JobStatus.ERROR_E);
+					changeStatus(queueId.longValue(), resubmission.intValue(), JobStatus.ERROR_E);
 					final Vector<String> varnames = new Vector<>();
 					varnames.add("host");
 					varnames.add("statusID");
@@ -127,7 +129,7 @@ public class JobUploader extends Thread {
 					}
 				}
 				else if (js.validationCode != 0) {
-					changeStatus(queueId.longValue(), JobStatus.ERROR_V);
+					changeStatus(queueId.longValue(), resubmission.intValue(), JobStatus.ERROR_V);
 					final Vector<String> varnames = new Vector<>();
 					varnames.add("host");
 					varnames.add("statusID");
@@ -144,7 +146,7 @@ public class JobUploader extends Thread {
 					}
 				}
 				else {
-					changeStatus(queueId.longValue(), JobStatus.SAVING);
+					changeStatus(queueId.longValue(), resubmission.intValue(), JobStatus.SAVING);
 					final Vector<String> varnames = new Vector<>();
 					varnames.add("host");
 					varnames.add("statusID");
@@ -217,7 +219,7 @@ public class JobUploader extends Thread {
 		boolean uploadedAllOutFiles = true;
 		boolean uploadedNotAllCopies = false;
 
-		commander.q_api.putJobLog(queueId.longValue(), "trace", "Going to uploadOutputFiles");
+		commander.q_api.putJobLog(queueId.longValue(), resubmission.intValue(), "trace", "Going to uploadOutputFiles");
 
 		// EXPERIMENTAL
 		final String outputDir = getJobOutputDir();
@@ -228,7 +230,7 @@ public class JobUploader extends Thread {
 
 		if (c_api.getLFN(outputDir) != null) {
 			System.err.println("OutputDir [" + outputDir + "] already exists.");
-			changeStatus(queueId.longValue(), JobStatus.ERROR_SV);
+			changeStatus(queueId.longValue(), resubmission.intValue(), JobStatus.ERROR_SV);
 
 			final Vector<String> varnames = new Vector<>();
 			varnames.add("host");
@@ -306,7 +308,7 @@ public class JobUploader extends Thread {
 
 						System.out.println("LFN :" + lfn + "\npfns: " + pfns);
 
-						commander.q_api.putJobLog(queueId.longValue(), "trace", "Uploading: " + lfn.getName());
+						commander.q_api.putJobLog(queueId.longValue(), resubmission.intValue(), "trace", "Uploading: " + lfn.getName());
 
 						if (pfns != null && !pfns.isEmpty()) {
 							final ArrayList<String> envelopes = new ArrayList<>(pfns.size());
@@ -353,7 +355,7 @@ public class JobUploader extends Thread {
 
 		if (jobStatus != JobStatus.ERROR_E && jobStatus != JobStatus.ERROR_V)
 			if (uploadedNotAllCopies) {
-				changeStatus(queueId.longValue(), JobStatus.DONE_WARN);
+				changeStatus(queueId.longValue(), resubmission.intValue(), JobStatus.DONE_WARN);
 				final Vector<String> varnames = new Vector<>();
 				varnames.add("host");
 				varnames.add("statusID");
@@ -370,7 +372,7 @@ public class JobUploader extends Thread {
 				}
 			}
 			else if (uploadedAllOutFiles) {
-				changeStatus(queueId.longValue(), JobStatus.DONE);
+				changeStatus(queueId.longValue(), resubmission.intValue(), JobStatus.DONE);
 				final Vector<String> varnames = new Vector<>();
 				varnames.add("host");
 				varnames.add("statusID");
@@ -388,7 +390,7 @@ public class JobUploader extends Thread {
 				}
 			}
 			else {
-				changeStatus(queueId.longValue(), JobStatus.ERROR_SV);
+				changeStatus(queueId.longValue(), resubmission.intValue(), JobStatus.ERROR_SV);
 				final Vector<String> varnames = new Vector<>();
 				varnames.add("host");
 				varnames.add("statusID");
@@ -424,15 +426,16 @@ public class JobUploader extends Thread {
 
 	/**
 	 * @param jobId
+	 * @param resubmissionCount 
 	 * @param newStatus
 	 */
-	public void changeStatus(final long jobId, final JobStatus newStatus) {
+	public void changeStatus(final long jobId, final int resubmissionCount, final JobStatus newStatus) {
 		// if final status with saved files, we set the path
 		if (newStatus == JobStatus.DONE || newStatus == JobStatus.DONE_WARN || newStatus == JobStatus.ERROR_E || newStatus == JobStatus.ERROR_V) {
 			final HashMap<String, Object> extrafields = new HashMap<>();
 			extrafields.put("path", getJobOutputDir());
 
-			TaskQueueApiUtils.setJobStatus(jobId, newStatus, extrafields);
+			TaskQueueApiUtils.setJobStatus(jobId, resubmissionCount, newStatus, extrafields);
 		}
 		else if (newStatus == JobStatus.RUNNING) {
 			final HashMap<String, Object> extrafields = new HashMap<>();
@@ -440,10 +443,10 @@ public class JobUploader extends Thread {
 			extrafields.put("node", hostName);
 			extrafields.put("exechost", hostName);
 
-			TaskQueueApiUtils.setJobStatus(jobId, newStatus, extrafields);
+			TaskQueueApiUtils.setJobStatus(jobId, resubmissionCount, newStatus, extrafields);
 		}
 		else
-			TaskQueueApiUtils.setJobStatus(jobId, newStatus);
+			TaskQueueApiUtils.setJobStatus(jobId, resubmissionCount, newStatus);
 
 		jobStatus = newStatus;
 

@@ -174,10 +174,10 @@ public class TitanBatchInfo {
 			return idleRanks;
 		try (Connection connection = DriverManager.getConnection(dbName);
 				Statement statement = connection.createStatement();
-				ResultSet rs = statement.executeQuery("SELECT rank, queue_id, job_folder, status, exec_code, val_code FROM alien_jobs WHERE status='D' OR status='I'");) {
+				ResultSet rs = statement.executeQuery("SELECT rank, queue_id, resubmission, job_folder, status, exec_code, val_code FROM alien_jobs WHERE status='D' OR status='I'");) {
 			while (rs.next())
-				idleRanks.add(new TitanJobStatus(rs.getInt("rank"), Long.valueOf(rs.getLong("queue_id")), rs.getString("job_folder"), rs.getString("status"), rs.getInt("exec_code"),
-						rs.getInt("val_code"), this));
+				idleRanks.add(new TitanJobStatus(rs.getInt("rank"), Long.valueOf(rs.getLong("queue_id")), Integer.valueOf(rs.getInt("resubmission")), rs.getString("job_folder"),
+						rs.getString("status"), rs.getInt("exec_code"), rs.getInt("val_code"), this));
 		}
 		catch (final SQLException e) {
 			System.err.println("Getting free slots failed: " + e.getMessage());
@@ -197,10 +197,10 @@ public class TitanBatchInfo {
 			return runningRanks;
 		try (Connection connection = DriverManager.getConnection(dbName);
 				Statement statement = connection.createStatement();
-				ResultSet rs = statement.executeQuery("SELECT rank, queue_id, job_folder, status, exec_code, val_code FROM alien_jobs WHERE status='R'")) {
+				ResultSet rs = statement.executeQuery("SELECT rank, queue_id, resubmission, job_folder, status, exec_code, val_code FROM alien_jobs WHERE status='R'")) {
 			while (rs.next())
-				runningRanks.add(new TitanJobStatus(rs.getInt("rank"), Long.valueOf(rs.getLong("queue_id")), rs.getString("job_folder"), rs.getString("status"), rs.getInt("exec_code"),
-						rs.getInt("val_code"), this));
+				runningRanks.add(new TitanJobStatus(rs.getInt("rank"), Long.valueOf(rs.getLong("queue_id")), Integer.valueOf(rs.getInt("resubmission")), rs.getString("job_folder"),
+						rs.getString("status"), rs.getInt("exec_code"), rs.getInt("val_code"), this));
 
 			connection.close();
 		}
@@ -230,7 +230,7 @@ public class TitanBatchInfo {
 				ResultSet rs = statement.executeQuery("SELECT * FROM alien_jobs_monitoring")) {
 			// read all
 			while (rs.next())
-				l.add(new ProcInfoPair(rs.getString("queue_id"), rs.getString("resources")));
+				l.add(new ProcInfoPair(rs.getString("queue_id"), rs.getString("resubmission"), rs.getString("resources")));
 			// delete all
 			statement.executeUpdate("DELETE FROM alien_jobs_monitoring");
 			// close database

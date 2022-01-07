@@ -225,7 +225,7 @@ public class TitanJobService implements MonitoringObject, Runnable {
 				// create pool of 16 thread
 				for (final ProcInfoPair pi : job_resources)
 					// notify to all processes waiting
-					commander.q_api.putJobLog(pi.queue_id, "proc", pi.procinfo);
+					commander.q_api.putJobLog(pi.queue_id, pi.resubmission, "proc", pi.procinfo);
 
 				// ApMon calls
 				System.out.println("Running periodic Apmon update on running jobs");
