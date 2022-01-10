@@ -116,10 +116,50 @@ public class JobAgent implements Runnable {
 	private static float lhcbMarks = -1;
 
 	private enum jaStatus {
-		STARTING_JA(0, "Starting running Job Agent"), REQUESTING_JOB(1, "Asking for a job"), INSTALLING_PKGS(2, "Found a matching job"), JOB_STARTED(3,
-				"Starting processing job's payload"), RUNNING_JOB(
-						4, "Running job's payload"), DONE(5, "Finished running job"), FINISHING_JA(6, "Finished running Job Agent"), ERROR_IP(-1, "Error getting AliEn jar path"), ERROR_GET_JDL(-2,
-								"Error getting jdl"), ERROR_DIRS(-3, "Error creating working directories"), ERROR_START(-4, "Error launching Job Wrapper to start job");
+		/**
+		 * Initial state of the JA
+		 */
+		STARTING_JA(0, "Starting running Job Agent"),
+		/**
+		 * Asking for a job
+		 */
+		REQUESTING_JOB(1, "Asking for a job"),
+		/**
+		 * Preparing environment
+		 */
+		INSTALLING_PKGS(2, "Found a matching job"),
+		/**
+		 * Starting the payload
+		 */
+		JOB_STARTED(3, "Starting processing job's payload"),
+		/**
+		 * Payload running, waiting for it to complete
+		 */
+		RUNNING_JOB(4, "Running job's payload"),
+		/**
+		 * Finished running the payload
+		 */
+		DONE(5, "Finished running job"),
+		/**
+		 * Cleaning up before exiting
+		 */
+		FINISHING_JA(6, "Finished running Job Agent"),
+		/**
+		 * Error getting AliEn jar path
+		 */
+		ERROR_IP(-1, "Error getting AliEn jar path"),
+		/**
+		 * Error getting jdl
+		 */
+		ERROR_GET_JDL(-2, "Error getting jdl"),
+		/**
+		 * Error creating working directories
+		 */
+		ERROR_DIRS(-3, "Error creating working directories"),
+		/**
+		 * Error launching Job Wrapper to start job
+		 */
+		ERROR_START(-4, "Error launching Job Wrapper to start job");
 
 		private final int value;
 		private final String value_string;
@@ -231,14 +271,16 @@ public class JobAgent implements Runnable {
 			names.add("TTL_left");
 			values.add(Integer.valueOf(computeTimeLeft(Level.OFF)));
 
-			names.add("ja_status_string");
-			values.add(status.getStringValue());
+			if (status != null) {
+				names.add("ja_status_string");
+				values.add(status.getStringValue());
 
-			names.add("ja_status");
-			values.add(Integer.valueOf(status.getValue()));
+				names.add("ja_status");
+				values.add(Integer.valueOf(status.getValue()));
 
-			names.add("ja_status_" + status.getValue());
-			values.add(Integer.valueOf(1));
+				names.add("ja_status_" + status.getValue());
+				values.add(Integer.valueOf(1));
+			}
 
 			if (reqCPU.longValue() > 0) {
 				names.add(reqCPU + "_cores_jobs");
@@ -982,16 +1024,17 @@ public class JobAgent implements Runnable {
 	}
 
 	private void setStatus(final jaStatus new_status) {
-		try {
-			// Reset old status
-			monitor.sendParameter("ja_status_" + status.getValue(), Integer.valueOf(0));
+		if (new_status != status) {
+			if (status != null)
+				monitor.sendParameter("ja_status_" + status.getValue(), Integer.valueOf(0));
+
 			status = new_status;
-			monitor.sendParameter("ja_status_string", status.getStringValue());
-			monitor.sendParameter("ja_status_" + status.getValue(), Integer.valueOf(1));
-			monitor.sendParameter("ja_status", Integer.valueOf(status.getValue()));
-		}
-		catch (NullPointerException npe) {
-			System.err.println("Error setting status: " + npe);
+
+			if (status != null) {
+				monitor.sendParameter("ja_status_string", status.getStringValue());
+				monitor.sendParameter("ja_status_" + status.getValue(), Integer.valueOf(1));
+				monitor.sendParameter("ja_status", Integer.valueOf(status.getValue()));
+			}
 		}
 	}
 
@@ -1155,8 +1198,12 @@ public class JobAgent implements Runnable {
 				return false;
 			}
 		}
+
 		jobTmpDir = new File(jobWorkdir + "/tmp");
-		jobTmpDir.mkdir();
+
+		if (!jobTmpDir.exists() && !jobTmpDir.mkdir()) {
+			logger.log(Level.WARNING, "Cannot create missing tmp dir " + jobTmpDir.getAbsolutePath());
+		}
 
 		putJobTrace("Created workdir: " + jobWorkdir);
 
