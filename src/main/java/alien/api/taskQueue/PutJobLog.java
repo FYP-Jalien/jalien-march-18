@@ -45,6 +45,8 @@ public class PutJobLog extends Request {
 	public void run() {
 		if (TaskQueueUtils.getResubmission(Long.valueOf(jobnumber)) == resubmission)
 			TaskQueueUtils.putJobLog(timestamp, jobnumber, tag, message, null);
+		else
+			setException(new JobKilledException("This job is not supposed to be running any more", null));
 
 		tag = message = null;
 	}
