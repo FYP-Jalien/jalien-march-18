@@ -80,6 +80,8 @@ public class Xrootd extends Protocol {
 
 	private static boolean preferEoscp = false;
 
+	private String md5Value = null;
+
 	/**
 	 * Statically filled variable, <code>true</code> when
 	 */
@@ -293,6 +295,22 @@ public class Xrootd extends Protocol {
 	 */
 	public void setTimeout(final int seconds) {
 		timeout = seconds;
+	}
+
+	/**
+	 * Set the md5 value
+	 *
+	 * @param md5Value
+	 */
+	public void setMd5Value(final String md5Value) {
+		this.md5Value = md5Value;
+	}
+
+	/**
+	 * Get the md5 value
+	 */
+	public String getMd5Value() {
+		return md5Value;
 	}
 
 	/**
@@ -808,6 +826,8 @@ public class Xrootd extends Protocol {
 				command.add("--verbose"); // display summary output
 				command.add("--force"); // re-create a file if already present
 				command.add("--posc"); // request POSC (persist-on-successful-close) processing to create a new file
+				command.add("--cksum");
+				command.add("md5:source");
 			}
 
 			/*
@@ -889,6 +909,15 @@ public class Xrootd extends Protocol {
 					sMessage = "Exit code was " + exitStatus.getExtProcExitStatus() + " for command:\n" + getFormattedLastCommand();
 
 				throw new TargetException(sMessage);
+			}
+
+			String outputMessage = exitStatus.getStdOut();
+			if (outputMessage.contains("md5:")) {
+				String[] outputList = outputMessage.split(" ");
+				int indexMd5 = Arrays.asList(outputList).indexOf("md5:");
+				if (outputList.length > indexMd5 + 1) {
+					setMd5Value(outputList[indexMd5 + 1].trim());
+				}
 			}
 
 			if (pfn.ticket != null && pfn.ticket.envelope.getEncryptedEnvelope() != null)
