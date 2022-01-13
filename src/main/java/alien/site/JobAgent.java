@@ -247,6 +247,11 @@ public class JobAgent implements Runnable {
 	private Long reqCPU = Long.valueOf(0);
 	private Long reqDisk = Long.valueOf(0);
 
+	/**
+	 * Boolean for CPU isolation
+	 */
+	static boolean cpuIsolation = false;
+
 	private jaStatus status;
 
 	/**
@@ -369,6 +374,12 @@ public class JobAgent implements Runnable {
 			jobAgentId = env.get("ALIEN_JOBAGENT_ID");
 		else
 			jobAgentId = Request.getVMID().toString();
+
+		if (env.containsKey("cpuIsolation"))
+			cpuIsolation = Boolean.parseBoolean(env.get("cpuIsolation"));
+		else
+			cpuIsolation = false;
+		logger.log(Level.INFO, "cpuIsolation = " + cpuIsolation);
 
 		workdir = Functions.resolvePathWithEnv((String) siteMap.get("workdir"));
 
