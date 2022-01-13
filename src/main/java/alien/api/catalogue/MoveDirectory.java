@@ -2,11 +2,9 @@ package alien.api.catalogue;
 
 import java.util.ArrayList;
 import java.util.List;
-
 import alien.api.Request;
 import alien.catalogue.LFNUtils;
 import alien.user.AliEnPrincipal;
-import utils.ExpireTime;
 
 /**
  * @author ibrinzoi
@@ -16,6 +14,7 @@ public class MoveDirectory extends Request {
 	private static final long serialVersionUID = 1950963890853076564L;
 
 	private final String path;
+	private String response;
 
 	/**
 	 * @param user
@@ -28,7 +27,7 @@ public class MoveDirectory extends Request {
 
 	@Override
 	public void run() {
-		LFNUtils.moveDirectory(getEffectiveRequester(), path);
+		this.response = LFNUtils.moveDirectory(getEffectiveRequester(), path);
 	}
 
 	@Override
@@ -37,6 +36,10 @@ public class MoveDirectory extends Request {
 		pathList.add(this.path);
 
 		return pathList;
+	}
+
+	public String getResponse() {
+		return this.response;
 	}
 
 }

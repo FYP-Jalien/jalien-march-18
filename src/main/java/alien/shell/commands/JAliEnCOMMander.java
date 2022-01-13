@@ -134,10 +134,10 @@ public class JAliEnCOMMander implements Runnable {
 			"showTagValue",
 			"time", "timing", "commandlist", "motd", "ping", "version",
 			"whoami", "user", "whois", "groups", "token",
-			"lfnexpiretime", "moveDirectory"
+			"lfnexpiretime"
 	};
 
-	private static final String[] jAliEnAdminCommandList = new String[] { "groupmembers" };
+	private static final String[] jAliEnAdminCommandList = new String[] { "groupmembers", "moveDirectory" };
 
 	/**
 	 * The commands that are advertised on the shell, e.g. by tab+tab

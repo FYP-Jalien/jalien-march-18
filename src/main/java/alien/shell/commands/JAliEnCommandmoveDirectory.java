@@ -23,7 +23,7 @@ public class JAliEnCommandmoveDirectory extends JAliEnBaseCommand {
 		final String absolutePath = FileSystemUtils.getAbsolutePath(commander.user.getName(),
 					currentDir != null ? currentDir.getCanonicalName() : null, file);
 
-		commander.c_api.moveDirectory(absolutePath);
+		commander.printOutln(commander.c_api.moveDirectory(absolutePath));
 	}
 
 	/**
@@ -32,7 +32,7 @@ public class JAliEnCommandmoveDirectory extends JAliEnBaseCommand {
 	@Override
 	public void printHelp() {
 		commander.printOutln();
-		commander.printOutln(helpUsage("moveDirectory", "<file>"));
+		commander.printOutln(helpUsage("moveDirectory", "<directory>"));
 		commander.printOutln();
 	}
 

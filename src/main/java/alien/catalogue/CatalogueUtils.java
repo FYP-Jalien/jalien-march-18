@@ -211,8 +211,8 @@ public final class CatalogueUtils {
 
 	private static List<IndexTableEntry> indextable = null;
 	private static Map<String, IndexTableEntry> tableentries = null;
-	private static long lastIndexTableUpdate = 0;
-	private static long lastIndexTableCheck = 0;
+	private static volatile long lastIndexTableUpdate = 0;
+	private static volatile long lastIndexTableCheck = 0;
 
 	private static final ReentrantReadWriteLock indextableRWLock = new ReentrantReadWriteLock();
 	private static final ReadLock indextableReadLock = indextableRWLock.readLock();
@@ -297,8 +297,8 @@ public final class CatalogueUtils {
 			}
 		}
 		finally {
-			indextableReadLock.unlock();
 			lastIndexTableCheck = System.currentTimeMillis();
+			indextableReadLock.unlock();
 		}
 	}
 
@@ -315,7 +315,7 @@ public final class CatalogueUtils {
 		}
 
 		if (db.moveNext()) {
-			return Long.parseLong(db.gets(1));
+			return db.getl(1);
 		}
 
 		return 0;

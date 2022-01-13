@@ -1131,12 +1131,13 @@ public class CatalogueApiUtils {
 	/**
 	 * @param path the path to the directory
 	 */
-	public void moveDirectory(final String path) {
+	public String moveDirectory(final String path) {
 		try {
-			Dispatcher.execute(new MoveDirectory(commander.getUser(), path));
+			return Dispatcher.execute(new MoveDirectory(commander.getUser(), path)).getResponse();
 		}
 		catch (final ServerException e) {
 			e.printStackTrace();
+			return "Error executing the command";
 		}
 
 	}
