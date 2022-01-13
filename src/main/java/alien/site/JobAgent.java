@@ -736,6 +736,10 @@ public class JobAgent implements Runnable {
 		siteMap.put("CPUCores", RUNNING_CPU);
 		siteMap.put("Disk", RUNNING_DISK);
 
+		final int cvmfsRevision = CVMFS.getRevision();
+		if (cvmfsRevision > 0)
+			siteMap.put("CVMFS_revision", Integer.valueOf(cvmfsRevision));
+
 		return true;
 	}
 

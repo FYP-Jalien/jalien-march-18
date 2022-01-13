@@ -200,4 +200,16 @@ public class CVMFS extends PackMan {
 	public static String getSingularityPath() {
 		return CVMFS_BASE_DIR + "/containers/bin/singularity/current/bin";
 	}
+
+	/**
+	 * @return the CVMFS revision of the alice.cern.ch repository mounted on the machine
+	 */
+	public static int getRevision() {
+		try {
+			return Integer.parseInt(SystemCommand.bash("LD_LIBRARY_PATH= attr -qg revision /cvmfs/alice.cern.ch").stdout.trim());
+		}
+		catch (final Exception e) {
+			return -1;
+		}
+	}
 }

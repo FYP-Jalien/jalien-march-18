@@ -26,6 +26,7 @@ import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.site.SiteMap;
+import alien.site.packman.CVMFS;
 import alien.user.AliEnPrincipal;
 import lazyj.DBFunctions;
 import lazyj.DBFunctions.DBConnection;
@@ -45,6 +46,28 @@ public class JobBroker {
 	 */
 	static final Monitor monitor = MonitorFactory.getMonitor(JobBroker.class.getCanonicalName());
 
+	private static long lastCVMFSRevisionCheck = 0;
+	private static int lastCVMFSRevision = 0;
+
+	/**
+	 * @return the cached CVMFS revision on the server side
+	 */
+	public static int getCachedCVMFSRevision() {
+		if (lastCVMFSRevisionCheck < System.currentTimeMillis() || lastCVMFSRevision <= 0) {
+			final int cvmfsRevision = CVMFS.getRevision();
+
+			if (cvmfsRevision < 0) {
+				lastCVMFSRevisionCheck = System.currentTimeMillis() + 1000 * 15;
+			}
+			else {
+				lastCVMFSRevision = cvmfsRevision;
+				lastCVMFSRevisionCheck = System.currentTimeMillis() + 1000 * 60;
+			}
+		}
+
+		return lastCVMFSRevision;
+	}
+
 	/**
 	 * @param matchRequest
 	 * @return the information of a matching job for the jobAgent (queueId,
@@ -52,6 +75,23 @@ public class JobBroker {
 	 */
 	public static HashMap<String, Object> getMatchJob(final HashMap<String, Object> matchRequest) {
 		updateWithValuesInLDAP(matchRequest);
+
+		final Object workerNodeCVMFSRevision = matchRequest.get("CVMFS_revision");
+
+		if (workerNodeCVMFSRevision != null && workerNodeCVMFSRevision instanceof Integer) {
+			final int wnCVMFSRevision = ((Integer) workerNodeCVMFSRevision).intValue();
+			final int serverCVMFSRevision = getCachedCVMFSRevision();
+
+			if (wnCVMFSRevision < serverCVMFSRevision - 1) {
+				logger.log(Level.WARNING, "The node has an outdated CVMFS revision, server now has " + serverCVMFSRevision + ":\n" + matchRequest);
+
+				final HashMap<String, Object> matchAnswer = new HashMap<>(2);
+				matchAnswer.put("Error", "CVMFS revision is outdated " + wnCVMFSRevision + " vs " + serverCVMFSRevision);
+				matchAnswer.put("Code", Integer.valueOf(-1));
+				return matchAnswer;
+			}
+		}
+
 		try (DBFunctions db = TaskQueueUtils.getQueueDB()) {
 			if (db == null)
 				return null;
@@ -245,8 +285,8 @@ public class JobBroker {
 	}
 
 	private static void setRejectionReason(String error, String ce) {
-		try (DBFunctions db = TaskQueueUtils.getQueueDB()){
-			if (db == null )
+		try (DBFunctions db = TaskQueueUtils.getQueueDB()) {
+			if (db == null)
 				return;
 			long timestamp = System.currentTimeMillis();
 			String q = "update SITEQUEUES set lastRejectionTime=" + timestamp + ", lastRejectionReason=\'" + error + "\' where site=\'" + ce + "\'";
