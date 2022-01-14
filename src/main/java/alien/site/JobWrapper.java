@@ -380,7 +380,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				return -1;
 			}
 
-			cleanupProcesses();
+			cleanupProcesses(queueId, pid);
 
 			return 0;
 		}
@@ -480,7 +480,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		processEnv.put("TMP", currentDir.getAbsolutePath() + "/tmp");
 		processEnv.put("TMPDIR", currentDir.getAbsolutePath() + "/tmp");
 		
-		processEnv.put("PARENT_HOSTNAME", parentHostname);
+		if (!parentHostname.isBlank())
+			processEnv.put("PARENT_HOSTNAME", parentHostname);
 
 		pBuilder.redirectOutput(Redirect.appendTo(new File(currentDir, "stdout")));
 		pBuilder.redirectError(Redirect.appendTo(new File(currentDir, "stderr")));
@@ -1059,7 +1060,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 *
 	 * @return script exit code, or -1 in case of error
 	 */
-	private int cleanupProcesses() {
+	public static int cleanupProcesses(long queueId, int pid) {
 		final File cleanupScript = new File(CVMFS.getCleanupScript());
 
 		if (!cleanupScript.exists()) {
