@@ -940,7 +940,7 @@ public class JobAgent implements Runnable {
 			public void run() {
 				logger.log(Level.SEVERE, "Timeout has occurred. Killing job!");
 				putJobTrace("Killing the job (it was running for longer than its TTL)");
-				killJobWrapperAndPayload(p);
+				killGracefully(p);
 			}
 		};
 
@@ -962,11 +962,17 @@ public class JobAgent implements Runnable {
 					monitor_loops++;
 					final String error = checkProcessResources();
 					if (error != null) {
-						logger.log(Level.SEVERE, "Process overusing resources: " + error);
-						putJobTrace("ERROR[FATAL]: Process overusing resources");
-						putJobTrace(error);
 						t.cancel();
-						killJobWrapperAndPayload(p);
+						if (!jobKilled) {
+							logger.log(Level.SEVERE, "Process overusing resources: " + error);
+							putJobTrace("ERROR[FATAL]: Process overusing resources");
+							putJobTrace(error);
+							killGracefully(p);
+						} else {
+							logger.log(Level.SEVERE, "ERROR[FATAL]: Job KILLED by user! Terminating...");
+							putJobTrace("ERROR[FATAL]: Job KILLED by user! Terminating...");
+							p.destroyForcibly();
+						}
 						return 1;
 					}
 					// Send report once every 10 min, or when the job changes state
@@ -1365,7 +1371,7 @@ public class JobAgent implements Runnable {
 	 *
 	 * @param p process for JobWrapper
 	 */
-	private void killJobWrapperAndPayload(final Process p) {
+	private void killGracefully(final Process p) {
 		try {
 			final int jobWrapperPid = getWrapperPid();
 			if (jobWrapperPid != 0)
