@@ -552,7 +552,6 @@ public class BookingTable {
 				member_g.md5 = md5s.get(member);
 				member_g.size = sizes.get(member).longValue();
 				member_g.type = 'f';
-				member_g.owner = user.getName();
 
 
 				// PFN
