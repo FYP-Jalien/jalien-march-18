@@ -51,6 +51,7 @@ import alien.monitoring.MonitorFactory;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.site.containers.Containerizer;
 import alien.site.containers.ContainerizerFactory;
+import alien.site.JobWrapper;
 import alien.site.packman.CVMFS;
 import alien.taskQueue.JDL;
 import alien.taskQueue.Job;
@@ -971,7 +972,7 @@ public class JobAgent implements Runnable {
 						} else {
 							logger.log(Level.SEVERE, "ERROR[FATAL]: Job KILLED by user! Terminating...");
 							putJobTrace("ERROR[FATAL]: Job KILLED by user! Terminating...");
-							p.destroyForcibly();
+							killForcibly(p);
 						}
 						return 1;
 					}
@@ -1399,6 +1400,30 @@ public class JobAgent implements Runnable {
 		}
 
 		// If still alive, kill everything, including the JW
+		if (p.isAlive()) {
+			killForcibly(p);
+		}
+	}
+
+	/**
+	 * 
+	 * Immediately kills the JobWrapper and its payload, without giving time for upload
+	 * 
+	 * @param p process for JobWrapper
+	 */
+	private void killForcibly(final Process p){
+		final int jobWrapperPid = getWrapperPid();
+		try {
+			if (jobWrapperPid != 0){
+				JobWrapper.cleanupProcesses(queueId, jobWrapperPid);
+				Runtime.getRuntime().exec("kill -9" + jobWrapperPid); }
+			else
+				logger.log(Level.INFO, "Could not kill JobWrapper: not found. Already done?");
+		}
+		catch (final Exception e) {
+			logger.log(Level.INFO, "Unable to kill the JobWrapper", e);
+		}
+
 		if (p.isAlive()) {
 			p.destroyForcibly();
 		}
