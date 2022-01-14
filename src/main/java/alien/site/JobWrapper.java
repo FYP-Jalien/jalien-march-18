@@ -92,6 +92,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	private final String hostName;
 	private final int pid;
 	private final String ceHost;
+	private final String parentHostname;
 	/**
 	 * @uml.property name="commander"
 	 * @uml.associationEnd
@@ -200,6 +201,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			defaultOutputDirPrefix = (String) inputFromJobAgent.readObject();
 			legacyToken = (String) inputFromJobAgent.readObject();
 			ttl = ((Long) inputFromJobAgent.readObject()).longValue();
+			parentHostname = (String) inputFromJobAgent.readObject();
 
 			if (logger.isLoggable(Level.FINEST)) {
 				logger.log(Level.FINEST, "We received the following tokenCert: " + tokenCert);
@@ -477,6 +479,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		processEnv.put("HOME", currentDir.getAbsolutePath());
 		processEnv.put("TMP", currentDir.getAbsolutePath() + "/tmp");
 		processEnv.put("TMPDIR", currentDir.getAbsolutePath() + "/tmp");
+		
+		processEnv.put("PARENT_HOSTNAME", parentHostname);
 
 		pBuilder.redirectOutput(Redirect.appendTo(new File(currentDir, "stdout")));
 		pBuilder.redirectError(Redirect.appendTo(new File(currentDir, "stderr")));

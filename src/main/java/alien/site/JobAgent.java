@@ -895,6 +895,7 @@ public class JobAgent implements Runnable {
 				stdinObj.writeObject(defaultOutputDirPrefix);
 				stdinObj.writeObject(legacyToken);
 				stdinObj.writeObject(Long.valueOf(ttl));
+				stdinObj.writeObject(env.getOrDefault("PARENT_HOSTNAME", ""));
 
 				stdinObj.flush();
 			}
