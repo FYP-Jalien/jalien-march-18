@@ -30,6 +30,7 @@ import alien.site.packman.CVMFS;
 import alien.user.AliEnPrincipal;
 import lazyj.DBFunctions;
 import lazyj.DBFunctions.DBConnection;
+import lazyj.Format;
 
 /**
  *
@@ -47,19 +48,25 @@ public class JobBroker {
 	static final Monitor monitor = MonitorFactory.getMonitor(JobBroker.class.getCanonicalName());
 
 	private static long lastCVMFSRevisionCheck = 0;
+	private static long lastCVMFSRevisionModified = 0;
 	private static int lastCVMFSRevision = 0;
 
 	/**
 	 * @return the cached CVMFS revision on the server side
 	 */
-	public static int getCachedCVMFSRevision() {
+	public static synchronized int getCachedCVMFSRevision() {
 		if (lastCVMFSRevisionCheck < System.currentTimeMillis() || lastCVMFSRevision <= 0) {
 			final int cvmfsRevision = CVMFS.getRevision();
 
 			if (cvmfsRevision < 0) {
+				logger.log(Level.WARNING, "Could not get the CVMFS revision");
 				lastCVMFSRevisionCheck = System.currentTimeMillis() + 1000 * 15;
 			}
 			else {
+				if (cvmfsRevision > lastCVMFSRevision) {
+					lastCVMFSRevisionModified = System.currentTimeMillis();
+				}
+
 				lastCVMFSRevision = cvmfsRevision;
 				lastCVMFSRevisionCheck = System.currentTimeMillis() + 1000 * 60;
 			}
@@ -82,8 +89,9 @@ public class JobBroker {
 			final int wnCVMFSRevision = ((Integer) workerNodeCVMFSRevision).intValue();
 			final int serverCVMFSRevision = getCachedCVMFSRevision();
 
-			if (wnCVMFSRevision < serverCVMFSRevision - 1) {
-				logger.log(Level.WARNING, "The node has an outdated CVMFS revision, server now has " + serverCVMFSRevision + ":\n" + matchRequest);
+			if (wnCVMFSRevision >= serverCVMFSRevision || (System.currentTimeMillis() - lastCVMFSRevisionModified < 1000L * 60 * 60 && wnCVMFSRevision == serverCVMFSRevision - 1)) {
+				logger.log(Level.WARNING, "The node has an outdated CVMFS revision, server has " + serverCVMFSRevision + " for " + Format.toInterval(System.currentTimeMillis() - lastCVMFSRevision)
+						+ ":\n" + matchRequest);
 
 				final HashMap<String, Object> matchAnswer = new HashMap<>(2);
 				matchAnswer.put("Error", "CVMFS revision is outdated " + wnCVMFSRevision + " vs " + serverCVMFSRevision);
