@@ -129,10 +129,14 @@ public class CVMFS extends PackMan {
 		final String keyModifier = SystemCommand.bash("lsb_release -s -d").stdout;
 
 		try {
+			logger.log(Level.INFO, "Executing GetAliEnv");
 			final GetAliEnv env = Dispatcher.execute(new GetAliEnv(args, keyModifier));
 
-			if (env.getCachedAliEnOutput() != null)
-				return env.getCachedAliEnOutput();
+			if (env.getCachedAliEnOutput() != null){
+				logger.log(Level.INFO, "We have cached alienv: " + env.getCachedAliEnOutput());
+				return env.getCachedAliEnOutput(); 
+			
+			}
 		}
 		catch (final Exception e) {
 			logger.log(Level.WARNING, "Exception executing GetAliEnv", e);
@@ -141,12 +145,14 @@ public class CVMFS extends PackMan {
 		final String source = SystemCommand.bash(ALIEN_BIN_DIR + "/alienv printenv " + args).stdout;
 
 		try {
+			logger.log(Level.INFO, "Executing SetAliEnv");
 			Dispatcher.execute(new SetAliEnv(args, keyModifier, source));
 		}
 		catch (final Exception e) {
 			logger.log(Level.WARNING, "Exception executing SetAliEnv", e);
 		}
 
+		logger.log(Level.INFO, "GetAliEnPrintenv done");
 		return source;
 	}
 
