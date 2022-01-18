@@ -470,7 +470,7 @@ public class ConfigUtils {
 
 		String hostName = getConfig().gets("hostname", null);
 
-		if (hostName == null || hostName.length() == 0 || !hostName.contains(".")) {
+		if (hostName == null || hostName.isBlank() || !hostName.contains(".")) {
 			try {
 				hostName = InetAddress.getLocalHost().getCanonicalHostName();
 			}
@@ -479,7 +479,7 @@ public class ConfigUtils {
 			}
 		}
 
-		if (hostName == null || hostName.length() == 0 || !hostName.contains(".")) {
+		if (hostName == null || hostName.isBlank() || !hostName.contains(".")) {
 			final Set<String> hostNameCandidates = new HashSet<>();
 
 			final Set<String> ipAddresses = new HashSet<>();
@@ -535,7 +535,10 @@ public class ConfigUtils {
 				hostName = hostNameCandidates.iterator().next();
 		}
 
-		if (hostName == null || hostName.length() == 0)
+		if (hostName == null || hostName.isBlank())
+			hostName = SystemCommand.executeCommand(Arrays.asList("hostname", "-f")).stdout;
+
+		if (hostName == null || hostName.isBlank())
 			return null;
 
 		hostName = hostName.replace("/.$/", "");
