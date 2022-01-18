@@ -80,15 +80,19 @@ public class Monitor implements Runnable {
 
 		clusterName = MonitorFactory.getConfigString(component, "cluster_name", cluster);
 
+		String hostname = ConfigUtils.getLocalHostname();
+
+		if (hostname == null)
+			hostname = "unresolved.hostname";
+
 		if (jobNumber < 0) {
-			final String pattern = MonitorFactory.getConfigString(component, "node_name",
-					component.startsWith("alien.site.") ? "${hostname}:${pid}" : "${hostname}");
-			final String temp = Format.replace(pattern, "${hostname}", ConfigUtils.getLocalHostname());
+			final String pattern = MonitorFactory.getConfigString(component, "node_name", component.startsWith("alien.site.") ? "${hostname}:${pid}" : "${hostname}");
+			final String temp = Format.replace(pattern, "${hostname}", hostname);
 			nodeName = Format.replace(temp, "${pid}", String.valueOf(MonitorFactory.getSelfProcessID()));
 		}
 		else {
 			final String pattern = MonitorFactory.getConfigString(component, "node_name", "${hostname}:${pid}:${jobnumber}");
-			String temp = Format.replace(pattern, "${hostname}", ConfigUtils.getLocalHostname());
+			String temp = Format.replace(pattern, "${hostname}", hostname);
 			temp = Format.replace(temp, "${pid}", String.valueOf(MonitorFactory.getSelfProcessID()));
 			nodeName = Format.replace(temp, "${jobnumber}", String.valueOf(jobNumber));
 		}
