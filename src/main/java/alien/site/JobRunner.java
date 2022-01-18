@@ -3,6 +3,7 @@ package alien.site;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import alien.api.DispatchSSLClient;
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
@@ -55,7 +56,7 @@ public class JobRunner extends JobAgent {
 		while (timestamp < ttlEnd) {
 			synchronized (JobAgent.requestSync) {
 				try {
-					if (checkParameters() == true) {
+					if (checkParameters()) {
 						logger.log(Level.INFO, "Spawned thread nr " + i);
 						jaThread = new Thread(new JobAgent());
 						jaThread.start();
@@ -97,6 +98,7 @@ public class JobRunner extends JobAgent {
 
 	public static void main(final String[] args) {
 		ConfigUtils.setApplicationName("JobRunner");
+		DispatchSSLClient.setIdleTimeout(30000);
 		ConfigUtils.switchToForkProcessLaunching();
 		final JobRunner jr = new JobRunner();
 		jr.run();

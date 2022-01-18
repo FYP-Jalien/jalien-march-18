@@ -3,6 +3,7 @@ package alien;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import alien.api.DispatchSSLClient;
 import alien.api.JBoxServer;
 import alien.api.TomcatServer;
 import alien.config.ConfigUtils;
@@ -31,6 +32,7 @@ public class JBox {
 	 */
 	public static void main(final String[] args) {
 		ConfigUtils.setApplicationName("JBox");
+		DispatchSSLClient.setIdleTimeout(10000);
 
 		logLoud(Level.FINE, "Starting JBox");
 

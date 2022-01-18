@@ -4,6 +4,7 @@ import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
+import java.io.StreamCorruptedException;
 import java.net.ConnectException;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -54,6 +55,59 @@ public class DispatchSSLClient {
 	private final ObjectOutputStream oos;
 
 	private final OutputStream os;
+
+	private static long idleTimeout = 0;
+
+	private static long lastCommand = System.currentTimeMillis();
+
+	private static IdleWatcher watcherThread = null;
+
+	private static final class IdleWatcher extends Thread {
+		public IdleWatcher() {
+			setDaemon(true);
+			setName("DispatchSSLClient.IdleWatcher");
+		}
+
+		@Override
+		public void run() {
+			while (idleTimeout > 0) {
+				checkIdleConnection();
+
+				try {
+					Thread.sleep(idleTimeout / 10 + 1);
+				}
+				catch (@SuppressWarnings("unused") InterruptedException e) {
+					break;
+				}
+			}
+
+			watcherThread = null;
+		}
+	}
+
+	/**
+	 * @param timeout in milliseconds
+	 */
+	public static void setIdleTimeout(final long timeout) {
+		idleTimeout = timeout;
+
+		if (idleTimeout > 0 && watcherThread == null) {
+			watcherThread = new IdleWatcher();
+			watcherThread.start();
+		}
+	}
+
+	/**
+	 * 
+	 */
+	static synchronized void checkIdleConnection() {
+		if (instance != null && idleTimeout > 0 && System.currentTimeMillis() - lastCommand > idleTimeout) {
+			logger.log(Level.INFO, "Closing idle socket");
+
+			instance.close();
+			instance = null;
+		}
+	}
 
 	/**
 	 * E.g. the CE proxy should act as a fowarding bridge between JA and central services
@@ -416,7 +470,11 @@ public class DispatchSSLClient {
 		try {
 			return dispatchARequest(r);
 		}
-		catch (@SuppressWarnings("unused") final IOException e) {
+		catch (final IOException e) {
+			if (e instanceof StreamCorruptedException) {
+				logger.log(Level.SEVERE, "First attempt to deserialize the response failed", e);
+			}
+
 			// Now let's try, if we can reconnect
 			if (instance != null) {
 				instance.close();
@@ -432,6 +490,9 @@ public class DispatchSSLClient {
 				return null;
 			}
 		}
+		finally {
+			lastCommand = System.currentTimeMillis();
+		}
 	}
 
 	/**
@@ -443,6 +504,8 @@ public class DispatchSSLClient {
 	 *             if the server didn't like the request content
 	 */
 	public static synchronized <T extends Request> T dispatchARequest(final T r) throws IOException, ServerException {
+		lastCommand = System.currentTimeMillis();
+
 		final DispatchSSLClient c = getInstance();
 
 		if (c == null)

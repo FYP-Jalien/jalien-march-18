@@ -41,6 +41,7 @@ import java.util.logging.SimpleFormatter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import alien.api.DispatchSSLClient;
 import alien.api.Request;
 import alien.api.taskQueue.GetMatchJob;
 import alien.api.taskQueue.TaskQueueApiUtils;
@@ -51,7 +52,6 @@ import alien.monitoring.MonitorFactory;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.site.containers.Containerizer;
 import alien.site.containers.ContainerizerFactory;
-import alien.site.JobWrapper;
 import alien.site.packman.CVMFS;
 import alien.taskQueue.JDL;
 import alien.taskQueue.Job;
@@ -536,7 +536,7 @@ public class JobAgent implements Runnable {
 				requestSync.notifyAll();
 			}
 		}
-		catch (Exception e) {
+		catch (final Exception e) {
 			if (!(e instanceof EOFException))
 				logger.log(Level.WARNING, "Another exception matching the job", e);
 
@@ -730,7 +730,7 @@ public class JobAgent implements Runnable {
 		// ttl recalculation
 		final int timeleft = computeTimeLeft(Level.INFO);
 
-		if (checkParameters() == false)
+		if (!checkParameters())
 			return false;
 
 		siteMap.put("TTL", Integer.valueOf(timeleft));
@@ -777,7 +777,7 @@ public class JobAgent implements Runnable {
 			}
 		}
 		else if (maxmemory != null) {
-			Pattern pLetter = Pattern.compile("\\p{L}+");
+			final Pattern pLetter = Pattern.compile("\\p{L}+");
 
 			final Matcher m = pLetter.matcher(maxmemory.trim().toUpperCase());
 			try {
@@ -806,6 +806,7 @@ public class JobAgent implements Runnable {
 	 */
 	public static void main(final String[] args) throws IOException {
 		ConfigUtils.setApplicationName("JobAgent");
+		DispatchSSLClient.setIdleTimeout(30000);
 		ConfigUtils.switchToForkProcessLaunching();
 
 		final JobAgent jao = new JobAgent();
@@ -969,7 +970,8 @@ public class JobAgent implements Runnable {
 							putJobTrace("ERROR[FATAL]: Process overusing resources");
 							putJobTrace(error);
 							killGracefully(p);
-						} else {
+						}
+						else {
 							logger.log(Level.SEVERE, "ERROR[FATAL]: Job KILLED by user! Terminating...");
 							putJobTrace("ERROR[FATAL]: Job KILLED by user! Terminating...");
 							killForcibly(p);
@@ -1050,7 +1052,7 @@ public class JobAgent implements Runnable {
 		}
 	}
 
-	private void setUsedCores(int jobNumber) {
+	private void setUsedCores(final int jobNumber) {
 		if (reqCPU.longValue() > 0)
 			monitor.sendParameter(reqCPU + "_cores_jobs", Integer.valueOf(jobNumber));
 		if (jobNumber == 0)
@@ -1406,17 +1408,18 @@ public class JobAgent implements Runnable {
 	}
 
 	/**
-	 * 
+	 *
 	 * Immediately kills the JobWrapper and its payload, without giving time for upload
-	 * 
+	 *
 	 * @param p process for JobWrapper
 	 */
-	private void killForcibly(final Process p){
+	private void killForcibly(final Process p) {
 		final int jobWrapperPid = getWrapperPid();
 		try {
-			if (jobWrapperPid != 0){
+			if (jobWrapperPid != 0) {
 				JobWrapper.cleanupProcesses(queueId, jobWrapperPid);
-				Runtime.getRuntime().exec("kill -9" + jobWrapperPid); }
+				Runtime.getRuntime().exec("kill -9" + jobWrapperPid);
+			}
 			else
 				logger.log(Level.INFO, "Could not kill JobWrapper: not found. Already done?");
 		}

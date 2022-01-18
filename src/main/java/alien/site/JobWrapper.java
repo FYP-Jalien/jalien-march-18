@@ -24,6 +24,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import alien.api.DispatchSSLClient;
 import alien.api.TomcatServer;
 import alien.api.catalogue.CatalogueApiUtils;
 import alien.api.taskQueue.TaskQueueApiUtils;
@@ -411,11 +412,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		boolean trackTime = false;
 		try {
-			String supportsTime = ExternalProcesses.getCmdOutput(Arrays.asList("time", "echo"), true, 30L, TimeUnit.SECONDS);
+			final String supportsTime = ExternalProcesses.getCmdOutput(Arrays.asList("time", "echo"), true, 30L, TimeUnit.SECONDS);
 			if (!supportsTime.contains("command not found"))
 				trackTime = true;
 		}
-		catch (@SuppressWarnings("unused") Exception e) {
+		catch (@SuppressWarnings("unused") final Exception e) {
 			// ignore
 		}
 
@@ -479,7 +480,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		processEnv.put("HOME", currentDir.getAbsolutePath());
 		processEnv.put("TMP", currentDir.getAbsolutePath() + "/tmp");
 		processEnv.put("TMPDIR", currentDir.getAbsolutePath() + "/tmp");
-		
+
 		if (!parentHostname.isBlank())
 			processEnv.put("PARENT_HOSTNAME", parentHostname);
 
@@ -524,7 +525,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			try {
 				putJobTrace("Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile)).replace("\n", ", "));
 			}
-			catch (@SuppressWarnings("unused") Exception te) {
+			catch (@SuppressWarnings("unused") final Exception te) {
 				// Ignore
 			}
 		}
@@ -954,6 +955,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 */
 	public static void main(final String[] args) throws Exception {
 		ConfigUtils.setApplicationName("JobWrapper");
+		DispatchSSLClient.setIdleTimeout(30000);
 		ConfigUtils.switchToForkProcessLaunching();
 
 		final JobWrapper jw = new JobWrapper();
@@ -1056,11 +1058,14 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	}
 
 	/**
-	 * Cleanup processes, using a specialised script in CVMFS
+	 * Cleanup processes, using a specialized script in CVMFS
+	 *
+	 * @param queueId
+	 * @param pid
 	 *
 	 * @return script exit code, or -1 in case of error
 	 */
-	public static int cleanupProcesses(long queueId, int pid) {
+	public static int cleanupProcesses(final long queueId, final int pid) {
 		final File cleanupScript = new File(CVMFS.getCleanupScript());
 
 		if (!cleanupScript.exists()) {
