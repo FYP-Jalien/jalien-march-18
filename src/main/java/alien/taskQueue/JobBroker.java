@@ -89,7 +89,14 @@ public class JobBroker {
 			final int wnCVMFSRevision = ((Integer) workerNodeCVMFSRevision).intValue();
 			final int serverCVMFSRevision = getCachedCVMFSRevision();
 
-			if (wnCVMFSRevision >= serverCVMFSRevision || (System.currentTimeMillis() - lastCVMFSRevisionModified < 1000L * 60 * 60 && wnCVMFSRevision == serverCVMFSRevision - 1)) {
+			boolean oldCVMFSRevision = wnCVMFSRevision < serverCVMFSRevision;
+
+			if (oldCVMFSRevision && (System.currentTimeMillis() - lastCVMFSRevisionModified < 1000L * 60 * 60 && wnCVMFSRevision == serverCVMFSRevision - 1)) {
+				// allow one hour propagation delay
+				oldCVMFSRevision = false;
+			}
+
+			if (oldCVMFSRevision) {
 				logger.log(Level.WARNING, "The node has an outdated CVMFS revision, server has " + serverCVMFSRevision + " for " + Format.toInterval(System.currentTimeMillis() - lastCVMFSRevision)
 						+ ":\n" + matchRequest);
 
