@@ -351,7 +351,7 @@ public class JobAgent implements Runnable {
 
 				MAX_CPU = Long.valueOf(((Number) siteMap.getOrDefault("CPUCores", Integer.valueOf(1))).longValue());
 				RUNNING_CPU = MAX_CPU;
-				RUNNING_DISK = Long.valueOf(((Number) siteMap.getOrDefault("Disk", Integer.valueOf(10 * 1024))).longValue());
+				RUNNING_DISK = Long.valueOf(((Number) siteMap.getOrDefault("Disk", Integer.valueOf(10 * 1024 * 1024))).longValue()/1024);
 				origTtl = ((Integer) siteMap.get("TTL")).intValue();
 				RUNNING_JOBAGENTS = 0;
 
@@ -459,6 +459,9 @@ public class JobAgent implements Runnable {
 				}
 
 				setStatus(jaStatus.REQUESTING_JOB);
+
+				if (siteMap.containsKey("Disk"))
+					siteMap.put("Disk", (Long)siteMap.get("Disk")*1024);
 
 				final GetMatchJob jobMatch = commander.q_api.getMatchJob(new HashMap<>(siteMap));
 
