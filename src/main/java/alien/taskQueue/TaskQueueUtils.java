@@ -3671,7 +3671,7 @@ public class TaskQueueUtils {
 		final int cpuCores = getCPUCores(jdl);
 		params.put("cpucores", Integer.valueOf(cpuCores));
 
-		params.put("disk", Integer.valueOf(getWorkDirSizeMB(jdl, cpuCores)));
+		params.put("disk", Integer.valueOf(getWorkDirSizeMB(jdl, cpuCores)*1024));
 
 		// parse the other.CloseSE (and !)
 
