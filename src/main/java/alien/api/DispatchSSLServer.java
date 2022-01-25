@@ -104,26 +104,6 @@ public class DispatchSSLServer extends Thread {
 	private static InetAddress actualServerAddress = null;
 	private static int actualServerPort = -1;
 
-	static {
-		if (monitor != null) {
-			monitor.addMonitoring("activeSessions", (names, values) -> {
-				names.add("activeSessions");
-				values.add(Double.valueOf(activeSessions.get()));
-
-				names.add("sessionMapSize");
-				values.add(Double.valueOf(sessionMap.size()));
-
-				names.add("acceptorPoolSize");
-				values.add(Double.valueOf(acceptorPool.getPoolSize()));
-
-				names.add("acceptorPoolQueueLength");
-				values.add(Double.valueOf(acceptorPool.getQueue().size()));
-			});
-
-			ipv6Connections = monitor.getCacheMonitor("ipv6_connections");
-		}
-	}
-
 	/**
 	 * E.g. the CE proxy should act as a forwarding bridge between JA and central services
 	 *
@@ -439,6 +419,8 @@ public class DispatchSSLServer extends Thread {
 		final IdleConnectionsKiller idleKiller = new IdleConnectionsKiller();
 		idleKiller.start();
 
+		startMonitoring();
+
 		SSLServerSocket server = null;
 
 		try {
@@ -528,6 +510,29 @@ public class DispatchSSLServer extends Thread {
 
 		final Throwable e) {
 			logger.log(Level.SEVERE, "Could not initiate SSL Server Socket on " + address + ":" + port, e);
+		}
+	}
+
+	/**
+	 * 
+	 */
+	private static void startMonitoring() {
+		if (monitor != null) {
+			monitor.addMonitoring("activeSessions", (names, values) -> {
+				names.add("activeSessions");
+				values.add(Double.valueOf(activeSessions.get()));
+
+				names.add("sessionMapSize");
+				values.add(Double.valueOf(sessionMap.size()));
+
+				names.add("acceptorPoolSize");
+				values.add(Double.valueOf(acceptorPool.getPoolSize()));
+
+				names.add("acceptorPoolQueueLength");
+				values.add(Double.valueOf(acceptorPool.getQueue().size()));
+			});
+
+			ipv6Connections = monitor.getCacheMonitor("ipv6_connections");
 		}
 	}
 

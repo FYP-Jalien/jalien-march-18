@@ -102,32 +102,6 @@ public class DispatchSSLServerNIO implements Runnable {
 
 	private static ConcurrentHashMap<SelectionKey, DispatchSSLServerNIO> sessionMap = new ConcurrentHashMap<>();
 
-	static {
-		if (monitor != null) {
-			monitor.addMonitoring("activeSessions", (names, values) -> {
-				names.add("activeSessions");
-				values.add(Double.valueOf(sessionMap.size()));
-
-				names.add("executorPoolSize");
-				values.add(Double.valueOf(executor.getPoolSize()));
-
-				names.add("executorActiveCount");
-				values.add(Double.valueOf(executor.getActiveCount()));
-
-				names.add("sslExecutorPoolSize");
-				values.add(Double.valueOf(sslExecutor.getPoolSize()));
-
-				names.add("sslExecutorActiveCount");
-				values.add(Double.valueOf(sslExecutor.getActiveCount()));
-
-				names.add("eQueueSize");
-				values.add(Double.valueOf(taskQueue.size()));
-			});
-
-			ipv6Connections = monitor.getCacheMonitor("ipv6_connections");
-		}
-	}
-
 	// --------------------------- Per connection information
 
 	/**
@@ -661,6 +635,8 @@ public class DispatchSSLServerNIO implements Runnable {
 		serverSocketChannel = new SSLServerSocketChannel(plainSocketChannel, sslContext, sslExecutor, nioLogger);
 		serverSocketChannel.needClientAuthentication = true;
 
+		startMonitoring();
+
 		try {
 			logger.log(Level.INFO, "Running JCentral with host cert: " + ((java.security.cert.X509Certificate) JAKeyStore.getKeyStore().getCertificateChain("User.cert")[0]).getSubjectDN());
 
@@ -706,6 +682,35 @@ public class DispatchSSLServerNIO implements Runnable {
 		}
 		catch (final Throwable e) {
 			logger.log(Level.SEVERE, "Could not initiate SSL Server Socket on " + address + ":" + port, e);
+		}
+	}
+
+	/**
+	 * 
+	 */
+	private static void startMonitoring() {
+		if (monitor != null) {
+			monitor.addMonitoring("activeSessions", (names, values) -> {
+				names.add("activeSessions");
+				values.add(Double.valueOf(sessionMap.size()));
+
+				names.add("executorPoolSize");
+				values.add(Double.valueOf(executor.getPoolSize()));
+
+				names.add("executorActiveCount");
+				values.add(Double.valueOf(executor.getActiveCount()));
+
+				names.add("sslExecutorPoolSize");
+				values.add(Double.valueOf(sslExecutor.getPoolSize()));
+
+				names.add("sslExecutorActiveCount");
+				values.add(Double.valueOf(sslExecutor.getActiveCount()));
+
+				names.add("eQueueSize");
+				values.add(Double.valueOf(taskQueue.size()));
+			});
+
+			ipv6Connections = monitor.getCacheMonitor("ipv6_connections");
 		}
 	}
 
