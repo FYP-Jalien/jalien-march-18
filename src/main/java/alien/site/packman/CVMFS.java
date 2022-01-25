@@ -214,7 +214,7 @@ public class CVMFS extends PackMan {
 		try {
 			return Integer.parseInt(SystemCommand.bash("LD_LIBRARY_PATH= attr -qg revision /cvmfs/alice.cern.ch").stdout.trim());
 		}
-		catch (final Exception e) {
+		catch (@SuppressWarnings("unused") final Exception e) {
 			return -1;
 		}
 	}
