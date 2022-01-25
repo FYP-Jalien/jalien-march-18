@@ -16,8 +16,14 @@ public class SingularityCVMFS extends Containerizer {
 		singularityCmd.add(CVMFS.getSingularityPath() + "/" + "singularity");
 		singularityCmd.add("exec");
 		singularityCmd.add("-C");
-		singularityCmd.add("-B");
 
+		final String gpuString = getGPUString();
+		if (gpuString.contains("nvidia"))
+			singularityCmd.add("--nv");
+		if (gpuString.contains("kfd"))
+			singularityCmd.add("--rocm");
+
+		singularityCmd.add("-B");
 		if(workdir != null) {
 			singularityCmd.add("/cvmfs:/cvmfs,/tmp:/tmp," + workdir + ":" + CONTAINER_JOBDIR); //TODO: remove /tmp after testing (not needed)
 			singularityCmd.add("--pwd");

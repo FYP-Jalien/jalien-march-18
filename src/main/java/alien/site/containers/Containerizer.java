@@ -36,7 +36,8 @@ public abstract class Containerizer {
 	/**
 	 * Command to set the environment for container
 	 */
-	protected static final String envSetup = "source <( " + CVMFS.getAlienvPrint() + " && echo export APMON_CONFIG=" + System.getenv("APMON_CONFIG") + " ); ";
+	protected static final String envSetup = "source <( " + CVMFS.getAlienvPrint() + " && echo export APMON_CONFIG=" + System.getenv("APMON_CONFIG") + " && echo export CUDA_VISIBLE_DEVICES=" +
+			System.getenv().get("CUDA_VISIBLE_DEVICES") + " && echo export ROCR_VISIBLE_DEVICES=" + System.getenv().get("ROCR_VISIBLE_DEVICES") + " ); ";
 
 	/**
 	 * Simple constructor, initializing the container path from default location or from the environment (DEFAULT_JOB_CONTAINER_PATH key)
@@ -72,6 +73,30 @@ public abstract class Containerizer {
 			logger.log(Level.WARNING, "Failed to start container: " + e.toString());
 		}
 		return supported;
+	}
+
+	/** 
+	 * @return String representing supported GPUs by the system. Will contain either 'nvidia[0-9]' (Nvidia), 'kfd' (AMD), or none. 
+	 */
+	public final String getGPUString(){
+		final String cmd = "ls /dev/ | grep -Ew 'nvidia[0-9]|kfd'";
+		String cmdString = "";
+
+		try {
+			final ProcessBuilder pb = new ProcessBuilder(cmd);
+			final Process p = pb.start();
+			p.waitFor();
+
+			try (Scanner cmdScanner = new Scanner(p.getErrorStream())) {
+				while (cmdScanner.hasNext()) {
+					cmdString += cmdScanner.next();
+				}
+			}
+		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "Failed to start container: " + e.toString());
+		}
+		return cmdString;
 	}
 
 	/**

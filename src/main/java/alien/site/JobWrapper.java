@@ -24,7 +24,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import alien.api.DispatchSSLClient;
 import alien.api.TomcatServer;
 import alien.api.catalogue.CatalogueApiUtils;
 import alien.api.taskQueue.TaskQueueApiUtils;
@@ -94,6 +93,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	private final int pid;
 	private final String ceHost;
 	private final String parentHostname;
+	private final Map<String, String> metavars;
 	/**
 	 * @uml.property name="commander"
 	 * @uml.associationEnd
@@ -203,6 +203,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			legacyToken = (String) inputFromJobAgent.readObject();
 			ttl = ((Long) inputFromJobAgent.readObject()).longValue();
 			parentHostname = (String) inputFromJobAgent.readObject();
+			metavars = (HashMap<String, String>) inputFromJobAgent.readObject();
 
 			if (logger.isLoggable(Level.FINEST)) {
 				logger.log(Level.FINEST, "We received the following tokenCert: " + tokenCert);
@@ -412,11 +413,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		boolean trackTime = false;
 		try {
-			final String supportsTime = ExternalProcesses.getCmdOutput(Arrays.asList("time", "echo"), true, 30L, TimeUnit.SECONDS);
+			String supportsTime = ExternalProcesses.getCmdOutput(Arrays.asList("time", "echo"), true, 30L, TimeUnit.SECONDS);
 			if (!supportsTime.contains("command not found"))
 				trackTime = true;
 		}
-		catch (@SuppressWarnings("unused") final Exception e) {
+		catch (@SuppressWarnings("unused") Exception e) {
 			// ignore
 		}
 
@@ -481,6 +482,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		processEnv.put("TMP", currentDir.getAbsolutePath() + "/tmp");
 		processEnv.put("TMPDIR", currentDir.getAbsolutePath() + "/tmp");
 
+		processEnv.putAll(metavars);
+		
 		if (!parentHostname.isBlank())
 			processEnv.put("PARENT_HOSTNAME", parentHostname);
 
@@ -525,7 +528,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			try {
 				putJobTrace("Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile)).replace("\n", ", "));
 			}
-			catch (@SuppressWarnings("unused") final Exception te) {
+			catch (@SuppressWarnings("unused") Exception te) {
 				// Ignore
 			}
 		}
@@ -955,7 +958,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 */
 	public static void main(final String[] args) throws Exception {
 		ConfigUtils.setApplicationName("JobWrapper");
-		DispatchSSLClient.setIdleTimeout(30000);
 		ConfigUtils.switchToForkProcessLaunching();
 
 		final JobWrapper jw = new JobWrapper();
@@ -1058,14 +1060,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	}
 
 	/**
-	 * Cleanup processes, using a specialized script in CVMFS
-	 *
-	 * @param queueId
-	 * @param pid
+	 * Cleanup processes, using a specialised script in CVMFS
 	 *
 	 * @return script exit code, or -1 in case of error
 	 */
-	public static int cleanupProcesses(final long queueId, final int pid) {
+	public static int cleanupProcesses(long queueId, int pid) {
 		final File cleanupScript = new File(CVMFS.getCleanupScript());
 
 		if (!cleanupScript.exists()) {

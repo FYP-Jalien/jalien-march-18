@@ -43,7 +43,6 @@ import java.util.logging.SimpleFormatter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import alien.api.DispatchSSLClient;
 import alien.api.Request;
 import alien.api.taskQueue.GetMatchJob;
 import alien.api.taskQueue.TaskQueueApiUtils;
@@ -54,6 +53,7 @@ import alien.monitoring.MonitorFactory;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.site.containers.Containerizer;
 import alien.site.containers.ContainerizerFactory;
+import alien.site.JobWrapper;
 import alien.site.packman.CVMFS;
 import alien.taskQueue.JDL;
 import alien.taskQueue.Job;
@@ -403,6 +403,7 @@ public class JobAgent implements Runnable {
 
 			setUsedCores(0);
 		}
+
 	}
 
 	private static final String SITESONAR = "/cvmfs/alice.cern.ch/sitesonar/sitesonar.sh";
@@ -541,7 +542,7 @@ public class JobAgent implements Runnable {
 				requestSync.notifyAll();
 			}
 		}
-		catch (final Exception e) {
+		catch (Exception e) {
 			if (!(e instanceof EOFException))
 				logger.log(Level.WARNING, "Another exception matching the job", e);
 
@@ -735,7 +736,7 @@ public class JobAgent implements Runnable {
 		// ttl recalculation
 		final int timeleft = computeTimeLeft(Level.INFO);
 
-		if (!checkParameters())
+		if (checkParameters() == false)
 			return false;
 
 		siteMap.put("TTL", Integer.valueOf(timeleft));
@@ -782,7 +783,7 @@ public class JobAgent implements Runnable {
 			}
 		}
 		else if (maxmemory != null) {
-			final Pattern pLetter = Pattern.compile("\\p{L}+");
+			Pattern pLetter = Pattern.compile("\\p{L}+");
 
 			final Matcher m = pLetter.matcher(maxmemory.trim().toUpperCase());
 			try {
@@ -811,7 +812,6 @@ public class JobAgent implements Runnable {
 	 */
 	public static void main(final String[] args) throws IOException {
 		ConfigUtils.setApplicationName("JobAgent");
-		DispatchSSLClient.setIdleTimeout(30000);
 		ConfigUtils.switchToForkProcessLaunching();
 
 		final JobAgent jao = new JobAgent();
@@ -903,6 +903,7 @@ public class JobAgent implements Runnable {
 				stdinObj.writeObject(legacyToken);
 				stdinObj.writeObject(Long.valueOf(ttl));
 				stdinObj.writeObject(env.getOrDefault("PARENT_HOSTNAME", ""));
+				stdinObj.writeObject(getMetaVariables());
 
 				stdinObj.flush();
 			}
@@ -975,8 +976,7 @@ public class JobAgent implements Runnable {
 							putJobTrace("ERROR[FATAL]: Process overusing resources");
 							putJobTrace(error);
 							killGracefully(p);
-						}
-						else {
+						} else {
 							logger.log(Level.SEVERE, "ERROR[FATAL]: Job KILLED by user! Terminating...");
 							putJobTrace("ERROR[FATAL]: Job KILLED by user! Terminating...");
 							killForcibly(p);
@@ -1061,7 +1061,7 @@ public class JobAgent implements Runnable {
 		}
 	}
 
-	private void setUsedCores(final int jobNumber) {
+	private void setUsedCores(int jobNumber) {
 		if (reqCPU.longValue() > 0)
 			monitor.sendParameter(reqCPU + "_cores_jobs", Integer.valueOf(jobNumber));
 		if (jobNumber == 0)
@@ -1439,18 +1439,17 @@ public class JobAgent implements Runnable {
 	}
 
 	/**
-	 *
+	 * 
 	 * Immediately kills the JobWrapper and its payload, without giving time for upload
-	 *
+	 * 
 	 * @param p process for JobWrapper
 	 */
-	private void killForcibly(final Process p) {
+	private void killForcibly(final Process p){
 		final int jobWrapperPid = getWrapperPid();
 		try {
-			if (jobWrapperPid != 0) {
+			if (jobWrapperPid != 0){
 				JobWrapper.cleanupProcesses(queueId, jobWrapperPid);
-				Runtime.getRuntime().exec("kill -9" + jobWrapperPid);
-			}
+				Runtime.getRuntime().exec("kill -9" + jobWrapperPid); }
 			else
 				logger.log(Level.INFO, "Could not kill JobWrapper: not found. Already done?");
 		}
@@ -1497,5 +1496,28 @@ public class JobAgent implements Runnable {
 					putJobTrace("BatchId " + var + ": " + env.get(var));
 			}
 		}
+	}
+
+	/**
+	 * 
+	 * Reads the list of variables defined in META_VARIABLES, and returns their current value in the
+	 * environment as a map.
+	 * 
+	 * Used for propagating any additional environment variables to container/payload.
+	 * 
+	 * @return map of env variables defined in META_VARIABLES and their current value.
+	 */
+	private Map<String, String> getMetaVariables() {
+		String metavars = env.get("META_VARIABLES");
+
+		List<String> metavars_list = Arrays.asList(metavars.split("\\s*,\\s*"));
+
+		System.err.println("Detected metavars: " + metavars_list.toString());
+
+		Map<String, String> metavars_map = new HashMap<String, String>();
+		for (final String var : metavars_list)
+			metavars_map.put(var, env.get(var));
+
+		return metavars_map;
 	}
 }
