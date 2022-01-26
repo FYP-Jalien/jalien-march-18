@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
+import java.security.GeneralSecurityException;
 import java.security.KeyPair;
 import java.security.KeyStore;
 import java.security.KeyStore.PasswordProtection;
@@ -37,6 +38,9 @@ import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import javax.net.ssl.KeyManagerFactory;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
 import javax.net.ssl.TrustManager;
 import javax.net.ssl.TrustManagerFactory;
 
@@ -375,7 +379,7 @@ public class JAKeyStore {
 	}
 
 	private static KeyStore makeKeyStore(final String key, final String cert, final String message) {
-		if (key == null || cert == null)
+		if (key == null || cert == null || key.isBlank() || cert.isBlank())
 			return null;
 
 		KeyStore ks = null;
@@ -449,16 +453,26 @@ public class JAKeyStore {
 		return hostCert != null;
 	}
 
-	private static void addKeyPairToKeyStore(final KeyStore ks, final String entryBaseName, final String privKeyLocation, final String pubKeyLocation) throws Exception {
+	private static boolean addKeyPairToKeyStore(final KeyStore ks, final String entryBaseName, final String privKeyLocation, final String pubKeyLocation) throws Exception {
 		final char[] passwd = requestPassword(privKeyLocation);
 		if (passwd == null)
 			throw new Exception("Failed to read password for key " + privKeyLocation);
 
 		final PrivateKey key = loadPrivX509(privKeyLocation, passwd);
+
+		if (key == null)
+			return false;
+
 		final X509Certificate[] certChain = loadPubX509(pubKeyLocation, true);
+
+		if (certChain == null || certChain.length == 0)
+			return false;
+
 		final PrivateKeyEntry entry = new PrivateKeyEntry(key, certChain);
 
 		ks.setEntry(entryBaseName, entry, new PasswordProtection(pass));
+
+		return true;
 	}
 
 	/**
@@ -944,5 +958,45 @@ public class JAKeyStore {
 		}
 
 		System.err.println("> Your certificate will expire in " + Format.toInterval(endTime - now));
+	}
+
+	/**
+	 * @return the SSLSocketFactory acting as a client, or <code>null</code> if the store could not be initialized
+	 * @throws GeneralSecurityException in case of SSL errors
+	 */
+	public static SSLSocketFactory getSSLSocketFactory() throws GeneralSecurityException {
+		final KeyManagerFactory kmf = KeyManagerFactory.getInstance("SunX509", "SunJSSE");
+
+		final KeyStore store = JAKeyStore.getKeyStore();
+
+		if (store != null) {
+			final Certificate[] userIdentity = store.getCertificateChain("User.cert");
+
+			if (userIdentity != null && userIdentity.length > 0) {
+				logger.log(Level.INFO, "Presenting client cert: " + ((java.security.cert.X509Certificate) userIdentity[0]).getSubjectDN());
+
+				try {
+					((java.security.cert.X509Certificate) userIdentity[0]).checkValidity();
+				}
+				catch (final CertificateException e) {
+					logger.log(Level.SEVERE, "Your certificate has expired or is invalid!", e);
+					return null;
+				}
+			}
+			else
+				logger.log(Level.INFO, "No client identity");
+
+			// initialize factory, with clientCert(incl. priv+pub)
+			kmf.init(store, JAKeyStore.pass);
+		}
+		else {
+			logger.log(Level.INFO, "Could not initialize the key store");
+			return null;
+		}
+
+		final SSLContext context = SSLContext.getInstance("TLS");
+		context.init(kmf.getKeyManagers(), JAKeyStore.trusts, null);
+
+		return context.getSocketFactory();
 	}
 }
