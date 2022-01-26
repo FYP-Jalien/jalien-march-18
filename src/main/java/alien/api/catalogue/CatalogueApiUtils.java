@@ -766,7 +766,6 @@ public class CatalogueApiUtils {
 		return false;
 	}
 
-
 	/**
 	 * Book the LFNs contained in the OutputEntry in catalogue
 	 *
@@ -1130,6 +1129,7 @@ public class CatalogueApiUtils {
 
 	/**
 	 * @param path the path to the directory
+	 * @return the result of this operation on the server side
 	 */
 	public String moveDirectory(final String path) {
 		try {

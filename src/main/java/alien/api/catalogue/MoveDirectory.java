@@ -1,7 +1,8 @@
 package alien.api.catalogue;
 
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
+
 import alien.api.Request;
 import alien.catalogue.LFNUtils;
 import alien.user.AliEnPrincipal;
@@ -32,12 +33,12 @@ public class MoveDirectory extends Request {
 
 	@Override
 	public List<String> getArguments() {
-		List<String> pathList = new ArrayList<>();
-		pathList.add(this.path);
-
-		return pathList;
+		return Arrays.asList(this.path);
 	}
 
+	/**
+	 * @return the message returned by the moveDirectory operation on the server side
+	 */
 	public String getResponse() {
 		return this.response;
 	}

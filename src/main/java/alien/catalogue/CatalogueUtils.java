@@ -112,9 +112,13 @@ public final class CatalogueUtils {
 	private static final WriteLock guidIndexWriteLock = guidIndexRWLock.writeLock();
 
 	/**
-	 * For how long the caches are active
+	 * One second definition
 	 */
 	public static final long ONE_SECOND = 1000;
+	/**
+	 * For how long the caches are active
+	 * 
+	 */
 	public static final long CACHE_TIMEOUT = ONE_SECOND * 60 * 5;
 
 	private static void updateGuidIndexCache() {
@@ -218,23 +222,23 @@ public final class CatalogueUtils {
 	private static final ReadLock indextableReadLock = indextableRWLock.readLock();
 	private static final WriteLock indextableWriteLock = indextableRWLock.writeLock();
 
-	private static boolean indexTableUpdated()
-	{
-		if (indextable == null || indextable.size() == 0) {
+	private static boolean indexTableUpdated() {
+		if (indextable == null || indextable.size() == 0 || lastIndexTableUpdate == 0)
 			return true;
-		}
-
-		if (System.currentTimeMillis() - lastIndexTableUpdate > CACHE_TIMEOUT) {
-			return true;
-		}
 
 		/* Check the INDEXTABLE_UPDATE table only at 1 second intervals */
-		if (System.currentTimeMillis() - lastIndexTableCheck >= ONE_SECOND) {
-			long lastUpdated = getIndexTableUpdate();
-			if (lastUpdated > (lastIndexTableUpdate / ONE_SECOND)) {
-				return true;
-			}
+		if (System.currentTimeMillis() - lastIndexTableCheck >= 5 * ONE_SECOND) {
+			final long lastUpdated = getIndexTableUpdate();
+
+			lastIndexTableCheck = System.currentTimeMillis();
+
+			// force the next iteration to reload the indextable content
+			if (lastUpdated > (lastIndexTableUpdate / ONE_SECOND))
+				lastIndexTableUpdate = 0;
 		}
+
+		if (System.currentTimeMillis() - lastIndexTableUpdate > CACHE_TIMEOUT)
+			return true;
 
 		return false;
 	}
@@ -276,7 +280,7 @@ public final class CatalogueUtils {
 										indextable = newIndextable;
 										tableentries = newTableentries;
 
-										lastIndexTableUpdate = System.currentTimeMillis();
+										lastIndexTableCheck = lastIndexTableUpdate = System.currentTimeMillis();
 									}
 									else
 										logger.log(Level.WARNING, "Empty list of INDEXTABLE entries");
@@ -297,7 +301,6 @@ public final class CatalogueUtils {
 			}
 		}
 		finally {
-			lastIndexTableCheck = System.currentTimeMillis();
 			indextableReadLock.unlock();
 		}
 	}
@@ -306,16 +309,20 @@ public final class CatalogueUtils {
 	 * Get the timestamp when the indextable has last been modified
 	 */
 	private static long getIndexTableUpdate() {
-		DBFunctions db = ConfigUtils.getDB("alice_users");
-		db.setReadOnly(true);
-		
-		String selectQuery = "SELECT UNIX_TIMESTAMP(last_updated) FROM INDEXTABLE_UPDATE";
-		if (!db.query(selectQuery, false)) {
-			return 0;
-		}
+		try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
+			if (db == null)
+				return 0;
 
-		if (db.moveNext()) {
-			return db.getl(1);
+			db.setReadOnly(true);
+
+			String selectQuery = "SELECT UNIX_TIMESTAMP(last_updated) FROM INDEXTABLE_UPDATE";
+			if (!db.query(selectQuery, false)) {
+				return 0;
+			}
+
+			if (db.moveNext()) {
+				return db.getl(1);
+			}
 		}
 
 		return 0;
@@ -325,12 +332,18 @@ public final class CatalogueUtils {
 	 * Set the timestamp when the indextable has last been modified
 	 */
 	public static void setIndexTableUpdate() {
-		DBFunctions db = ConfigUtils.getDB("alice_users");
-		db.setReadOnly(false);
+		try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
+			if (db != null) {
+				db.setReadOnly(false);
 
-		String updateQuery = "INSERT INTO INDEXTABLE_UPDATE (last_updated) VALUES (NOW()) ON DUPLICATE KEY UPDATE last_updated = NOW()";
-		if (!db.query(updateQuery, false)) {
-			return;
+				String updateQuery = "INSERT INTO INDEXTABLE_UPDATE (last_updated) VALUES (NOW()) ON DUPLICATE KEY UPDATE last_updated = NOW()";
+				if (!db.query(updateQuery, false)) {
+					logger.log(Level.SEVERE, "Cannot update the last_updated timestamp in INDEXTABLE_UPDATE");
+				}
+
+				// force a self reload of the indextable cache
+				lastIndexTableUpdate = 0;
+			}
 		}
 	}
 

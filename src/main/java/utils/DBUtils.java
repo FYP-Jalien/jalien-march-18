@@ -5,6 +5,10 @@ import java.io.IOException;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
+import alien.config.ConfigUtils;
 import lazyj.DBFunctions.DBConnection;
 
 /**
@@ -13,15 +17,25 @@ import lazyj.DBFunctions.DBConnection;
  */
 public final class DBUtils implements Closeable {
 
+	/**
+	 * Logger
+	 */
+	static final Logger logger = ConfigUtils.getLogger(DBUtils.class.getCanonicalName());
+
 	private DBConnection dbc = null;
 	private ResultSet resultSet = null;
 	private Statement stat = null;
 
-	public DBUtils(DBConnection dbc) {
+	/**
+	 * Database connection to work with
+	 * 
+	 * @param dbc
+	 */
+	public DBUtils(final DBConnection dbc) {
 		this.dbc = dbc;
 	}
 
-	private final void executeClose() {
+	private void executeClose() {
 		if (resultSet != null) {
 			try {
 				resultSet.close();
@@ -45,7 +59,12 @@ public final class DBUtils implements Closeable {
 		}
 	}
 
-	public final boolean executeQuery(final String query) {
+	/**
+	 * @param query
+	 * @return <code>true</code> if the query was successfully executed
+	 */
+	@SuppressWarnings("resource")
+	public boolean executeQuery(final String query) {
 		executeClose();
 
 		try {
@@ -61,16 +80,25 @@ public final class DBUtils implements Closeable {
 			return true;
 		}
 		catch (final SQLException e) {
+			logger.log(Level.WARNING, "Failed executing this query: `" + query + "`", e);
 			return false;
 		}
 	}
-	
-	public final void lockTables(String tables) {
+
+	/**
+	 * Disable autocommit and lock the indicated tables (SQL statement format)
+	 * 
+	 * @param tables
+	 */
+	public void lockTables(final String tables) {
 		executeQuery("SET autocommit = 0;");
 		executeQuery("lock tables " + tables + ";");
 	}
 
-	public final void unlockTables() {
+	/**
+	 * Commit and unlock tables
+	 */
+	public void unlockTables() {
 		executeQuery("commit;");
 		executeQuery("unlock tables;");
 		executeQuery("SET autocommit = 1;");
@@ -78,6 +106,9 @@ public final class DBUtils implements Closeable {
 		executeClose();
 	}
 
+	/**
+	 * @return the result of the last executed query
+	 */
 	public ResultSet getResultSet() {
 		return resultSet;
 	}
