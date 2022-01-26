@@ -26,6 +26,8 @@ public final class DBUtils implements Closeable {
 	private ResultSet resultSet = null;
 	private Statement stat = null;
 
+	private boolean correctlyClosed = true;
+
 	/**
 	 * Database connection to work with
 	 * 
@@ -89,21 +91,51 @@ public final class DBUtils implements Closeable {
 	 * Disable autocommit and lock the indicated tables (SQL statement format)
 	 * 
 	 * @param tables
+	 * @return <code>true</code> if everything went ok
 	 */
-	public void lockTables(final String tables) {
-		executeQuery("SET autocommit = 0;");
-		executeQuery("lock tables " + tables + ";");
+	@SuppressWarnings("resource")
+	public boolean lockTables(final String tables) {
+		try {
+			dbc.getConnection().setAutoCommit(false);
+		}
+		catch (SQLException e) {
+			logger.log(Level.WARNING, "Cannot begin transaction", e);
+			return false;
+		}
+
+		if (!executeQuery("lock tables " + tables + ";"))
+			return false;
+
+		correctlyClosed = false;
+
+		return true;
 	}
 
 	/**
 	 * Commit and unlock tables
+	 * 
+	 * @return <code>true</code> if everything went ok
 	 */
-	public void unlockTables() {
-		executeQuery("commit;");
-		executeQuery("unlock tables;");
-		executeQuery("SET autocommit = 1;");
+	@SuppressWarnings("resource")
+	public boolean unlockTables() {
+		try {
+			if (!executeQuery("unlock tables;"))
+				return false;
 
-		executeClose();
+			dbc.getConnection().commit();
+			dbc.getConnection().setAutoCommit(true);
+
+			correctlyClosed = true;
+
+			return true;
+		}
+		catch (SQLException e) {
+			logger.log(Level.WARNING, "Cannot commit transaction", e);
+			return false;
+		}
+		finally {
+			executeClose();
+		}
 	}
 
 	/**
@@ -113,8 +145,20 @@ public final class DBUtils implements Closeable {
 		return resultSet;
 	}
 
+	@SuppressWarnings("resource")
 	@Override
 	public void close() throws IOException {
+		if (!correctlyClosed) {
+			try {
+				dbc.getConnection().rollback();
+				dbc.getConnection().setAutoCommit(false);
+			}
+			catch (SQLException e) {
+				logger.log(Level.WARNING, "Cannot rollback transaction", e);
+				e.printStackTrace();
+			}
+		}
+
 		dbc.free();
 	}
 }

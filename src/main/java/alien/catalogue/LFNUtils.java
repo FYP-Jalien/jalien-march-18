@@ -1592,51 +1592,71 @@ public class LFNUtils {
 			// create the destination table
 			String createTableQuery = "CREATE TABLE L" + tableName + "L LIKE L" + lfn.indexTableEntry.tableName + "L";
 			if (!db.query(createTableQuery, false)) {
-				return "DB query failed";
+				return "DB query failed:\n" + createTableQuery;
 			}
 
-			// insert the "" directory in the destination table
-			String insertEmptyQuery = "INSERT INTO L" + tableName + "L (owner, lfn, dir, gowner, type, perm) VALUES (?, ?, 0, ?, ?, ?)";
-			if (!db.query(insertEmptyQuery, false, lfn.owner, "", lfn.gowner, "d", lfn.perm)) {
-				return "DB query failed";
-			}
+			boolean allOk = false;
 
-			// get the entryId for the "" directory
-			int entryId = 1;
-			String entryIdQuery = "SELECT entryId FROM L" + tableName + "L WHERE lfn=?";
-			if (!db.query(entryIdQuery, false, "")) {
-				return "DB query failed";
-			}
-			if (db.moveNext()) {
+			try {
+				// insert the "" directory in the destination table
+				String insertEmptyQuery = "INSERT INTO L" + tableName + "L (owner, lfn, dir, gowner, type, perm) VALUES (?, '', 0, ?, 'd', ?)";
+				if (!db.query(insertEmptyQuery, false, lfn.owner, lfn.gowner, lfn.perm)) {
+					return "DB query failed:\n" + insertEmptyQuery;
+				}
+
+				// get the entryId for the "" directory, normally it is == 1
+				int entryId = 1;
+				String entryIdQuery = "SELECT entryId FROM L" + tableName + "L WHERE lfn=''";
+
+				if (!db.query(entryIdQuery) || !db.moveNext()) {
+					return "DB query failed:\n" + entryIdQuery;
+				}
+
 				entryId = db.geti(1);
-			}
 
-			try (DBUtils dbu = new DBUtils(db.getConnection())) {
-				// lock tables in order to move the files in the given directory
-				dbu.lockTables("L" + lfn.indexTableEntry.tableName + "L WRITE, L" + tableName + "L WRITE, INDEXTABLE WRITE");
-				// insert directory entries into the destination table
-				String newLFN = "substring(lfn, " + (lfn.lfn.length() + 1) + ")";
-				String columns = "entryId, owner, 0 as replicated, ctime, guidtime, jobid, aclId, " + newLFN + " as lfn, broken, expiretime, size, dir, gowner, type, guid, md5, perm";
-				String insertQuery = "INSERT INTO L" + tableName + "L (SELECT " + columns + " FROM L" + lfn.indexTableEntry.tableName + "L WHERE lfn LIKE \"" + Format.escSQL(lfn.lfn + "_%") + "\");";
-				dbu.executeQuery(insertQuery);
+				try (DBUtils dbu = new DBUtils(db.getConnection())) {
+					// lock tables in order to move the files in the given directory
+					dbu.lockTables("L" + lfn.indexTableEntry.tableName + "L WRITE, L" + tableName + "L WRITE, INDEXTABLE WRITE");
+					// insert directory entries into the destination table
+					String newLFN = "substring(lfn, " + (lfn.lfn.length() + 1) + ")";
+					String columns = "entryId, owner, ctime, replicated, aclId, lfn, expiretime, size, dir, selist, gowner, type, perm, guid, md5, guidtime, broken, jobid";
+					String insertQuery = "INSERT INTO L" + tableName + "L (" + columns
+						+ ") SELECT entryId, owner, ctime, replicated, aclId, " + newLFN
+						+ " as lfn, expiretime, size, dir, selist, gowner, type, perm, guid, md5, guidtime, broken, jobid FROM L10L WHERE lfn LIKE \""
+						+ Format.escSQL(lfn.lfn + "_%") + "\";";
 
-				// update parent directory to point to the "" directory
-				String updatedAllQuery = "UPDATE L" + tableName + "L SET dir=" + Format.escSQL("" + entryId) + " WHERE dir=" + Format.escSQL("" + lfn.entryId) + ";";
-				dbu.executeQuery(updatedAllQuery);
+					if (!dbu.executeQuery(insertQuery))
+						return "Failed to insert into the newly created table:\n" + insertQuery;
 
-				// delete directory entries from the source table
-				String deleteQuery = "DELETE FROM L" + lfn.indexTableEntry.tableName + "L WHERE lfn LIKE \"" + Format.escSQL(lfn.lfn + "_%") + "\";";
-				dbu.executeQuery(deleteQuery);
+					// update parent directory to point to the "" directory
+					String updatedAllQuery = "UPDATE L" + tableName + "L SET dir=" + entryId + " WHERE dir=" + lfn.entryId + ";";
 
-				// insert lfn into indextable
-				String indexTableEntryQuery = "INSERT INTO INDEXTABLE (hostIndex, tableName, lfn) VALUES (" + lfn.indexTableEntry.hostIndex + ", " + tableName + ", \""
+					if (!dbu.executeQuery(updatedAllQuery))
+						return "Failed to update the parent directory to the root of the new table:\n" + updatedAllQuery;
+
+					// delete directory entries from the source table
+					String deleteQuery = "DELETE FROM L" + lfn.indexTableEntry.tableName + "L WHERE lfn LIKE \"" + Format.escSQL(lfn.lfn + "_%") + "\";";
+					if (!dbu.executeQuery(deleteQuery))
+						return "Failed to delete the entries from the old table:\n" + deleteQuery;
+
+					// insert lfn into indextable
+					String indexTableEntryQuery = "INSERT INTO INDEXTABLE (hostIndex, tableName, lfn) VALUES (" + lfn.indexTableEntry.hostIndex + ", " + tableName + ", \""
 						+ Format.escSQL(lfn.getCanonicalName()) + "\");";
-				dbu.executeQuery(indexTableEntryQuery);
 
-				dbu.unlockTables();
+					if (!dbu.executeQuery(indexTableEntryQuery))
+						return "Failed inserting the new table in the INDEXTABLE:\n" + indexTableEntryQuery;
+
+					allOk = dbu.unlockTables();
+				}
+				catch (Exception e) {
+					return "Error executing the DB operations: " + e.getMessage();
+				}
 			}
-			catch (Exception e) {
-				return "Error executing the DB operations: " + e.getMessage();
+			finally{
+				if (!allOk) {
+					db.query("DROP TABLE L" + tableName + "L");
+					return "Operation failed, rolling back the changes";
+				}
 			}
 
 			// update the timestamp where the INDEXTABLE has last been modified
