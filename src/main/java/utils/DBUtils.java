@@ -149,6 +149,8 @@ public final class DBUtils implements Closeable {
 	@Override
 	public void close() throws IOException {
 		if (!correctlyClosed) {
+			logger.log(Level.WARNING, "Detected incomplete transaction, rolling back");
+
 			try {
 				dbc.getConnection().rollback();
 				dbc.getConnection().setAutoCommit(false);
