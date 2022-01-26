@@ -1,6 +1,1 @@
-Collections
-	- Cascade deleting from COLLECTION* on delete from LFN
-	
-Metadata operations
-	- find
-	- set
+Try to skip gitlab pipeline checks
