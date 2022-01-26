@@ -351,7 +351,7 @@ public class JobAgent implements Runnable {
 
 				MAX_CPU = Long.valueOf(((Number) siteMap.getOrDefault("CPUCores", Integer.valueOf(1))).longValue());
 				RUNNING_CPU = MAX_CPU;
-				RUNNING_DISK = Long.valueOf(((Number) siteMap.getOrDefault("Disk", Long.valueOf(10 * 1024 * 1024))).longValue()/1024);
+				RUNNING_DISK = Long.valueOf(((Number) siteMap.getOrDefault("Disk", Long.valueOf(10 * 1024 * 1024 * RUNNING_CPU))).longValue()/1024);
 				origTtl = ((Integer) siteMap.get("TTL")).intValue();
 				RUNNING_JOBAGENTS = 0;
 
