@@ -20,7 +20,6 @@ import static alien.io.protocols.SourceExceptionCode.XROOTD_TIMED_OUT;
 
 import java.io.BufferedReader;
 import java.io.File;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.io.StringReader;
 import java.net.URL;
@@ -308,6 +307,8 @@ public class Xrootd extends Protocol {
 
 	/**
 	 * Get the md5 value
+	 * 
+	 * @return the xrdcp-observed checksum of the transferred file
 	 */
 	public String getMd5Value() {
 		return md5Value;
@@ -386,37 +387,59 @@ public class Xrootd extends Protocol {
 	 * @throws IOException
 	 */
 	public boolean delete(final PFN pfn, final boolean enforceTicket) throws IOException {
-		if (enforceTicket && (pfn == null || pfn.ticket == null || pfn.ticket.type != AccessType.DELETE))
-			throw new IOException("You didn't get the rights to delete this PFN");
+		final ExitStatus status = delete(Arrays.asList(pfn), enforceTicket).values().iterator().next();
+
+		if (status.getExtProcExitStatus() == 0)
+			return true;
+
+		if (status.getStdErr() != null)
+			throw new TargetException(status.getStdErr());
+
+		return false;
+	}
+
+	/**
+	 * @param pfns to delete, <b>all from the same server</b>
+	 * @param enforceTicket optionally enforce a delete token
+	 * @return the deletion result of each PFN that is indicated
+	 * @throws IOException
+	 */
+	public Map<PFN, ExitStatus> delete(final List<PFN> pfns, final boolean enforceTicket) throws IOException {
+		if (pfns == null || pfns.size() == 0)
+			throw new IOException("No work");
+
+		if (enforceTicket) {
+			for (final PFN pfn : pfns)
+				if (pfn == null || pfn.ticket == null || pfn.ticket.type != AccessType.DELETE)
+					throw new IOException("You didn't get the rights to delete this PFN");
+		}
 
 		try {
 			final List<String> command = new LinkedList<>();
-
-			// command.addAll(getCommonArguments());
 
 			String envelope = null;
 
 			boolean encryptedEnvelope = false;
 
-			if (pfn.ticket != null && pfn.ticket.envelope != null) {
-				envelope = pfn.ticket.envelope.getEncryptedEnvelope();
+			final Map<PFN, ExitStatus> ret = new LinkedHashMap<>();
 
-				if (envelope == null) {
-					envelope = pfn.ticket.envelope.getSignedEnvelope();
-					encryptedEnvelope = false;
+			for (final PFN pfn : pfns) {
+				if (pfn.ticket != null && pfn.ticket.envelope != null) {
+					envelope = pfn.ticket.envelope.getEncryptedEnvelope();
+
+					if (envelope == null) {
+						envelope = pfn.ticket.envelope.getSignedEnvelope();
+						encryptedEnvelope = false;
+					}
+					else
+						encryptedEnvelope = true;
 				}
-				else
-					encryptedEnvelope = true;
-			}
 
-			File fAuthz = null;
+				String transactionURL = pfn.pfn;
 
-			String transactionURL = pfn.pfn;
+				if (pfn.ticket != null && pfn.ticket.envelope != null)
+					transactionURL = pfn.ticket.envelope.getTransactionURL();
 
-			if (pfn.ticket != null && pfn.ticket.envelope != null)
-				transactionURL = pfn.ticket.envelope.getTransactionURL();
-
-			if (xrootdNewerThan4) {
 				final URL url = new URL(transactionURL);
 
 				final String host = url.getHost();
@@ -427,27 +450,15 @@ public class Xrootd extends Protocol {
 				if (path.startsWith("/"))
 					path = path.substring(1);
 
-				command.add(xrootd_default_path + "/bin/xrdfs");
-				command.add(host + ":" + port);
-				command.add("rm");
-				command.add(path + (envelope != null ? "?" + (encryptedEnvelope ? "authz=" : "") + envelope : ""));
-			}
-			else {
-				command.add(xrootd_default_path + "/bin/xrdrm");
-				command.add("-v");
-
-				if (envelope != null) {
-					fAuthz = File.createTempFile("xrdrm-", ".authz", IOUtils.getTemporaryDirectory());
-
-					try (FileWriter fw = new FileWriter(fAuthz)) {
-						fw.write(envelope);
-					}
-
-					command.add("-authz");
-					command.add(fAuthz.getCanonicalPath());
+				if (command.isEmpty()) {
+					command.add(xrootd_default_path + "/bin/xrdfs");
+					command.add(host + ":" + port);
+					command.add("rm");
 				}
 
-				command.add(transactionURL);
+				command.add(path + (envelope != null ? "?" + (encryptedEnvelope ? "authz=" : "") + envelope : ""));
+
+				ret.put(pfn, new ExitStatus(0, 0, null, null, null));
 			}
 
 			if (logger.isLoggable(Level.FINEST))
@@ -477,17 +488,14 @@ public class Xrootd extends Protocol {
 				setLastExitStatus(null);
 				throw new IOException("Interrupted while waiting for the following command to finish:" + getFormattedLastCommand(), ie);
 			}
-			finally {
-				if (fAuthz != null)
-					if (!fAuthz.delete())
-						logger.log(Level.WARNING, "Could not delete temporary auth token file: " + fAuthz.getAbsolutePath());
-			}
 
 			if (exitStatus.getExtProcExitStatus() != 0) {
-				String sMessage = parseXrootdError(exitStatus.getStdOut());
+				String stdout = exitStatus.getStdOut();
+
+				String sMessage = parseXrootdError(stdout);
 
 				if (logger.isLoggable(Level.WARNING))
-					logger.log(Level.WARNING, "RM of " + pfn.pfn + " failed with exit code: " + exitStatus.getExtProcExitStatus() + ", stdout: " + exitStatus.getStdOut());
+					logger.log(Level.WARNING, "RM of " + pfns + " failed with exit code: " + exitStatus.getExtProcExitStatus() + ", stdout: " + stdout);
 
 				if (sMessage != null) {
 					if (exitStatus.getExtProcExitStatus() < 0)
@@ -506,7 +514,7 @@ public class Xrootd extends Protocol {
 			if (logger.isLoggable(Level.FINEST))
 				logger.log(Level.FINEST, "Exit code was zero and the output was:\n" + exitStatus.getStdOut());
 
-			return true;
+			return ret;
 		}
 		catch (final IOException ioe) {
 			throw ioe;
