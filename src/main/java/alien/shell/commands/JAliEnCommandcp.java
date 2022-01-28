@@ -380,6 +380,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 
 	private class GridToLocal implements Runnable {
 		private final String sourcelfn;
+		private LFN lfn;
 		private final String longestMatchingPath;
 		private final File targetLocalFile;
 		private File resultFile = null;
@@ -390,9 +391,17 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 			this.targetLocalFile = targetLocalFile;
 		}
 
+		public GridToLocal(final LFN lfn, final File targetLocalFile) {
+			this.sourcelfn = null;
+			this.lfn = lfn;
+			this.longestMatchingPath = null;
+			this.targetLocalFile = targetLocalFile;
+		}
+
 		@Override
 		public void run() {
-			final LFN lfn = commander.c_api.getLFN(sourcelfn);
+			if (lfn == null)
+				lfn = commander.c_api.getLFN(sourcelfn);
 
 			if (lfn == null) {
 				commander.setReturnCode(101, "Could not get the file's LFN: " + sourcelfn);
@@ -504,6 +513,19 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 		public File getResult() {
 			return resultFile;
 		}
+	}
+
+	/**
+	 * Copy one LFN to one local file
+	 * 
+	 * @param lfn the LFN object pointing to a file
+	 * @param toLocalFile the target file to write to
+	 * @return the result of the download
+	 */
+	public File copyGridToLocal(final LFN lfn, final File toLocalFile) {
+		final GridToLocal cpOperation = new GridToLocal(lfn, toLocalFile);
+		cpOperation.run();
+		return cpOperation.getResult();
 	}
 
 	/**

@@ -646,7 +646,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			final JAliEnCommandcp cp = new JAliEnCommandcp(commander, Arrays.asList(entry.getKey().getCanonicalName(), "file:" + f.getAbsolutePath()));
 
-			final File copyResult = cp.copyGridToLocal(entry.getKey().getCanonicalName(), f);
+			final File copyResult = cp.copyGridToLocal(entry.getKey(), f);
 
 			if (copyResult == null) {
 				final String commanderError = commander.getLastErrorMessage();
