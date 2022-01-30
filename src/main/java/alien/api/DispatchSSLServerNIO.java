@@ -656,14 +656,18 @@ public class DispatchSSLServerNIO implements Runnable {
 
 				// serverSelector.wakeup();
 
-				Thread.sleep(60000);
+				Thread.sleep(ConfigUtils.getConfig().geti("alien.api.DispatchSSLServer.checkInterval", 30) * 1000L);
 
 				final long maxIdleTime = ConfigUtils.getConfig().geti("alien.api.DispatchSSLServer.idleTimeout_seconds", 900) * 1000L;
 
+				final long authGraceTime = ConfigUtils.getConfig().geti("alien.api.DispatchSSLServer.idleTimeout_seconds", 30) * 1000L;
+
 				final long referenceTime = System.currentTimeMillis() - maxIdleTime;
 
+				final long authGraceReferenceTime = System.currentTimeMillis() - authGraceTime;
+
 				for (DispatchSSLServerNIO instance : sessionMap.values()) {
-					if (instance.lastActive < referenceTime && !instance.isActive.get()) {
+					if (!instance.isActive.get() && instance.lastActive < (instance.remoteIdentity != null ? referenceTime : authGraceReferenceTime)) {
 						try {
 							if (instance.remoteIdentity != null)
 								logger.log(Level.WARNING, "Closing idle connection: " + instance.remoteIdentity.getName() + "@" + instance.remoteIdentity.getRemoteEndpoint());
@@ -678,7 +682,6 @@ public class DispatchSSLServerNIO implements Runnable {
 					}
 				}
 			}
-
 		}
 		catch (final Throwable e) {
 			logger.log(Level.SEVERE, "Could not initiate SSL Server Socket on " + address + ":" + port, e);
