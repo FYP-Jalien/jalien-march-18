@@ -480,7 +480,7 @@ public class DispatchSSLServerNIO implements Runnable {
 		}
 	}
 
-	private static Thread acceptorThread = new Thread() {
+	private static Thread acceptorThread = new Thread("NIO.acceptorThread") {
 		@Override
 		public void run() {
 			while (true) {
@@ -497,7 +497,7 @@ public class DispatchSSLServerNIO implements Runnable {
 		}
 	};
 
-	private static Thread selectorThread = new Thread() {
+	private static Thread selectorThread = new Thread("NIO.selectorThread") {
 		@Override
 		public void run() {
 			while (true) {
@@ -660,7 +660,7 @@ public class DispatchSSLServerNIO implements Runnable {
 
 				final long maxIdleTime = ConfigUtils.getConfig().geti("alien.api.DispatchSSLServer.idleTimeout_seconds", 900) * 1000L;
 
-				final long authGraceTime = ConfigUtils.getConfig().geti("alien.api.DispatchSSLServer.idleTimeout_seconds", 30) * 1000L;
+				final long authGraceTime = ConfigUtils.getConfig().geti("alien.api.DispatchSSLServer.authTimeout_seconds", 30) * 1000L;
 
 				final long referenceTime = System.currentTimeMillis() - maxIdleTime;
 
