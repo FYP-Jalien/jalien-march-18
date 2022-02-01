@@ -19,6 +19,7 @@ import alien.api.catalogue.SetAliEnv;
 import alien.config.ConfigUtils;
 import alien.config.Version;
 import alien.site.JobAgent;
+import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
 
 /**
@@ -109,6 +110,9 @@ public class CVMFS extends PackMan {
 
 		final String source = getAliEnPrintenv(args);
 
+		if (source == null)
+			return null;
+
 		final ArrayList<String> parts = new ArrayList<>(Arrays.asList(source.split(";")));
 		parts.remove(parts.size() - 1);
 
@@ -132,17 +136,24 @@ public class CVMFS extends PackMan {
 			logger.log(Level.INFO, "Executing GetAliEnv");
 			final GetAliEnv env = Dispatcher.execute(new GetAliEnv(args, keyModifier));
 
-			if (env.getCachedAliEnOutput() != null){
+			if (env.getCachedAliEnOutput() != null) {
 				logger.log(Level.INFO, "We have cached alienv: " + env.getCachedAliEnOutput());
-				return env.getCachedAliEnOutput(); 
-			
+				return env.getCachedAliEnOutput();
+
 			}
 		}
 		catch (final Exception e) {
 			logger.log(Level.WARNING, "Exception executing GetAliEnv", e);
 		}
 
-		final String source = SystemCommand.bash(ALIEN_BIN_DIR + "/alienv printenv " + args).stdout;
+		final CommandOutput co = SystemCommand.bash(ALIEN_BIN_DIR + "/alienv printenv " + args);
+
+		if (!co.stderr.isBlank() || co.stdout.isBlank()) {
+			logger.log(Level.SEVERE, "alienv returned an error: " + co.stderr);
+			return null;
+		}
+
+		final String source = co.stdout;
 
 		try {
 			logger.log(Level.INFO, "Executing SetAliEnv");
