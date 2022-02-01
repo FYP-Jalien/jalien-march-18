@@ -1,5 +1,6 @@
 package alien.site.containers;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 import java.util.logging.Level;
@@ -79,22 +80,27 @@ public abstract class Containerizer {
 	 * @return String representing supported GPUs by the system. Will contain either 'nvidia[0-9]' (Nvidia), 'kfd' (AMD), or none. 
 	 */
 	public final String getGPUString(){
-		final String cmd = "ls /dev/ | grep -Ew 'nvidia[0-9]|kfd'";
+		List<String> cmd = new ArrayList<String>();
 		String cmdString = "";
 
 		try {
+			cmd.add("/bin/sh");
+			cmd.add("-c");
+			cmd.add("ls /dev/ | grep -Ew \"nvidia[0-9]|kfd\"");
+
+
 			final ProcessBuilder pb = new ProcessBuilder(cmd);
 			final Process p = pb.start();
 			p.waitFor();
 
-			try (Scanner cmdScanner = new Scanner(p.getErrorStream())) {
+			try (Scanner cmdScanner = new Scanner(p.getInputStream())) {
 				while (cmdScanner.hasNext()) {
 					cmdString += cmdScanner.next();
 				}
 			}
 		}
 		catch (final Exception e) {
-			logger.log(Level.WARNING, "Failed to start container: " + e.toString());
+			logger.log(Level.WARNING, "Could not get GPU string");
 		}
 		return cmdString;
 	}
