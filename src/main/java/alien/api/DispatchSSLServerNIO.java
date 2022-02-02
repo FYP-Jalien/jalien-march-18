@@ -211,7 +211,6 @@ public class DispatchSSLServerNIO implements Runnable {
 			try (RequestEvent event = new RequestEvent(DispatchSSLServer.getAccessLog())) {
 				event.command = "login";
 				event.identity = remoteIdentity;
-				event.clientID = Request.getVMID();
 
 				if (logger.isLoggable(Level.FINE))
 					logger.log(Level.FINE, "Identity address and port: " + event.identity.getRemoteEndpoint() + ":" + event.identity.getRemotePort());
