@@ -67,7 +67,7 @@ public class LDAPHelper {
 
 	private static String ldapRoot = ConfigUtils.getConfig().gets("ldap_root", "o=alice,dc=cern,dc=ch");
 
-	private static final ExpirationCache<String, TreeSet<String>> cache = new ExpirationCache<>(1000);
+	private static final ExpirationCache<String, TreeSet<String>> cache = new ExpirationCache<>(16 * 1024);
 
 	private static final ExpirationCache<String, HashMap<String, Object>> cacheTree = new ExpirationCache<>(1000);
 
@@ -93,6 +93,16 @@ public class LDAPHelper {
 		defaultEnv.put("com.sun.jndi.ldap.connect.pool.maxsize", "50");
 		defaultEnv.put("com.sun.jndi.ldap.connect.pool.prefsize", "5");
 		defaultEnv.put("com.sun.jndi.ldap.connect.pool.timeout", "120000");
+
+		if (ConfigUtils.isCentralService()) {
+			monitor.addMonitoring("cacheSize", (names, values) -> {
+				names.add("cacheSize");
+				values.add(Integer.valueOf(cache.size()));
+
+				names.add("treeCacheSize");
+				values.add(Integer.valueOf(cacheTree.size()));
+			});
+		}
 	}
 
 	/**
