@@ -348,8 +348,19 @@ public class DispatchSSLServerNIO implements Runnable {
 				event.arguments = r.getArguments();
 
 				try {
+					r.setException(null);
+
 					r = Dispatcher.execute(r, forwardRequest);
-					event.exitCode = 0;
+
+					event.exception = r.getException();
+
+					if (event.exception == null) {
+						event.exitCode = 0;
+					}
+					else {
+						event.exitCode = ErrNo.EBADE.getErrorCode();
+						event.errorMessage = "Request doesn't pass muster";
+					}
 				}
 				catch (final Exception e) {
 					logger.log(Level.WARNING, "Returning an exception to the client", e);
