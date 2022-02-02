@@ -35,8 +35,9 @@ public class LFNCrawler extends Optimizer {
     /**
 	 * Crawler Frequency
 	 */
-    private static final int ONE_HOUR  = 3600 * 1000;
-    private static int       frequency = 24 * ONE_HOUR; // one day
+    private static final int ONE_MINUTE = 60 * 1000;
+    private static final int ONE_HOUR   = 60 * ONE_MINUTE;
+    private static int       frequency  = 24 * ONE_HOUR; // one day
 
     /**
 	 * Dry Run Mode
@@ -99,43 +100,26 @@ public class LFNCrawler extends Optimizer {
 	 *
 	 * @param indextableCollection A collection of indexTables on which to perform the queries
 	 */
-    private static void removeDirectories(Collection<IndexTableEntry> indextableCollection) {
+    private static void removeDirectories(IndexTableEntry ite) {
         LFN currentDirectory = null;
 
-        for (final IndexTableEntry ite : indextableCollection) {
+        try (DBFunctions db = ite.getDB()) {
+            db.query("set wait_timeout=31536000;");
 
-            try (DBFunctions db = ite.getDB()) {
-                db.query("set wait_timeout=31536000;");
+            String q = "SELECT * FROM L" + ite.tableName + "L WHERE expiretime IS NOT NULL AND expiretime < ? AND type = 'd' ORDER BY lfn";
 
-                String q = "SELECT * FROM L" + ite.tableName + "L WHERE expiretime IS NOT NULL AND expiretime < ? AND type = 'd' ORDER BY lfn";
+            db.setReadOnly(true);
+            if (!db.query(q, false, currentDate)) {
+                print("db.query returned error");
+                return;
+            }
 
-                db.setReadOnly(true);
-                if (!db.query(q, false, currentDate)) {
-                    print("db.query returned error");
-                    return;
-                }
+            while (db.moveNext()) {
+                final LFN lfn = new LFN(db, ite);
 
-                while (db.moveNext()) {
-                    final LFN lfn = new LFN(db, ite);
-
-                    if (currentDirectory == null) {
-                        currentDirectory = lfn;
-                    } else if (!lfn.getCanonicalName().contains(currentDirectory.getCanonicalName() + "/")) {
-                        print("Removing directory recursively: " + currentDirectory.getCanonicalName());
-                        if (!dryRun) {
-                            currentDirectory.delete(true, true);
-                        }
-
-                        reclaimedSpace  += currentDirectory.size;
-                        directoriesDeleted++;
-                        currentDirectory = lfn;
-                    } else {
-                        print("Found subentry: " + lfn.getCanonicalName());
-                    }
-                }
-
-                // Remove the last directory
-                if (currentDirectory != null) {
+                if (currentDirectory == null) {
+                    currentDirectory = lfn;
+                } else if (!lfn.getCanonicalName().contains(currentDirectory.getCanonicalName() + "/")) {
                     print("Removing directory recursively: " + currentDirectory.getCanonicalName());
                     if (!dryRun) {
                         currentDirectory.delete(true, true);
@@ -143,14 +127,26 @@ public class LFNCrawler extends Optimizer {
 
                     reclaimedSpace  += currentDirectory.size;
                     directoriesDeleted++;
-                    currentDirectory = null;
+                    currentDirectory = lfn;
+                } else {
+                    print("Found subentry: " + lfn.getCanonicalName());
                 }
-
-            } catch (@SuppressWarnings("unused") final Exception e) {
-                // ignore
             }
 
-            DBSyncUtils.setLastActive(LFNCrawler.class.getCanonicalName());
+            // Remove the last directory
+            if (currentDirectory != null) {
+                print("Removing directory recursively: " + currentDirectory.getCanonicalName());
+                if (!dryRun) {
+                    currentDirectory.delete(true, true);
+                }
+
+                reclaimedSpace  += currentDirectory.size;
+                directoriesDeleted++;
+                currentDirectory = null;
+            }
+
+        } catch (@SuppressWarnings("unused") final Exception e) {
+            // ignore
         }
     }
 
@@ -207,53 +203,48 @@ public class LFNCrawler extends Optimizer {
 	 *
 	 * @param indextableCollection A collection of indexTables on which to perform the queries
 	 */
-    private static void removeFiles(Collection<IndexTableEntry> indextableCollection) {
+    private static void removeFiles(IndexTableEntry ite) {
         String currentDirectory     = null;
         ArrayList<LFN> lfnsToDelete = new ArrayList<>();
 
-        for (final IndexTableEntry ite : indextableCollection) {
+        try (DBFunctions db = ite.getDB()) {
+            db.query("set wait_timeout=31536000;");
 
-            try (DBFunctions db = ite.getDB()) {
-                db.query("set wait_timeout=31536000;");
+            String q = "SELECT * FROM L" + ite.tableName + "L WHERE expiretime IS NOT NULL AND expiretime < ? AND type = 'f' ORDER BY lfn";
 
-                String q = "SELECT * FROM L" + ite.tableName + "L WHERE expiretime IS NOT NULL AND expiretime < ? AND type = 'f' ORDER BY lfn";
-
-                db.setReadOnly(true);
-                if (!db.query(q, false, currentDate)) {
-                    print("db.query returned error");
-                    return;
-                }
-
-                while (db.moveNext()) {
-                    final LFN lfn = new LFN(db, ite);
-                    final String parent = lfn.getParentName();
-
-                    if (currentDirectory == null) {
-                        currentDirectory = parent;
-
-                        print("Entering directory: " + currentDirectory);
-                    } else if (!currentDirectory.equals(parent)) {
-                        processBatch(lfnsToDelete);
-                        lfnsToDelete = new ArrayList<>();
-
-                        currentDirectory = parent;
-
-                        print("Entering directory: " + currentDirectory);
-                    }
-                    lfnsToDelete.add(lfn);
-                }
-
-                // Process the last batch
-                if (!lfnsToDelete.isEmpty()) {
-                    processBatch(lfnsToDelete);
-                    lfnsToDelete = new ArrayList<>();
-                }
-
-            } catch (@SuppressWarnings("unused") final Exception e) {
-                // ignore
+            db.setReadOnly(true);
+            if (!db.query(q, false, currentDate)) {
+                print("db.query returned error");
+                return;
             }
 
-            DBSyncUtils.setLastActive(LFNCrawler.class.getCanonicalName());
+            while (db.moveNext()) {
+                final LFN lfn = new LFN(db, ite);
+                final String parent = lfn.getParentName();
+
+                if (currentDirectory == null) {
+                    currentDirectory = parent;
+
+                    print("Entering directory: " + currentDirectory);
+                } else if (!currentDirectory.equals(parent)) {
+                    processBatch(lfnsToDelete);
+                    lfnsToDelete = new ArrayList<>();
+
+                    currentDirectory = parent;
+
+                    print("Entering directory: " + currentDirectory);
+                }
+                lfnsToDelete.add(lfn);
+            }
+
+            // Process the last batch
+            if (!lfnsToDelete.isEmpty()) {
+                processBatch(lfnsToDelete);
+                lfnsToDelete = new ArrayList<>();
+            }
+
+        } catch (@SuppressWarnings("unused") final Exception e) {
+            // ignore
         }
     }
 
@@ -279,11 +270,19 @@ public class LFNCrawler extends Optimizer {
             return;
         }
 
-        print("========== Directories iteration ==========");
-        removeDirectories(indextableCollection);
+        for (IndexTableEntry ite: indextableCollection) {
+            print("========== Table L" + ite.tableName + "L ==========");
+            print("========== Directories iteration ==========");
+            removeDirectories(ite);
 
-        print("========== Files iteration ==========");
-        removeFiles(indextableCollection);
+            print("========== Files iteration ==========");
+            removeFiles(ite);
+
+            DBSyncUtils.setLastActive(LFNCrawler.class.getCanonicalName());
+
+            // Sleep between indextable entries iterations
+            sleep(5 * ONE_MINUTE);
+        }
 
         print("========== Results ==========");
         print("Directories deleted: " + directoriesDeleted);
@@ -296,6 +295,8 @@ public class LFNCrawler extends Optimizer {
                                 "Files deleted: "       + filesDeleted       + "\n" +
                                 "Reclaimed space: "     + Format.size(reclaimedSpace)     + "\n" +
                                 "Execution took: "      + t);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
         }
     }
 }
