@@ -3366,7 +3366,7 @@ public class TaskQueueUtils {
 				}
 			}
 
-			final String pathFromJDL = jdl.gets("Path");
+			final String pathFromJDL = jdl.gets("OutputDir");
 
 			if (!clearPathAndResultsJDL(Long.valueOf(queueId))) {
 				logger.info("Cannot cleanup path and resultsJdl: " + queueId);
