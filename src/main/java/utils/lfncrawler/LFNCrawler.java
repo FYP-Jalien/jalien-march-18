@@ -35,7 +35,8 @@ public class LFNCrawler extends Optimizer {
     /**
 	 * Crawler Frequency
 	 */
-    private static final int ONE_MINUTE = 60 * 1000;
+    private static final int ONE_SECOND = 1000;
+    private static final int ONE_MINUTE = 60 * ONE_SECOND;
     private static final int ONE_HOUR   = 60 * ONE_MINUTE;
     private static int       frequency  = 24 * ONE_HOUR; // one day
 
@@ -280,8 +281,8 @@ public class LFNCrawler extends Optimizer {
 
             DBSyncUtils.setLastActive(LFNCrawler.class.getCanonicalName());
 
-            // Sleep between indextable entries iterations
-            sleep(5 * ONE_MINUTE);
+            // Sleep between indextable entries iterations. With 4500 tables currently we can't pause for too long.
+            sleep(2 * ONE_SECOND);
         }
 
         print("========== Results ==========");
