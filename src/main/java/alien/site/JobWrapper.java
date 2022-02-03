@@ -413,11 +413,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		boolean trackTime = false;
 		try {
-			String supportsTime = ExternalProcesses.getCmdOutput(Arrays.asList("time", "echo"), true, 30L, TimeUnit.SECONDS);
+			final String supportsTime = ExternalProcesses.getCmdOutput(Arrays.asList("time", "echo"), true, 30L, TimeUnit.SECONDS);
 			if (!supportsTime.contains("command not found"))
 				trackTime = true;
 		}
-		catch (@SuppressWarnings("unused") Exception e) {
+		catch (@SuppressWarnings("unused") final Exception e) {
 			// ignore
 		}
 
@@ -528,7 +528,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			try {
 				putJobTrace("Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile)).replace("\n", ", "));
 			}
-			catch (@SuppressWarnings("unused") Exception te) {
+			catch (@SuppressWarnings("unused") final Exception te) {
 				// Ignore
 			}
 		}
@@ -1064,7 +1064,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 *
 	 * @return script exit code, or -1 in case of error
 	 */
-	public static int cleanupProcesses(long queueId, int pid) {
+	public static int cleanupProcesses(final long queueId, final int pid) {
 		final File cleanupScript = new File(CVMFS.getCleanupScript());
 
 		if (!cleanupScript.exists()) {
