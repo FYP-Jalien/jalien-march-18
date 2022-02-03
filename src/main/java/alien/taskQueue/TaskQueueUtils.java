@@ -3453,23 +3453,10 @@ public class TaskQueueUtils {
 					}
 
 					// we need to clean up the previous output
-					if (pathFromJDL != null || j.path != null) {
-						final Collection<LFN> list = LFNUtils.find(pathFromJDL != null ? pathFromJDL : j.path, "*", LFNUtils.FIND_FILTER_JOBID | LFNUtils.FIND_NO_SORT, null, "",
-								Long.valueOf(queueId));
-						if (list != null)
-							for (final LFN l : list) {
-								if (l.jobid == queueId) {
-									logger.info("Resubmit: removing output file: " + l.getCanonicalName());
-									putJobLog(queueId, "trace", "Resubmit: removing output file: " + l.getCanonicalName(), null);
-									if (!LFNUtils.rmLFN(user, l, false)) {
-										logger.severe("Resubmit: could not remove output file: " + l.getCanonicalName());
-										putJobLog(queueId, "trace", "Resubmit: could not remove output file: " + l.getCanonicalName(), null);
-										return new AbstractMap.SimpleEntry<>(Integer.valueOf(ErrNo.EIO.getErrorCode()),
-												"Resubmit: could not remove output file: " + l.getCanonicalName() + " for " + queueId);
-									}
-								}
-							}
-					}
+					deletePreviousIterationOutput(user, queueId, pathFromJDL);
+
+					if (j.path != null && !j.path.equals(pathFromJDL))
+						deletePreviousIterationOutput(user, queueId, j.path);
 
 					if (js == JobStatus.SAVING || js == JobStatus.SAVED || js == JobStatus.ERROR_E || js == JobStatus.ERROR_V || js == JobStatus.ZOMBIE) {
 						CatalogueUtils.cleanLfnBookedForJob(queueId);
@@ -3489,6 +3476,34 @@ public class TaskQueueUtils {
 		}
 
 		return new AbstractMap.SimpleEntry<>(Integer.valueOf(ErrNo.EPERM.getErrorCode()), "Resubmit: not authorized for : " + queueId);
+	}
+
+	/**
+	 * @param user
+	 * @param queueId
+	 * @param j
+	 * @param pathFromJDL
+	 */
+	private static Map.Entry<Integer, String> deletePreviousIterationOutput(final AliEnPrincipal user, final long queueId, final String path) {
+		if (path == null || path.isBlank())
+			return null;
+
+		final Collection<LFN> list = LFNUtils.find(path, "*", LFNUtils.FIND_FILTER_JOBID | LFNUtils.FIND_NO_SORT, null, "", Long.valueOf(queueId));
+		if (list != null)
+			for (final LFN l : list) {
+				if (l.jobid == queueId) {
+					logger.info("Resubmit: removing output file: " + l.getCanonicalName());
+					putJobLog(queueId, "trace", "Resubmit: removing output file: " + l.getCanonicalName(), null);
+					if (!LFNUtils.rmLFN(user, l, false)) {
+						logger.severe("Resubmit: could not remove output file: " + l.getCanonicalName());
+						putJobLog(queueId, "trace", "Resubmit: could not remove output file: " + l.getCanonicalName(), null);
+						return new AbstractMap.SimpleEntry<>(Integer.valueOf(ErrNo.EIO.getErrorCode()),
+								"Resubmit: could not remove output file: " + l.getCanonicalName() + " for " + queueId);
+					}
+				}
+			}
+
+		return null;
 	}
 
 	private static int updateOrInsertJobAgent(final Job j, final JDL jdl) {
@@ -3671,7 +3686,7 @@ public class TaskQueueUtils {
 		final int cpuCores = getCPUCores(jdl);
 		params.put("cpucores", Integer.valueOf(cpuCores));
 
-		params.put("disk", Integer.valueOf(getWorkDirSizeMB(jdl, cpuCores)*1024));
+		params.put("disk", Integer.valueOf(getWorkDirSizeMB(jdl, cpuCores) * 1024));
 
 		// parse the other.CloseSE (and !)
 
