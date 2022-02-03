@@ -3453,10 +3453,17 @@ public class TaskQueueUtils {
 					}
 
 					// we need to clean up the previous output
-					deletePreviousIterationOutput(user, queueId, pathFromJDL);
+					Entry<Integer, String> deleteResult = deletePreviousIterationOutput(user, queueId, pathFromJDL);
 
-					if (j.path != null && !j.path.equals(pathFromJDL))
-						deletePreviousIterationOutput(user, queueId, j.path);
+					if (deleteResult != null)
+						return deleteResult;
+
+					if (j.path != null && !j.path.equals(pathFromJDL)) {
+						deleteResult = deletePreviousIterationOutput(user, queueId, j.path);
+
+						if (deleteResult != null)
+							return deleteResult;
+					}
 
 					if (js == JobStatus.SAVING || js == JobStatus.SAVED || js == JobStatus.ERROR_E || js == JobStatus.ERROR_V || js == JobStatus.ZOMBIE) {
 						CatalogueUtils.cleanLfnBookedForJob(queueId);
