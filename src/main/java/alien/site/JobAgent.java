@@ -3,7 +3,9 @@ package alien.site;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectOutputStream;
@@ -937,7 +939,7 @@ public class JobAgent implements Runnable {
 
 			final String fs = checkProcessResources();
 			if (fs == null)
-				sendProcessResources();
+				sendProcessResources(false);
 		}
 
 		final TimerTask killPayload = new TimerTask() {
@@ -984,14 +986,14 @@ public class JobAgent implements Runnable {
 					// Send report once every 10 min, or when the job changes state
 					if (monitor_loops == 120) {
 						monitor_loops = 0;
-						sendProcessResources();
+						sendProcessResources(false);
 					}
 					else if (getWrapperJobStatusTimestamp() != lastStatusChange) {
 						final String wrapperStatus = getWrapperJobStatus();
 
 						if (!"STARTED".equals(wrapperStatus) && !"RUNNING".equals(wrapperStatus)) {
 							lastStatusChange = getWrapperJobStatusTimestamp();
-							sendProcessResources();
+							sendProcessResources(false);
 						}
 					}
 				}
@@ -1006,7 +1008,7 @@ public class JobAgent implements Runnable {
 			code = p.exitValue();
 
 			// Send a final report once the payload completes
-			sendProcessResources();
+			sendProcessResources(true);
 
 			logger.log(Level.INFO, "JobWrapper has finished execution. Exit code: " + code);
 			logger.log(Level.INFO, "All done for job " + queueId + ". Final status: " + getWrapperJobStatus());
@@ -1063,15 +1065,37 @@ public class JobAgent implements Runnable {
 		monitor.sendParameter("num_cores", reqCPU);
 	}
 
-	private void sendProcessResources() {
+	private void sendProcessResources(boolean finalReporting) {
 		// runtime(date formatted) start cpu(%) mem cputime rsz vsize ncpu
 		// cpufamily cpuspeed resourcecost maxrss maxvss ksi2k
+		if (finalReporting)
+			getFinalCPUUsage();
+
 		final String procinfo = String.format("%s %d %.2f %.2f %.2f %.2f %.2f %d %s %s %s %.2f %.2f 1000", RES_FRUNTIME, RES_RUNTIME, RES_CPUUSAGE, RES_MEMUSAGE, RES_CPUTIME, RES_RMEM, RES_VMEM,
 				RES_NOCPUS, RES_CPUFAMILY, RES_CPUMHZ, RES_RESOURCEUSAGE, RES_RMEMMAX, RES_VMEMMAX);
 		logger.log(Level.INFO, "+++++ Sending resources info +++++");
 		logger.log(Level.INFO, procinfo);
 
 		putJobLog("proc", procinfo);
+	}
+
+	private void getFinalCPUUsage() {
+		String timeFile = tempDir + "/tmp/.jalienTimes";
+		double cpuTime = 0;
+		try {
+			BufferedReader br = new BufferedReader(new FileReader(timeFile));
+			String line;
+			while ((line = br.readLine()) != null) {
+				if (line.startsWith("real") || line.startsWith("user"))
+					cpuTime = cpuTime + Float.parseFloat(line.split(" ")[1]);
+			}
+			RES_CPUTIME = Double.valueOf(cpuTime);
+			RES_CPUUSAGE =  Double.valueOf((RES_CPUTIME / RES_RUNTIME) * 100);
+			logger.log(Level.INFO, "The last CPU time, computed as real+user time is " + RES_CPUTIME + ". Given that the job's wall time is " + RES_RUNTIME + ", the CPU usage is " + RES_CPUUSAGE);
+		}
+		catch (NumberFormatException | IOException e) {
+			logger.log(Level.SEVERE, "The .time file could not be read to parse final time. \n" + e);
+		}
 	}
 
 	private boolean jobKilled = false;
