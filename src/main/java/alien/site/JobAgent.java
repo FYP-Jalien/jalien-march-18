@@ -1510,16 +1510,14 @@ public class JobAgent implements Runnable {
 	 * @return map of env variables defined in META_VARIABLES and their current value.
 	 */
 	private Map<String, String> getMetaVariables() {
-		String metavars = env.get("META_VARIABLES");
-
+		String metavars = env.getOrDefault("META_VARIABLES", "");
+        
 		List<String> metavars_list = Arrays.asList(metavars.split("\\s*,\\s*"));
-
 		System.err.println("Detected metavars: " + metavars_list.toString());
 
 		Map<String, String> metavars_map = new HashMap<String, String>();
 		for (final String var : metavars_list)
-			metavars_map.put(var, env.get(var));
+			metavars_map.put(var, env.getOrDefault(var, ""));
 
 		return metavars_map;
 	}
-}
