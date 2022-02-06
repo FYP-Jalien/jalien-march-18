@@ -3299,7 +3299,10 @@ public class TaskQueueUtils {
 
 			int resubmission = -1;
 
-			if (db.query("select resubmission from QUEUE where queueId=?", false, queueId) && db.moveNext()) {
+			if (!db.query("select resubmission from QUEUE where queueId=?", false, queueId))
+				return -2;
+
+			if (db.moveNext()) {
 				resubmission = db.geti(1);
 			}
 

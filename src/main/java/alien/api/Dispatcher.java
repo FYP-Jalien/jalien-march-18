@@ -139,6 +139,10 @@ public class Dispatcher {
 		if (cachedResubmissionCounter == null) {
 			cachedResubmissionCounter = Integer.valueOf(TaskQueueUtils.getResubmission(queueId));
 
+			// the database query didn't work (likely a timeout)
+			if (cachedResubmissionCounter.intValue() == -2)
+				return true;
+
 			jobResubmissionsCache.put(queueId, cachedResubmissionCounter, 1000 * 60);
 		}
 

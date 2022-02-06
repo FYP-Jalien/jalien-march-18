@@ -70,7 +70,9 @@ public class SetJobStatus extends Request {
 			return;
 		}
 
-		if (TaskQueueUtils.getResubmission(Long.valueOf(this.jobnumber)) != resubmission) {
+		final int expectedResubmissionCount = TaskQueueUtils.getResubmission(Long.valueOf(jobnumber));
+
+		if (expectedResubmissionCount >= -1 && expectedResubmissionCount != resubmission) {
 			setException(new JobKilledException("This job is not supposed to be running any more", null));
 			return;
 		}
