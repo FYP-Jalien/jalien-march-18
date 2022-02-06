@@ -144,7 +144,11 @@ public class LFNUtils {
 		return getLFN(fileName, false);
 	}
 
-	private static String processFileName(final String fileName) {
+	/**
+	 * @param fileName
+	 * @return the cleaned up path
+	 */
+	public static String processFileName(final String fileName) {
 		String processedFileName = fileName;
 
 		while (processedFileName.indexOf("//") >= 0)

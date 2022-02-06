@@ -3495,7 +3495,7 @@ public class TaskQueueUtils {
 		if (path == null || path.isBlank())
 			return null;
 
-		final Collection<LFN> list = LFNUtils.find(path, "*", LFNUtils.FIND_FILTER_JOBID | LFNUtils.FIND_NO_SORT, null, "", Long.valueOf(queueId));
+		final Collection<LFN> list = LFNUtils.find(LFNUtils.processFileName(path), "*", LFNUtils.FIND_FILTER_JOBID | LFNUtils.FIND_NO_SORT, null, "", Long.valueOf(queueId));
 		if (list != null)
 			for (final LFN l : list) {
 				if (l.jobid == queueId) {
