@@ -76,33 +76,14 @@ public abstract class Containerizer {
 		return supported;
 	}
 
-	/** 
-	 * @return String representing supported GPUs by the system. Will contain either 'nvidia[0-9]' (Nvidia), 'kfd' (AMD), or none. 
+	/**
+	 * @return String representing supported GPUs by the system. Will contain either 'nvidia[0-9]' (Nvidia), 'kfd' (AMD), or none.
 	 */
-	public final String getGPUString(){
-		List<String> cmd = new ArrayList<String>();
-		String cmdString = "";
+	public final String getGPUString() {
+		final Pattern p = Pattern.compile("^nvidia\\d+$");
+		String[] names = new File("/dev").list((dir, name) -> name.equals("kfd") || p.matcher(name).matches());
 
-		try {
-			cmd.add("/bin/sh");
-			cmd.add("-c");
-			cmd.add("ls /dev/ | grep -Ew \"nvidia[0-9]|kfd\"");
-
-
-			final ProcessBuilder pb = new ProcessBuilder(cmd);
-			final Process p = pb.start();
-			p.waitFor();
-
-			try (Scanner cmdScanner = new Scanner(p.getInputStream())) {
-				while (cmdScanner.hasNext()) {
-					cmdString += cmdScanner.next();
-				}
-			}
-		}
-		catch (final Exception e) {
-			logger.log(Level.WARNING, "Could not get GPU string");
-		}
-		return cmdString;
+		return String.join(",", names);
 	}
 
 	/**
