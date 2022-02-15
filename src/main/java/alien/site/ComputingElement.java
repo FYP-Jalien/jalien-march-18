@@ -391,6 +391,7 @@ public final class ComputingElement extends Thread {
 		before += "export CE=\"" + siteMap.get("CE") + "\"\n";
 		before += "export CEhost=\"" + siteMap.get("Localhost") + "\"\n";
 		before += "export TTL=\"" + siteMap.get("TTL") + "\"\n";
+		before += "export -n _LMFILES_" + "\"\n";
 		/*
 		 * If the admin wants to use another ML instance, on the same
 		 * site, we should enable them to do so
