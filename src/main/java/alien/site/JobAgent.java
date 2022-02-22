@@ -1092,7 +1092,7 @@ public class JobAgent implements Runnable {
 			BufferedReader br = new BufferedReader(new FileReader(timeFile));
 			String line;
 			while ((line = br.readLine()) != null) {
-				if (line.startsWith("real") || line.startsWith("user"))
+				if (line.startsWith("sys") || line.startsWith("user"))
 					cpuTime = cpuTime + Float.parseFloat(line.split(" ")[1]);
 			}
 			RES_CPUTIME = Double.valueOf(cpuTime);
