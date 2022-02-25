@@ -309,11 +309,15 @@ public class OrphanPFNsCleanup {
 			return ret;
 		}
 
-		private static int getVectorSize(final int seNumber) {
-			int ret = ConfigUtils.getConfig().geti("utils.OrphanPFNsCleanup.vectorOperations", 8);
-			ret = ConfigUtils.getConfig().geti("utils.OrphanPFNsCleanup.vectorOperations." + seNumber, ret);
+		private static int getVectorSize(final int seNumber, final SE se) {
+			if (seNumber > 0 && !se.getName().toLowerCase().contains("dcache")) {
+				int ret = ConfigUtils.getConfig().geti("utils.OrphanPFNsCleanup.vectorOperations", 8);
+				ret = ConfigUtils.getConfig().geti("utils.OrphanPFNsCleanup.vectorOperations." + seNumber, ret);
 
-			return ret;
+				return ret;
+			}
+
+			return 1;
 		}
 
 		@Override
@@ -375,7 +379,7 @@ public class OrphanPFNsCleanup {
 
 								List<UUID> nullUUIDs = new ArrayList<>();
 
-								final int vectorSize = getVectorSize(seNumber);
+								final int vectorSize = getVectorSize(seNumber, se);
 
 								List<ToDeleteEntry> vectorDelete = new ArrayList<>(vectorSize);
 
