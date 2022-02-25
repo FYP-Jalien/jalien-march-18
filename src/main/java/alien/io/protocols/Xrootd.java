@@ -147,7 +147,7 @@ public class Xrootd extends Protocol {
 				logger.log(Level.INFO, "Configuration prefers eoscp over xrdcp, but I couldn't locate it in $PATH, using xrdcp = " + xrdcpPath + " instead");
 		}
 
-		boolean newerThan4 = false;
+		boolean newerThan4 = true;
 
 		if (xrdcpPath != null) {
 			int idx = xrdcpPath.lastIndexOf('/');
@@ -307,7 +307,7 @@ public class Xrootd extends Protocol {
 
 	/**
 	 * Get the md5 value
-	 * 
+	 *
 	 * @return the xrdcp-observed checksum of the transferred file
 	 */
 	public String getMd5Value() {
@@ -398,6 +398,8 @@ public class Xrootd extends Protocol {
 		return false;
 	}
 
+	private static final String UNABLE_REMOVE = " Unable remove ";
+
 	/**
 	 * @param pfns to delete, <b>all from the same server</b>
 	 * @param enforceTicket optionally enforce a delete token
@@ -468,6 +470,9 @@ public class Xrootd extends Protocol {
 
 			final ProcessBuilder pBuilder = new ProcessBuilder(command);
 
+			if (pfns.size() > 1)
+				pBuilder.environment().put("XRD_LOGLEVEL", "Error");
+
 			checkLibraryPath(pBuilder);
 			setCommonEnv(pBuilder, null);
 
@@ -478,7 +483,7 @@ public class Xrootd extends Protocol {
 			try {
 				final Process p = pBuilder.start();
 				final ProcessWithTimeout ptimeout = new ProcessWithTimeout(p, pBuilder);
-				ptimeout.waitFor(1, TimeUnit.MINUTES);
+				ptimeout.waitFor(pfns.size(), TimeUnit.MINUTES);
 
 				exitStatus = ptimeout.getExitStatus();
 
@@ -489,8 +494,41 @@ public class Xrootd extends Protocol {
 				throw new IOException("Interrupted while waiting for the following command to finish:" + getFormattedLastCommand(), ie);
 			}
 
+			// System.err.println("delete stdout:\n----------\n" + exitStatus.getStdOut() + "\n==========================================");
+
 			if (exitStatus.getExtProcExitStatus() != 0) {
-				String stdout = exitStatus.getStdOut();
+				final String stdout = exitStatus.getStdOut();
+
+				boolean anyVerboseError = false;
+
+				try (BufferedReader br = new BufferedReader(new StringReader(stdout))) {
+					String line = null;
+
+					while ((line = br.readLine()) != null) {
+						int idx = line.indexOf(UNABLE_REMOVE);
+
+						if (idx > 0) {
+							line = line.substring(idx + UNABLE_REMOVE.length());
+
+							idx = line.indexOf('?');
+
+							if (idx > 0)
+								line = line.substring(0, idx);
+
+							// which of the PFNs was this ?
+
+							for (final Map.Entry<PFN, ExitStatus> entry : ret.entrySet())
+								if (entry.getKey().getPFN().contains(line)) {
+									entry.setValue(new ExitStatus(0, exitStatus.getExtProcExitStatus(), null, null, "Unable remove " + line));
+
+									anyVerboseError = true;
+								}
+						}
+					}
+
+					if (anyVerboseError)
+						return ret;
+				}
 
 				String sMessage = parseXrootdError(stdout);
 
@@ -508,7 +546,8 @@ public class Xrootd extends Protocol {
 				else
 					sMessage = "Exit code was " + exitStatus.getExtProcExitStatus() + " for command : " + getFormattedLastCommand();
 
-				throw new TargetException(sMessage);
+				for (final Map.Entry<PFN, ExitStatus> entry : ret.entrySet())
+					entry.setValue(new ExitStatus(0, exitStatus.getExtProcExitStatus(), null, null, sMessage));
 			}
 
 			if (logger.isLoggable(Level.FINEST))
@@ -919,10 +958,10 @@ public class Xrootd extends Protocol {
 				throw new TargetException(sMessage);
 			}
 
-			String outputMessage = exitStatus.getStdOut();
+			final String outputMessage = exitStatus.getStdOut();
 			if (outputMessage.contains("md5:")) {
-				String[] outputList = outputMessage.split(" ");
-				int indexMd5 = Arrays.asList(outputList).indexOf("md5:");
+				final String[] outputList = outputMessage.split(" ");
+				final int indexMd5 = Arrays.asList(outputList).indexOf("md5:");
 				if (outputList.length > indexMd5 + 1) {
 					setMd5Value(outputList[indexMd5 + 1].trim());
 				}

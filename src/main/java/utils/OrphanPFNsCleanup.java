@@ -41,6 +41,7 @@ import lazyj.DBFunctions;
 import lazyj.DBFunctions.DBConnection;
 import lazyj.Format;
 import lia.Monitor.monitor.AppConfig;
+import lia.util.process.ExternalProcess.ExitStatus;
 
 /**
  * Go over the orphan_pfns and try to physically remove the entries
@@ -91,7 +92,7 @@ public class OrphanPFNsCleanup {
 
 		private Statement stat = null;
 
-		private final void executeClose() {
+		private void executeClose() {
 			if (resultSet != null) {
 				try {
 					resultSet.close();
@@ -116,7 +117,7 @@ public class OrphanPFNsCleanup {
 		}
 
 		@SuppressWarnings("resource")
-		private final boolean executeQuery(final DBConnection dbc, final String query) {
+		private boolean executeQuery(final DBConnection dbc, final String query) {
 			executeClose();
 
 			try {
@@ -301,9 +302,16 @@ public class OrphanPFNsCleanup {
 			seNumber = se != null ? se.seNumber : 0;
 		}
 
-		private static final int getPoolSize(final int seNumber) {
+		private static int getPoolSize(final int seNumber) {
 			int ret = ConfigUtils.getConfig().geti("utils.OrphanPFNsCleanup.threadsPerSE", 16);
 			ret = ConfigUtils.getConfig().geti("utils.OrphanPFNsCleanup.threadsPerSE." + seNumber, ret);
+
+			return ret;
+		}
+
+		private static int getVectorSize(final int seNumber) {
+			int ret = ConfigUtils.getConfig().geti("utils.OrphanPFNsCleanup.vectorOperations", 8);
+			ret = ConfigUtils.getConfig().geti("utils.OrphanPFNsCleanup.vectorOperations." + seNumber, ret);
 
 			return ret;
 		}
@@ -367,9 +375,19 @@ public class OrphanPFNsCleanup {
 
 								List<UUID> nullUUIDs = new ArrayList<>();
 
+								final int vectorSize = getVectorSize(seNumber);
+
+								List<ToDeleteEntry> vectorDelete = new ArrayList<>(vectorSize);
+
 								do {
-									if (seNumber > 0)
-										executor.submit(new CleanupTask(h, db.gets(1), seNumber, db.getl(2), db.gets(3), db.gets(4), db.geti(5)));
+									if (seNumber > 0) {
+										vectorDelete.add(new ToDeleteEntry(h, db.gets(1), se, db.getl(2), db.gets(3), db.gets(4), db.geti(5)));
+
+										if (vectorDelete.size() >= vectorSize) {
+											executor.submit(new CleanupTask(vectorDelete));
+											vectorDelete = new ArrayList<>(vectorSize);
+										}
+									}
 									else {
 										try {
 											nullUUIDs.add(UUID.fromString(db.gets(1)));
@@ -389,6 +407,9 @@ public class OrphanPFNsCleanup {
 
 								if (nullUUIDs.size() > 0)
 									executor.submit(new NullSETask(h, new ArrayList<>(nullUUIDs)));
+
+								if (vectorDelete.size() > 0)
+									executor.submit(new CleanupTask(vectorDelete));
 							}
 						}
 
@@ -537,30 +558,34 @@ public class OrphanPFNsCleanup {
 		}
 	}
 
-	private static class CleanupTask implements Runnable {
+	private static class ToDeleteEntry {
 		final Host h;
 		final String sGUID;
-		final int seNumber;
+		final SE se;
 		final long size;
 		final String md5;
 		final String knownPFN;
 		final int flags;
 
-		public CleanupTask(final Host h, final String sGUID, final int se, final long size, final String md5, final String knownPFN, final int flags) {
+		private GUID guid = null;
+
+		private PFN pfn = null;
+
+		public ToDeleteEntry(final Host h, final String sGUID, final SE se, final long size, final String md5, final String knownPFN, final int flags) {
 			this.h = h;
 			this.sGUID = sGUID;
-			this.seNumber = se;
+			this.se = se;
 			this.size = size;
 			this.md5 = md5;
 			this.knownPFN = knownPFN;
 			this.flags = flags;
 		}
 
-		@Override
-		public void run() {
-			final UUID uuid = UUID.fromString(sGUID);
+		public PFN getPFN() {
+			if (pfn != null)
+				return pfn;
 
-			final GUID guid;
+			final UUID uuid = UUID.fromString(sGUID);
 
 			if ((flags & 1) == 1)
 				guid = new GUID(uuid);
@@ -575,30 +600,20 @@ public class OrphanPFNsCleanup {
 				}
 			}
 
-			final SE se = SEUtils.getSE(seNumber);
-
-			if (se == null) {
-				syslog("Cannot find any se with seNumber=" + seNumber);
-				kept.incrementAndGet();
-				return;
-			}
-
 			if (!guid.exists()) {
 				guid.size = size > 0 ? size : 123456;
 				guid.md5 = md5 != null ? md5 : "130254d9540d6903fa6f0ab41a132361";
 			}
 
-			final PFN pfn;
-
 			try {
 				pfn = knownPFN == null || knownPFN.length() == 0 ? new PFN(guid, se) : new PFN(knownPFN, guid, se);
 			}
 			catch (final Throwable t) {
-				syslog("Cannot generate the entry for " + seNumber + " (" + se.getName() + ") and " + sGUID);
+				syslog("Cannot generate the entry for " + se.seNumber + " (" + se.getName() + ") and " + sGUID);
 				t.printStackTrace();
 
 				kept.incrementAndGet();
-				return;
+				return null;
 			}
 
 			concurrentQueryies.acquireUninterruptibly();
@@ -621,18 +636,22 @@ public class OrphanPFNsCleanup {
 			}
 			catch (final GeneralSecurityException e) {
 				e.printStackTrace();
-				return;
+				return null;
 			}
 
 			pfn.ticket = new AccessTicket(AccessType.DELETE, env);
 
+			return pfn;
+		}
+
+		public void commit(final boolean successfulDelete) {
 			try (DBFunctions db2 = h.getDB()) {
-				if (!Factory.xrootd.delete(pfn)) {
-					syslog("Could not delete from " + se.getName());
+				if (!successfulDelete) {
+					syslog("Could not delete " + guid.guid + " (" + Format.size(guid.size) + ") from " + se.getName());
 
 					concurrentQueryies.acquireUninterruptibly();
 					try {
-						db2.query("UPDATE orphan_pfns_" + seNumber + " SET fail_count=fail_count+1 WHERE guid=string2binary(?);", false, sGUID);
+						db2.query("UPDATE orphan_pfns_" + se.seNumber + " SET fail_count=fail_count+1 WHERE guid=string2binary(?);", false, sGUID);
 
 						failOne(se);
 					}
@@ -671,31 +690,55 @@ public class OrphanPFNsCleanup {
 								syslog("  GUID " + guid.guid + " doesn't exist in the catalogue any more");
 						}
 
-						db2.query("DELETE FROM orphan_pfns_" + seNumber + " WHERE guid=string2binary(?);", false, sGUID);
+						db2.query("DELETE FROM orphan_pfns_" + se.seNumber + " WHERE guid=string2binary(?);", false, sGUID);
 					}
 					finally {
 						concurrentQueryies.release();
 					}
 				}
 			}
+		}
+	}
+
+	private static class CleanupTask implements Runnable {
+
+		List<ToDeleteEntry> toDelete;
+
+		public CleanupTask(final List<ToDeleteEntry> toDelete) {
+			this.toDelete = toDelete;
+		}
+
+		@Override
+		public void run() {
+			final List<PFN> pfns = new ArrayList<>(toDelete.size());
+
+			for (final ToDeleteEntry entry : toDelete) {
+				final PFN pfn = entry.getPFN();
+
+				if (pfn != null)
+					pfns.add(pfn);
+			}
+
+			if (pfns.size() == 0)
+				return;
+
+			Map<PFN, ExitStatus> deleteResult;
+			try {
+				deleteResult = Factory.xrootd.delete(pfns, true);
+			}
 			catch (final IOException e) {
-				// e.printStackTrace();
+				syslog(e.getMessage());
 
-				failOne(se);
+				for (final ToDeleteEntry entry : toDelete)
+					entry.commit(false);
 
-				syslog("Exception deleting " + guid.guid + " from " + se.getName() + " : " + e.getMessage());
+				return;
+			}
 
-				if (logger.isLoggable(Level.FINER))
-					logger.log(Level.FINER, "Exception deleting from " + se.getName(), e);
+			for (final ToDeleteEntry entry : toDelete) {
+				final ExitStatus result = deleteResult.get(entry.getPFN());
 
-				concurrentQueryies.acquireUninterruptibly();
-
-				try (DBFunctions db2 = h.getDB()) {
-					db2.query("UPDATE orphan_pfns_" + seNumber + " SET fail_count=fail_count+1 WHERE guid=string2binary(?);", false, sGUID);
-				}
-				finally {
-					concurrentQueryies.release();
-				}
+				entry.commit(result.getExtProcExitStatus() == 0);
 			}
 		}
 	}
