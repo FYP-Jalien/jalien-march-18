@@ -405,7 +405,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @return <code>0</code> if everything went fine, a positive number with the process exit code (which would mean a problem) and a negative error code in case of timeout or other supervised
 	 *         execution errors
 	 */
-	private int executeCommand(final String command, final List<String> arguments, final Map<String, String> environment_packages) {
+	private int executeCommand(final String command, final List<String> arguments, final Map<String, String> environment_packages, String executionType) {
 
 		logger.log(Level.INFO, "Starting execution of command: " + command);
 
@@ -425,7 +425,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			cmd.add("time");
 			cmd.add("-p");
 			cmd.add("-o");
-			cmd.add(tmpDir + "/" + timeFile);
+			cmd.add(tmpDir + "/" + timeFile + "-" + executionType);
 		}
 
 		final int idx = command.lastIndexOf('/');
@@ -483,7 +483,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		processEnv.put("TMPDIR", currentDir.getAbsolutePath() + "/tmp");
 
 		processEnv.putAll(metavars);
-		
+
 		if (!parentHostname.isBlank())
 			processEnv.put("PARENT_HOSTNAME", parentHostname);
 
@@ -527,7 +527,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		if (trackTime) {
 			try {
-				putJobTrace("Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile)).replace("\n", ", "));
+				putJobTrace("Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile + "-" + executionType)).replace("\n", ", "));
 			}
 			catch (@SuppressWarnings("unused") final Exception te) {
 				// Ignore
@@ -541,7 +541,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		putJobTrace("Starting execution");
 
 		changeStatus(JobStatus.RUNNING);
-		final int code = executeCommand(jdl.gets("Executable"), jdl.getArguments(), environment_packages);
+		final int code = executeCommand(jdl.gets("Executable"), jdl.getArguments(), environment_packages, "execution");
 
 		return code;
 	}
@@ -553,7 +553,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		if (validation != null) {
 			putJobTrace("Starting validation");
-			code = executeCommand(validation, null, environment_packages);
+			code = executeCommand(validation, null, environment_packages, "validation");
 		}
 
 		return code;

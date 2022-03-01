@@ -1086,7 +1086,7 @@ public class JobAgent implements Runnable {
 	}
 
 	private void getFinalCPUUsage() {
-		String timeFile = tempDir + "/tmp/.jalienTimes";
+		String timeFile = tempDir + "/tmp/.jalienTimes-execution";
 		double cpuTime = 0;
 		try {
 			BufferedReader br = new BufferedReader(new FileReader(timeFile));
