@@ -1108,7 +1108,6 @@ public class JobAgent implements Runnable {
 				if (line.startsWith("sys") || line.startsWith("user"))
 					cpuTime = cpuTime + Float.parseFloat(line.split(" ")[1]);
 			}
-			br.close();
 		} catch (IOException e) {
 			logger.log(Level.WARNING, "Exception while reading the file " + timeFile + ". \n" + e);
 		}
