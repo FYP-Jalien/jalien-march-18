@@ -1086,22 +1086,29 @@ public class JobAgent implements Runnable {
 	}
 
 	private void getFinalCPUUsage() {
-		String timeFile = tempDir + "/tmp/.jalienTimes-execution";
-		double cpuTime = 0;
 		try {
-			BufferedReader br = new BufferedReader(new FileReader(timeFile));
-			String line;
-			while ((line = br.readLine()) != null) {
-				if (line.startsWith("sys") || line.startsWith("user"))
-					cpuTime = cpuTime + Float.parseFloat(line.split(" ")[1]);
-			}
-			RES_CPUTIME = Double.valueOf(cpuTime);
+			double cpuTimeExecution = getTotalCPUTime("execution");
+			double cpuTimeValidation = getTotalCPUTime("validation");
+			double totalCPUTime = cpuTimeExecution + cpuTimeValidation;
+			RES_CPUTIME = Double.valueOf(totalCPUTime);
 			RES_CPUUSAGE =  Double.valueOf((RES_CPUTIME / RES_RUNTIME) * 100);
 			logger.log(Level.INFO, "The last CPU time, computed as real+user time is " + RES_CPUTIME + ". Given that the job's wall time is " + RES_RUNTIME + ", the CPU usage is " + RES_CPUUSAGE);
 		}
 		catch (NumberFormatException | IOException e) {
 			logger.log(Level.SEVERE, "The .time file could not be read to parse final time. \n" + e);
 		}
+	}
+
+	private double getTotalCPUTime(String executionType) throws FileNotFoundException, IOException {
+		String timeFile = tempDir + "/tmp/.jalienTimes-" + executionType;
+		double cpuTime = 0;
+		BufferedReader br = new BufferedReader(new FileReader(timeFile));
+		String line;
+		while ((line = br.readLine()) != null) {
+			if (line.startsWith("sys") || line.startsWith("user"))
+				cpuTime = cpuTime + Float.parseFloat(line.split(" ")[1]);
+		}
+		return cpuTime;
 	}
 
 	private boolean jobKilled = false;
