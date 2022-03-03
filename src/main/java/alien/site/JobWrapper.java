@@ -510,6 +510,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					logger.log(Level.SEVERE, "SIGTERM received. Killing payload");
 					payload.destroyForcibly();
 				}
+				cleanupProcesses(queueId, pid);
 			});
 
 			payload.waitFor(ttl, TimeUnit.SECONDS);
