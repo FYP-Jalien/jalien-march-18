@@ -1086,17 +1086,14 @@ public class JobAgent implements Runnable {
 	}
 
 	private void getFinalCPUUsage() {
-		try {
-			double cpuTimeExecution = getTotalCPUTime("execution");
-			double cpuTimeValidation = getTotalCPUTime("validation");
-			double totalCPUTime = cpuTimeExecution + cpuTimeValidation;
-			RES_CPUTIME = Double.valueOf(totalCPUTime);
-			RES_CPUUSAGE =  Double.valueOf((RES_CPUTIME / RES_RUNTIME) * 100);
-			logger.log(Level.INFO, "The last CPU time, computed as real+user time is " + RES_CPUTIME + ". Given that the job's wall time is " + RES_RUNTIME + ", the CPU usage is " + RES_CPUUSAGE);
-		}
-		catch (NumberFormatException e) {
-			logger.log(Level.SEVERE, "The .time file could not be read to parse final time. \n" + e);
-		}
+		double totalCPUTime = getTotalCPUTime("execution") + getTotalCPUTime("validation");
+		if (RES_RUNTIME > 0) {
+			if (totalCPUTime > RES_CPUTIME)
+				RES_CPUTIME = Double.valueOf(totalCPUTime);
+			RES_CPUUSAGE = Double.valueOf((RES_CPUTIME / RES_RUNTIME) * 100);
+		} else
+			RES_CPUUSAGE = Double.valueOf(0);
+		logger.log(Level.INFO, "The last CPU time, computed as real+user time is " + RES_CPUTIME + ". Given that the job's wall time is " + RES_RUNTIME + ", the CPU usage is " + RES_CPUUSAGE);
 	}
 
 	private double getTotalCPUTime(String executionType) {
@@ -1105,11 +1102,17 @@ public class JobAgent implements Runnable {
 		try (BufferedReader br = new BufferedReader(new FileReader(timeFile))) {
 			String line;
 			while ((line = br.readLine()) != null) {
-				if (line.startsWith("sys") || line.startsWith("user"))
-					cpuTime = cpuTime + Float.parseFloat(line.split(" ")[1]);
+				if (line.startsWith("sys") || line.startsWith("user")) {
+					try {
+				        float time = Float.parseFloat(line.split(" ")[1]);
+				        cpuTime = cpuTime + time;
+				    } catch (NumberFormatException e) {
+						logger.log(Level.WARNING, "The file " + timeFile + " did not have the expected `time` format. \n" + e);
+				    }
+				}
 			}
 		} catch (IOException e) {
-			logger.log(Level.WARNING, "Exception while reading the file " + timeFile + ". \n" + e);
+			logger.log(Level.WARNING, "The file " + timeFile + " could not be found. \n" + e);
 		}
 		return cpuTime;
 	}
