@@ -171,6 +171,11 @@ public final class ComputingElement extends Thread {
 		final GetNumberFreeSlots jobSlots = commander.q_api.getNumberFreeSlots((String) config.get("host_host"), port, siteMap.get("CE").toString(),
 				ConfigUtils.getConfig().gets("version", "J-1.0").trim());
 
+		if(jobSlots == null){
+			logger.info("Cannot get values from getNumberFreeSlots");
+			return 0;
+		}
+
 		final List<Integer> slots = jobSlots.getJobSlots();
 		int max_jobs = 0;
 		int max_queued = 0;
@@ -255,6 +260,11 @@ public final class ComputingElement extends Thread {
 
 		// We ask the broker how many jobs we could run
 		final GetNumberWaitingJobs jobMatch = commander.q_api.getNumberWaitingForSite(siteMap);
+		if(jobMatch == null){
+			logger.warning("Could not get number of waiting jobs!");
+			return;
+		}
+
 		final int waiting_jobs = jobMatch.getNumberJobsWaitingForSite().intValue();
 
 		if (waiting_jobs <= 0) {
