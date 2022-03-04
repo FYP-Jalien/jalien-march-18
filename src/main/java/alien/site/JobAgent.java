@@ -1087,11 +1087,11 @@ public class JobAgent implements Runnable {
 
 	private void getFinalCPUUsage() {
 		double totalCPUTime = getTotalCPUTime("execution") + getTotalCPUTime("validation");
-		if (RES_RUNTIME > 0) {
-			if (totalCPUTime > RES_CPUTIME)
-				RES_CPUTIME = Double.valueOf(totalCPUTime);
+		if (totalCPUTime > RES_CPUTIME)
+			RES_CPUTIME = Double.valueOf(totalCPUTime);
+		if (RES_RUNTIME > 0)
 			RES_CPUUSAGE = Double.valueOf((RES_CPUTIME / RES_RUNTIME) * 100);
-		} else
+		else
 			RES_CPUUSAGE = Double.valueOf(0);
 		logger.log(Level.INFO, "The last CPU time, computed as real+user time is " + RES_CPUTIME + ". Given that the job's wall time is " + RES_RUNTIME + ", the CPU usage is " + RES_CPUUSAGE);
 	}
@@ -1101,16 +1101,20 @@ public class JobAgent implements Runnable {
 		double cpuTime = 0;
 		try (BufferedReader br = new BufferedReader(new FileReader(timeFile))) {
 			String line;
+			ArrayList<String> fields = new ArrayList<>();
 			while ((line = br.readLine()) != null) {
+				fields.add(line.split(" ")[0]);
 				if (line.startsWith("sys") || line.startsWith("user")) {
 					try {
 				        float time = Float.parseFloat(line.split(" ")[1]);
 				        cpuTime = cpuTime + time;
-				    } catch (NumberFormatException e) {
+				    } catch (NumberFormatException|IndexOutOfBoundsException e) {
 						logger.log(Level.WARNING, "The file " + timeFile + " did not have the expected `time` format. \n" + e);
 				    }
 				}
 			}
+			if (fields.size() != 3 || !fields.contains("real") || !fields.contains("user")|| !fields.contains("sys"))
+				logger.log(Level.WARNING, "The file " + timeFile + " did not have the expected `time` format. Expected to have real,user,sys fields");
 		} catch (IOException e) {
 			logger.log(Level.WARNING, "The file " + timeFile + " could not be found. \n" + e);
 		}
