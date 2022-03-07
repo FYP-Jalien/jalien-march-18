@@ -2726,6 +2726,34 @@ public class TaskQueueUtils {
 		siteQueueStatusCache.put(ce, status, 1000 * 60);
 	}
 
+	private static volatile boolean dbStructureInitialized = false;
+
+	private static void tqDBStructureInit() {
+		if (dbStructureInitialized)
+			return;
+
+		try (DBFunctions db = getQueueDB()) {
+			if (db == null)
+				return;
+
+			final Map<String, Integer> status = getJobStatusFromDB();
+
+			for (final Map.Entry<String, Integer> entry : status.entrySet()) {
+				if (!db.query("SELECT count(*) FROM information_schema.columns WHERE table_schema = 'processes' and COLUMN_NAME = ? AND table_name = 'SITEQUEUES';", false, entry.getKey())) {
+					logger.log(Level.SEVERE, "Exception querying for columns of processes.SITEQUEUES");
+					return;
+				}
+
+				if (db.geti(1) == 0) {
+					logger.log(Level.INFO, "Adding column " + entry.getKey() + " to processes.SITEQUEUES;");
+					db.query("alter table SITEQUEUES add column `" + Format.escSQL(entry.getKey()) + "` int not null default 0;");
+				}
+			}
+
+			dbStructureInitialized = true;
+		}
+	}
+
 	/**
 	 * @param ce
 	 */
@@ -2749,6 +2777,8 @@ public class TaskQueueUtils {
 	 *
 	 */
 	public static void resyncSiteQueueTable() {
+		tqDBStructureInit();
+
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
 				return;
@@ -2757,20 +2787,20 @@ public class TaskQueueUtils {
 
 			final Map<String, Integer> status = getJobStatusFromDB();
 
-			String sql = " update SITEQUEUES left join (select siteid, sum(cost) REALCOST, ";
+			String sql = "update SITEQUEUES left join (select siteid, sum(cost) REALCOST, ";
 			String set = " Group by statusId, siteid) dd group by siteid) bb using (siteid) set cost=REALCOST, ";
 
 			for (final Map.Entry<String, Integer> entry : status.entrySet()) {
 				sql += " max(if(statusId=" + entry.getValue() + ", count, 0)) REAL" + entry.getKey() + ",";
-				set += " " + entry.getKey() + "=REAL" + entry.getKey() + ",";
+				set += " " + entry.getKey() + "=coalesce(REAL" + entry.getKey() + ",0),";
 			}
 			sql = sql.substring(0, sql.length() - 1);
-			sql = set.substring(0, set.length() - 1);
+			set = set.substring(0, set.length() - 1);
 
 			sql += " from (select siteid, statusId, sum(cost) as cost, count(*) as count from QUEUE join QUEUEPROC using(queueid) ";
 			sql += set;
 
-			logger.log(Level.INFO, "resyncSiteQueueTable with " + sql);
+			logger.log(Level.FINE, "resyncSiteQueueTable with " + sql);
 
 			db.query(sql, false);
 		}
