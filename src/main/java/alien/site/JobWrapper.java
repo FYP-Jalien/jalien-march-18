@@ -422,7 +422,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		if (trackTime) {
-			cmd.add("time");
+			cmd.add("/usr/bin/time");
 			cmd.add("-p");
 			cmd.add("-o");
 			cmd.add(tmpDir + "/" + timeFile + "-" + executionType);
@@ -510,7 +510,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					logger.log(Level.SEVERE, "SIGTERM received. Killing payload");
 					payload.destroyForcibly();
 				}
-				cleanupProcesses(queueId, pid);
 			});
 
 			payload.waitFor(ttl, TimeUnit.SECONDS);

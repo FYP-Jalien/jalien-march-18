@@ -997,6 +997,13 @@ public class JobAgent implements Runnable {
 							lastStatusChange = getWrapperJobStatusTimestamp();
 							sendProcessResources(false);
 						}
+
+						//Check if the wrapper has exited without us knowing
+						if ("DONE".equals(wrapperStatus) || wrapperStatus.contains("ERROR")) {
+							putJobTrace("Warning: The JobWrapper has terminated without the JobAgent noticing. Killing leftover processes...");
+							p.destroyForcibly();
+						}
+
 					}
 				}
 				try {
