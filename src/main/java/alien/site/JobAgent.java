@@ -3,7 +3,6 @@ package alien.site;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -54,7 +53,6 @@ import alien.monitoring.MonitorFactory;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.site.containers.Containerizer;
 import alien.site.containers.ContainerizerFactory;
-import alien.site.JobWrapper;
 import alien.site.packman.CVMFS;
 import alien.taskQueue.JDL;
 import alien.taskQueue.Job;
@@ -354,7 +352,7 @@ public class JobAgent implements Runnable {
 
 				MAX_CPU = Long.valueOf(((Number) siteMap.getOrDefault("CPUCores", Integer.valueOf(1))).longValue());
 				RUNNING_CPU = MAX_CPU;
-				RUNNING_DISK = Long.valueOf(((Number) siteMap.getOrDefault("Disk", Long.valueOf(10 * 1024 * 1024 * RUNNING_CPU))).longValue()/1024);
+				RUNNING_DISK = Long.valueOf(((Number) siteMap.getOrDefault("Disk", Long.valueOf(10 * 1024 * 1024 * RUNNING_CPU.longValue()))).longValue() / 1024);
 				origTtl = ((Integer) siteMap.get("TTL")).intValue();
 				RUNNING_JOBAGENTS = 0;
 
@@ -465,7 +463,7 @@ public class JobAgent implements Runnable {
 				setStatus(jaStatus.REQUESTING_JOB);
 
 				if (siteMap.containsKey("Disk"))
-					siteMap.put("Disk", (Long)siteMap.get("Disk")*1024);
+					siteMap.put("Disk", (Long) siteMap.get("Disk") * 1024);
 
 				final GetMatchJob jobMatch = commander.q_api.getMatchJob(new HashMap<>(siteMap));
 
@@ -636,6 +634,9 @@ public class JobAgent implements Runnable {
 		RES_RESOURCEUSAGE = "";
 		RES_RUNTIME = Long.valueOf(0);
 		RES_FRUNTIME = "";
+
+		if (mj != null)
+			mj.close();
 
 		logger.log(Level.INFO, "Done!");
 	}
@@ -978,7 +979,8 @@ public class JobAgent implements Runnable {
 							putJobTrace("ERROR[FATAL]: Process overusing resources");
 							putJobTrace(error);
 							killGracefully(p);
-						} else {
+						}
+						else {
 							logger.log(Level.SEVERE, "ERROR[FATAL]: Job KILLED by user! Terminating...");
 							putJobTrace("ERROR[FATAL]: Job KILLED by user! Terminating...");
 							killForcibly(p);
@@ -1047,7 +1049,7 @@ public class JobAgent implements Runnable {
 					putJobTrace("ERROR: The JobWrapper was killed during saving");
 					changeJobStatus(JobStatus.ERROR_SV, null); // JobWrapper was killed during saving
 				}
-                else if (lastStatus.isBlank()){
+				else if (lastStatus.isBlank()) {
 					putJobTrace("ERROR: The JobWrapper was killed before job start");
 					changeJobStatus(JobStatus.ERROR_E, null); // JobWrapper was killed before payload start
 				}
@@ -1094,10 +1096,10 @@ public class JobAgent implements Runnable {
 
 	private void getFinalCPUUsage() {
 		double totalCPUTime = getTotalCPUTime("execution") + getTotalCPUTime("validation");
-		if (totalCPUTime > RES_CPUTIME)
+		if (totalCPUTime > RES_CPUTIME.doubleValue())
 			RES_CPUTIME = Double.valueOf(totalCPUTime);
-		if (RES_RUNTIME > 0)
-			RES_CPUUSAGE = Double.valueOf((RES_CPUTIME / RES_RUNTIME) * 100);
+		if (RES_RUNTIME.doubleValue() > 0)
+			RES_CPUUSAGE = Double.valueOf((RES_CPUTIME.doubleValue() / RES_RUNTIME.doubleValue()) * 100);
 		else
 			RES_CPUUSAGE = Double.valueOf(0);
 		logger.log(Level.INFO, "The last CPU time, computed as real+user time is " + RES_CPUTIME + ". Given that the job's wall time is " + RES_RUNTIME + ", the CPU usage is " + RES_CPUUSAGE);
@@ -1113,16 +1115,18 @@ public class JobAgent implements Runnable {
 				fields.add(line.split(" ")[0]);
 				if (line.startsWith("sys") || line.startsWith("user")) {
 					try {
-				        float time = Float.parseFloat(line.split(" ")[1]);
-				        cpuTime = cpuTime + time;
-				    } catch (NumberFormatException|IndexOutOfBoundsException e) {
+						float time = Float.parseFloat(line.split(" ")[1]);
+						cpuTime = cpuTime + time;
+					}
+					catch (NumberFormatException | IndexOutOfBoundsException e) {
 						logger.log(Level.WARNING, "The file " + timeFile + " did not have the expected `time` format. \n" + e);
-				    }
+					}
 				}
 			}
-			if (fields.size() != 3 || !fields.contains("real") || !fields.contains("user")|| !fields.contains("sys"))
+			if (fields.size() != 3 || !fields.contains("real") || !fields.contains("user") || !fields.contains("sys"))
 				logger.log(Level.WARNING, "The file " + timeFile + " did not have the expected `time` format. Expected to have real,user,sys fields");
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
 			logger.log(Level.WARNING, "The file " + timeFile + " could not be found. \n" + e);
 		}
 		return cpuTime;
@@ -1470,12 +1474,13 @@ public class JobAgent implements Runnable {
 	 * 
 	 * @param p process for JobWrapper
 	 */
-	private void killForcibly(final Process p){
+	private void killForcibly(final Process p) {
 		final int jobWrapperPid = getWrapperPid();
 		try {
-			if (jobWrapperPid != 0){
+			if (jobWrapperPid != 0) {
 				JobWrapper.cleanupProcesses(queueId, jobWrapperPid);
-				Runtime.getRuntime().exec("kill -9" + jobWrapperPid); }
+				Runtime.getRuntime().exec("kill -9" + jobWrapperPid);
+			}
 			else
 				logger.log(Level.INFO, "Could not kill JobWrapper: not found. Already done?");
 		}
@@ -1533,13 +1538,13 @@ public class JobAgent implements Runnable {
 	 * 
 	 * @return map of env variables defined in META_VARIABLES and their current value.
 	 */
-	private Map<String, String> getMetaVariables() {
+	private static Map<String, String> getMetaVariables() {
 		String metavars = env.getOrDefault("META_VARIABLES", "");
-        
+
 		List<String> metavars_list = Arrays.asList(metavars.split("\\s*,\\s*"));
 		System.err.println("Detected metavars: " + metavars_list.toString());
 
-		Map<String, String> metavars_map = new HashMap<String, String>();
+		Map<String, String> metavars_map = new HashMap<>();
 		for (final String var : metavars_list)
 			metavars_map.put(var, env.getOrDefault(var, ""));
 
