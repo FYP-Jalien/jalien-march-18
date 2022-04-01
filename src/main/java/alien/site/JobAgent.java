@@ -876,6 +876,9 @@ public class JobAgent implements Runnable {
 		logger.log(Level.INFO, "Launching jobwrapper using the command: " + launchCommand.toString());
 		final long ttl = ttlForJob();
 
+		boolean payloadMonitoring = false;
+		MonitoredJob mjPayload = null;
+
 		final ProcessBuilder pBuilder = new ProcessBuilder(launchCommand);
 		pBuilder.environment().remove("JALIEN_TOKEN_CERT");
 		pBuilder.environment().remove("JALIEN_TOKEN_KEY");
@@ -942,6 +945,13 @@ public class JobAgent implements Runnable {
 			apmon.addJobToMonitor(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
 			mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
 
+			String monitoring = jdl.gets("Monitoring");
+			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
+				payloadMonitoring = true;
+				mjPayload = apmon.addJobToMonitor(getWrapperPid(), jobWorkdir, ce + "_JobWrapper", matchedJob.get("queueId").toString());
+				mjPayload.setPayloadMonitoring();
+			}
+
 			final String fs = checkProcessResources();
 			if (fs == null)
 				sendProcessResources(false);
@@ -966,6 +976,7 @@ public class JobAgent implements Runnable {
 		logger.log(Level.INFO, "About to enter monitor loop. Is the JobWrapper process alive?: " + p.isAlive());
 
 		int monitor_loops = 0;
+		boolean discoveredPid = false;
 		try {
 			while (p.isAlive()) {
 				logger.log(Level.FINEST, "Waiting for the JobWrapper process to finish");
@@ -999,6 +1010,11 @@ public class JobAgent implements Runnable {
 						if (!"STARTED".equals(wrapperStatus) && !"RUNNING".equals(wrapperStatus)) {
 							lastStatusChange = getWrapperJobStatusTimestamp();
 							sendProcessResources(false);
+						}
+
+						if ("RUNNING".equals(wrapperStatus) && payloadMonitoring == true && mjPayload != null && discoveredPid == false) {
+							mjPayload.discoverPayloadPid();
+							discoveredPid = true;
 						}
 
 						//Check if the wrapper has exited without us knowing

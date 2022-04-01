@@ -456,7 +456,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					while (st.hasMoreTokens())
 						cmd.add(st.nextToken());
 				}
-				
+		cmd.add("; echo payload");
+
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
 
 		final ProcessBuilder pBuilder = new ProcessBuilder(cmd);
