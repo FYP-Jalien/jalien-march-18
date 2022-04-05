@@ -1579,6 +1579,11 @@ public class LFNUtils {
 				return "The directory " + lfn.getCanonicalName() + " is already in a separate table";
 			}
 
+			String alterSourceEngineQuery = "ALTER TABLE L" + lfn.indexTableEntry.tableName + "L ENGINE=InnoDB";
+			if (!db.query(alterSourceEngineQuery, false)) {
+				return "DB query failed:\n" + alterSourceEngineQuery;
+			}
+
 			// generate a name for the destination table
 			int tableName = Math.abs(lfn.lfn.hashCode());
 			// check if table name exists
@@ -1597,6 +1602,25 @@ public class LFNUtils {
 			String createTableQuery = "CREATE TABLE L" + tableName + "L LIKE L" + lfn.indexTableEntry.tableName + "L";
 			if (!db.query(createTableQuery, false)) {
 				return "DB query failed:\n" + createTableQuery;
+			}
+
+			String selistColumn = "selist";
+
+			// check if the "selist" column has been copied from the source table
+			String checkColumnExistsQuery = "SHOW COLUMNS FROM L" + tableName + "L LIKE \"" + Format.escSQL(selistColumn) + "\"";
+			if (!db.query(checkColumnExistsQuery, false)) {
+				db.query("DROP TABLE L" + tableName + "L");
+				return "DB query failed:\n" + checkColumnExistsQuery;
+			}
+
+			// the "selist" column exists
+			if (db.moveNext()) {
+				// drop the column as not all tables have it
+				String dropColumnQuery = "ALTER TABLE L" + tableName + "L DROP COLUMN " + Format.escSQL(selistColumn);
+				if (!db.query(dropColumnQuery, false)) {
+					db.query("DROP TABLE L" + tableName + "L");
+					return "DB query failed:\n" + dropColumnQuery;
+				}
 			}
 
 			boolean allOk = false;
@@ -1623,29 +1647,30 @@ public class LFNUtils {
 					dbu.lockTables("L" + lfn.indexTableEntry.tableName + "L WRITE, L" + tableName + "L WRITE, INDEXTABLE WRITE");
 					// insert directory entries into the destination table
 					String newLFN = "substring(lfn, " + (lfn.lfn.length() + 1) + ")";
-					String columns = "entryId, owner, ctime, replicated, aclId, lfn, expiretime, size, dir, selist, gowner, type, perm, guid, md5, guidtime, broken, jobid";
+
+					String columns = "entryId, owner, replicated, ctime, guidtime, jobid, aclId, lfn, broken, expiretime, size, dir, gowner, type, guid, md5, perm";
 					String insertQuery = "INSERT INTO L" + tableName + "L (" + columns
-						+ ") SELECT entryId, owner, ctime, replicated, aclId, " + newLFN
-						+ " as lfn, expiretime, size, dir, selist, gowner, type, perm, guid, md5, guidtime, broken, jobid FROM L10L WHERE lfn LIKE \""
-						+ Format.escSQL(lfn.lfn + "_%") + "\";";
+						+ ") SELECT entryId, owner, replicated, ctime, guidtime, jobid, aclId, " + newLFN
+						+ " as lfn, broken, expiretime, size, dir, gowner, type, guid, md5, perm FROM L" + lfn.indexTableEntry.tableName + "L WHERE lfn LIKE \""
+						+ Format.escSQL(lfn.lfn + "_%") + "\"";
 
 					if (!dbu.executeQuery(insertQuery))
 						return "Failed to insert into the newly created table:\n" + insertQuery;
 
 					// update parent directory to point to the "" directory
-					String updatedAllQuery = "UPDATE L" + tableName + "L SET dir=" + entryId + " WHERE dir=" + lfn.entryId + ";";
+					String updatedAllQuery = "UPDATE L" + tableName + "L SET dir=" + entryId + " WHERE dir=" + lfn.entryId;
 
 					if (!dbu.executeQuery(updatedAllQuery))
 						return "Failed to update the parent directory to the root of the new table:\n" + updatedAllQuery;
 
 					// delete directory entries from the source table
-					String deleteQuery = "DELETE FROM L" + lfn.indexTableEntry.tableName + "L WHERE lfn LIKE \"" + Format.escSQL(lfn.lfn + "_%") + "\";";
+					String deleteQuery = "DELETE FROM L" + lfn.indexTableEntry.tableName + "L WHERE lfn LIKE \"" + Format.escSQL(lfn.lfn + "_%") + "\"";
 					if (!dbu.executeQuery(deleteQuery))
 						return "Failed to delete the entries from the old table:\n" + deleteQuery;
 
 					// insert lfn into indextable
 					String indexTableEntryQuery = "INSERT INTO INDEXTABLE (hostIndex, tableName, lfn) VALUES (" + lfn.indexTableEntry.hostIndex + ", " + tableName + ", \""
-						+ Format.escSQL(lfn.getCanonicalName()) + "\");";
+						+ Format.escSQL(lfn.getCanonicalName()) + "\")";
 
 					if (!dbu.executeQuery(indexTableEntryQuery))
 						return "Failed inserting the new table in the INDEXTABLE:\n" + indexTableEntryQuery;
@@ -1656,7 +1681,7 @@ public class LFNUtils {
 					return "Error executing the DB operations: " + e.getMessage();
 				}
 			}
-			finally{
+			finally {
 				if (!allOk) {
 					db.query("DROP TABLE L" + tableName + "L");
 					return "Operation failed, rolling back the changes";

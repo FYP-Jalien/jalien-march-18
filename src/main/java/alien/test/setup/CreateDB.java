@@ -360,7 +360,7 @@ public class CreateDB {
 				"DROP TABLE IF EXISTS `INDEXTABLE`;",
 				"CREATE TABLE `INDEXTABLE` (" + "  `indexId` int(11) NOT NULL AUTO_INCREMENT," + "  `hostIndex` int(11) NOT NULL," + "  `tableName` int(11) NOT NULL,"
 						+ "  `lfn` varchar(255) COLLATE latin1_general_cs DEFAULT NULL," + "  PRIMARY KEY (`indexId`)," + "  UNIQUE KEY `lfn` (`lfn`)"
-						+ ") ENGINE=MyISAM AUTO_INCREMENT=2 DEFAULT CHARSET=latin1 COLLATE=latin1_general_cs;",
+						+ ") ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=latin1 COLLATE=latin1_general_cs;",
 				
 				"DROP TABLE IF EXISTS `INDEXTABLE_UPDATE`;",
 				"CREATE TABLE `INDEXTABLE_UPDATE` (" + " `entryId` ENUM(" + "`1`) NOT NULL PRIMARY KEY," + " `last_updated` TIMESTAMP);",
