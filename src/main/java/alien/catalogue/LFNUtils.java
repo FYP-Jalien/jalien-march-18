@@ -1604,25 +1604,6 @@ public class LFNUtils {
 				return "DB query failed:\n" + createTableQuery;
 			}
 
-			String selistColumn = "selist";
-
-			// check if the "selist" column has been copied from the source table
-			String checkColumnExistsQuery = "SHOW COLUMNS FROM L" + tableName + "L LIKE \"" + Format.escSQL(selistColumn) + "\"";
-			if (!db.query(checkColumnExistsQuery, false)) {
-				db.query("DROP TABLE L" + tableName + "L");
-				return "DB query failed:\n" + checkColumnExistsQuery;
-			}
-
-			// the "selist" column exists
-			if (db.moveNext()) {
-				// drop the column as not all tables have it
-				String dropColumnQuery = "ALTER TABLE L" + tableName + "L DROP COLUMN " + Format.escSQL(selistColumn);
-				if (!db.query(dropColumnQuery, false)) {
-					db.query("DROP TABLE L" + tableName + "L");
-					return "DB query failed:\n" + dropColumnQuery;
-				}
-			}
-
 			boolean allOk = false;
 
 			try {
