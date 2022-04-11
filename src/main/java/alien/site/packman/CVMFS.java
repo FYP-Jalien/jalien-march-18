@@ -157,7 +157,7 @@ public class CVMFS extends PackMan {
 
 		final String stderr = co.stderr;
 
-		if (!stderr.contains("ERROR:")) {
+		if (stderr.contains("ERROR:")) {
 			logger.log(Level.SEVERE, "alienv returned an error: " + stderr);
 			return null;
 		}
