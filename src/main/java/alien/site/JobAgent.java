@@ -114,7 +114,7 @@ public class JobAgent implements Runnable {
 	private final JAliEnCOMMander commander = JAliEnCOMMander.getInstance();
 	private String jarPath;
 	private String jarName;
-	private int wrapperPID;
+	private int childPID;
 	private static float lhcbMarks = -1;
 
 	private enum jaStatus {
@@ -935,11 +935,11 @@ public class JobAgent implements Runnable {
 			logger.log(Level.INFO, process_res_format);
 			putJobLog("procfmt", process_res_format);
 
-			wrapperPID = (int) p.pid();
+			childPID = (int) p.pid();
 
 			apmon.setNumCPUs(cpuCores);
-			apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
-			mj = new MonitoredJob(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
+			apmon.addJobToMonitor(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
+			mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
 
 			final String fs = checkProcessResources();
 			if (fs == null)
@@ -1037,7 +1037,7 @@ public class JobAgent implements Runnable {
 			catch (final Exception e) {
 				logger.log(Level.WARNING, "Not all resources from the current job could be cleared: " + e);
 			}
-			apmon.removeJobToMonitor(wrapperPID);
+			apmon.removeJobToMonitor(childPID);
 			if (code != 0) {
 				// Looks like something went wrong. Let's check the last reported status
 				final String lastStatus = getWrapperJobStatus();

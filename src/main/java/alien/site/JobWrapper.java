@@ -247,6 +247,14 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		logger.log(Level.INFO, "JobWrapper initialised. Running as the following user: " + commander.getUser().getName());
 
+		try {
+			putJobTrace("The following OS has been detected: \n\r" + Files.readString(Paths.get("/etc/os-release")));
+			logger.log(Level.INFO, "The following OS has been detected: \n\r" + Files.readString(Paths.get("/etc/os-release")));
+		}
+		catch (IOException e1) {
+			// Ignore
+		}
+
 		monitor.addMonitoring("JobWrapper", this);
 	}
 
