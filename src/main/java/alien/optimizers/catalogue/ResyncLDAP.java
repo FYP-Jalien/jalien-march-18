@@ -690,7 +690,7 @@ public class ResyncLDAP extends Optimizer {
 						dbTransfers.query("DELETE from `PROTOCOLS` where sename=? and protocol=?", false, element.split("#")[0], element.split("#")[1]);
 					}
 					catch (Exception e) {
-						logger.log(Level.WARNING, "Could not split SE and protocol string `" + element + "`");
+						logger.log(Level.WARNING, "Could not split SE and protocol string `" + element + "`", e);
 					}
 				}
 
