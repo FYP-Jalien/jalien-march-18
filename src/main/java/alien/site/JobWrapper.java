@@ -248,8 +248,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		logger.log(Level.INFO, "JobWrapper initialised. Running as the following user: " + commander.getUser().getName());
 
 		try {
-			putJobTrace("The following OS has been detected: \n\r" + Files.readString(Paths.get("/etc/os-release")));
-			logger.log(Level.INFO, "The following OS has been detected: \n\r" + Files.readString(Paths.get("/etc/os-release")));
+			final String osRelease = Files.readString(Paths.get("/etc/os-release"));
+			putJobTrace("The following OS has been detected: \n\r" + osRelease);
+			logger.log(Level.INFO, "The following OS has been detected: \n\r" + osRelease);
 		}
 		catch (IOException e1) {
 			// Ignore
@@ -759,7 +760,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		logger.log(Level.INFO, "Preparing to install packages");
 		if (packs != null) {
 			for (final Map.Entry<String, String> entry : packs.entrySet())
-				packages.append(voalice + entry.getKey() + "::" + entry.getValue() + ",");
+				packages.append(voalice + entry.getKey() + "::" + entry.getValue() + ", ");
 
 			if (!packs.containsKey("APISCONFIG"))
 				packages.append(voalice + "APISCONFIG,");
