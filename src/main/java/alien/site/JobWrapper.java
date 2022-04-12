@@ -763,7 +763,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				packages.append(voalice + entry.getKey() + "::" + entry.getValue() + ", ");
 
 			if (!packs.containsKey("APISCONFIG"))
-				packages.append(voalice + "APISCONFIG,");
+				packages.append(voalice + "APISCONFIG, ");
 
 			final String packagestring = packages.substring(0, packages.length() - 1);
 
