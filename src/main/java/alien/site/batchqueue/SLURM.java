@@ -176,14 +176,15 @@ public class SLURM extends BatchQueue {
 		}
 
 		final String encodedScriptContent = Utils.base64Encode(scriptContent.getBytes()).replaceAll("(\\w{76})", "$1\n");
+		final String srun_script = String.format("%s_%d", script, timestamp);
 
-		submit_cmd += "cat<<__EOF__ | base64 -d > " + script + "\n";
+		submit_cmd += "cat<<__EOF__ | base64 -d > " + srun_script + "\n";
 		submit_cmd += encodedScriptContent;
 		submit_cmd += "\n__EOF__\n";
-		submit_cmd += "chmod a+x " + script + "\n";
-		submit_cmd += "srun " + runArgs + " " + script + "\n";
+		submit_cmd += "chmod a+x " + srun_script + "\n";
+		submit_cmd += "srun " + runArgs + " " + srun_script + "\n";
 
-		submit_cmd += "rm " + script;
+		submit_cmd += "rm " + srun_script;
 
 		if (this.temp_file != null && (!this.temp_file.exists() || !this.temp_file.canExecute() || this.temp_file.length() == 0)) {
 			if (!this.temp_file.delete())
