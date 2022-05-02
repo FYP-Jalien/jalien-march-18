@@ -249,8 +249,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		try {
 			final String osRelease = Files.readString(Paths.get("/etc/os-release"));
-			putJobTrace("The following OS has been detected: \n\r" + osRelease);
-			logger.log(Level.INFO, "The following OS has been detected: \n\r" + osRelease);
+			final String osName = osRelease.substring(osRelease.indexOf("PRETTY_NAME=")+12, osRelease.length()).split("\\r?\\n")[0];
+
+			putJobTrace("The following OS has been detected: " + osName);
+			logger.log(Level.INFO, "The following OS has been detected: " + osName);
 		}
 		catch (IOException e1) {
 			// Ignore
