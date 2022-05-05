@@ -32,6 +32,7 @@ import alien.monitoring.MonitorFactory;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.site.batchqueue.BatchQueue;
 import alien.site.packman.CVMFS;
+import alien.user.JAKeyStore;
 import apmon.ApMon;
 import apmon.ApMonException;
 import lazyj.ExtProperties;
@@ -84,7 +85,7 @@ public final class ComputingElement extends Thread {
 			host_logdir_resolved = Functions.resolvePathWithEnv((String) config.get("host_logdir"));
 			if (host_logdir_resolved == null)
 				host_logdir_resolved = Functions.resolvePathWithEnv((String) config.get("host_tmpdir"));
-			
+
 			logger = LogUtils.redirectToCustomHandler(logger, host_logdir_resolved + "/CE");
 
 			if (config.containsKey("proxy_cache_file")) {
@@ -116,6 +117,12 @@ public final class ComputingElement extends Thread {
 
 		logger.info("Looping");
 		while (true) {
+
+			if(JAKeyStore.expireSoon(commander.getUser().getUserCert()[0].getNotAfter().getTime())){
+				logger.log(Level.WARNING, "Certificate is about to expire");
+				System.exit(0);
+			}
+
 			if (System.currentTimeMillis() - lastLdapRefresh > LDAP_REFRESH_INTERVAL) {
 				logger.info("Time to sync with LDAP");
 				logger.info("Building new SiteMap.");
