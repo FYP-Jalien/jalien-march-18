@@ -675,6 +675,23 @@ public class IOUtils {
 
 		final JAliEnCOMMander cmd = new JAliEnCOMMander(owner, null, ConfigUtils.getCloseSite(), out);
 
+		return upload(localFile, toLFN, cmd, args);
+	}
+
+	/**
+	 * Upload a local file to the Grid
+	 *
+	 * @param localFile
+	 *            local file to upload
+	 * @param toLFN
+	 *            catalogue entry name
+	 * @param cmd pre-existing commander instance to use, required
+	 * @param args
+	 *            other `cp` command parameters to pass
+	 * @return the uploaded LFN, if everything went ok, <code>null</code> if not
+	 * @throws IOException
+	 */
+	public static LFN upload(final File localFile, final String toLFN, final JAliEnCOMMander cmd, final String... args) throws IOException {
 		final LFN l = cmd.c_api.getLFN(toLFN, true);
 
 		if (l == null)
@@ -683,7 +700,7 @@ public class IOUtils {
 		if (l.exists)
 			throw new IOException("LFN already exists: " + toLFN);
 
-		final String absolutePath = FileSystemUtils.getAbsolutePath(owner.getName(), null, toLFN);
+		final String absolutePath = FileSystemUtils.getAbsolutePath(cmd.getUsername(), null, toLFN);
 
 		final ArrayList<String> cpArgs = new ArrayList<>();
 		cpArgs.add("file:" + localFile.getAbsolutePath());
