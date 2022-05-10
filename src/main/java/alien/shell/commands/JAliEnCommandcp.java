@@ -895,7 +895,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 
 			return lfn;
 		}
-		else if (bD)
+		else if (bD && envelopes.size() > 0)
 			sourceFile.delete();
 
 		if (commit(envelopes, guid, bD ? null : sourceFile, referenceCount, true))
@@ -970,11 +970,12 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 				}
 			}
 
-			if (envelopes.size() > 0)
+			if (envelopes.size() > 0) {
 				commit(envelopes, guid, null, futures.size(), false);
 
-			if (fileToDeleteOnComplete != null)
-				fileToDeleteOnComplete.delete();
+				if (fileToDeleteOnComplete != null)
+					fileToDeleteOnComplete.delete();
+			}
 		}
 	}
 
