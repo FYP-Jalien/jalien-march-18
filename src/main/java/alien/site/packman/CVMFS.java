@@ -148,7 +148,7 @@ public class CVMFS extends PackMan {
 
 		final CommandOutput co = SystemCommand.bash(ALIEN_BIN_DIR + "/alienv printenv " + args);
 
-		final String source = co.stdout;
+		String source = co.stdout;
 
 		if (source.isBlank()) {
 			logger.log(Level.SEVERE, "alienv didn't return anything useful");
@@ -161,6 +161,9 @@ public class CVMFS extends PackMan {
 			logger.log(Level.SEVERE, "alienv returned an error: " + stderr);
 			return null;
 		}
+		
+		//remove newline between entries, in case of modules v4
+		source = source.replace("\n", "").replace("\r", "");
 
 		try {
 			logger.log(Level.INFO, "Executing SetAliEnv");
