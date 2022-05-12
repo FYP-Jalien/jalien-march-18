@@ -222,6 +222,13 @@ public class CVMFS extends PackMan {
 	}
 
 	/**
+	 * @return path to Apptainer runtime in CVMFS
+	 */
+	public static String getApptainerPath() {
+		return CVMFS_BASE_DIR + "/containers/bin/apptainer/current/bin";
+	}
+	
+	/**
 	 * @return path to Singularity runtime in CVMFS
 	 */
 	public static String getSingularityPath() {
