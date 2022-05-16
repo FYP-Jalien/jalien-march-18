@@ -415,6 +415,11 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 			File writeToLocalFile = targetLocalFile;
 
 			if (targetLocalFile != null && targetLocalFile.exists() && targetLocalFile.isDirectory()) {
+				if (sourcelfn == null || longestMatchingPath == null) {
+					commander.setReturnCode(102, "Target file already exists and on this code path I should not save it in an alternate location");
+					return;
+				}
+
 				final String fileName = sourcelfn.substring(longestMatchingPath.length());
 
 				final int idx = fileName.lastIndexOf('/');
@@ -503,7 +508,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 				commander.setReturnCode(105, "No replicas for this LFN: " + lfn.getCanonicalName());
 
 			if (resultFile == null)
-				commander.setReturnCode(106, "Could not get the file: " + sourcelfn + " to " + (writeToLocalFile != null ? writeToLocalFile.getAbsolutePath() : " a temporary file")
+				commander.setReturnCode(106, "Could not get the file: " + lfn.getCanonicalName() + " to " + (writeToLocalFile != null ? writeToLocalFile.getAbsolutePath() : " a temporary file")
 						+ (lastException != null ? ", error was: " + lastException.getMessage() : ""));
 		}
 
