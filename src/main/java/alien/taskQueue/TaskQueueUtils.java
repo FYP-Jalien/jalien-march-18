@@ -99,6 +99,8 @@ public class TaskQueueUtils {
 		fieldMap.put("node_field", "nodeId");
 		fieldMap.put("exechost_table", "QUEUE");
 		fieldMap.put("exechost_field", "execHostId");
+		fieldMap.put("error_table", "QUEUE");
+		fieldMap.put("error_field", "error");
 	}
 
 	static {

@@ -363,7 +363,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					putJobTrace("Warning: executable exit code was " + execExitCode);
 
 				// if (jdl.gets("OutputErrorE") != null)
-				return uploadOutputFiles(JobStatus.ERROR_E) ? execExitCode : -1;
+				return uploadOutputFiles(JobStatus.ERROR_E, execExitCode) ? execExitCode : -1;
 
 				// changeStatus(JobStatus.ERROR_E);
 				// return execExitCode;
@@ -381,13 +381,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				else
 					putJobTrace("Validation failed. Exit code: " + valExitCode);
 
-				final int valUploadExitCode = uploadOutputFiles(JobStatus.ERROR_V) ? valExitCode : -1;
+				final int valUploadExitCode = uploadOutputFiles(JobStatus.ERROR_V, valExitCode) ? valExitCode : -1;
 
 				// changeStatus(JobStatus.ERROR_V);
 				return valUploadExitCode;
 			}
 
-			if (!uploadOutputFiles(JobStatus.DONE)) {
+			if (!uploadOutputFiles(JobStatus.DONE, 0)) {
 				logger.log(Level.SEVERE, "Failed to upload output files");
 				return -1;
 			}
@@ -780,7 +780,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		return envmap;
 	}
 
-	private boolean uploadOutputFiles(final JobStatus exitStatus) {
+	private boolean uploadOutputFiles(final JobStatus exitStatus, final int exitCode) {
 		boolean uploadedAllOutFiles = true;
 		boolean uploadedNotAllCopies = false;
 
@@ -930,7 +930,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				changeStatus(JobStatus.DONE);
 		}
 		else
-			changeStatus(exitStatus);
+			changeStatus(exitStatus, exitCode);
 
 		return uploadedAllOutFiles;
 	}
@@ -981,6 +981,17 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @return <code>false</code> if the job was killed and execution should not continue
 	 */
 	public boolean changeStatus(final JobStatus newStatus) {
+		return changeStatus(jobStatus, 0);
+	}
+
+	/**
+	 * Updates the current state of the job.
+	 *
+	 * @param newStatus
+	 * @param exitCode
+	 * @return <code>false</code> if the job was killed and execution should not continue
+	 */
+	public boolean changeStatus(final JobStatus newStatus, final int exitCode) {
 		if (jobKilled)
 			return false;
 
@@ -990,8 +1001,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		extrafields.put("exechost", ceHost);
 
 		// if final status with saved files, we set the path
-		if (jobStatus == JobStatus.DONE || jobStatus == JobStatus.DONE_WARN || jobStatus == JobStatus.ERROR_E || jobStatus == JobStatus.ERROR_V)
+		if (jobStatus == JobStatus.DONE || jobStatus == JobStatus.DONE_WARN || jobStatus == JobStatus.ERROR_E || jobStatus == JobStatus.ERROR_V) {
 			extrafields.put("path", getJobOutputDir(newStatus));
+			if (exitCode != 0)
+				extrafields.put("error", exitCode);
+		}
 		else if (jobStatus == JobStatus.RUNNING) {
 			extrafields.put("spyurl", hostName + ":" + TomcatServer.getPort());
 			extrafields.put("node", hostName);
