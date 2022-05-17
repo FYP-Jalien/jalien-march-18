@@ -12,31 +12,31 @@ public class ApptainerCVMFS extends Containerizer {
 
 	@Override
 	public List<String> containerize(final String cmd) {
-		final List<String> singularityCmd = new ArrayList<>();
-		singularityCmd.add(CVMFS.getApptainerPath() + "/" + "apptainer");
-		singularityCmd.add("exec");
-		singularityCmd.add("-C");
+		final List<String> apptainerCmd = new ArrayList<>();
+		apptainerCmd.add(CVMFS.getApptainerPath() + "/" + "apptainer");
+		apptainerCmd.add("exec");
+		apptainerCmd.add("-C");
 
 		final String gpuString = getGPUString();
 		if (gpuString.contains("nvidia"))
-			singularityCmd.add("--nv");
+			apptainerCmd.add("--nv");
 		if (gpuString.contains("kfd"))
-			singularityCmd.add("--rocm");
+			apptainerCmd.add("--rocm");
 
-		singularityCmd.add("-B");
+		apptainerCmd.add("-B");
 		if(workdir != null) {
-			singularityCmd.add("/cvmfs:/cvmfs,/tmp:/tmp," + workdir + ":" + CONTAINER_JOBDIR); //TODO: remove /tmp after testing (not needed)
-			singularityCmd.add("--pwd");
-			singularityCmd.add(CONTAINER_JOBDIR);
+			apptainerCmd.add("/cvmfs:/cvmfs,/tmp:/tmp," + workdir + ":" + CONTAINER_JOBDIR); //TODO: remove /tmp after testing (not needed)
+			apptainerCmd.add("--pwd");
+			apptainerCmd.add(CONTAINER_JOBDIR);
 		}
 		else
-			singularityCmd.add("/cvmfs:/cvmfs");
+			apptainerCmd.add("/cvmfs:/cvmfs");
 
-		singularityCmd.add(containerImgPath);
-		singularityCmd.add("/bin/bash");
-		singularityCmd.add("-c");
-		singularityCmd.add(envSetup + cmd);
+		apptainerCmd.add(containerImgPath);
+		apptainerCmd.add("/bin/bash");
+		apptainerCmd.add("-c");
+		apptainerCmd.add(envSetup + cmd);
 
-		return singularityCmd;
+		return apptainerCmd;
 	}
 }
