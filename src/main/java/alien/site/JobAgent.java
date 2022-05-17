@@ -455,7 +455,7 @@ public class JobAgent implements Runnable {
 					if (!Files.readString(Paths.get("/proc/cpuinfo")).contains("avx")) {
 							if(!((ArrayList<Object>) siteMap.computeIfAbsent("NoUsers", (k) -> new ArrayList<>())).contains("alihyperloop"))
 								((ArrayList<String>) siteMap.get("NoUsers")).add("alihyperloop");
-					}	
+					}
 				}
 				catch (IOException | NullPointerException ex) {
 					logger.log(Level.WARNING, "Unable to check for AVX support", ex);
@@ -877,7 +877,6 @@ public class JobAgent implements Runnable {
 		final long ttl = ttlForJob();
 
 		boolean payloadMonitoring = false;
-		MonitoredJob mjPayload = null;
 
 		final ProcessBuilder pBuilder = new ProcessBuilder(launchCommand);
 		pBuilder.environment().remove("JALIEN_TOKEN_CERT");
@@ -941,15 +940,17 @@ public class JobAgent implements Runnable {
 
 			childPID = (int) p.pid();
 
-			apmon.setNumCPUs(cpuCores);
-			apmon.addJobToMonitor(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
+			//apmon.setNumCPUs(cpuCores);
+			//apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
 			mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
+			apmon.addJobInstanceToMonitor(mj);
 
 			String monitoring = jdl.gets("Monitoring");
 			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
 				payloadMonitoring = true;
-				mjPayload = apmon.addJobToMonitor(getWrapperPid(), jobWorkdir, ce + "_JobWrapper", matchedJob.get("queueId").toString());
-				mjPayload.setPayloadMonitoring();
+				mj.setWrapperPid(getWrapperPid());
+				//mjPayload = apmon.addJobToMonitor(getWrapperPid(), jobWorkdir, ce + "_JobWrapper", matchedJob.get("queueId").toString());
+				mj.setPayloadMonitoring();
 			}
 
 			final String fs = checkProcessResources();
@@ -1004,6 +1005,13 @@ public class JobAgent implements Runnable {
 						monitor_loops = 0;
 						sendProcessResources(false);
 					}
+
+					//set to 24
+					if (monitor_loops % 12 == 0) {
+						logger.log(Level.INFO, "DBG: Sending to monitor");
+						apmon.sendOneJobInfo(mj);
+					}
+
 					else if (getWrapperJobStatusTimestamp() != lastStatusChange) {
 						final String wrapperStatus = getWrapperJobStatus();
 
@@ -1012,8 +1020,8 @@ public class JobAgent implements Runnable {
 							sendProcessResources(false);
 						}
 
-						if ("RUNNING".equals(wrapperStatus) && payloadMonitoring == true && mjPayload != null && discoveredPid == false) {
-							mjPayload.discoverPayloadPid();
+						if ("RUNNING".equals(wrapperStatus) && payloadMonitoring == true && mj != null && discoveredPid == false) {
+							mj.discoverPayloadPid("payload-" + queueId);
 							discoveredPid = true;
 						}
 
@@ -1486,9 +1494,9 @@ public class JobAgent implements Runnable {
 	}
 
 	/**
-	 * 
+	 *
 	 * Immediately kills the JobWrapper and its payload, without giving time for upload
-	 * 
+	 *
 	 * @param p process for JobWrapper
 	 */
 	private void killForcibly(final Process p) {
@@ -1547,12 +1555,12 @@ public class JobAgent implements Runnable {
 	}
 
 	/**
-	 * 
+	 *
 	 * Reads the list of variables defined in META_VARIABLES, and returns their current value in the
 	 * environment as a map.
-	 * 
+	 *
 	 * Used for propagating any additional environment variables to container/payload.
-	 * 
+	 *
 	 * @return map of env variables defined in META_VARIABLES and their current value.
 	 */
 	private static Map<String, String> getMetaVariables() {
