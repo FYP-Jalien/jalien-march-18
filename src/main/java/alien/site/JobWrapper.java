@@ -362,11 +362,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				else
 					putJobTrace("Warning: executable exit code was " + execExitCode);
 
-				// if (jdl.gets("OutputErrorE") != null)
 				return uploadOutputFiles(JobStatus.ERROR_E, execExitCode) ? execExitCode : -1;
-
-				// changeStatus(JobStatus.ERROR_E);
-				// return execExitCode;
 			}
 
 			final int valExitCode = validate(packResolver.environment_packages);
@@ -383,11 +379,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 				final int valUploadExitCode = uploadOutputFiles(JobStatus.ERROR_V, valExitCode) ? valExitCode : -1;
 
-				// changeStatus(JobStatus.ERROR_V);
 				return valUploadExitCode;
 			}
 
-			if (!uploadOutputFiles(JobStatus.DONE, 0)) {
+			if (!uploadOutputFiles(JobStatus.DONE)) {
 				logger.log(Level.SEVERE, "Failed to upload output files");
 				return -1;
 			}
@@ -778,6 +773,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		logger.log(Level.INFO, envmap.toString());
 		return envmap;
+	}
+
+	private boolean uploadOutputFiles(final JobStatus exitStatus) {
+		return uploadOutputFiles(exitStatus, 0);
 	}
 
 	private boolean uploadOutputFiles(final JobStatus exitStatus, final int exitCode) {
