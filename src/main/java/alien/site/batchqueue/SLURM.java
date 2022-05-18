@@ -7,9 +7,6 @@ import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -111,8 +108,6 @@ public class SLURM extends BatchQueue {
 
 		this.logger.info("Submit SLURM");
 
-		final DateFormat date_format = new SimpleDateFormat("yyyy-MM-dd");
-		final String current_date_str = date_format.format(new Date());
 		final Long timestamp = Long.valueOf(System.currentTimeMillis());
 
 		// Logging setup
@@ -124,7 +119,7 @@ public class SLURM extends BatchQueue {
 		final String host_logdir = environment.getOrDefault("SLURM_LOG_PATH", config.get("host_logdir") != null ? config.get("host_logdir").toString() : null);
 
 		if (host_logdir != null) {
-			final String log_folder_path = String.format("%s/%s", host_logdir, current_date_str);
+			final String log_folder_path = String.format("%s", host_logdir);
 			final File log_folder = new File(log_folder_path);
 			if (!(log_folder.exists()) || !(log_folder.isDirectory())) {
 				try {
