@@ -9,6 +9,7 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -669,14 +670,23 @@ public class CatalogueApiUtils {
 	 * @param removeReplica SE to remove from, after the transfer is successful (making it a `move` operation)
 	 * @return command result for each lfn or <code>null</code>
 	 */
-	public HashMap<String, Long> mirrorLFN(final String lfn_name, final List<String> ses, final List<String> exses, final HashMap<String, Integer> qos, final boolean useLFNasGuid,
+	public HashMap<String, Long> mirrorLFN(final String lfn_name, final List<String> ses, final List<String> exses, final Map<String, Integer> qos, final boolean useLFNasGuid,
 			final Integer attempts, final String removeReplica) {
 
 		if (lfn_name == null || lfn_name.length() == 0)
 			throw new IllegalArgumentException("Empty LFN name");
 
 		try {
-			final MirrorLFN ml = Dispatcher.execute(new MirrorLFN(commander.getUser(), lfn_name, ses, exses, qos, useLFNasGuid, attempts, removeReplica));
+			HashMap<String, Integer> actualQoS = null;
+
+			if (qos != null) {
+				if (qos instanceof HashMap)
+					actualQoS = (HashMap<String, Integer>) qos;
+				else
+					actualQoS = new HashMap<>(qos);
+			}
+
+			final MirrorLFN ml = Dispatcher.execute(new MirrorLFN(commander.getUser(), lfn_name, ses, exses, actualQoS, useLFNasGuid, attempts, removeReplica));
 			return ml.getResultHashMap();
 		}
 		catch (final SecurityException e) {
