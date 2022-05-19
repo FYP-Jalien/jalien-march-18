@@ -980,7 +980,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @return <code>false</code> if the job was killed and execution should not continue
 	 */
 	public boolean changeStatus(final JobStatus newStatus) {
-		return changeStatus(jobStatus, 0);
+		return changeStatus(newStatus, 0);
 	}
 
 	/**
