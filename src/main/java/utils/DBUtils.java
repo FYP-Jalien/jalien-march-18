@@ -35,6 +35,7 @@ public final class DBUtils implements Closeable {
 	 */
 	public DBUtils(final DBConnection dbc) {
 		this.dbc = dbc;
+		dbc.setReadOnly(false);
 	}
 
 	private void executeClose() {
