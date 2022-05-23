@@ -855,80 +855,81 @@ public class ResyncLDAP extends Optimizer {
 						DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".SEs");
 				}
 
-				try (DBUtils dbu = new DBUtils(dbTransfers.getConnection())) {
-					// lock tables in order to update the protocols table
-					dbu.lockTables("PROTOCOLS WRITE");
-					try {
+				if (updatedProtocolsNTransfers.size() > 1) {
+					try (DBUtils dbu = new DBUtils(dbTransfers.getConnection())) {
+						// lock tables in order to update the protocols table
+						dbu.lockTables("PROTOCOLS WRITE");
+						try {
 
-						for (String combined : updatedProtocolsNTransfers) {
-							String seName = combined.split("#")[0];
-							String protocol = combined.split("#")[1];
-							int numTransfers = ((combined.split("#").length == 3 &&  !combined.split("#")[2].equals("null")) ? Integer.parseInt(combined.split("#")[2]) : 0);
-							String selectQuery = "SELECT seName, protocol from `PROTOCOLS` WHERE sename='" + Format.escSQL(seName) + "' and protocol='" + Format.escSQL(protocol) + "'";
+							for (String combined : updatedProtocolsNTransfers) {
+								String seName = combined.split("#")[0];
+								String protocol = combined.split("#")[1];
+								int numTransfers = ((combined.split("#").length == 3 &&  !combined.split("#")[2].equals("null")) ? Integer.parseInt(combined.split("#")[2]) : 0);
+								String selectQuery = "SELECT seName, protocol from `PROTOCOLS` WHERE sename='" + Format.escSQL(seName) + "' and protocol='" + Format.escSQL(protocol) + "'";
+								if (!dbu.executeQuery(selectQuery)) {
+									logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
+									return;
+								}
+
+								if (dbu.getResultSet().next()) {
+									logger.log(Level.INFO, "Updating protocol " + protocol + " on SE " + seName);
+									String updateQuery = "UPDATE PROTOCOLS SET max_transfers=" + Integer.valueOf(numTransfers) + " where sename='"  + Format.escSQL(seName) + "' and protocol='" + Format.escSQL(protocol) + "'";
+									if (!dbu.executeQuery(updateQuery)) {
+										logger.log(Level.SEVERE, "Error updating protocol " + protocol + " in SE " + seName);
+										return;
+									}
+								}
+								else {
+									modificationsProtocols.put("\t" + seName + " - " + protocol, protocol + " : new protocol in " + seName + "\n");
+									logger.log(Level.INFO, "Inserting protocol " + protocol + " on SE " + seName);
+									String insertQuery = "INSERT INTO PROTOCOLS(sename,protocol,max_transfers) values ('" + Format.escSQL(seName) + "','" + Format.escSQL(protocol) + "'," + Integer.valueOf(numTransfers) + ")";
+									if (!dbu.executeQuery(insertQuery)) {
+										logger.log(Level.SEVERE, "Error inserting protocol " + protocol + " in SE " + seName);
+										return;
+									}
+								}
+							}
+
+							ArrayList<String> toDelete = new ArrayList<>();
+							String selectQuery = "SELECT concat(seName, '#', protocol) from `PROTOCOLS` where protocol is not null;";
 							if (!dbu.executeQuery(selectQuery)) {
 								logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
 								return;
 							}
-
-							if (dbu.getResultSet().next()) {
-								logger.log(Level.INFO, "Updating protocol " + protocol + " on SE " + seName);
-								String updateQuery = "UPDATE PROTOCOLS SET max_transfers=" + Integer.valueOf(numTransfers) + " where sename='"  + Format.escSQL(seName) + "' and protocol='" + Format.escSQL(protocol) + "'";
-								if (!dbu.executeQuery(updateQuery)) {
-									logger.log(Level.SEVERE, "Error updating protocol " + protocol + " in SE " + seName);
-									return;
-								}
+							while (dbu.getResultSet().next()) {
+								String composed = dbu.getResultSet().getString(1);
+								if (!updatedProtocols.contains(composed))
+									toDelete.add(composed);
 							}
-							else {
-								modificationsProtocols.put("\t" + seName + " - " + protocol, protocol + " : new protocol in " + seName + "\n");
-								logger.log(Level.INFO, "Inserting protocol " + protocol + " on SE " + seName);
-								String insertQuery = "INSERT INTO PROTOCOLS(sename,protocol,max_transfers) values ('" + Format.escSQL(seName) + "','" + Format.escSQL(protocol) + "'," + Integer.valueOf(numTransfers) + ")";
-								if (!dbu.executeQuery(insertQuery)) {
-									logger.log(Level.SEVERE, "Error inserting protocol " + protocol + " in SE " + seName);
-									return;
+
+							for (String element : toDelete) {
+								try {
+									String protocol = element.split("#")[1];
+									String se = element.split("#")[0];
+									logger.log(Level.INFO, "Deleting protocol " + protocol + " from SE " + se);
+									modificationsProtocols.put("\t" + se + " - " + protocol, protocol + " : deleted protocol from " + se + "\n");
+									String deleteQuery = "DELETE from `PROTOCOLS` where sename='" + Format.escSQL(se) + "' and protocol='" + Format.escSQL(protocol) + "'";
+									if (!dbu.executeQuery(deleteQuery)) {
+										logger.log(Level.SEVERE, "Error deleting PROTOCOLS from DB");
+										return;
+									}
+								}
+								catch (Exception e) {
+									logger.log(Level.WARNING, "Could not split SE and protocol string `" + element + "` " + e);
 								}
 							}
 						}
-
-						ArrayList<String> toDelete = new ArrayList<>();
-						String selectQuery = "SELECT concat(seName, '#', protocol) from `PROTOCOLS` where protocol is not null;";
-						if (!dbu.executeQuery(selectQuery)) {
-							logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
-							return;
-						}
-						while (dbu.getResultSet().next()) {
-							String composed = dbu.getResultSet().getString(1);
-							if (!updatedProtocols.contains(composed))
-								toDelete.add(composed);
-						}
-
-						for (String element : toDelete) {
-							try {
-								String protocol = element.split("#")[1];
-								String se = element.split("#")[0];
-								logger.log(Level.INFO, "Deleting protocol " + protocol + " from SE " + se);
-								modificationsProtocols.put("\t" + se + " - " + protocol, protocol + " : deleted protocol from " + se + "\n");
-								String deleteQuery = "DELETE from `PROTOCOLS` where sename='" + Format.escSQL(se) + "' and protocol='" + Format.escSQL(protocol) + "'";
-								if (!dbu.executeQuery(deleteQuery)) {
-									logger.log(Level.SEVERE, "Error deleting PROTOCOLS from DB");
-									return;
-								}
-							}
-							catch (Exception e) {
-								logger.log(Level.WARNING, "Could not split SE and protocol string `" + element + "` " + e);
-							}
+						finally{
+						         dbu.unlockTables();
 						}
 					}
-					finally{
-					         dbu.unlockTables();
+					catch (SQLException e) {
+						logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP Protocols: " + e.getMessage());
+					}
+					catch (IOException e1) {
+						logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP Protocols: " + e1.getMessage());
 					}
 				}
-				catch (SQLException e) {
-					logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP Protocols: " + e.getMessage());
-				}
-				catch (IOException e1) {
-					logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP Protocols: " + e1.getMessage());
-				}
-
 				db.query("update SE_VOLUMES set usedspace=0 where usedspace is null");
 				db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
 				db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
