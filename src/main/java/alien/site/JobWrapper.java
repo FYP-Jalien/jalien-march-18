@@ -249,12 +249,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		try {
 			final String osRelease = Files.readString(Paths.get("/etc/os-release"));
-			final String osName = osRelease.substring(osRelease.indexOf("PRETTY_NAME=")+12, osRelease.length()).split("\\r?\\n")[0];
+			final String osName = osRelease.substring(osRelease.indexOf("PRETTY_NAME=") + 12, osRelease.length()).split("\\r?\\n")[0];
 
 			putJobTrace("The following OS has been detected: " + osName);
 			logger.log(Level.INFO, "The following OS has been detected: " + osName);
 		}
-		catch (IOException e1) {
+		catch (@SuppressWarnings("unused") final IOException e1) {
 			// Ignore
 		}
 
@@ -410,7 +410,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @return <code>0</code> if everything went fine, a positive number with the process exit code (which would mean a problem) and a negative error code in case of timeout or other supervised
 	 *         execution errors
 	 */
-	private int executeCommand(final String command, final List<String> arguments, final Map<String, String> environment_packages, String executionType) {
+	private int executeCommand(final String command, final List<String> arguments, final Map<String, String> environment_packages, final String executionType) {
 
 		logger.log(Level.INFO, "Starting execution of command: " + command);
 
@@ -860,7 +860,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					putJobTrace("Uploading: " + entry.getName() + " to " + outputDir);
 
 					final List<String> cpOptions = new ArrayList<>();
-					cpOptions.add("-w");
+					cpOptions.add("-m");
 					cpOptions.add("-S");
 
 					if (entry.getOptions() != null && entry.getOptions().length() > 0)
@@ -1003,7 +1003,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (jobStatus == JobStatus.DONE || jobStatus == JobStatus.DONE_WARN || jobStatus == JobStatus.ERROR_E || jobStatus == JobStatus.ERROR_V) {
 			extrafields.put("path", getJobOutputDir(newStatus));
 			if (exitCode != 0)
-				extrafields.put("error", exitCode);
+				extrafields.put("error", Integer.valueOf(exitCode));
 		}
 		else if (jobStatus == JobStatus.RUNNING) {
 			extrafields.put("spyurl", hostName + ":" + TomcatServer.getPort());
@@ -1083,7 +1083,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	}
 
 	/**
-	 * Cleanup processes, using a specialised script in CVMFS
+	 * Cleanup processes, using a specialized script in CVMFS
+	 *
+	 * @param queueId AliEn job ID
+	 * @param pid child process ID to start from
 	 *
 	 * @return script exit code, or -1 in case of error
 	 */
