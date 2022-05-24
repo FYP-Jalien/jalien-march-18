@@ -17,15 +17,18 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.Vector;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
@@ -76,6 +79,12 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 	private boolean bD = false;
 
 	/**
+	 * If <code>true</code> then replicas failing immediate upload are asynchronously mirror-ed to the rest of the locations.
+	 * It would only apply for partially successful uploads, at least one physical replica must exist at that point.
+	 */
+	private boolean bM = false;
+
+	/**
 	 * Number of concurrent operations to do
 	 */
 	private int concurrentOperations = 1;
@@ -84,6 +93,8 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 
 	private final List<String> ses = new ArrayList<>();
 	private final List<String> exses = new ArrayList<>();
+
+	private final Map<String, AtomicInteger> failedUploads = new ConcurrentHashMap<>();
 
 	private final HashMap<String, Integer> qos = new HashMap<>();
 
@@ -522,7 +533,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 
 	/**
 	 * Copy one LFN to one local file
-	 * 
+	 *
 	 * @param lfn the LFN object pointing to a file
 	 * @param toLocalFile the target file to write to
 	 * @return the result of the download
@@ -869,7 +880,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 			}
 
 			if (!bW && pfns.size() > 1 && envelopes.size() > 0) {
-				if (commit(envelopes, guid, bD ? null : sourceFile, envelopes.size(), true)) {
+				if (commit(lfn.getCanonicalName(), envelopes, guid, bD ? null : sourceFile, envelopes.size(), true)) {
 					envelopes.clear();
 					break;
 				}
@@ -896,14 +907,14 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 		if (futures.size() > 0) {
 			// there was a successfully registered upload so far, we can return true
 
-			new BackgroundUpload(guid, futures, bD ? sourceFile : null).start();
+			new BackgroundUpload(lfn, guid, futures, bD ? sourceFile : null).start();
 
 			return lfn;
 		}
 		else if (bD && envelopes.size() > 0)
 			sourceFile.delete();
 
-		if (commit(envelopes, guid, bD ? null : sourceFile, referenceCount, true))
+		if (commit(lfn.getCanonicalName(), envelopes, guid, bD ? null : sourceFile, referenceCount, true))
 			return lfn;
 
 		return null;
@@ -914,10 +925,12 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 		private final List<Future<UploadWork>> futures;
 		private final int originalNoOfCopies;
 		private final File fileToDeleteOnComplete;
+		private final LFN lfn;
 
-		public BackgroundUpload(final GUID guid, final List<Future<UploadWork>> futures, final File fileToDeleteOnComplete) {
+		public BackgroundUpload(final LFN lfn, final GUID guid, final List<Future<UploadWork>> futures, final File fileToDeleteOnComplete) {
 			super("alien.shell.commands.JAliEnCommandcp.BackgroundUpload (" + futures.size() + " x " + guid.guid + " )");
 
+			this.lfn = lfn;
 			this.guid = guid;
 			this.futures = futures;
 			this.fileToDeleteOnComplete = fileToDeleteOnComplete;
@@ -976,7 +989,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 			}
 
 			if (envelopes.size() > 0) {
-				commit(envelopes, guid, null, futures.size(), false);
+				commit(lfn.getCanonicalName(), envelopes, guid, null, futures.size(), false);
 
 				if (fileToDeleteOnComplete != null)
 					fileToDeleteOnComplete.delete();
@@ -993,7 +1006,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 	 * @param report
 	 * @return <code>true</code> if the request was successful
 	 */
-	boolean commit(final Vector<String> envelopes, final GUID guid, final File sourceFile, final int desiredCount, final boolean report) {
+	boolean commit(final String lfnToCommit, final Vector<String> envelopes, final GUID guid, final File sourceFile, final int desiredCount, final boolean report) {
 		if (envelopes.size() != 0) {
 			final List<PFN> registeredPFNs = commander.c_api.registerEnvelopes(envelopes, noCommit ? BOOKING_STATE.KEPT : BOOKING_STATE.COMMITED);
 
@@ -1013,6 +1026,29 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 			return true;
 		}
 		else if (envelopes.size() > 0) {
+			if (bM && failedUploads.size() > 0) {
+				// scheduling a background mirror to the missing replicas
+				final List<String> sesToRecover = new ArrayList<>();
+				final Map<String, Integer> qosToRecover = new HashMap<>();
+
+				for (final Map.Entry<String, AtomicInteger> entry : failedUploads.entrySet()) {
+					final String key = entry.getKey();
+
+					if (key.contains("::"))
+						sesToRecover.add(key);
+					else
+						qosToRecover.put(key, Integer.valueOf(entry.getValue().intValue()));
+				}
+
+				final Map<String, Long> scheduledTransfers = commander.c_api.mirrorLFN(lfnToCommit, sesToRecover, null, qosToRecover, false, Integer.valueOf(10), null);
+
+				if (scheduledTransfers != null && scheduledTransfers.size() > 0) {
+					commander.printOutln("Scheduled the following transfers to make up for the failed uploads: " + scheduledTransfers);
+
+					// TODO: decide whether or not to return here, avoiding to send the jobs to DONE_WARN if the file can be recovered
+				}
+			}
+
 			// Warning: do NOT touch this message, it is used in particular by JobWrapper to decide upon the job status
 			if (report)
 				commander.printOutln("Only " + envelopes.size() + " out of " + desiredCount + " requested replicas could be uploaded");
@@ -1123,6 +1159,8 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 
 				if (wasExplicitSE) {
 					commander.printErrln("Error uploading file to explicit SE target: " + failedSEName);
+
+					failedUploads.put(failedSEName, new AtomicInteger(1));
 				}
 				else {
 					failOver = true;
@@ -1156,8 +1194,11 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 
 							exses.add(se.getName());
 						}
-						else
+						else {
 							pfn = null;
+
+							failedUploads.computeIfAbsent(qosType, (k) -> new AtomicInteger(0)).incrementAndGet();
+						}
 					}
 
 					if (pfn != null)
@@ -1192,6 +1233,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 		commander.printOutln(helpOption("-T", "Use this many concurrent download threads (where possible) - default 1"));
 		commander.printOutln(helpOption("-d", "delete local file after a successful upload (i.e. move local to Grid)"));
 		commander.printOutln(helpOption("-j <job ID>", "the job ID that has created the file"));
+		commander.printOutln(helpOption("-m", "queue mirror operations to the missing SEs, in case of partial success. Forces '-w'"));
 		commander.printOutln();
 	}
 
@@ -1243,6 +1285,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 			parser.accepts("T").withRequiredArg().ofType(Integer.class);
 			parser.accepts("silent");
 			parser.accepts("nc");
+			parser.accepts("m");
 
 			final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
 
@@ -1262,6 +1305,11 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 
 			if (options.has("d"))
 				bD = true;
+
+			if (options.has("m")) {
+				bM = true;
+				bW = true;
+			}
 
 			if (options.has("silent"))
 				this.silent();
