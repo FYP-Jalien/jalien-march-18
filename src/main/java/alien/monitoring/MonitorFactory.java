@@ -76,8 +76,8 @@ public final class MonitorFactory {
 				if (getConfigBoolean("System", "enabled", true))
 					enableSystemMonitoring();
 
-				//if (getConfigBoolean("Self", "enabled", true))
-				//	enableSelfMonitoring();
+				if (getConfigBoolean("Self", "enabled", true))
+					enableSelfMonitoring();
 			}
 		};
 

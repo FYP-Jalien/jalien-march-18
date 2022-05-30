@@ -1008,7 +1008,6 @@ public class JobAgent implements Runnable {
 
 					//set to 24
 					if (monitor_loops % 12 == 0) {
-						logger.log(Level.INFO, "DBG: Sending to monitor");
 						apmon.sendOneJobInfo(mj);
 					}
 
