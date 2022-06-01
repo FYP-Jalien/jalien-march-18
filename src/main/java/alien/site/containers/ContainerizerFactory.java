@@ -29,6 +29,10 @@ public class ContainerizerFactory {
 		 */
 		Singularity,
 		/**
+		 * Entry for Podman
+		 */
+		Podman,
+		/**
 		 * Entry for Docker
 		 */
 		Docker
