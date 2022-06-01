@@ -452,9 +452,10 @@ public class JobAgent implements Runnable {
 
 				// TODO: Hack to exclude alihyperloop jobs from nodes without avx support. Remove me soon!
 				try {
-					if (!Files.readString(Paths.get("/proc/cpuinfo")).contains("avx")) {
-						((ArrayList<Object>) siteMap.computeIfAbsent("NoUsers", (k) -> new ArrayList<>())).add("alihyperloop");
-					}
+					if (Files.readString(Paths.get("/proc/cpuinfo")).contains("avx")) {
+							if(!((ArrayList<Object>) siteMap.computeIfAbsent("NoUsers", (k) -> new ArrayList<>())).contains("alihyperloop"))
+								((ArrayList<String>) siteMap.get("NoUsers")).add("alihyperloop");
+					}	
 				}
 				catch (IOException | NullPointerException ex) {
 					logger.log(Level.WARNING, "Unable to check for AVX support", ex);
