@@ -456,15 +456,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					while (st.hasMoreTokens())
 						cmd.add(st.nextToken());
 				}
-
-		// Check if we can put the payload in its own container
-		// TODO: Put back later
-		// Containerizer cont = ContainerizerFactory.getContainerizer();
-		// if (cont != null) {
-		// monitor.sendParameter("containerLayer", Integer.valueOf(2));
-		// cmd = cont.containerize(String.join(" ", cmd));
-		// }
-
+				
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
 
 		final ProcessBuilder pBuilder = new ProcessBuilder(cmd);
@@ -1016,12 +1008,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				jobKilled = true;
 				return false;
 			}
-
-			// TODO: Confirm(?) and remove
-			// Wait 10s, and set status once more, in case the first attempt was not registered (high load?)
-			// Thread.sleep(10 * 1000);
-			// TaskQueueApiUtils.setJobStatus(queueId, newStatus, extrafields);
-
 			// Also write status to file for the JobAgent to see
 			Files.writeString(Paths.get(tmpDir + "/" + jobstatusFile), newStatus.name());
 		}
