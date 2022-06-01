@@ -146,7 +146,7 @@ public class CVMFS extends PackMan {
 			logger.log(Level.WARNING, "Exception executing GetAliEnv", e);
 		}
 
-		final CommandOutput co = SystemCommand.bash(ALIEN_BIN_DIR + "/alienv printenv " + args);
+		final CommandOutput co = SystemCommand.executeCommand(Arrays.asList(ALIEN_BIN_DIR + "/alienv", "printenv", args), false, false);
 
 		String source = co.stdout;
 
@@ -161,8 +161,8 @@ public class CVMFS extends PackMan {
 			logger.log(Level.SEVERE, "alienv returned an error: " + stderr);
 			return null;
 		}
-		
-		//remove newline between entries, in case of modules v4
+
+		// remove newline between entries, in case of modules v4
 		source = source.replace("\n", "").replace("\r", "");
 
 		try {
@@ -227,7 +227,7 @@ public class CVMFS extends PackMan {
 	public static String getApptainerPath() {
 		return CVMFS_BASE_DIR + "/containers/bin/apptainer/current/bin";
 	}
-	
+
 	/**
 	 * @return path to Singularity runtime in CVMFS
 	 */
