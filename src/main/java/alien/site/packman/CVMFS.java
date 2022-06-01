@@ -146,7 +146,7 @@ public class CVMFS extends PackMan {
 			logger.log(Level.WARNING, "Exception executing GetAliEnv", e);
 		}
 
-		final CommandOutput co = SystemCommand.executeCommand(Arrays.asList(ALIEN_BIN_DIR + "/alienv", "printenv", args), false, false);
+		final CommandOutput co = SystemCommand.executeCommand(Arrays.asList(ALIEN_BIN_DIR + "/alienv", "printenv", args), false, true);
 
 		String source = co.stdout;
 
