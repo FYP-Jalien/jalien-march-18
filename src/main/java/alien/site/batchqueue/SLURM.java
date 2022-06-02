@@ -147,15 +147,14 @@ public class SLURM extends BatchQueue {
 		String submit_cmd = "#!/bin/bash\n";
 
 		// Create JobAgent workdir
-		final String workdir_path = String.format("%s/jobagent_%s_%d", config.get("host_workdir"),
-				config.get("host_host"), timestamp);
+		final String workdir_path = config.get("host_workdir") != null ? String.format("%s/jobagent_%s_%d", config.get("host_workdir"),
+				config.get("host_host"), timestamp) : "/tmp";
 		final String workdir_path_resolved = Functions.resolvePathWithEnv(workdir_path);
 		final File workdir_file = new File(workdir_path_resolved);
 		workdir_file.mkdir();
 
 		submit_cmd += String.format("#SBATCH -J %s%n", name);
 		submit_cmd += String.format("#SBATCH -D %s\n", workdir_path_resolved);
-		//submit_cmd += String.format("#SBATCH -D /tmp%n");
 		submit_cmd += "#SBATCH -N 1\n";
 		submit_cmd += "#SBATCH -n 1\n";
 		submit_cmd += "#SBATCH --no-requeue\n";
