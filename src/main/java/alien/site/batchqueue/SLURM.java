@@ -148,7 +148,7 @@ public class SLURM extends BatchQueue {
 
 		// Create JobAgent workdir
 		final String workdir_path = config.get("host_workdir") != null ? String.format("%s/jobagent_%s_%d", config.get("host_workdir"),
-				config.get("host_host"), timestamp) : "/tmp";
+				config.get("host_host"), timestamp) : environment.getOrDefault("TMPDIR", "/tmp");
 		final String workdir_path_resolved = Functions.resolvePathWithEnv(workdir_path);
 		final File workdir_file = new File(workdir_path_resolved);
 		workdir_file.mkdir();
