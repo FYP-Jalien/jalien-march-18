@@ -145,8 +145,8 @@ public class JAKeyStore {
 
 	private static void loadTrusts(final KeyStore keystore, final boolean isTrustStore) {
 		final String trustsDirSet = ConfigUtils.getConfig().gets("trusted.certificates.location",
-				UserFactory.getUserHome() + System.getProperty("file.separator") + ".j" + System.getProperty("file.separator") + "trusts");
-
+			System.getProperty("AliEnConfig", "") + System.getProperty("file.separator") + ".." + System.getProperty("file.separator") + "trusts");
+			
 		try {
 			final StringTokenizer st = new StringTokenizer(trustsDirSet, ":");
 

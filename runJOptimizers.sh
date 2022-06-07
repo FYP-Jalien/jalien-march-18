@@ -8,7 +8,7 @@ if [ -z "$JALIEN_HOME" ]; then
     JALIEN_HOME=`pwd`
 fi
 
-CONFIG_DIR=${JALIEN_CONFIG_DIR:-${HOME}/.j/config}
+CONFIG_DIR=${JALIEN_CONFIG_DIR:-${HOME}/.alien/config}
 
 # This flag helps debugging SSL connection errors
 #    -Djavax.net.debug=all \

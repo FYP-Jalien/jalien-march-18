@@ -12,8 +12,8 @@ if [[ -z "${JALIEN_HOME}" ]]; then
   export JALIEN_HOME
 fi
 
-# if not defined use default .j/config
-JALIEN_CONF_DIR=${JALIEN_CONF_DIR:-${HOME}/.j/config}
+# if not defined use default .alien/config
+JALIEN_CONF_DIR=${JALIEN_CONF_DIR:-${HOME}/.alien/config}
 if [ ! -d "${JALIEN_CONF_DIR}" ]; then # ups, setup was not run, so lets use the defaults from JALIEN_HOME
     JALIEN_CONF_DIR="${JALIEN_HOME}/config"
 fi
@@ -21,15 +21,15 @@ fi
 RUNSH="${JALIEN_HOME}/run.sh"
 
 if [ "$1" == "setup" ]; then
-    mkdir -p ${HOME}/.j/config
+    mkdir -p ${HOME}/.alien/config
 
     #Copy the default logging and config files to user controllable versions - if present, make backup
-    cp --backup -S "_$(date +%Y%m%d_%H%M%S)" ${JALIEN_HOME}/config/logging.properties ${JALIEN_HOME}/config/config.properties ${HOME}/.j/config/
+    cp --backup -S "_$(date +%Y%m%d_%H%M%S)" ${JALIEN_HOME}/config/logging.properties ${JALIEN_HOME}/config/config.properties ${HOME}/.alien/config/
 
-    #mkdir -p ${HOME}/.j/trusts
-    #wget -q "https://cafiles.cern.ch/cafiles/certificates/CERN%20Certification%20Authority.crt" -O ${HOME}/.j/trusts/CERN_CA.der
-    #wget -q "https://cafiles.cern.ch/cafiles/certificates/CERN%20Root%20Certification%20Authority%202.crt" -O ${HOME}/.j/trusts/CERN_ROOT_CA2.der
-    #wget -q "https://cafiles.cern.ch/cafiles/certificates/CERN%20Grid%20Certification%20Authority.crt" -O ${HOME}/.j/trusts/CERN_Grid_CA.der
+    #mkdir -p ${HOME}/.alien/trusts
+    #wget -q "https://cafiles.cern.ch/cafiles/certificates/CERN%20Certification%20Authority.crt" -O ${HOME}/.alien/trusts/CERN_CA.der
+    #wget -q "https://cafiles.cern.ch/cafiles/certificates/CERN%20Root%20Certification%20Authority%202.crt" -O ${HOME}/.alien/trusts/CERN_ROOT_CA2.der
+    #wget -q "https://cafiles.cern.ch/cafiles/certificates/CERN%20Grid%20Certification%20Authority.crt" -O ${HOME}/.alien/trusts/CERN_Grid_CA.der
 
     if [ ! -f "$HOME/.globus/userkey.pem" -o ! -f "$HOME/.globus/usercert.pem" ]; then
       echo "Your Grid user certificate should be stored in $HOME/.globus/{usercert,userkey}.pem"

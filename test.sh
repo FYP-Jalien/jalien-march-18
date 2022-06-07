@@ -10,5 +10,5 @@ CLASSPATH="$CLASSPATH:alien.jar"
 
 export CLASSPATH
 
-java -Duserid=$(id -u) -DAliEnConfig=$HOME/.j/testVO/config "$@" $(pwd) 
+java -Duserid=$(id -u) -DAliEnConfig=$HOME/.alien/testVO/config "$@" $(pwd) 
 
