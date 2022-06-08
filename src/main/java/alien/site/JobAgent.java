@@ -651,9 +651,9 @@ public class JobAgent implements Runnable {
 
 		try {
 			if (!folderFile.exists())
-				folderFile.createNewFile();
+				folderFile.mkdirs();
 		}
-		catch (IOException ioe) {
+		catch (Exception e) {
 			// ignore
 		}
 
