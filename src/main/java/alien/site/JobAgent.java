@@ -647,8 +647,17 @@ public class JobAgent implements Runnable {
 	 * @return amount of free space (in bytes) in the given folder. Or zero if there was a problem (or no free space).
 	 */
 	public static long getFreeSpace(final String folder) {
-		long space = new File(Functions.resolvePathWithEnv(folder)).getFreeSpace();
+		final File folderFile = new File(Functions.resolvePathWithEnv(folder));
 
+		try {
+			if (!folderFile.exists())
+				folderFile.createNewFile();
+		}
+		catch (IOException ioe) {
+			// ignore
+		}
+
+		long space = folderFile.getFreeSpace();
 		if (space <= 0) {
 			// 32b JRE returns 0 when too much space is available
 
