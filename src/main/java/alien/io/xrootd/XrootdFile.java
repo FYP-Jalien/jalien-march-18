@@ -38,12 +38,21 @@ public class XrootdFile implements Comparable<XrootdFile> {
 	 */
 	public XrootdFile(final String line) throws IllegalArgumentException {
 		// drwx 2016-01-29 07:45:36 57 /15/34485
+		// -rw-r----- aliecsgc def-cg 135399544 2021-09-15 14:13:23 /eos/aliceo2/ls2data/GC/ECS/2021-09-15_15-56/run0501294_2021-09-15T15_57_47Z/2021-09-15_00040415.tf
 		final StringTokenizer st = new StringTokenizer(line);
 
-		if (st.countTokens() != 5)
+		final int tokens = st.countTokens();
+
+		if (tokens != 5 && tokens != 7)
 			throw new IllegalArgumentException("Not in the correct format : " + line);
 
 		perms = st.nextToken();
+
+		if (tokens == 7) {
+			// skip over owner and group names
+			st.nextToken();
+			st.nextToken();
+		}
 
 		final String t2 = st.nextToken();
 		final String t3 = st.nextToken();

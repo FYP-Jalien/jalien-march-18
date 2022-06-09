@@ -43,7 +43,6 @@ public class JAliEnCommandcommit extends JAliEnBaseCommand {
 	/**
 	 * commit request PFN
 	 */
-	@SuppressWarnings("unused")
 	private String pfn = "";
 
 	/**
@@ -93,6 +92,9 @@ public class JAliEnCommandcommit extends JAliEnBaseCommand {
 		}
 		else {
 			commander.printOut("lfn", "0");
+
+			if (pfn != null && !pfn.isBlank())
+				commander.printOut("pfn", pfn);
 
 			ret += lfn + padSpace(1) + "0";
 

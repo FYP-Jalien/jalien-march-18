@@ -36,7 +36,7 @@ public class SEfromString extends Request implements Cacheable {
 
 	@Override
 	public List<String> getArguments() {
-		return Arrays.asList(sSE);
+		return Arrays.asList(sSE != null ? sSE : String.valueOf(seNo));
 	}
 
 	/**

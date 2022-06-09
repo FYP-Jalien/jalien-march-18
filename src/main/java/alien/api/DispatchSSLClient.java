@@ -88,7 +88,7 @@ public class DispatchSSLClient {
 	/**
 	 * @param timeout in milliseconds
 	 */
-	public static void setIdleTimeout(final long timeout) {
+	public static synchronized void setIdleTimeout(final long timeout) {
 		idleTimeout = timeout;
 
 		if (idleTimeout > 0 && watcherThread == null) {

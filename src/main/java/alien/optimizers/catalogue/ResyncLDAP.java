@@ -1,15 +1,19 @@
 package alien.optimizers.catalogue;
 
+import java.io.IOException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import alien.api.Request;
 import alien.catalogue.LFN;
 import alien.catalogue.LFNUtils;
 import alien.config.ConfigUtils;
@@ -19,7 +23,9 @@ import alien.user.AliEnPrincipal;
 import alien.user.LDAPHelper;
 import alien.user.UserFactory;
 import alien.user.UsersHelper;
+import utils.DBUtils;
 import lazyj.DBFunctions;
+import lazyj.Format;
 
 /**
  * @author Marta
@@ -60,7 +66,7 @@ public class ResyncLDAP extends Optimizer {
 		DBSyncUtils.checkLdapSyncTable();
 		while (true) {
 			try {
-				resyncLDAP();
+				resyncLDAP(Request.getVMID());
 			}
 			catch (final Exception e) {
 				logger.log(Level.WARNING, "Exception running the LDAP resync", e);
@@ -116,10 +122,12 @@ public class ResyncLDAP extends Optimizer {
 	/**
 	 * Performs the ResyncLDAP for the users, roles and SEs
 	 *
+	 * @param uuid
+	 *
 	 * @param usersdb Database instance for SE, SE_VOLUMES and LDAP_SYNC tables
 	 * @param admindb Database instance for USERS_LDAP and USERS_LDAP_ROLE tables
 	 */
-	private static void resyncLDAP() {
+	private static void resyncLDAP(UUID uuid) {
 		final int frequency = 3600 * 1000; // 1 hour default
 		logOutput = "";
 
@@ -170,18 +178,21 @@ public class ResyncLDAP extends Optimizer {
 			return;
 		}
 
+		final HashMap<String, Set<String>> dbUsersOld = new HashMap<>();
 		try (DBFunctions db = ConfigUtils.getDB("ADMIN");) {
 			if (db == null) {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return;
 			}
-			boolean querySuccess = db.query("SELECT user from `USERS_LDAP`", false);
+			boolean querySuccess = db.query("SELECT user, dn from `USERS_LDAP`", false);
 			if (!querySuccess) {
 				logger.log(Level.SEVERE, "Error getting users from DB");
 				return;
 			}
 			while (db.moveNext()) {
 				final String user = db.gets("user");
+				dbUsersOld.computeIfAbsent(user, (k) -> new LinkedHashSet<>()).add(db.gets("dn"));
+
 				if (!uids.contains(user)) {
 					modifications.put(user, user + ": deleted account \n");
 				}
@@ -189,7 +200,7 @@ public class ResyncLDAP extends Optimizer {
 
 			int counter = 0;
 			// TODO: To be done with replace into
-			db.query("UPDATE USERS_LDAP SET up=0");
+			final HashMap<String, Set<String>> dbUsersNew = new HashMap<>();
 			for (final String user : uids) {
 				final ArrayList<String> originalDns = new ArrayList<>();
 				querySuccess = db.query("SELECT * from `USERS_LDAP` WHERE user = ?", false, user);
@@ -204,8 +215,37 @@ public class ResyncLDAP extends Optimizer {
 				for (final String dn : dns) {
 					final String trimmedDN = dn.replaceAll("(^[\\s\\r\\n]+)|([\\s\\r\\n]+$)", "");
 					currentDns.add(trimmedDN);
-					// db.query("REPLACE INTO USERS_LDAP (user, dn, up) VALUES (?, ?, 1)", false, user, dn);
-					db.query("INSERT INTO USERS_LDAP (user, dn, up) VALUES (?, ?, 1)", false, user, trimmedDN);
+					try (DBUtils dbu = new DBUtils(db.getConnection())) {
+						dbu.lockTables("USERS_LDAP WRITE");
+						try{
+							String selectQuery = "SELECT COUNT(*) FROM USERS_LDAP WHERE user='" + Format.escSQL(user) + "' AND dn='" + Format.escSQL(trimmedDN) + "'";
+							if (!dbu.executeQuery(selectQuery)) {
+								logger.log(Level.SEVERE, "Error getting users from DB");
+								return;
+							}
+
+							if (dbu.getResultSet().next()) {
+								final int valuecounts = dbu.getResultSet().getInt(1);
+								if (valuecounts == 0) {
+									String insertQuery = "INSERT INTO USERS_LDAP (user, dn, up) VALUES ('" + Format.escSQL(user) + "','" + Format.escSQL(trimmedDN) + "', 1)";
+									if (!dbu.executeQuery(insertQuery)) {
+										logger.log(Level.SEVERE, "Error inserting user " + user + " in DB");
+										return;
+									}
+								}
+							}
+							dbUsersNew.computeIfAbsent(user, (k) -> new LinkedHashSet<>()).add(trimmedDN);
+						}
+						finally{
+						         dbu.unlockTables();
+						}
+					}
+					catch (SQLException e) {
+						logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP Users: " + e.getMessage());
+					}
+					catch (IOException e1) {
+						logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP Users: " + e1.getMessage());
+					}
 				}
 
 				printModifications(modifications, currentDns, originalDns, user, "added", "DNs");
@@ -228,20 +268,31 @@ public class ResyncLDAP extends Optimizer {
 				if (counter > updateDBCount)
 					DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".users");
 			}
-			db.query("select a.user from USERS_LDAP a left join USERS_LDAP b on b.up=0 and a.user=b.user where a.up=1 and b.user is null");
-			while (db.moveNext()) {
-				final String userToDelete = db.gets("user");
-				db.query("SELECT count(*) from `USERS_LDAP` WHERE user = ?", false, userToDelete);
-				if (db.moveNext()) {
-					final int count = db.geti(1);
-					if (count == 0) {
-						logger.log(Level.WARNING, "The user " + userToDelete + " is no longer listed in LDAP. It will be deleted from the database");
+
+			HashMap<String, Set<String>> toDelete = listToDelete(dbUsersOld, dbUsersNew, "user");
+			logger.log(Level.INFO, "Deleting inactive users (" + toDelete + ")");
+
+			try (DBUtils dbu = new DBUtils(db.getConnection())) {
+				dbu.lockTables("USERS_LDAP WRITE");
+				try {
+					for (String user : toDelete.keySet()) {
+						for (String dn : toDelete.get(user)) {
+							String deleteQuery = "DELETE FROM USERS_LDAP WHERE user='" + Format.escSQL(user) + "' AND dn='" + Format.escSQL(dn) + "'";
+							if (!dbu.executeQuery(deleteQuery)) {
+								logger.log(Level.SEVERE, "Error deleting user " + user + " from DB");
+								return;
+							}
+						}
 					}
 				}
+				finally{
+				         dbu.unlockTables();
+				}
+			}
+			catch (IOException e) {
+				logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP Users: " + e.getMessage());
 			}
 
-			logger.log(Level.INFO, "Deleting inactive users");
-			db.query("DELETE FROM USERS_LDAP WHERE up = 0");
 			// TODO: Delete home dir of inactive users
 
 			final String usersLog = "Users: " + length + " synchronized. " + modifications.size() + " changes. \n" + String.join("\n", modifications.values());
@@ -252,6 +303,26 @@ public class ResyncLDAP extends Optimizer {
 			else if (modifications.size() > 0)
 				DBSyncUtils.updateManual(ResyncLDAP.class.getCanonicalName() + ".users", usersLog);
 		}
+	}
+
+	private static HashMap<String, Set<String>> listToDelete(final HashMap<String, Set<String>> dbUsersOld, final HashMap<String, Set<String>> dbUsersNew, String entity) {
+		HashMap<String, Set<String>> toDelete = new HashMap<>();
+
+		for (String user : dbUsersOld.keySet()) {
+			if (dbUsersNew.containsKey(user)) {
+				if (!dbUsersNew.get(user).equals(dbUsersOld.get(user))) {
+					Set<String> deleteDns = dbUsersOld.get(user);
+					deleteDns.removeAll(dbUsersNew.get(user));
+					toDelete.put(user, deleteDns);
+					logger.log(Level.WARNING, "The " + entity + " " + user + " has DNs that are no longer listed in LDAP. Those DNs (" + deleteDns + ") will be deleted from the database");
+				}
+			}
+			else {
+				logger.log(Level.WARNING, "The " + entity + " " + user + " is no longer listed in LDAP. It will be deleted from the database");
+				toDelete.put(user, dbUsersOld.get(user));
+			}
+		}
+		return toDelete;
 	}
 
 	/**
@@ -272,78 +343,111 @@ public class ResyncLDAP extends Optimizer {
 			logger.log(Level.WARNING, "No roles gotten from LDAP. This is likely an error, exiting now");
 			return;
 		}
-
+		final HashMap<String, Set<String>> dbRolesOld = new HashMap<>();
+		final HashMap<String, Set<String>> dbRolesNew = new HashMap<>();
 		try (DBFunctions db = ConfigUtils.getDB("ADMIN");) {
 			if (db == null) {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return;
 			}
-			boolean querySuccess = db.query("SELECT role from `USERS_LDAP_ROLE`", false);
-			if (!querySuccess) {
-				logger.log(Level.SEVERE, "Error getting roles from DB");
-				return;
-			}
-			while (db.moveNext()) {
-				final String role = db.gets("role");
-				if (!roles.contains(role)) {
-					modifications.put(role, role + ": deleted role \n");
-				}
-			}
 
-			int counter = 0;
-			// TODO: To be done with replace into
-			db.query("UPDATE USERS_LDAP_ROLE SET up=0");
-			for (final String role : roles) {
-				final ArrayList<String> originalUsers = new ArrayList<>();
-				querySuccess = db.query("SELECT * from `USERS_LDAP_ROLE` WHERE role = ?", false, role);
-				if (!querySuccess) {
-					logger.log(Level.SEVERE, "Error getting DB entry for role " + role);
-					return;
-				}
-				while (db.moveNext())
-					originalUsers.add(db.gets("user"));
-				if (originalUsers.isEmpty())
-					modifications.put(role, role + ": new role, ");
-				final Set<String> users = LDAPHelper.checkLdapInformation("uid=" + role, ouRoles, "users", false);
-				final ArrayList<String> currentUsers = new ArrayList<>();
-				for (final String user : users) {
-					querySuccess = db.query("SELECT count(*) from `USERS_LDAP` WHERE user = ?", false, user);
-					if (!querySuccess) {
-						logger.log(Level.SEVERE, "Error getting user count from DB");
+			try (DBUtils dbu = new DBUtils(db.getConnection())) {
+				dbu.lockTables("USERS_LDAP_ROLE WRITE, USERS_LDAP READ");
+				try {
+					String selectQuery = "SELECT role from `USERS_LDAP_ROLE`";
+					if (!dbu.executeQuery(selectQuery)) {
+						logger.log(Level.SEVERE, "Error getting roles from DB");
 						return;
 					}
-					if (db.moveNext()) {
-						final int userInstances = db.geti(1);
-						if (userInstances == 0) {
-							logger.log(Level.WARNING, "An already deleted user is still associated with role " + role + ". Consider cleaning ldap");
-							if (originalUsers.contains(user))
-								originalUsers.remove(user);
+
+					while (dbu.getResultSet().next()) {
+						final String role = dbu.getResultSet().getString("role");
+						if (!roles.contains(role)) {
+							modifications.put(role, role + ": deleted role \n");
 						}
-						else {
-							db.query("INSERT INTO USERS_LDAP_ROLE (user, role, up) VALUES (?, ?, 1)", false, user, role);
-							currentUsers.add(user);
+					}
+
+					int counter = 0;
+					// TODO: To be done with replace into
+
+					for (final String role : roles) {
+						final ArrayList<String> originalUsers = new ArrayList<>();
+						selectQuery = "SELECT * from `USERS_LDAP_ROLE` WHERE role = '" + Format.escSQL(role) + "'";
+						if (!dbu.executeQuery(selectQuery)) {
+
+							logger.log(Level.SEVERE, "Error getting DB entry for role " + role);
+							return;
+						}
+
+						while (dbu.getResultSet().next())
+							originalUsers.add(dbu.getResultSet().getString("user"));
+						dbRolesOld.put(role, new HashSet<>(originalUsers));
+
+						if (originalUsers.isEmpty())
+							modifications.put(role, role + ": new role, ");
+
+						final Set<String> users = LDAPHelper.checkLdapInformation("uid=" + role, ouRoles, "users", false);
+						final ArrayList<String> currentUsers = new ArrayList<>();
+						for (final String user : users) {
+							selectQuery = "SELECT count(*) from `USERS_LDAP` WHERE user = '" + Format.escSQL(user) + "'";
+							if (!dbu.executeQuery(selectQuery)) {
+								logger.log(Level.SEVERE, "Error getting user count from DB");
+								return;
+							}
+
+							if (dbu.getResultSet().next()) {
+								final int userInstances = dbu.getResultSet().getInt(1);
+								if (userInstances == 0) {
+									logger.log(Level.WARNING, "An already deleted user is still associated with role " + role + ". Consider cleaning ldap");
+									if (originalUsers.contains(user))
+										originalUsers.remove(user);
+								}
+								else {
+									currentUsers.add(user);
+									if (!originalUsers.contains(user)) {
+										String insertQuery = "INSERT INTO USERS_LDAP_ROLE (user, role, up) VALUES ('" + Format.escSQL(user) + "','" + Format.escSQL(role) + "', 1)";
+										if (!dbu.executeQuery(insertQuery)) {
+											logger.log(Level.SEVERE, "Error inserting user " + user + " with role " + role + " in USERS_LDAP_ROLE table");
+											return;
+										}
+
+									}
+								}
+							}
+						}
+						dbRolesNew.put(role, new HashSet<>(currentUsers));
+						if (currentUsers.isEmpty())
+							modifications.remove(role);
+						printModifications(modifications, currentUsers, originalUsers, role, "added", "users");
+						printModifications(modifications, originalUsers, currentUsers, role, "removed", "users");
+
+						counter = counter + 1;
+						if (counter > updateDBCount)
+							DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".roles");
+					}
+
+					HashMap<String, Set<String>> toDelete = listToDelete(dbRolesOld, dbRolesNew, "role");
+					logger.log(Level.INFO, "Deleting inactive roles (" + toDelete + ")");
+					for (String role : toDelete.keySet()) {
+						for (String user : toDelete.get(role)) {
+							String deleteQuery = "DELETE FROM USERS_LDAP_ROLE WHERE role='" + Format.escSQL(role) + "' AND user='" + Format.escSQL(user) + "'";
+							if (!dbu.executeQuery(deleteQuery)) {
+								logger.log(Level.SEVERE, "Error deleting role " + role + " for user " + user + " from DB");
+								return;
+							}
 						}
 					}
 				}
-
-				if (currentUsers.isEmpty())
-					modifications.remove(role);
-				printModifications(modifications, currentUsers, originalUsers, role, "added", "users");
-				printModifications(modifications, originalUsers, currentUsers, role, "removed", "users");
-
-				counter = counter + 1;
-				if (counter > updateDBCount)
-					DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".roles");
+				finally{
+				         dbu.unlockTables();
+				}
 			}
-
-			db.query("select a.role from USERS_LDAP_ROLE a left join USERS_LDAP_ROLE b on b.up=0 and a.role=b.role where a.up=1 and b.role is null");
-			while (db.moveNext()) {
-				final String roleToDelete = db.gets("role");
-				logger.log(Level.WARNING, "The role " + roleToDelete + " is no longer listed in LDAP. It will be deleted from the database");
+			catch (SQLException e) {
+				logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP Roles: " + e.getMessage());
 			}
-
-			logger.log(Level.INFO, "Deleting inactive roles");
-			db.query("DELETE FROM USERS_LDAP_ROLE WHERE up = 0");
+			catch (IOException e1) {
+				logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP Roles: " + e1.getMessage());
+			}
 
 			final String rolesLog = "Roles: " + length + " synchronized. " + modifications.size() + " changes. \n" + String.join("\n", modifications.values());
 
@@ -412,47 +516,89 @@ public class ResyncLDAP extends Optimizer {
 
 					final String maxqueuedjobs = getLdapContentSE(ouCE, ce, "maxqueuedjobs", null);
 
-					int siteId = -1;
-					boolean querySuccess = db.query("SELECT * from `SITEQUEUES` WHERE site=?", false, ceName);
-					if (!querySuccess) {
-						logger.log(Level.SEVERE, "Error getting CE from DB");
-						return;
-					}
+					try (DBUtils dbu = new DBUtils(db.getConnection())) {
+						dbu.lockTables("SITEQUEUES WRITE");
+						try {
+							int siteId = -1;
+							String selectQuery = "SELECT * from `SITEQUEUES` WHERE site='" + Format.escSQL(ceName) + "'";
+							if (!dbu.executeQuery(selectQuery)) {
+								logger.log(Level.SEVERE, "Error getting CEs from DB");
+								return;
+							}
 
-					if (db.moveNext()) {
-						siteId = db.geti("siteId");
-						db.gets("site");
-						originalCEs = populateCERegistry(db.gets("site"), db.gets("maxrunning"), db.gets("maxqueued"));
-					}
+							if (dbu.getResultSet().next()) {
+								siteId = dbu.getResultSet().getInt("siteId");
+								originalCEs = populateCERegistry(dbu.getResultSet().getString("site"), dbu.getResultSet().getString("maxrunning"), dbu.getResultSet().getString("maxqueued"));
+							}
 
-					logger.log(Level.INFO, "Inserting or updating database entry for CE " + ceName);
-					if (siteId != -1) {
-						db.query("UPDATE SITEQUEUES SET maxrunning=?, maxqueued=? WHERE site=?", false,
-								maxjobs, maxqueuedjobs, ceName);
+							logger.log(Level.INFO, "Inserting or updating database entry for CE " + ceName);
+							if (siteId != -1) {
+								String updateQuery = "UPDATE SITEQUEUES SET maxrunning=" + Integer.valueOf(maxjobs) + ", maxqueued=" + Integer.valueOf(maxqueuedjobs) + " WHERE site='" + Format.escSQL(ceName) + "'";
+								if (!dbu.executeQuery(updateQuery)) {
+									logger.log(Level.SEVERE, "Error updating CEs to DB");
+									return;
+								}
+							}
+							else {
+								String insertQuery = "INSERT INTO SITEQUEUES(site,maxrunning,maxqueued) values ('" + Format.escSQL(ceName) + "'," + Integer.valueOf(maxjobs) + ","
+										+ Integer.valueOf(maxqueuedjobs) + ")";
+								if (!dbu.executeQuery(insertQuery)) {
+									logger.log(Level.SEVERE, "Error inserting CE " + ceName + " to DB");
+									return;
+								}
+							}
+						}
+						finally{
+						         dbu.unlockTables();
+						}
 					}
-					else {
-						db.query("INSERT INTO SITEQUEUES(site,maxrunning,maxqueued) values (?,?,?)", false,
-								ceName, Integer.valueOf(maxjobs), Integer.valueOf(maxqueuedjobs));
+					catch (SQLException e) {
+						logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP CEs: " + e.getMessage());
+					}
+					catch (IOException e1) {
+						logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP CEs: " + e1.getMessage());
 					}
 
 					final HashMap<String, String> currentCEs = populateCERegistry(ceName, maxjobs, maxqueuedjobs);
-					printModificationsSEs(modifications, originalCEs, currentCEs, ceName, "CEs");
+					printModifications(modifications, originalCEs, currentCEs, ceName, "CEs");
 
 					if (ind > updateDBCount)
 						DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".CEs");
 				}
 
-				ArrayList<String> toDelete = new ArrayList<>();
-				db.query("SELECT site from `SITEQUEUES`", false);
-				while (db.moveNext()) {
-					String ce = db.gets("site");
-					if (!updatedCEs.contains(ce) && !ce.equals("unassigned::site")) {
-						toDelete.add(ce);
+				try (DBUtils dbu = new DBUtils(db.getConnection())) {
+					dbu.lockTables("SITEQUEUES WRITE");
+					try {
+						ArrayList<String> toDelete = new ArrayList<>();
+						String selectQuery = "SELECT site from `SITEQUEUES`";
+						if (!dbu.executeQuery(selectQuery)) {
+							logger.log(Level.SEVERE, "Error getting CEs from DB");
+							return;
+						}
+						while (dbu.getResultSet().next()) {
+							String ce = dbu.getResultSet().getString("site");
+							if (!updatedCEs.contains(ce) && !ce.equals("unassigned::site")) {
+								toDelete.add(ce);
+							}
+						}
+						for (String element : toDelete) {
+							logger.log(Level.INFO, "Deleting CE " + element + " from CE database");
+							String deleteQuery = "DELETE from `SITEQUEUES` where site='" + Format.escSQL(element) + "'";
+							if (!dbu.executeQuery(deleteQuery)) {
+								logger.log(Level.SEVERE, "Error deleting CE " + element + " from DB");
+								return;
+							}
+						}
+					}
+					finally{
+					         dbu.unlockTables();
 					}
 				}
-				for (String element : toDelete) {
-					logger.log(Level.INFO, "Deleting CE " + element + " from CE database");
-					db.query("DELETE from `SITEQUEUES` where site=?", false, element);
+				catch (SQLException e) {
+					logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP CEs: " + e.getMessage());
+				}
+				catch (IOException e1) {
+					logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP CEs: " + e1.getMessage());
 				}
 
 				final String cesLog = "CEs: " + length + " synchronized. " + modifications.size() + " changes. \n" + String.join("\n", modifications.values());
@@ -484,7 +630,9 @@ public class ResyncLDAP extends Optimizer {
 		final ArrayList<String> dnsEntries = new ArrayList<>();
 		final ArrayList<String> sites = new ArrayList<>();
 		final HashMap<String, String> modifications = new HashMap<>();
+		final HashMap<String, String> modificationsProtocols = new HashMap<>();
 		final Set<String> updatedProtocols = new HashSet<>();
+		final Set<String> updatedProtocolsNTransfers = new HashSet<>();
 		if (!dns.isEmpty()) {
 			try (DBFunctions db = ConfigUtils.getDB("alice_users"); DBFunctions dbTransfers = ConfigUtils.getDB("transfers")) {
 				if (db == null || dbTransfers == null) {
@@ -539,34 +687,11 @@ public class ResyncLDAP extends Optimizer {
 							else
 								numTransfers = Integer.valueOf(transfers.split("=")[1]);
 						}
-
-						boolean querySuccess = dbTransfers.query("SELECT * from `PROTOCOLS` WHERE sename=? and protocol=?", false, seName, protocol);
-						if (!querySuccess) {
-							logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
-							return;
-						}
 						updatedProtocols.add(seName + "#" + protocol);
-						if (dbTransfers.moveNext())
-							dbTransfers.query("UPDATE PROTOCOLS SET max_transfers=?, updated=1 where sename=? and protocol=?", false, numTransfers, seName, protocol);
-						else
-							dbTransfers.query("INSERT INTO PROTOCOLS(sename,protocol,max_transfers) values (?,?,?)", false, seName, protocol, numTransfers);
+						updatedProtocolsNTransfers.add(seName + "#" + protocol + "#" + numTransfers);
 					}
 
 					HashMap<String, String> originalSEs = new HashMap<>();
-
-					boolean querySuccess = db.query("SELECT * from `SE` WHERE seName = ?", false, seName);
-					if (!querySuccess) {
-						logger.log(Level.SEVERE, "Error getting SEs from DB");
-						return;
-					}
-
-					while (db.moveNext()) {
-						originalSEs = populateSERegistry(db.gets("seName"), db.gets("seioDaemons"), db.gets("seStoragePath"), db.gets("seMinSize"), db.gets("seType"), db.gets("seQoS"),
-								db.gets("seExclusiveWrite"), db.gets("seExclusiveRead"), db.gets("seVersion"));
-						seNumber = db.geti("seNumber");
-					}
-					if (originalSEs.isEmpty())
-						modifications.put(seName, seName + " : new storage element, ");
 
 					final String t = getLdapContentSE(ouSE, se, "mss", null);
 					final String host = getLdapContentSE(ouSE, se, "host", null);
@@ -574,7 +699,6 @@ public class ResyncLDAP extends Optimizer {
 					final Set<String> savedir = LDAPHelper.checkLdapInformation("name=" + se, ouSE, "savedir");
 					for (String path : savedir) {
 						HashMap<String, String> originalSEVolumes = new HashMap<>();
-
 						long size = -1;
 						logger.log(Level.INFO, "Checking the path of " + path);
 						if (path.matches(".*,\\d+")) {
@@ -584,27 +708,47 @@ public class ResyncLDAP extends Optimizer {
 						logger.log(Level.INFO, "Need to add the volume " + path);
 						final String method = t.toLowerCase() + "://" + host;
 
-						int volumeId = -1;
-						querySuccess = db.query("SELECT * from `SE_VOLUMES` WHERE seName=? and mountpoint=?", false, seName, path);
-						if (!querySuccess) {
-							logger.log(Level.SEVERE, "Error getting SE volumes from DB");
-							return;
+						try (DBUtils dbu = new DBUtils(db.getConnection())) {
+							dbu.lockTables("SE_VOLUMES WRITE");
+							try {
+								int volumeId = -1;
+								String selectQuery = "SELECT * from `SE_VOLUMES` WHERE seName='" + Format.escSQL(seName) + "' and mountpoint='" + Format.escSQL(path) + "'";
+								if (!dbu.executeQuery(selectQuery)) {
+									logger.log(Level.SEVERE, "Error getting SE volumes from DB");
+									return;
+								}
+								while (dbu.getResultSet().next()) {
+									originalSEVolumes = populateSEVolumesRegistry(dbu.getResultSet().getString("sename"), dbu.getResultSet().getString("volume"), dbu.getResultSet().getString("method"), dbu.getResultSet().getString("mountpoint"), dbu.getResultSet().getString("size"));
+									volumeId = dbu.getResultSet().getInt("volumeId");
+								}
+								if (volumeId != -1) {
+									String updateQuery = "UPDATE SE_VOLUMES SET volume='" + Format.escSQL(path) + "',method='" + Format.escSQL(method) + "',size=" + Long.valueOf(size) + " WHERE seName='" + Format.escSQL(seName) + "' AND mountpoint='" + Format.escSQL(path) + "' and volumeId=" + Integer.valueOf(volumeId);
+									if (!dbu.executeQuery(updateQuery)) {
+										logger.log(Level.SEVERE, "Error updating SE_VOLUMES from DB");
+										return;
+									}
+								}
+								else {
+									String insertQuery = "INSERT INTO SE_VOLUMES(sename,volume,method,mountpoint,size) values ('" + Format.escSQL(seName) + "','" + Format.escSQL(path) + "','" + Format.escSQL(method) + "','" + Format.escSQL(path) + "'," + Long.valueOf(size) + ")";
+									if (!dbu.executeQuery(insertQuery)) {
+										logger.log(Level.SEVERE, "Error inserting SE_VOLUMES to DB");
+										return;
+									}
+								}
+								final HashMap<String, String> currentSEVolumes = populateSEVolumesRegistry(seName, path, method, path, String.valueOf(size));
+								printModifications(modifications, originalSEVolumes, currentSEVolumes, seName, "SE Volumes");
+
+							}
+							finally{
+							         dbu.unlockTables();
+							}
 						}
-						while (db.moveNext()) {
-							originalSEVolumes = populateSEVolumesRegistry(db.gets("sename"), db.gets("volume"), db.gets("method"), db.gets("mountpoint"), db.gets("size"));
-							volumeId = db.geti("volumeId");
+						catch (SQLException e) {
+							logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP SEs: " + e.getMessage());
 						}
-
-						if (volumeId != -1)
-							db.query("UPDATE SE_VOLUMES SET volume=?, method=?, size=? WHERE seName=? AND mountpoint=? and volumeId=?", false,
-									path, method, Long.valueOf(size), seName, path, Integer.valueOf(volumeId));
-						else
-							db.query("INSERT INTO SE_VOLUMES(sename,volume,method,mountpoint,size) values (?,?,?,?,?)", false,
-									seName, path, method, path, Long.valueOf(size));
-
-						final HashMap<String, String> currentSEVolumes = populateSEVolumesRegistry(seName, path, method, path, String.valueOf(size));
-						printModificationsSEs(modifications, originalSEVolumes, currentSEVolumes, seName, "SE Volumes");
-
+						catch (IOException e1) {
+							logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP SEs: " + e1.getMessage());
+						}
 					}
 
 					final String iodaemons = getLdapContentSE(ouSE, se, "ioDaemons", null);
@@ -660,53 +804,149 @@ public class ResyncLDAP extends Optimizer {
 					final String seExclusiveRead = getLdapContentSE(ouSE, se, "seExclusiveRead", "");
 					final String seVersion = getLdapContentSE(ouSE, se, "seVersion", "");
 
-					final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, String.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion);
-					printModificationsSEs(modifications, originalSEs, currentSEs, seName, "SEs");
+					try (DBUtils dbu = new DBUtils(db.getConnection())) {
+						dbu.lockTables("SE WRITE");
+						try {
+							String selectQuery = "SELECT * from `SE` WHERE seName = '" + Format.escSQL(seName) + "'";
+							if (!dbu.executeQuery(selectQuery)) {
+								logger.log(Level.SEVERE, "Error getting SEs from DB");
+								return;
+							}
+							if (dbu.getResultSet().next()) {
+								originalSEs = populateSERegistry(dbu.getResultSet().getString("seName"), dbu.getResultSet().getString("seioDaemons"), dbu.getResultSet().getString("seStoragePath"), dbu.getResultSet().getString("seMinSize"), dbu.getResultSet().getString("seType"), dbu.getResultSet().getString("seQoS"),
+										dbu.getResultSet().getString("seExclusiveWrite"), dbu.getResultSet().getString("seExclusiveRead"), dbu.getResultSet().getString("seVersion"));
+								seNumber = dbu.getResultSet().getInt("seNumber");
+							}
+							if (originalSEs.isEmpty())
+								modifications.put(seName, seName + " : new storage element, \n");
 
-					if (seNumber != -1)
-						db.query("UPDATE SE SET seMinSize=?, seType=?, seQoS=?, seExclusiveWrite=?, seExclusiveRead=?, seVersion=?, seStoragePath=?, seioDaemons=?"
-								+ "WHERE seNumber=? and seName=?", false, Integer.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path,
-								seioDaemons, Integer.valueOf(seNumber), seName);
-					else
-						db.query("INSERT INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
-								+ "values (?,?,?,?,?,?,?,?,?)", false, seName, Integer.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion, path, seioDaemons);
-					logger.log(Level.INFO, "Added or updated entry for SE " + seName);
+							final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, String.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion);
+							printModifications(modifications, originalSEs, currentSEs, seName, "SEs");
 
+							if (seNumber != -1) {
+								String updateQuery = "UPDATE SE SET seMinSize=" + Integer.valueOf(minSize) + ", seType='" + Format.escSQL(mss) + "', seQoS='" + Format.escSQL(qos) + "', seExclusiveWrite='" + Format.escSQL(seExclusiveWrite) + "', seExclusiveRead='" + Format.escSQL(seExclusiveWrite) + "', seVersion='" + seVersion + "', seStoragePath='" + Format.escSQL(path) + "', seioDaemons='" + Format.escSQL(seioDaemons)
+										+ "' WHERE seNumber=" + Integer.valueOf(seNumber) + " and seName='" + Format.escSQL(seName) + "'";
+								if (!dbu.executeQuery(updateQuery)) {
+									logger.log(Level.SEVERE, "Error updating SEs from DB");
+									return;
+								}
+							}
+							else {
+								String insertQuery = "INSERT INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
+										+ "values ('" + Format.escSQL(seName) + "'," + Integer.valueOf(minSize) + ",'" + Format.escSQL(mss) + "','" + Format.escSQL(qos) + "','" + Format.escSQL(seExclusiveWrite) + "','" + Format.escSQL(seExclusiveRead) + "','" + Format.escSQL(seVersion) + "','" + Format.escSQL(path) + "','" + Format.escSQL(seioDaemons) + "')";
+								if (!dbu.executeQuery(insertQuery)) {
+									logger.log(Level.SEVERE, "Error inserting SEs to DB");
+									return;
+								}
+							}
+							logger.log(Level.INFO, "Added or updated entry for SE " + seName);
+						}
+						finally{
+						         dbu.unlockTables();
+						}
+					}
+					catch (SQLException e) {
+						logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP SEs: " + e.getMessage());
+					}
+					catch (IOException e1) {
+						logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP SEs: " + e1.getMessage());
+					}
 					if (ind > updateDBCount)
 						DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".SEs");
 				}
 
-				ArrayList<String> toDelete = new ArrayList<>();
-				dbTransfers.query("SELECT concat(seName, '#', protocol) from `PROTOCOLS` where protocol is not null;", false);
-				while (dbTransfers.moveNext()) {
-					String composed = dbTransfers.gets(1);
-					if (!updatedProtocols.contains(composed)) {
-						toDelete.add(composed);
+				if (updatedProtocolsNTransfers.size() > 1) {
+					try (DBUtils dbu = new DBUtils(dbTransfers.getConnection())) {
+						// lock tables in order to update the protocols table
+						dbu.lockTables("PROTOCOLS WRITE");
+						try {
+
+							for (String combined : updatedProtocolsNTransfers) {
+								String seName = combined.split("#")[0];
+								String protocol = combined.split("#")[1];
+								int numTransfers = ((combined.split("#").length == 3 &&  !combined.split("#")[2].equals("null")) ? Integer.parseInt(combined.split("#")[2]) : 0);
+								String selectQuery = "SELECT seName, protocol from `PROTOCOLS` WHERE sename='" + Format.escSQL(seName) + "' and protocol='" + Format.escSQL(protocol) + "'";
+								if (!dbu.executeQuery(selectQuery)) {
+									logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
+									return;
+								}
+
+								if (dbu.getResultSet().next()) {
+									logger.log(Level.INFO, "Updating protocol " + protocol + " on SE " + seName);
+									String updateQuery = "UPDATE PROTOCOLS SET max_transfers=" + Integer.valueOf(numTransfers) + " where sename='"  + Format.escSQL(seName) + "' and protocol='" + Format.escSQL(protocol) + "'";
+									if (!dbu.executeQuery(updateQuery)) {
+										logger.log(Level.SEVERE, "Error updating protocol " + protocol + " in SE " + seName);
+										return;
+									}
+								}
+								else {
+									modificationsProtocols.put("\t" + seName + " - " + protocol, protocol + " : new protocol in " + seName + "\n");
+									logger.log(Level.INFO, "Inserting protocol " + protocol + " on SE " + seName);
+									String insertQuery = "INSERT INTO PROTOCOLS(sename,protocol,max_transfers) values ('" + Format.escSQL(seName) + "','" + Format.escSQL(protocol) + "'," + Integer.valueOf(numTransfers) + ")";
+									if (!dbu.executeQuery(insertQuery)) {
+										logger.log(Level.SEVERE, "Error inserting protocol " + protocol + " in SE " + seName);
+										return;
+									}
+								}
+							}
+
+							ArrayList<String> toDelete = new ArrayList<>();
+							String selectQuery = "SELECT concat(seName, '#', protocol) from `PROTOCOLS` where protocol is not null;";
+							if (!dbu.executeQuery(selectQuery)) {
+								logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
+								return;
+							}
+							while (dbu.getResultSet().next()) {
+								String composed = dbu.getResultSet().getString(1);
+								if (!updatedProtocols.contains(composed))
+									toDelete.add(composed);
+							}
+
+							for (String element : toDelete) {
+								try {
+									String protocol = element.split("#")[1];
+									String se = element.split("#")[0];
+									logger.log(Level.INFO, "Deleting protocol " + protocol + " from SE " + se);
+									modificationsProtocols.put("\t" + se + " - " + protocol, protocol + " : deleted protocol from " + se + "\n");
+									String deleteQuery = "DELETE from `PROTOCOLS` where sename='" + Format.escSQL(se) + "' and protocol='" + Format.escSQL(protocol) + "'";
+									if (!dbu.executeQuery(deleteQuery)) {
+										logger.log(Level.SEVERE, "Error deleting PROTOCOLS from DB");
+										return;
+									}
+								}
+								catch (Exception e) {
+									logger.log(Level.WARNING, "Could not split SE and protocol string `" + element + "` " + e);
+								}
+							}
+						}
+						finally{
+						         dbu.unlockTables();
+						}
+					}
+					catch (SQLException e) {
+						logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP Protocols: " + e.getMessage());
+					}
+					catch (IOException e1) {
+						logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP Protocols: " + e1.getMessage());
 					}
 				}
-
-				for (String element : toDelete) {
-					try {
-						dbTransfers.query("DELETE from `PROTOCOLS` where sename=? and protocol=?", false, element.split("#")[0], element.split("#")[1]);
-					}
-					catch (Exception e) {
-						logger.log(Level.WARNING, "Could not split SE and protocol string `" + element + "`");
-					}
-				}
-
 				db.query("update SE_VOLUMES set usedspace=0 where usedspace is null");
 				db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
 				db.query("update SE_VOLUMES set freespace=size-usedspace where size <> -1");
 
 				// TODO: Delete inactive SEs
 
-				final String sesLog = "SEs: " + length + " synchronized. " + modifications.size() + " changes. \n" + String.join("\n", modifications.values());
+				String sesLog = "SEs: " + length + " synchronized. " + modifications.size() + " changes. \n" + String.join("\n", modifications.values());
+				if (modifications.size() > 0)
+					sesLog = sesLog + "\n";
+				final String protocolsLog = "Protocols: " + updatedProtocols.size() + " synchronized. " + modificationsProtocols.size() + " changes. \n" + String.join("", modificationsProtocols.values());
 
-				logOutput = logOutput + "\n" + sesLog;
+				logOutput = logOutput + "\n" + sesLog + "\n" + protocolsLog;
 				if (periodic.get())
 					DBSyncUtils.registerLog(ResyncLDAP.class.getCanonicalName() + ".SEs", sesLog);
-				else if (modifications.size() > 0)
+				else if (modifications.size() > 0 || modificationsProtocols.size() > 0)
 					DBSyncUtils.updateManual(ResyncLDAP.class.getCanonicalName() + ".SEs", sesLog);
+
 			}
 		}
 		else {
@@ -742,7 +982,7 @@ public class ResyncLDAP extends Optimizer {
 	 * @param current
 	 * @param se
 	 */
-	private static void printModificationsSEs(final HashMap<String, String> modifications, final HashMap<String, String> original, final HashMap<String, String> current, final String se,
+	private static void printModifications(final HashMap<String, String> modifications, final HashMap<String, String> original, final HashMap<String, String> current, final String se,
 			final String entity) {
 		final ArrayList<String> updatedSEs = new ArrayList<>();
 		final Set<String> keySet = new LinkedHashSet<>(original.keySet());

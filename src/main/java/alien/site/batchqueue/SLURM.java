@@ -7,9 +7,6 @@ import java.io.PrintWriter;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
-import java.text.DateFormat;
-import java.text.SimpleDateFormat;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -111,8 +108,6 @@ public class SLURM extends BatchQueue {
 
 		this.logger.info("Submit SLURM");
 
-		final DateFormat date_format = new SimpleDateFormat("yyyy-MM-dd");
-		final String current_date_str = date_format.format(new Date());
 		final Long timestamp = Long.valueOf(System.currentTimeMillis());
 
 		// Logging setup
@@ -124,7 +119,7 @@ public class SLURM extends BatchQueue {
 		final String host_logdir = environment.getOrDefault("SLURM_LOG_PATH", config.get("host_logdir") != null ? config.get("host_logdir").toString() : null);
 
 		if (host_logdir != null) {
-			final String log_folder_path = String.format("%s/%s", host_logdir, current_date_str);
+			final String log_folder_path = String.format("%s", host_logdir);
 			final File log_folder = new File(log_folder_path);
 			if (!(log_folder.exists()) || !(log_folder.isDirectory())) {
 				try {
@@ -152,15 +147,14 @@ public class SLURM extends BatchQueue {
 		String submit_cmd = "#!/bin/bash\n";
 
 		// Create JobAgent workdir
-		final String workdir_path = String.format("%s/jobagent_%s_%d", config.get("host_workdir"),
-				config.get("host_host"), timestamp);
+		final String workdir_path = config.get("host_workdir") != null ? String.format("%s/jobagent_%s_%d", config.get("host_workdir"),
+				config.get("host_host"), timestamp) : environment.getOrDefault("TMPDIR", "/tmp");
 		final String workdir_path_resolved = Functions.resolvePathWithEnv(workdir_path);
 		final File workdir_file = new File(workdir_path_resolved);
 		workdir_file.mkdir();
 
 		submit_cmd += String.format("#SBATCH -J %s%n", name);
-		// submit_cmd += String.format("#SBATCH -D %s\n", workdir_path_resolved);
-		submit_cmd += String.format("#SBATCH -D /tmp%n");
+		submit_cmd += String.format("#SBATCH -D %s\n", workdir_path_resolved);
 		submit_cmd += "#SBATCH -N 1\n";
 		submit_cmd += "#SBATCH -n 1\n";
 		submit_cmd += "#SBATCH --no-requeue\n";
@@ -176,14 +170,15 @@ public class SLURM extends BatchQueue {
 		}
 
 		final String encodedScriptContent = Utils.base64Encode(scriptContent.getBytes()).replaceAll("(\\w{76})", "$1\n");
+		final String srun_script = String.format("%s_%d", script, timestamp);
 
-		submit_cmd += "cat<<__EOF__ | base64 -d > " + script + "\n";
+		submit_cmd += "cat<<__EOF__ | base64 -d > " + srun_script + "\n";
 		submit_cmd += encodedScriptContent;
 		submit_cmd += "\n__EOF__\n";
-		submit_cmd += "chmod a+x " + script + "\n";
-		submit_cmd += "srun " + runArgs + " " + script + "\n";
+		submit_cmd += "chmod a+x " + srun_script + "\n";
+		submit_cmd += "srun " + runArgs + " " + srun_script + "\n";
 
-		submit_cmd += "rm " + script;
+		submit_cmd += "rm " + srun_script;
 
 		if (this.temp_file != null && (!this.temp_file.exists() || !this.temp_file.canExecute() || this.temp_file.length() == 0)) {
 			if (!this.temp_file.delete())

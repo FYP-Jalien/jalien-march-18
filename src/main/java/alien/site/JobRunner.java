@@ -89,7 +89,8 @@ public class JobRunner extends JobAgent {
 					monitor.sendParameter("state", "Last JA cannot get job");
 					monitor.sendParameter("statenumeric", Long.valueOf(2));
 					logger.log(Level.INFO, "JobRunner going to exit from lack of jobs");
-					break;
+					System.exit(0);
+					//break;
 				}
 			}
 		}

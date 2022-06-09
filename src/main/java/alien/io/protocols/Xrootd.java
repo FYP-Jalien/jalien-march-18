@@ -75,6 +75,8 @@ public class Xrootd extends Protocol {
 
 	private static String xrdcpPath = null;
 
+	private static String xrdcpVersion = null;
+
 	private static String eoscpPath = null;
 
 	private static boolean preferEoscp = false;
@@ -173,10 +175,10 @@ public class Xrootd extends Protocol {
 				final ProcessWithTimeout timeout = new ProcessWithTimeout(p, pBuilder);
 
 				if (timeout.waitFor(15, TimeUnit.SECONDS) && timeout.exitValue() == 0) {
-					final String version = timeout.getStdout().toString().trim();
+					xrdcpVersion = timeout.getStdout().toString().trim();
 
-					if (version.indexOf('.') > 0) {
-						String tok = version.substring(0, version.indexOf('.')).trim();
+					if (xrdcpVersion.indexOf('.') > 0) {
+						String tok = xrdcpVersion.substring(0, xrdcpVersion.indexOf('.')).trim();
 
 						while (tok.startsWith("v") || tok.startsWith("\""))
 							tok = tok.substring(1);
@@ -185,11 +187,11 @@ public class Xrootd extends Protocol {
 							newerThan4 = Integer.parseInt(tok) >= 4;
 						}
 						catch (final NumberFormatException nfe) {
-							logger.log(Level.WARNING, "Unrecognized xrootd version string: " + version, nfe);
+							logger.log(Level.WARNING, "Unrecognized xrootd version string: " + xrdcpVersion, nfe);
 						}
 					}
 
-					logger.log(Level.FINE, "Local Xrootd version is " + version + ", newer than 4: " + newerThan4);
+					logger.log(Level.FINE, "Local Xrootd version is " + xrdcpVersion + ", newer than 4: " + newerThan4);
 				}
 			}
 			catch (final IOException | InterruptedException ie) {
@@ -1671,6 +1673,13 @@ public class Xrootd extends Protocol {
 	 */
 	public static String getXrdcpPath() {
 		return xrdcpPath;
+	}
+
+	/**
+	 * @return the version string returned by `xrdcp --version`
+	 */
+	public static String getXrdcpVersion() {
+		return xrdcpVersion;
 	}
 
 	/**

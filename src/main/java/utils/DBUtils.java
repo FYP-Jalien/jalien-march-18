@@ -35,6 +35,7 @@ public final class DBUtils implements Closeable {
 	 */
 	public DBUtils(final DBConnection dbc) {
 		this.dbc = dbc;
+		dbc.setReadOnly(false);
 	}
 
 	private void executeClose() {
@@ -152,8 +153,9 @@ public final class DBUtils implements Closeable {
 			logger.log(Level.WARNING, "Detected incomplete transaction, rolling back");
 
 			try {
-				dbc.getConnection().rollback();
 				dbc.getConnection().setAutoCommit(false);
+				dbc.getConnection().rollback();
+				executeQuery("unlock tables;");
 			}
 			catch (SQLException e) {
 				logger.log(Level.WARNING, "Cannot rollback transaction", e);

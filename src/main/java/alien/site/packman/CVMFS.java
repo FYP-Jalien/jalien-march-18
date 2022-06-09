@@ -146,14 +146,24 @@ public class CVMFS extends PackMan {
 			logger.log(Level.WARNING, "Exception executing GetAliEnv", e);
 		}
 
-		final CommandOutput co = SystemCommand.bash(ALIEN_BIN_DIR + "/alienv printenv " + args);
+		final CommandOutput co = SystemCommand.executeCommand(Arrays.asList(ALIEN_BIN_DIR + "/alienv", "printenv", args), false, true);
 
-		if (!co.stderr.isBlank() || co.stdout.isBlank()) {
-			logger.log(Level.SEVERE, "alienv returned an error: " + co.stderr);
+		String source = co.stdout;
+
+		if (source.isBlank()) {
+			logger.log(Level.SEVERE, "alienv didn't return anything useful");
 			return null;
 		}
 
-		final String source = co.stdout;
+		final String stderr = co.stderr;
+
+		if (stderr.contains("ERROR:")) {
+			logger.log(Level.SEVERE, "alienv returned an error: " + stderr);
+			return null;
+		}
+
+		// remove newline between entries, in case of modules v4
+		source = source.replace("\n", "").replace("\r", "");
 
 		try {
 			logger.log(Level.INFO, "Executing SetAliEnv");
@@ -209,6 +219,13 @@ public class CVMFS extends PackMan {
 	 */
 	public static String getContainerPath() {
 		return CVMFS_BASE_DIR + "/containers/fs/singularity/centos7";
+	}
+
+	/**
+	 * @return path to Apptainer runtime in CVMFS
+	 */
+	public static String getApptainerPath() {
+		return CVMFS_BASE_DIR + "/containers/bin/apptainer/current/bin";
 	}
 
 	/**

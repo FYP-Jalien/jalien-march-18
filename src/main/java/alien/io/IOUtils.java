@@ -1,14 +1,13 @@
 package alien.io;
 
+import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
-import java.io.BufferedInputStream;
 import java.math.BigInteger;
 import java.security.DigestInputStream;
 import java.security.MessageDigest;
@@ -39,7 +38,6 @@ import alien.catalogue.access.AuthorizationFactory;
 import alien.config.ConfigUtils;
 import alien.io.protocols.Protocol;
 import alien.io.protocols.TempFileManager;
-import alien.io.StreamingXXHash64;
 import alien.se.SEUtils;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.shell.commands.JAliEnCommandcp;
@@ -126,23 +124,22 @@ public class IOUtils {
 	 */
 
 	public static long getXXHash64(final File f) throws IOException {
-        try {
-            InputStream input = new FileInputStream(f);
-            BufferedInputStream buffStream = new BufferedInputStream(input);
-            StreamingXXHash64 hash64 = new StreamingXXHash64(0);
-            byte[] buffer = new byte[8192];
-            for (;;) {
-                int read = buffStream.read(buffer);
-                if (read == -1) {
-                    break;
-                }
-                hash64.update(buffer, 0, read);
-            }
-            return hash64.getValue();
-        } catch (final IOException ioe) {
-            throw ioe;
-        }
-    }
+		try (BufferedInputStream buffStream = new BufferedInputStream(new FileInputStream(f))) {
+			final StreamingXXHash64 hash64 = new StreamingXXHash64(0);
+			final byte[] buffer = new byte[8192];
+			for (;;) {
+				final int read = buffStream.read(buffer);
+				if (read == -1) {
+					break;
+				}
+				hash64.update(buffer, 0, read);
+			}
+			return hash64.getValue();
+		}
+		catch (final IOException ioe) {
+			throw ioe;
+		}
+	}
 
 	/**
 	 * Download the file in a temporary location. The GUID should be filled with authorization tokens before calling this method.
@@ -678,6 +675,23 @@ public class IOUtils {
 
 		final JAliEnCOMMander cmd = new JAliEnCOMMander(owner, null, ConfigUtils.getCloseSite(), out);
 
+		return upload(localFile, toLFN, cmd, args);
+	}
+
+	/**
+	 * Upload a local file to the Grid
+	 *
+	 * @param localFile
+	 *            local file to upload
+	 * @param toLFN
+	 *            catalogue entry name
+	 * @param cmd pre-existing commander instance to use, required
+	 * @param args
+	 *            other `cp` command parameters to pass
+	 * @return the uploaded LFN, if everything went ok, <code>null</code> if not
+	 * @throws IOException
+	 */
+	public static LFN upload(final File localFile, final String toLFN, final JAliEnCOMMander cmd, final String... args) throws IOException {
 		final LFN l = cmd.c_api.getLFN(toLFN, true);
 
 		if (l == null)
@@ -686,7 +700,7 @@ public class IOUtils {
 		if (l.exists)
 			throw new IOException("LFN already exists: " + toLFN);
 
-		final String absolutePath = FileSystemUtils.getAbsolutePath(owner.getName(), null, toLFN);
+		final String absolutePath = FileSystemUtils.getAbsolutePath(cmd.getUsername(), null, toLFN);
 
 		final ArrayList<String> cpArgs = new ArrayList<>();
 		cpArgs.add("file:" + localFile.getAbsolutePath());

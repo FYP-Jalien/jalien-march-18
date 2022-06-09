@@ -15,6 +15,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
+import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -34,6 +35,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import alien.api.Dispatcher;
 import alien.api.ServerException;
@@ -97,6 +99,8 @@ public class TaskQueueUtils {
 		fieldMap.put("node_field", "nodeId");
 		fieldMap.put("exechost_table", "QUEUE");
 		fieldMap.put("exechost_field", "execHostId");
+		fieldMap.put("error_table", "QUEUE");
+		fieldMap.put("error_field", "error");
 	}
 
 	static {
@@ -895,21 +899,23 @@ public class TaskQueueUtils {
 		}
 	}
 
+	private static String masterjobStatusQuery;
+
+	static {
+		final Set<JobStatus> nonFinalJobStatus = Collections.unmodifiableSet(EnumSet.complementOf(EnumSet.range(JobStatus.DONE, JobStatus.KILLED)));
+
+		masterjobStatusQuery = "select 1 from QUEUE where split=? AND statusId IN ("
+				+ String.join(",", nonFinalJobStatus.stream().map((k) -> String.valueOf(k.getAliEnLevel())).collect(Collectors.toList())) + ") LIMIT 1";
+	}
+
 	private static void checkMasterjobStatus(final long masterjobID) {
-		boolean allDone = true;
+		final boolean allDone;
 
 		try (DBFunctions db = ConfigUtils.getDB("processes")) {
-			if (!db.query("select distinct statusId from QUEUE where split=?;", false, Long.valueOf(masterjobID)))
+			if (!db.query(masterjobStatusQuery, false, Long.valueOf(masterjobID)))
 				return;
 
-			while (db.moveNext()) {
-				final JobStatus status = JobStatus.getStatusByAlien(Integer.valueOf(db.geti(1)));
-
-				if (!JobStatus.finalStates().contains(status)) {
-					allDone = false;
-					break;
-				}
-			}
+			allDone = !db.moveNext();
 		}
 
 		if (allDone)

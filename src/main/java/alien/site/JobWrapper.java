@@ -247,6 +247,17 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		logger.log(Level.INFO, "JobWrapper initialised. Running as the following user: " + commander.getUser().getName());
 
+		try {
+			final String osRelease = Files.readString(Paths.get("/etc/os-release"));
+			final String osName = osRelease.substring(osRelease.indexOf("PRETTY_NAME=") + 12, osRelease.length()).split("\\r?\\n")[0];
+
+			putJobTrace("The following OS has been detected: " + osName);
+			logger.log(Level.INFO, "The following OS has been detected: " + osName);
+		}
+		catch (@SuppressWarnings("unused") final IOException e1) {
+			// Ignore
+		}
+
 		monitor.addMonitoring("JobWrapper", this);
 	}
 
@@ -288,9 +299,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		try (Timing t = new Timing()) {
 			final Map<String, String> env = packMan.installPackage(username, String.join(",", packToInstall), null);
 			if (env == null) {
-				logger.log(Level.INFO, "Error installing the package " + packToInstall);
-				// monitor.sendParameter("ja_status", "ERROR_IP");
 				logger.log(Level.SEVERE, "Error installing " + packToInstall);
+				putJobTrace("Error setting the environment for " + packToInstall);
 				System.exit(1);
 			}
 
@@ -352,11 +362,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				else
 					putJobTrace("Warning: executable exit code was " + execExitCode);
 
-				// if (jdl.gets("OutputErrorE") != null)
-				return uploadOutputFiles(JobStatus.ERROR_E) ? execExitCode : -1;
-
-				// changeStatus(JobStatus.ERROR_E);
-				// return execExitCode;
+				return uploadOutputFiles(JobStatus.ERROR_E, execExitCode) ? execExitCode : -1;
 			}
 
 			final int valExitCode = validate(packResolver.environment_packages);
@@ -371,9 +377,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				else
 					putJobTrace("Validation failed. Exit code: " + valExitCode);
 
-				final int valUploadExitCode = uploadOutputFiles(JobStatus.ERROR_V) ? valExitCode : -1;
+				final int valUploadExitCode = uploadOutputFiles(JobStatus.ERROR_V, valExitCode) ? valExitCode : -1;
 
-				// changeStatus(JobStatus.ERROR_V);
 				return valUploadExitCode;
 			}
 
@@ -405,7 +410,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @return <code>0</code> if everything went fine, a positive number with the process exit code (which would mean a problem) and a negative error code in case of timeout or other supervised
 	 *         execution errors
 	 */
-	private int executeCommand(final String command, final List<String> arguments, final Map<String, String> environment_packages, String executionType) {
+	private int executeCommand(final String command, final List<String> arguments, final Map<String, String> environment_packages, final String executionType) {
 
 		logger.log(Level.INFO, "Starting execution of command: " + command);
 
@@ -451,14 +456,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					while (st.hasMoreTokens())
 						cmd.add(st.nextToken());
 				}
-
-		// Check if we can put the payload in its own container
-		// TODO: Put back later
-		// Containerizer cont = ContainerizerFactory.getContainerizer();
-		// if (cont != null) {
-		// monitor.sendParameter("containerLayer", Integer.valueOf(2));
-		// cmd = cont.containerize(String.join(" ", cmd));
-		// }
+		cmd.add("; echo payload-" + queueId);
 
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
 
@@ -771,6 +769,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	}
 
 	private boolean uploadOutputFiles(final JobStatus exitStatus) {
+		return uploadOutputFiles(exitStatus, 0);
+	}
+
+	private boolean uploadOutputFiles(final JobStatus exitStatus, final int exitCode) {
 		boolean uploadedAllOutFiles = true;
 		boolean uploadedNotAllCopies = false;
 
@@ -851,7 +853,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					putJobTrace("Uploading: " + entry.getName() + " to " + outputDir);
 
 					final List<String> cpOptions = new ArrayList<>();
-					cpOptions.add("-w");
+					cpOptions.add("-m");
 					cpOptions.add("-S");
 
 					if (entry.getOptions() != null && entry.getOptions().length() > 0)
@@ -920,7 +922,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				changeStatus(JobStatus.DONE);
 		}
 		else
-			changeStatus(exitStatus);
+			changeStatus(exitStatus, exitCode);
 
 		return uploadedAllOutFiles;
 	}
@@ -971,6 +973,17 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @return <code>false</code> if the job was killed and execution should not continue
 	 */
 	public boolean changeStatus(final JobStatus newStatus) {
+		return changeStatus(newStatus, 0);
+	}
+
+	/**
+	 * Updates the current state of the job.
+	 *
+	 * @param newStatus
+	 * @param exitCode
+	 * @return <code>false</code> if the job was killed and execution should not continue
+	 */
+	public boolean changeStatus(final JobStatus newStatus, final int exitCode) {
 		if (jobKilled)
 			return false;
 
@@ -980,8 +993,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		extrafields.put("exechost", ceHost);
 
 		// if final status with saved files, we set the path
-		if (jobStatus == JobStatus.DONE || jobStatus == JobStatus.DONE_WARN || jobStatus == JobStatus.ERROR_E || jobStatus == JobStatus.ERROR_V)
+		if (jobStatus == JobStatus.DONE || jobStatus == JobStatus.DONE_WARN || jobStatus == JobStatus.ERROR_E || jobStatus == JobStatus.ERROR_V) {
 			extrafields.put("path", getJobOutputDir(newStatus));
+			if (exitCode != 0)
+				extrafields.put("error", Integer.valueOf(exitCode));
+		}
 		else if (jobStatus == JobStatus.RUNNING) {
 			extrafields.put("spyurl", hostName + ":" + TomcatServer.getPort());
 			extrafields.put("node", hostName);
@@ -993,12 +1009,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				jobKilled = true;
 				return false;
 			}
-
-			// TODO: Confirm(?) and remove
-			// Wait 10s, and set status once more, in case the first attempt was not registered (high load?)
-			// Thread.sleep(10 * 1000);
-			// TaskQueueApiUtils.setJobStatus(queueId, newStatus, extrafields);
-
 			// Also write status to file for the JobAgent to see
 			Files.writeString(Paths.get(tmpDir + "/" + jobstatusFile), newStatus.name());
 		}
@@ -1060,7 +1070,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	}
 
 	/**
-	 * Cleanup processes, using a specialised script in CVMFS
+	 * Cleanup processes, using a specialized script in CVMFS
+	 *
+	 * @param queueId AliEn job ID
+	 * @param pid child process ID to start from
 	 *
 	 * @return script exit code, or -1 in case of error
 	 */

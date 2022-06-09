@@ -97,7 +97,7 @@ public class JobBroker {
 			}
 
 			if (oldCVMFSRevision) {
-				logger.log(Level.WARNING, "The node has an outdated CVMFS revision, server has " + serverCVMFSRevision + " for " + Format.toInterval(System.currentTimeMillis() - lastCVMFSRevision)
+				logger.log(Level.WARNING, "The node has an outdated CVMFS revision, server has " + serverCVMFSRevision + " for " + Format.toInterval(System.currentTimeMillis() - lastCVMFSRevisionModified)
 						+ ":\n" + matchRequest);
 
 				final HashMap<String, Object> matchAnswer = new HashMap<>(2);

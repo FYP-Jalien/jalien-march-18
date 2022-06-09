@@ -3,7 +3,6 @@ package alien.site;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
@@ -54,7 +53,6 @@ import alien.monitoring.MonitorFactory;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.site.containers.Containerizer;
 import alien.site.containers.ContainerizerFactory;
-import alien.site.JobWrapper;
 import alien.site.packman.CVMFS;
 import alien.taskQueue.JDL;
 import alien.taskQueue.Job;
@@ -116,7 +114,7 @@ public class JobAgent implements Runnable {
 	private final JAliEnCOMMander commander = JAliEnCOMMander.getInstance();
 	private String jarPath;
 	private String jarName;
-	private int wrapperPID;
+	private int childPID;
 	private static float lhcbMarks = -1;
 
 	private enum jaStatus {
@@ -354,7 +352,7 @@ public class JobAgent implements Runnable {
 
 				MAX_CPU = Long.valueOf(((Number) siteMap.getOrDefault("CPUCores", Integer.valueOf(1))).longValue());
 				RUNNING_CPU = MAX_CPU;
-				RUNNING_DISK = Long.valueOf(((Number) siteMap.getOrDefault("Disk", Long.valueOf(10 * 1024 * 1024 * RUNNING_CPU))).longValue()/1024);
+				RUNNING_DISK = Long.valueOf(((Number) siteMap.getOrDefault("Disk", Long.valueOf(10 * 1024 * 1024 * RUNNING_CPU.longValue()))).longValue() / 1024);
 				origTtl = ((Integer) siteMap.get("TTL")).intValue();
 				RUNNING_JOBAGENTS = 0;
 
@@ -455,7 +453,8 @@ public class JobAgent implements Runnable {
 				// TODO: Hack to exclude alihyperloop jobs from nodes without avx support. Remove me soon!
 				try {
 					if (!Files.readString(Paths.get("/proc/cpuinfo")).contains("avx")) {
-						((ArrayList<Object>) siteMap.computeIfAbsent("NoUsers", (k) -> new ArrayList<>())).add("alihyperloop");
+							if(!((ArrayList<Object>) siteMap.computeIfAbsent("NoUsers", (k) -> new ArrayList<>())).contains("alihyperloop"))
+								((ArrayList<String>) siteMap.get("NoUsers")).add("alihyperloop");
 					}
 				}
 				catch (IOException | NullPointerException ex) {
@@ -465,7 +464,7 @@ public class JobAgent implements Runnable {
 				setStatus(jaStatus.REQUESTING_JOB);
 
 				if (siteMap.containsKey("Disk"))
-					siteMap.put("Disk", (Long)siteMap.get("Disk")*1024);
+					siteMap.put("Disk", (Long) siteMap.get("Disk") * 1024);
 
 				final GetMatchJob jobMatch = commander.q_api.getMatchJob(new HashMap<>(siteMap));
 
@@ -637,6 +636,9 @@ public class JobAgent implements Runnable {
 		RES_RUNTIME = Long.valueOf(0);
 		RES_FRUNTIME = "";
 
+		if (mj != null)
+			mj.close();
+
 		logger.log(Level.INFO, "Done!");
 	}
 
@@ -645,8 +647,17 @@ public class JobAgent implements Runnable {
 	 * @return amount of free space (in bytes) in the given folder. Or zero if there was a problem (or no free space).
 	 */
 	public static long getFreeSpace(final String folder) {
-		long space = new File(Functions.resolvePathWithEnv(folder)).getFreeSpace();
+		final File folderFile = new File(Functions.resolvePathWithEnv(folder));
 
+		try {
+			if (!folderFile.exists())
+				folderFile.mkdirs();
+		}
+		catch (Exception e) {
+			// ignore
+		}
+
+		long space = folderFile.getFreeSpace();
 		if (space <= 0) {
 			// 32b JRE returns 0 when too much space is available
 
@@ -874,6 +885,8 @@ public class JobAgent implements Runnable {
 		logger.log(Level.INFO, "Launching jobwrapper using the command: " + launchCommand.toString());
 		final long ttl = ttlForJob();
 
+		boolean payloadMonitoring = false;
+
 		final ProcessBuilder pBuilder = new ProcessBuilder(launchCommand);
 		pBuilder.environment().remove("JALIEN_TOKEN_CERT");
 		pBuilder.environment().remove("JALIEN_TOKEN_KEY");
@@ -934,11 +947,20 @@ public class JobAgent implements Runnable {
 			logger.log(Level.INFO, process_res_format);
 			putJobLog("procfmt", process_res_format);
 
-			wrapperPID = (int) p.pid();
+			childPID = (int) p.pid();
 
-			apmon.setNumCPUs(cpuCores);
-			apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
-			mj = new MonitoredJob(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
+			//apmon.setNumCPUs(cpuCores);
+			//apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
+			mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
+			apmon.addJobInstanceToMonitor(mj);
+
+			String monitoring = jdl.gets("Monitoring");
+			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
+				payloadMonitoring = true;
+				mj.setWrapperPid(getWrapperPid());
+				//mjPayload = apmon.addJobToMonitor(getWrapperPid(), jobWorkdir, ce + "_JobWrapper", matchedJob.get("queueId").toString());
+				mj.setPayloadMonitoring();
+			}
 
 			final String fs = checkProcessResources();
 			if (fs == null)
@@ -964,6 +986,7 @@ public class JobAgent implements Runnable {
 		logger.log(Level.INFO, "About to enter monitor loop. Is the JobWrapper process alive?: " + p.isAlive());
 
 		int monitor_loops = 0;
+		boolean discoveredPid = false;
 		try {
 			while (p.isAlive()) {
 				logger.log(Level.FINEST, "Waiting for the JobWrapper process to finish");
@@ -978,7 +1001,8 @@ public class JobAgent implements Runnable {
 							putJobTrace("ERROR[FATAL]: Process overusing resources");
 							putJobTrace(error);
 							killGracefully(p);
-						} else {
+						}
+						else {
 							logger.log(Level.SEVERE, "ERROR[FATAL]: Job KILLED by user! Terminating...");
 							putJobTrace("ERROR[FATAL]: Job KILLED by user! Terminating...");
 							killForcibly(p);
@@ -990,6 +1014,12 @@ public class JobAgent implements Runnable {
 						monitor_loops = 0;
 						sendProcessResources(false);
 					}
+
+					//set to 24
+					if (monitor_loops % 12 == 0) {
+						apmon.sendOneJobInfo(mj);
+					}
+
 					else if (getWrapperJobStatusTimestamp() != lastStatusChange) {
 						final String wrapperStatus = getWrapperJobStatus();
 
@@ -998,10 +1028,19 @@ public class JobAgent implements Runnable {
 							sendProcessResources(false);
 						}
 
+						if ("RUNNING".equals(wrapperStatus) && payloadMonitoring == true && mj != null && discoveredPid == false) {
+							mj.discoverPayloadPid("payload-" + queueId);
+							discoveredPid = true;
+						}
+
 						//Check if the wrapper has exited without us knowing
 						if ("DONE".equals(wrapperStatus) || wrapperStatus.contains("ERROR")) {
-							putJobTrace("Warning: The JobWrapper has terminated without the JobAgent noticing. Killing leftover processes...");
-							p.destroyForcibly();
+
+							//In case the wrapper was just about to exit normally, wait a few seconds
+							if (!p.waitFor(15, TimeUnit.SECONDS)) {
+								putJobTrace("Warning: The JobWrapper has terminated without the JobAgent noticing. Killing leftover processes...");
+								p.destroyForcibly();
+							}
 						}
 
 					}
@@ -1027,6 +1066,11 @@ public class JobAgent implements Runnable {
 
 			return code;
 		}
+		catch (Exception ex) {
+			logger.log(Level.WARNING, "Error encountered while running job: ", ex);
+			putJobTrace("Error encountered while running job: " + ex);
+			return -1;
+		}
 		finally {
 			try {
 				t.cancel();
@@ -1035,7 +1079,7 @@ public class JobAgent implements Runnable {
 			catch (final Exception e) {
 				logger.log(Level.WARNING, "Not all resources from the current job could be cleared: " + e);
 			}
-			apmon.removeJobToMonitor(wrapperPID);
+			apmon.removeJobToMonitor(childPID);
 			if (code != 0) {
 				// Looks like something went wrong. Let's check the last reported status
 				final String lastStatus = getWrapperJobStatus();
@@ -1047,9 +1091,9 @@ public class JobAgent implements Runnable {
 					putJobTrace("ERROR: The JobWrapper was killed during saving");
 					changeJobStatus(JobStatus.ERROR_SV, null); // JobWrapper was killed during saving
 				}
-                else if (lastStatus.isBlank()){
+				else if (lastStatus.isBlank()) {
 					putJobTrace("ERROR: The JobWrapper was killed before job start");
-					changeJobStatus(JobStatus.ERROR_E, null); // JobWrapper was killed before payload start
+					changeJobStatus(JobStatus.ERROR_IB, null); // JobWrapper was killed before payload start
 				}
 			}
 		}
@@ -1094,10 +1138,10 @@ public class JobAgent implements Runnable {
 
 	private void getFinalCPUUsage() {
 		double totalCPUTime = getTotalCPUTime("execution") + getTotalCPUTime("validation");
-		if (totalCPUTime > RES_CPUTIME)
+		if (totalCPUTime > RES_CPUTIME.doubleValue())
 			RES_CPUTIME = Double.valueOf(totalCPUTime);
-		if (RES_RUNTIME > 0)
-			RES_CPUUSAGE = Double.valueOf((RES_CPUTIME / RES_RUNTIME) * 100);
+		if (RES_RUNTIME.doubleValue() > 0)
+			RES_CPUUSAGE = Double.valueOf((RES_CPUTIME.doubleValue() / RES_RUNTIME.doubleValue()) * 100);
 		else
 			RES_CPUUSAGE = Double.valueOf(0);
 		logger.log(Level.INFO, "The last CPU time, computed as real+user time is " + RES_CPUTIME + ". Given that the job's wall time is " + RES_RUNTIME + ", the CPU usage is " + RES_CPUUSAGE);
@@ -1113,16 +1157,18 @@ public class JobAgent implements Runnable {
 				fields.add(line.split(" ")[0]);
 				if (line.startsWith("sys") || line.startsWith("user")) {
 					try {
-				        float time = Float.parseFloat(line.split(" ")[1]);
-				        cpuTime = cpuTime + time;
-				    } catch (NumberFormatException|IndexOutOfBoundsException e) {
+						float time = Float.parseFloat(line.split(" ")[1]);
+						cpuTime = cpuTime + time;
+					}
+					catch (NumberFormatException | IndexOutOfBoundsException e) {
 						logger.log(Level.WARNING, "The file " + timeFile + " did not have the expected `time` format. \n" + e);
-				    }
+					}
 				}
 			}
-			if (fields.size() != 3 || !fields.contains("real") || !fields.contains("user")|| !fields.contains("sys"))
+			if (fields.size() != 3 || !fields.contains("real") || !fields.contains("user") || !fields.contains("sys"))
 				logger.log(Level.WARNING, "The file " + timeFile + " did not have the expected `time` format. Expected to have real,user,sys fields");
-		} catch (IOException e) {
+		}
+		catch (IOException e) {
 			logger.log(Level.WARNING, "The file " + timeFile + " could not be found. \n" + e);
 		}
 		return cpuTime;
@@ -1465,17 +1511,18 @@ public class JobAgent implements Runnable {
 	}
 
 	/**
-	 * 
+	 *
 	 * Immediately kills the JobWrapper and its payload, without giving time for upload
-	 * 
+	 *
 	 * @param p process for JobWrapper
 	 */
-	private void killForcibly(final Process p){
+	private void killForcibly(final Process p) {
 		final int jobWrapperPid = getWrapperPid();
 		try {
-			if (jobWrapperPid != 0){
+			if (jobWrapperPid != 0) {
 				JobWrapper.cleanupProcesses(queueId, jobWrapperPid);
-				Runtime.getRuntime().exec("kill -9" + jobWrapperPid); }
+				Runtime.getRuntime().exec("kill -9" + jobWrapperPid);
+			}
 			else
 				logger.log(Level.INFO, "Could not kill JobWrapper: not found. Already done?");
 		}
@@ -1525,21 +1572,21 @@ public class JobAgent implements Runnable {
 	}
 
 	/**
-	 * 
+	 *
 	 * Reads the list of variables defined in META_VARIABLES, and returns their current value in the
 	 * environment as a map.
-	 * 
+	 *
 	 * Used for propagating any additional environment variables to container/payload.
-	 * 
+	 *
 	 * @return map of env variables defined in META_VARIABLES and their current value.
 	 */
-	private Map<String, String> getMetaVariables() {
+	private static Map<String, String> getMetaVariables() {
 		String metavars = env.getOrDefault("META_VARIABLES", "");
-        
+
 		List<String> metavars_list = Arrays.asList(metavars.split("\\s*,\\s*"));
 		System.err.println("Detected metavars: " + metavars_list.toString());
 
-		Map<String, String> metavars_map = new HashMap<String, String>();
+		Map<String, String> metavars_map = new HashMap<>();
 		for (final String var : metavars_list)
 			metavars_map.put(var, env.getOrDefault(var, ""));
 

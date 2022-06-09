@@ -17,6 +17,10 @@ public class ContainerizerFactory {
 	 */
 	enum Containerizers {
 		/**
+		 * Entry for Apptainer (CVMFS)
+		 */
+		ApptainerCVMFS,
+		/**
 		 * Entry for Singularity (CVMFS)
 		 */
 		SingularityCVMFS,
@@ -24,6 +28,10 @@ public class ContainerizerFactory {
 		 * Entry for Singularity (local)
 		 */
 		Singularity,
+		/**
+		 * Entry for Podman
+		 */
+		Podman,
 		/**
 		 * Entry for Docker
 		 */
