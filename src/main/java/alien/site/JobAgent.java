@@ -1035,8 +1035,12 @@ public class JobAgent implements Runnable {
 
 						//Check if the wrapper has exited without us knowing
 						if ("DONE".equals(wrapperStatus) || wrapperStatus.contains("ERROR")) {
-							putJobTrace("Warning: The JobWrapper has terminated without the JobAgent noticing. Killing leftover processes...");
-							p.destroyForcibly();
+
+							//In case the wrapper was just about to exit normally, wait a few seconds
+							if (!p.waitFor(15, TimeUnit.SECONDS)) {
+								putJobTrace("Warning: The JobWrapper has terminated without the JobAgent noticing. Killing leftover processes...");
+								p.destroyForcibly();
+							}
 						}
 
 					}
@@ -1061,6 +1065,11 @@ public class JobAgent implements Runnable {
 				logger.log(Level.WARNING, "Error encountered: see the JobWrapper logs in: " + env.getOrDefault("TMPDIR", "/tmp") + "/jalien-jobwrapper.log " + " for more details");
 
 			return code;
+		}
+		catch (Exception ex) {
+			logger.log(Level.WARNING, "Error encountered while running job: ", ex);
+			putJobTrace("Error encountered while running job: " + ex);
+			return -1;
 		}
 		finally {
 			try {
