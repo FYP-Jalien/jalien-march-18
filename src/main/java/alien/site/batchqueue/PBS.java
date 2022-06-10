@@ -3,7 +3,6 @@ package alien.site.batchqueue;
 import java.io.File;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
@@ -34,7 +33,7 @@ public class PBS extends BatchQueue {
 	 * @param logr
 	 */
 	@SuppressWarnings("unchecked")
-	public PBS(HashMap<String, Object> conf, Logger logr) {
+	public PBS(final HashMap<String, Object> conf, final Logger logr) {
 		this.environment = System.getenv();
 		this.config = conf;
 		this.logger = logr;
@@ -57,7 +56,7 @@ public class PBS extends BatchQueue {
 
 		// Get environment from LDAP
 		if (envFromConfig != null) {
-			for (String env_field : envFromConfig) {
+			for (final String env_field : envFromConfig) {
 				if (env_field.contains("SUBMIT_ARGS")) {
 					this.submitArg = getValue(env_field, "SUBMIT_ARGS", this.submitArg);
 				}
@@ -70,11 +69,10 @@ public class PBS extends BatchQueue {
 		// Override with process environment
 		this.submitArg = environment.getOrDefault("SUBMIT_ARGS", submitArg);
 		this.statusArg = environment.getOrDefault("STATUS_ARGS", this.statusArg);
-		
+
 		user = environment.get("USER");
 
-
-		this.statusCmd = statusCmd + " -u " + user + " " + statusArg;  
+		this.statusCmd = statusCmd + " -u " + user + " " + statusArg;
 		this.submitCmd = submitCmd + " " + submitArg;
 
 	}
@@ -133,11 +131,11 @@ public class PBS extends BatchQueue {
 
 		// Stage jobagent startup script to PBS node if no "alien_not_stage_files" declared
 		if (stageIn) {
-			Pattern pattern = Pattern.compile("^.*/([^/]*)$");
-			Matcher matcher = pattern.matcher(script);
+			final Pattern pattern = Pattern.compile("^.*/([^/]*)$");
+			final Matcher matcher = pattern.matcher(script);
 
 			if (matcher.find()) {
-				String stagewn = matcher.group(1);
+				final String stagewn = matcher.group(1);
 				submit_cmd += String.format("#PBS -W stagein=%s@%s:%s\n", stagewn, config.get("ce_host"), script);
 			}
 			else
@@ -148,7 +146,7 @@ public class PBS extends BatchQueue {
 		this.logger.info(submit_cmd);
 
 		submit_cmd += script + "\n";
-		String temp_file_cmd = this.submitCmd + " <<EOF\n" + submit_cmd + "EOF";
+		final String temp_file_cmd = this.submitCmd + " <<EOF\n" + submit_cmd + "EOF";
 		final ExitStatus exitStatus = executeCommand(temp_file_cmd);
 		final List<String> output = getStdOut(exitStatus);
 
@@ -159,7 +157,7 @@ public class PBS extends BatchQueue {
 
 	}
 
-	public int getStatus(String status) {
+	public int getStatus(final String status) {
 		int numberedStatus = 0;
 		final ExitStatus exitStatus = executeCommand(statusCmd);
 		final List<String> output_list = getStdOut(exitStatus);
@@ -167,9 +165,9 @@ public class PBS extends BatchQueue {
 		if (exitStatus.getExecutorFinishStatus() != ExecutorFinishStatus.NORMAL)
 			return -1;
 
-		for (String output_line : output_list) {
-			String[] line = output_line.trim().split("\\s+");
-			for (String job_line : line) {
+		for (final String output_line : output_list) {
+			final String[] line = output_line.trim().split("\\s+");
+			for (final String job_line : line) {
 				if (job_line.equals("Q") || job_line.equals(status)) {
 					numberedStatus++;
 				}
@@ -210,7 +208,7 @@ public class PBS extends BatchQueue {
 			return args.toString();
 		}
 		else {
-			String arg = config.get(argToRead).toString();
+			final String arg = config.get(argToRead).toString();
 			if (!arg.equalsIgnoreCase("alien_not_stage_files"))
 				return arg;
 			else
