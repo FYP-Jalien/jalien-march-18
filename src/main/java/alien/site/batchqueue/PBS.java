@@ -27,6 +27,7 @@ public class PBS extends BatchQueue {
 	private String statusCmd;
 	private TreeSet<String> envFromConfig;
 	private boolean stageIn = true;
+	private final String user;
 
 	/**
 	 * @param conf
@@ -37,7 +38,6 @@ public class PBS extends BatchQueue {
 		this.environment = System.getenv();
 		this.config = conf;
 		this.logger = logr;
-		this.envFromConfig = (TreeSet<String>) this.config.get("ce_environment");
 		this.logger.info("This VO-Box is " + config.get("ALIEN_CM_AS_LDAP_PROXY") + ", site is "
 				+ config.get("site_accountname"));
 
@@ -70,7 +70,11 @@ public class PBS extends BatchQueue {
 		// Override with process environment
 		this.submitArg = environment.getOrDefault("SUBMIT_ARGS", submitArg);
 		this.statusArg = environment.getOrDefault("STATUS_ARGS", this.statusArg);
+		
+		user = environment.get("USER");
 
+
+		this.statusCmd = statusCmd + " -u " + user + " " + statusArg;  
 		this.submitCmd = submitCmd + " " + submitArg;
 
 	}
@@ -157,7 +161,7 @@ public class PBS extends BatchQueue {
 
 	public int getStatus(String status) {
 		int numberedStatus = 0;
-		final ExitStatus exitStatus = executeCommand(statusCmd + " " + statusArg);
+		final ExitStatus exitStatus = executeCommand(statusCmd);
 		final List<String> output_list = getStdOut(exitStatus);
 
 		if (exitStatus.getExecutorFinishStatus() != ExecutorFinishStatus.NORMAL)
