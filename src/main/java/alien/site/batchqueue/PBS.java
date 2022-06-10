@@ -40,7 +40,7 @@ public class PBS extends BatchQueue {
 		this.envFromConfig = (TreeSet<String>) this.config.get("ce_environment");
 		this.logger.info("This VO-Box is " + config.get("ALIEN_CM_AS_LDAP_PROXY") + ", site is "
 				+ config.get("site_accountname"));
-		
+
 		try {
 			this.envFromConfig = (TreeSet<String>) this.config.get("ce_environment");
 		}
@@ -48,14 +48,14 @@ public class PBS extends BatchQueue {
 			logger.severe(e.toString());
 		}
 
-		//Initialize from LDAP
+		// Initialize from LDAP
 		this.submitCmd = (String) config.getOrDefault("ce_submitcmd", "qsub");
 		this.statusCmd = (String) config.getOrDefault("ce_statuscmd", "qstat -n -1");
-		
+
 		this.submitArg = readArgFromLdap("ce_submitarg");
 		this.statusArg = readArgFromLdap("ce_statusarg");
-		
-		//Get environment from LDAP
+
+		// Get environment from LDAP
 		if (envFromConfig != null) {
 			for (String env_field : envFromConfig) {
 				if (env_field.contains("SUBMIT_ARGS")) {
@@ -66,12 +66,11 @@ public class PBS extends BatchQueue {
 				}
 			}
 		}
-		
-		//Override with process environment
+
+		// Override with process environment
 		this.submitArg = environment.getOrDefault("SUBMIT_ARGS", submitArg);
 		this.statusArg = environment.getOrDefault("STATUS_ARGS", this.statusArg);
 
-		
 		this.submitCmd = submitCmd + " " + submitArg;
 
 	}
@@ -79,28 +78,25 @@ public class PBS extends BatchQueue {
 	@Override
 	public void submit(final String script) {
 		this.logger.info("Submit PBS");
-		
+
 		final DateFormat date_format = new SimpleDateFormat("yyyy-MM-dd");
 		final String current_date_str = date_format.format(new Date());
 		final Long timestamp = Long.valueOf(System.currentTimeMillis());
 
-
-
 		String out_cmd = "#PBS -o /dev/null\n";
 		String err_cmd = "#PBS -e /dev/null\n";
-	
-		
-		//Check if logdir is declared
+
+		// Check if logdir is declared
 		final String host_logdir = config.get("host_logdir") != null ? config.get("host_logdir").toString() : null;
-		
+
 		if (host_logdir != null) {
-			final String log_folder_path = String.format("%s/%s",Functions.resolvePathWithEnv( host_logdir), current_date_str);
+			final String log_folder_path = String.format("%s/%s", Functions.resolvePathWithEnv(host_logdir), current_date_str);
 			final File log_folder = new File(log_folder_path);
 			if (!(log_folder.exists())) {
 				try {
 					log_folder.mkdirs();
 				}
-				catch (final SecurityException e){
+				catch (final SecurityException e) {
 					this.logger.info(String.format("[PBS] Couldn't create log folder, dont have permission: %s", log_folder_path));
 					e.printStackTrace();
 				}
@@ -121,36 +117,32 @@ public class PBS extends BatchQueue {
 					config.get("host_host"), timestamp);
 			out_cmd = String.format("#PBS -o %s.out\n", file_base_name);
 			err_cmd = String.format("#PBS -e %s.err\n", file_base_name);
-			
+
 		}
 
-
-
-		String submit_cmd = out_cmd + err_cmd;	
+		String submit_cmd = out_cmd + err_cmd;
 		submit_cmd += "#PBS -V \n";
-		
-		//Name must be max 15 characters long
+
+		// Name must be max 15 characters long
 		final String name = String.format("jobagent_%d", timestamp % 1000000L);
 		submit_cmd += String.format("#PBS -N %s%n", name);
 
-
-		
-		//Stage jobagent startup script to PBS node if no "alien_not_stage_files" declared
+		// Stage jobagent startup script to PBS node if no "alien_not_stage_files" declared
 		if (stageIn) {
-			Pattern pattern = Pattern.compile("^.*\\/([^\\/]*)$");    
+			Pattern pattern = Pattern.compile("^.*/([^/]*)$");
 			Matcher matcher = pattern.matcher(script);
-			
-			if(matcher.find()) {
+
+			if (matcher.find()) {
 				String stagewn = matcher.group(1);
 				submit_cmd += String.format("#PBS -W stagein=%s@%s:%s\n", stagewn, config.get("ce_host"), script);
 			}
 			else
 				this.logger.log(Level.WARNING, "Unable to use stage in. Issue with script path?");
-			
+
 		}
-		
+
 		this.logger.info(submit_cmd);
-		
+
 		submit_cmd += script + "\n";
 		String temp_file_cmd = this.submitCmd + " <<EOF\n" + submit_cmd + "EOF";
 		final ExitStatus exitStatus = executeCommand(temp_file_cmd);
@@ -161,15 +153,13 @@ public class PBS extends BatchQueue {
 			logger.info(trimmed_line);
 		}
 
-
 	}
 
-	
 	public int getStatus(String status) {
 		int numberedStatus = 0;
 		final ExitStatus exitStatus = executeCommand(statusCmd + " " + statusArg);
 		final List<String> output_list = getStdOut(exitStatus);
-		
+
 		if (exitStatus.getExecutorFinishStatus() != ExecutorFinishStatus.NORMAL)
 			return -1;
 
@@ -183,7 +173,7 @@ public class PBS extends BatchQueue {
 		}
 		return numberedStatus;
 	}
-	
+
 	@Override
 	public int getNumberActive() {
 		return getStatus("R");
@@ -196,10 +186,10 @@ public class PBS extends BatchQueue {
 
 	@Override
 	public int kill() {
-		//Not implemented.
+		// Not implemented. Is it needed?
 		return 0;
 	}
-	
+
 	@SuppressWarnings("unchecked")
 	private String readArgFromLdap(final String argToRead) {
 		if (!config.containsKey(argToRead) || config.get(argToRead) == null)
@@ -221,8 +211,7 @@ public class PBS extends BatchQueue {
 				return arg;
 			else
 				stageIn = false;
-				return "";
+			return "";
 		}
 	}
 }
-
