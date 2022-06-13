@@ -56,7 +56,6 @@ public class LFNCrawler extends Optimizer {
     private static long    directoriesDeleted;
     private static long    filesDeleted;
     private static long    reclaimedSpace;
-    private static long    elapsedTime;
 
 
     /**
@@ -289,7 +288,7 @@ public class LFNCrawler extends Optimizer {
         print("Directories deleted: " + directoriesDeleted);
         print("Files deleted: "       + filesDeleted);
         print("Reclaimed space: "     + reclaimedSpace);
-        print("Execution took: "      + elapsedTime + " hours");
+        print("Execution took: "      + t);
 
         DBSyncUtils.registerLog(LFNCrawler.class.getCanonicalName(),
                                 "Directories deleted: " + directoriesDeleted + "\n" +
