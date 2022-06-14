@@ -42,9 +42,14 @@ public abstract class Containerizer {
 	private static final String rocrDevices = System.getenv().containsKey("ROCR_VISIBLE_DEVICES") ? " && echo export ROCR_VISIBLE_DEVICES=" + System.getenv().get("ROCR_VISIBLE_DEVICES") : "";
 
 	/**
+	 * ApMon
+	 */
+	private static final String apmonConfig = System.getenv().containsKey("APMON_CONFIG") ? " && echo export APMON_CONFIG=" + System.getenv().get("APMON_CONFIG") : "";
+
+	/**
 	 * Command to set the environment for container
 	 */
-	protected static final String envSetup = "source <( " + CVMFS.getAlienvPrint() + " && echo export APMON_CONFIG=" + System.getenv("APMON_CONFIG") + cudaDevices +  rocrDevices + " ); ";
+	protected static final String envSetup = "source <( " + CVMFS.getAlienvPrint() + apmonConfig + cudaDevices +  rocrDevices + " ); ";
 
 	/**
 	 * Simple constructor, initializing the container path from default location or from the environment (DEFAULT_JOB_CONTAINER_PATH key)
