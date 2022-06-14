@@ -1598,11 +1598,11 @@ public class JobAgent implements Runnable {
 		return metavars_map;
 	}
 
-	final Runnable heartbeatMonitor(Process p) {
+	private final Runnable heartbeatMonitor(Process p) {
 		return () -> {
 			while (p.isAlive()) {
 				if (System.currentTimeMillis() - lastHeartbeat > 900000)
-					putJobTrace("WARNING: Something is preventing the sending of hearbeats/resource info!");
+					putJobTrace("WARNING: Something is preventing the sending of heartbeats/resource info!");
 
 				try {
 					Thread.sleep(30 * 1000);
