@@ -891,7 +891,7 @@ public class JobAgent implements Runnable {
 		final ProcessBuilder pBuilder = new ProcessBuilder(launchCommand);
 		pBuilder.environment().remove("JALIEN_TOKEN_CERT");
 		pBuilder.environment().remove("JALIEN_TOKEN_KEY");
-		pBuilder.environment().put("TMPDIR", "tmp");
+		pBuilder.environment().put("TMPDIR", "tmp"); //Only for JW start --> set to jobworkdir/tmp by JW for payload
 		pBuilder.redirectError(Redirect.INHERIT);
 		pBuilder.directory(tempDir);
 

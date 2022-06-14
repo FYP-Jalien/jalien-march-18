@@ -34,12 +34,17 @@ public abstract class Containerizer {
 	 * Working directory
 	 */
 	String workdir = null;
-	
+
+	/**
+	 * GPU
+	 */
+	private static final String cudaDevices = System.getenv().containsKey("CUDA_VISIBLE_DEVICES") ? " && echo export CUDA_VISIBLE_DEVICES=" + System.getenv().get("CUDA_VISIBLE_DEVICES") : "";
+	private static final String rocrDevices = System.getenv().containsKey("ROCR_VISIBLE_DEVICES") ? " && echo export ROCR_VISIBLE_DEVICES=" + System.getenv().get("ROCR_VISIBLE_DEVICES") : "";
+
 	/**
 	 * Command to set the environment for container
 	 */
-	protected static final String envSetup = "source <( " + CVMFS.getAlienvPrint() + " && echo export APMON_CONFIG=" + System.getenv("APMON_CONFIG") + " && echo export CUDA_VISIBLE_DEVICES=" +
-			System.getenv().get("CUDA_VISIBLE_DEVICES") + " && echo export ROCR_VISIBLE_DEVICES=" + System.getenv().get("ROCR_VISIBLE_DEVICES") + " ); ";
+	protected static final String envSetup = "source <( " + CVMFS.getAlienvPrint() + " && echo export APMON_CONFIG=" + System.getenv("APMON_CONFIG") + cudaDevices +  rocrDevices + " ); ";
 
 	/**
 	 * Simple constructor, initializing the container path from default location or from the environment (DEFAULT_JOB_CONTAINER_PATH key)
@@ -111,6 +116,8 @@ public abstract class Containerizer {
 	}
 
 	/**
+	 * Workdir to be mounted in the container as CONTAINER_JOBDIR
+	 * 
 	 * @param newWorkdir
 	 */
 	public void setWorkdir(final String newWorkdir) {
