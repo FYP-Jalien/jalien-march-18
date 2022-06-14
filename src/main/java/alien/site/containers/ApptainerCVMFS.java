@@ -25,7 +25,7 @@ public class ApptainerCVMFS extends Containerizer {
 
 		apptainerCmd.add("-B");
 		if(workdir != null) {
-			apptainerCmd.add("/cvmfs:/cvmfs,/tmp:/tmp," + workdir + ":" + CONTAINER_JOBDIR); //TODO: remove /tmp after testing (not needed)
+			apptainerCmd.add("/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR);
 			apptainerCmd.add("--pwd");
 			apptainerCmd.add(CONTAINER_JOBDIR);
 		}

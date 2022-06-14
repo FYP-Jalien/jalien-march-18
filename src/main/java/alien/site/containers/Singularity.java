@@ -17,7 +17,7 @@ public class Singularity extends Containerizer {
 		singularityCmd.add("-B");
 
 		if(workdir != null) {
-			singularityCmd.add("/cvmfs:/cvmfs,/tmp:/tmp," + workdir + ":" + CONTAINER_JOBDIR); //TODO: remove /tmp after testing (not needed)
+			singularityCmd.add("/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR);
 			singularityCmd.add("--pwd");
 			singularityCmd.add(CONTAINER_JOBDIR);
 		}
