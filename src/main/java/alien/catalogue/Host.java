@@ -50,6 +50,8 @@ public class Host implements Comparable<Host> {
 	 */
 	public final String jdbcURL;
 
+	private final String configFile;
+
 	private ExtProperties dbProperties = null;
 
 	/**
@@ -73,8 +75,16 @@ public class Host implements Comparable<Host> {
 		else
 			dbProperties = new ExtProperties();
 
-		if (jdbcURL.length() > 0)
-			dbProperties.set("url", jdbcURL);
+		if (jdbcURL.length() > 0) {
+			if (jdbcURL.endsWith(".properties"))
+				configFile = jdbcURL.substring(0, jdbcURL.indexOf('.'));
+			else {
+				configFile = null;
+				dbProperties.set("url", jdbcURL);
+			}
+		}
+		else
+			configFile = null;
 
 		dbProperties.set("database", this.db);
 		dbProperties.set("host", address.substring(0, address.indexOf(':')));
@@ -92,6 +102,9 @@ public class Host implements Comparable<Host> {
 	 * @return a database connection to this host
 	 */
 	public DBFunctions getDB() {
+		if (configFile != null)
+			return ConfigUtils.getDB(configFile);
+
 		return new DBFunctions(dbProperties);
 	}
 
