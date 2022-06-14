@@ -116,6 +116,7 @@ public class JobAgent implements Runnable {
 	private String jarName;
 	private int childPID;
 	private static float lhcbMarks = -1;
+	private long lastHeartbeat = 0;
 
 	private enum jaStatus {
 		/**
@@ -985,6 +986,8 @@ public class JobAgent implements Runnable {
 
 		logger.log(Level.INFO, "About to enter monitor loop. Is the JobWrapper process alive?: " + p.isAlive());
 
+		new Thread(heartbeatMonitor(p)).start();
+
 		int monitor_loops = 0;
 		boolean discoveredPid = false;
 		try {
@@ -1134,6 +1137,8 @@ public class JobAgent implements Runnable {
 		logger.log(Level.INFO, procinfo);
 
 		putJobLog("proc", procinfo);
+
+		lastHeartbeat = System.currentTimeMillis();
 	}
 
 	private void getFinalCPUUsage() {
@@ -1592,4 +1597,21 @@ public class JobAgent implements Runnable {
 
 		return metavars_map;
 	}
+
+	final Runnable heartbeatMonitor(Process p) {
+		return () -> {
+			while (p.isAlive()) {
+				if (System.currentTimeMillis() - lastHeartbeat > 900000)
+					putJobTrace("WARNING: Something is preventing the sending of hearbeats/resource info!");
+
+				try {
+					Thread.sleep(30 * 1000);
+				}
+				catch (final InterruptedException ie) {
+					// ignore
+				}
+			}
+		};
+	}
+	
 }
