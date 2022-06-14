@@ -25,12 +25,15 @@ public class ApptainerCVMFS extends Containerizer {
 
 		apptainerCmd.add("-B");
 		if(workdir != null) {
-			apptainerCmd.add("/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR);
+			apptainerCmd.add("/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + workdir + "/tmp:/tmp");
 			apptainerCmd.add("--pwd");
 			apptainerCmd.add(CONTAINER_JOBDIR);
 		}
 		else
 			apptainerCmd.add("/cvmfs:/cvmfs");
+
+		apptainerCmd.add("--no-mount");
+		apptainerCmd.add("tmp");
 
 		apptainerCmd.add(containerImgPath);
 		apptainerCmd.add("/bin/bash");

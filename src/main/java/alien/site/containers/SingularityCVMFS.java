@@ -25,12 +25,15 @@ public class SingularityCVMFS extends Containerizer {
 
 		singularityCmd.add("-B");
 		if(workdir != null) {
-			singularityCmd.add("/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR);
+			singularityCmd.add("/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + workdir + "/tmp:/tmp");
 			singularityCmd.add("--pwd");
 			singularityCmd.add(CONTAINER_JOBDIR);
 		}
 		else
 			singularityCmd.add("/cvmfs:/cvmfs");
+
+		singularityCmd.add("--no-mount");
+		singularityCmd.add("tmp");			
 
 		singularityCmd.add(containerImgPath);
 		singularityCmd.add("/bin/bash");
