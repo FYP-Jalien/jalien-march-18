@@ -270,7 +270,7 @@ public class JobAgent implements Runnable {
 	 */
 	protected static final AtomicInteger retries = new AtomicInteger(0);
 
-	static int []usedCPUs;
+	static int[] usedCPUs;
 
 	/**
 	 */
@@ -402,8 +402,7 @@ public class JobAgent implements Runnable {
 
 		if (env.containsKey("cpuIsolation"))
 			cpuIsolation = Boolean.parseBoolean(env.get("cpuIsolation"));
-		else
-			cpuIsolation = false;
+
 		logger.log(Level.INFO, "cpuIsolation = " + cpuIsolation);
 
 		workdir = Functions.resolvePathWithEnv((String) siteMap.get("workdir"));
@@ -891,7 +890,7 @@ public class JobAgent implements Runnable {
 		try {
 			String cmd = "pgrep -v -U root -u root | xargs -L1 taskset -a -p 2>/dev/null | cut -d' ' -f6 | sort -u";
 
-			final Process affinityCmd = Runtime.getRuntime().exec(new String[] {"/bin/bash", "-c", cmd});
+			final Process affinityCmd = Runtime.getRuntime().exec(new String[] { "/bin/bash", "-c", cmd });
 			affinityCmd.waitFor();
 			try (Scanner cmdScanner = new Scanner(affinityCmd.getInputStream())) {
 				String readArg;
@@ -903,7 +902,7 @@ public class JobAgent implements Runnable {
 					if (BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE).equals(newVal))
 						continue;
 
-					mask.or(newVal);
+					mask = mask.or(newVal);
 
 				}
 				return valueToArray(mask, RES_NOCPUS.intValue());
@@ -924,12 +923,11 @@ public class JobAgent implements Runnable {
 		int count = 0;
 		BigInteger vAux = v;
 
-		while (vAux.compareTo(BigInteger.ZERO) < 0) {
-			maskArray[count] = vAux.testBit(1) ? 1 : 0;
-			vAux = vAux.shiftLeft(1);
+		while (vAux.compareTo(BigInteger.ZERO)  > 0 && count < size) {
+			maskArray[count] = vAux.testBit(0) ? 1 : 0;
+			vAux = vAux.shiftRight(1);
 			count++;
 		}
-
 		return maskArray;
 	}
 
@@ -965,24 +963,166 @@ public class JobAgent implements Runnable {
 		return null;
 	}
 
-	String pickCPUs(long[] mask) {
-		long remainingCPU = reqCPU.longValue();
-		long []newMask = new long[RES_NOCPUS.intValue()];
-		for (int i = 0; i < RES_NOCPUS.intValue() && remainingCPU > 0; i++) {
-			if (mask[i] != 1 && usedCPUs[i] == 0) {
-				newMask[i] = 1;
-				remainingCPU--;
+	long[] getCPURange(int cpu, int index) {
+		long[] cpuRange = new long[RES_NOCPUS.intValue()];
+		String filename = "/sys/bus/cpu/devices/cpu" + cpu + "/cache/index" + index + "/shared_cpu_list";
+		File f = new File(filename);
+
+		String s;
+		if (f.exists() && f.canRead()) {
+			try (BufferedReader br = new BufferedReader(new FileReader(f))) {
+				while ((s = br.readLine()) != null) {
+					String[] splitted = s.split(",");
+					for (String range : splitted) {
+						String patternStr = "(\\d+)-(\\d+)";
+						Pattern pattern = Pattern.compile(patternStr);
+						Matcher matcher = pattern.matcher(range);
+						if (matcher.matches()) {
+							int rangeidx = Integer.parseInt(matcher.group(1));
+							while (rangeidx <= Integer.parseInt(matcher.group(2))) {
+								cpuRange[rangeidx] = 1;
+								rangeidx += 1;
+							}
+							System.out.println(matcher.group(1) + " - " + matcher.group(2));
+						}
+						else {
+							patternStr = "^\\d+$";
+							pattern = Pattern.compile(patternStr);
+							matcher = pattern.matcher(range);
+							if (matcher.matches())
+								cpuRange[Integer.parseInt(matcher.group())] = 1;
+						}
+					}
+				}
+			}
+			catch (IOException e) {
+				logger.log(Level.WARNING, "Could not access " + filename + " " + e);
 			}
 		}
+		String rangeStr = getMaskString(cpuRange);
+		logger.log(Level.INFO, "The CPU range for CPU " + cpu + " and index " + index + " is " + rangeStr);
+
+		return cpuRange;
+
+	}
+
+	private String getMaskString(long[] cpuRange) {
+		// Aux printing for debugging purposes
+		String rangeStr = "";
+		for (int i = 0; i < cpuRange.length; i++) {
+			//if (cpuRange[i] == 1)
+				rangeStr = rangeStr + cpuRange[i] + " ";
+		}
+		return rangeStr;
+	}
+
+	private String getMaskString(int[] cpuRange) {
+		// Aux printing for debugging purposes
+			String rangeStr = "";
+			for (int i = 0; i < cpuRange.length; i++) {
+				//if (cpuRange[i] == 1)
+					rangeStr = rangeStr + cpuRange[i] + " ";
+			}
+			return rangeStr;
+	}
+
+	String pickCPUs(long[] mask) {
+		long remainingCPU = reqCPU.longValue();
+		long[] newMask = new long[RES_NOCPUS.intValue()];
+
+		for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
+			// for (int i = 0; i < RES_NOCPUS.intValue() && remainingCPU > 0; i++) {
+			if (mask[i] != 1 && usedCPUs[i] == 0) {
+				newMask[i] = 1;
+				// remainingCPU--;
+			}
+		}
+
+		File indexes = new File("/sys/bus/cpu/devices/cpu0/cache/");
+		File filesList[] = indexes.listFiles();
+
+		//For the moment we get the highest - NUMA nodes
+		int highestIndex = 0;
+		for(File dir : filesList) {
+			if (dir.getName().startsWith("index")) {
+				int index = Integer.parseInt(dir.getName().substring(dir.getName().length() - 1));
+				if (index > highestIndex) {
+					highestIndex = index;
+				}
+			}
+		}
+
+		long[] finalMask = new long[RES_NOCPUS.intValue()];
+		for (int cpu = 0; cpu < newMask.length; cpu ++) {
+			if (newMask[cpu] == 1) {
+				remainingCPU = reqCPU.longValue();
+				finalMask = new long[RES_NOCPUS.intValue()];
+				long[] rangeSharingCPUs = getCPURange(cpu, highestIndex);
+				for (int i = cpu; i < rangeSharingCPUs.length && remainingCPU > 0; i++) {
+					if (rangeSharingCPUs[i] == 1 && newMask[i] == 1) {
+						remainingCPU--;
+						finalMask[i] = 1;
+						if (remainingCPU == 0) {
+							break;
+						}
+					}
+				}
+				if (remainingCPU == 0)
+					break;
+			}
+		}
+
+		/*for (int cpu = 0; cpu < newMask.length; cpu ++) {
+			if (newMask[cpu] == 1) {
+				remainingCPU = reqCPU.longValue();
+				finalMask = new long[RES_NOCPUS.intValue()];
+				long[] rangeSharingCPUs = getCPURange(cpu, highestIndex);
+				for (int i = cpu; i < rangeSharingCPUs.length && remainingCPU > 0; i+=2) {
+					logger.log(Level.INFO, "DBG: rangeSharingCPUs[" + i +"] is " + rangeSharingCPUs[i] + ". newMask[" + i + "] is " + newMask[i]);
+					if (rangeSharingCPUs[i] == 1 && newMask[i] == 1) {
+						remainingCPU--;
+						finalMask[i] = 1;
+						if (remainingCPU == 0) {
+							break;
+						}
+					}
+				}
+				if (remainingCPU == 0)
+					break;
+			}
+		}*/
+
+		//For a fixed config
+		//INTEL test cases
+		//int[] randomidx = new int[]{31,26,21,16,15,10,5,0}; // different numa node but sharing l1,l2 cache
+		//int[] randomidx = new int[]{19,18,17,16,3,2,1,0}; // Same numa node but sharing l1,l2 cache
+		//int[] randomidx = new int[]{11,10,9,8,3,2,1}; // different numa node and different l1,l2 cache
+
+		//AMD Test cases
+		//int[] randomidx = new int[]{32,33,34,35,36,37,38,39}; // same numa node and different L1,L2 caches
+		//int[] randomidx = new int[]{0,8,16,24,32,40,48,56}; // different numa node and different L1,L2 caches
+		//int[] randomidx = new int[]{0,64,8,72,16,80,24,88}; //different NUMA node and same caches (2 in each NUMA node)
+		//int[] randomidx = new int[]{24,88,25,89,26,90,27,91}; // same numa node sharing l1,l2 caches
+		//int[] randomidx = new int[]{67,66,65,64,3,2,1,0};
+		/*int[] randomidx = new int[]{25,89,33,97,54,118,58,122};
+		for (int i : randomidx) {
+			logger.log(Level.INFO, "DBG: Assigning to " + i);
+			finalMask[i] = 1L;
+		}
+		remainingCPU = 0;*/
+		logger.log(Level.INFO, "Process is going to be pinned to CPU mask " + getMaskString(finalMask));
+
 		if (remainingCPU != 0)
 			return "Error";
 
 		for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
-			if (newMask[i] == 1) {
+			if (finalMask[i] == 1) {
 				usedCPUs[i] = jobNumber;
 			}
 		}
-		return arrayToTaskset(newMask);
+
+		logger.log(Level.INFO, "DBG: Used CPUs = " + getMaskString(usedCPUs));
+		return arrayToTaskset(finalMask);
 	}
 
 	synchronized String addIsolation(long cpuSize) {
@@ -1011,6 +1151,8 @@ public class JobAgent implements Runnable {
 			else {
 				isolatedCPUs = pickCPUs(hostMask);
 			}
+
+			putJobTrace("Job will be pinned to CPUs " + isolatedCPUs);
 
 			if (ret != 0) {
 				logger.log(Level.SEVERE, "Could not isolate job to " + cpuSize + " CPUs");
