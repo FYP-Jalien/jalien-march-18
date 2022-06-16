@@ -11,6 +11,7 @@ import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
+import lia.util.process.ExternalProcess.ExecutorFinishStatus;
 import lia.util.process.ExternalProcess.ExitStatus;
 import utils.ProcessWithTimeout;
 import java.util.logging.Level;
@@ -119,6 +120,10 @@ public abstract class BatchQueue {
 
 			exitStatus = pTimeout.getExitStatus();
 			logger.info("Process exit status: " + exitStatus.getExecutorFinishStatus());
+
+			if (exitStatus.getExecutorFinishStatus() == ExecutorFinishStatus.ERROR)
+				logger.warning("An error was detected: " + exitStatus.getStdOut());
+
 		}
 		catch (final Throwable t) {
 			logger.log(Level.WARNING, "Exception executing command: " + cmd, t);
