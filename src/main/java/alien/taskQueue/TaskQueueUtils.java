@@ -597,7 +597,7 @@ public class TaskQueueUtils {
 			final String q;
 
 			if (dbStructure2_20)
-				q = "SELECT queueId,statusId,split,execHostId FROM QUEUE WHERE " + where + " ORDER BY queueId ASC limit " + lim + ";";
+				q = "SELECT queueId,statusId,split,execHostId,cpucores FROM QUEUE WHERE " + where + " ORDER BY queueId ASC limit " + lim + ";";
 			else
 				q = "SELECT queueId,status,split,execHost FROM QUEUE WHERE " + where + " ORDER BY queueId ASC limit " + lim + ";";
 
