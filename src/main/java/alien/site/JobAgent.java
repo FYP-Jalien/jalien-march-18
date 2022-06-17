@@ -982,7 +982,7 @@ public class JobAgent implements Runnable {
 
 		long lastStatusChange = getWrapperJobStatusTimestamp();
 
-		int code = 0;
+		int code = -1;
 
 		logger.log(Level.INFO, "About to enter monitor loop. Is the JobWrapper process alive?: " + p.isAlive());
 
