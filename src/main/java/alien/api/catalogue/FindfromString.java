@@ -128,7 +128,7 @@ public class FindfromString extends Request implements Cacheable {
 
 	@Override
 	public String getKey() {
-		return path + "|" + pattern + "|" + query + "|" + flags + "|" + queueid;
+		return path + "|" + pattern + "|" + query + "|" + flags + "|" + queueid + "|" + queryLimit;
 	}
 
 	@Override
