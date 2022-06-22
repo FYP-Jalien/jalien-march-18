@@ -136,7 +136,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			return;
 		}
 
-		lfns = commander.c_api.find(path, alPaths.get(1), query, flags, xmlCollectionPath, queueid, xmlCollectionPath != null && limit != Long.MAX_VALUE ? limit : -1);
+		lfns = commander.c_api.find(path, alPaths.get(1), query, flags, xmlCollectionPath, queueid, limit != Long.MAX_VALUE ? limit + offset : -1);
 
 		int count = 0;
 
@@ -305,7 +305,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 				}
 			}
 
-			if (options.has("o")) {
+			if (options.has("o") && !bX) {
 				offset = ((Long) options.valueOf("o")).longValue();
 
 				if (offset < 0) {
@@ -313,8 +313,8 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 					offset = 0;
 				}
 			}
-			
-			if (alPaths.size()==0) {
+
+			if (alPaths.size() == 0) {
 				setArgumentsOk(false);
 				return;
 			}
