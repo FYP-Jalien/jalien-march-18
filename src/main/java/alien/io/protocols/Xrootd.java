@@ -903,9 +903,9 @@ public class Xrootd extends Protocol {
 				}
 				else if (pfn.ticket.envelope.getSignedEnvelope() != null)
 					transactionURL += "?" + pfn.ticket.envelope.getSignedEnvelope();
-
-				transactionURL = decorateOpaqueParams(transactionURL, applicationName);
 			}
+
+			transactionURL = decorateOpaqueParams(transactionURL, applicationName);
 
 			command.add(transactionURL);
 
