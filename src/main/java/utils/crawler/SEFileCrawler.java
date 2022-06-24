@@ -42,6 +42,8 @@ import alien.se.SEUtils;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.user.JAKeyStore;
 import utils.StatusType;
+import java.io.FileInputStream;
+import java.util.Scanner;
 
 /**
  * Start the crawling process for a chunk of PFNs
@@ -71,6 +73,12 @@ public class SEFileCrawler {
 	 * The name of the file that holds statistics about crawled files.
 	 */
 	private static final String STATS_FILE_NAME = "stats";
+
+	/**
+	 * The marker that is searched in the xrootd logs that determines the
+	 * line containing the server hostname
+	 */
+	private static final String LOG_FILE_SERVER_HOSTNAME_MARKER = "Retry at";
 
 	/**
 	 * The number of command line arguments required
@@ -334,6 +342,39 @@ public class SEFileCrawler {
 	}
 
 	/**
+	 * Parse an XrootD log line. The format is the following:
+	 *
+	 * [*] [*] [*] [hostname] *
+	 */
+	private static String getServerHostnameFromLine(String line) {
+		String hostname = null;
+
+		try {
+			int leftBracketIndex = line.indexOf('[');
+			int i = 0;
+
+			while(leftBracketIndex >= 0 && i < 4) {
+				int index = line.indexOf('[', leftBracketIndex + 1);
+
+				if (index > 0)
+					leftBracketIndex = index;
+
+				i += 1;
+			}
+
+			line = line.substring(leftBracketIndex + 1);
+			int rightBracketIndex = line.indexOf("]");
+
+			hostname = line.substring(0, rightBracketIndex);
+		}
+		catch (Exception e) {
+			e.printStackTrace();
+		}
+
+		return hostname;
+	}
+
+	/**
 	 * Crawl the PFN specified in the argument
 	 *
 	 * @param currentPFN
@@ -344,7 +385,7 @@ public class SEFileCrawler {
 		PFN pfnToRead = null;
 		GUID guid = null;
 		Long catalogueFileSize = null, observedFileSize = null;
-		String catalogueMD5 = null, observedMD5 = null;
+		String catalogueMD5 = null, observedMD5 = null, serverHostname = null;
 		Long downloadDurationMillis = null, xrdfsDurationMillis = null;
 
 		// fill PFN access token
@@ -380,11 +421,6 @@ public class SEFileCrawler {
 				final String stat = xrootd.xrdstat(pfnToRead, false, false, false);
 				final long end = System.currentTimeMillis();
 				xrdfsDurationMillis = Long.valueOf(end - start);
-				if (stat != null) {
-					final int idx = stat.indexOf("Flags");
-					if (idx >= 0 && stat.indexOf("Offline", idx) > 0)
-						status = new CrawlingStatus(E_PFN_OFFLINE, "PFN is not online");
-				}
 			}
 			catch (final IOException exception) {
 				exception.printStackTrace();
@@ -402,12 +438,46 @@ public class SEFileCrawler {
 		// check size and checksum
 		if (pfnToRead != null && status == null) {
 			File downloadedFile = null;
+			String logFilePath = "crawling_hostname_" + se.seNumber + "_" + System.currentTimeMillis() + ".log";
 
 			try {
+				xrootd.setEnvVariable("XRD_LOGFILE", logFilePath);
+				xrootd.setEnvVariable("XRD_LOGLEVEL", "Debug");
+				xrootd.setEnvVariable("XRD_LOGMASK", "ExDbgMsg");
+
 				final long start = System.currentTimeMillis();
 				downloadedFile = xrootd.get(pfnToRead, null);
 				final long end = System.currentTimeMillis();
+
 				downloadDurationMillis = Long.valueOf(end - start);
+
+				// extract hostname from xrootd log file
+				int lineIndex = 0;
+
+				try (
+					FileInputStream inputStream = new FileInputStream(logFilePath);
+					Scanner sc = new Scanner(inputStream, "UTF-8")
+				) {
+					while (sc.hasNextLine()) {
+						String line = sc.nextLine();
+
+						// the first line usually contains the hostname of the redirector
+						if (lineIndex == 0)
+							serverHostname = getServerHostnameFromLine(line);
+
+						// the data server can be found on the line with the retry
+						if (line.contains(LOG_FILE_SERVER_HOSTNAME_MARKER)) {
+							String server = getServerHostnameFromLine(line);
+							if (server != null)
+								serverHostname = server;
+						}
+
+						lineIndex += 1;
+					}
+				}
+				catch (Exception e) {
+					e.printStackTrace();
+				}
 			}
 			catch (final IOException exception) {
 				exception.printStackTrace();
@@ -419,6 +489,11 @@ public class SEFileCrawler {
 				}
 				else
 					status = new CrawlingStatus(E_PFN_DOWNLOAD_FAILED, formatError(exception.getMessage()));
+			}
+			finally {
+				File logFile = new File(logFilePath);
+				if (logFile.exists() && !logFile.delete())
+					logger.log(Level.INFO, "Cannot delete " + logFile.getName());
 			}
 
 			if (status == null && downloadedFile != null) {
@@ -477,7 +552,9 @@ public class SEFileCrawler {
 					status.getCode().toString(),
 					status.getCode().getType().toString(),
 					status.getMessage(),
-					Long.valueOf(System.currentTimeMillis()));
+					Long.valueOf(System.currentTimeMillis()),
+					serverHostname
+				);
 
 			// build the list of pfn data that will be written to disk as crawler output
 			pfnDataList.add(pfnData);

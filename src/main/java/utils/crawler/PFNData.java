@@ -31,9 +31,10 @@ public class PFNData {
 	 * @param statusType
 	 * @param statusMessage
 	 * @param timestamp
+	 * @param serverHostname
 	 */
 	public PFNData(final String guid, final Integer seNumber, final String pfn, final Long observedSize, final Long catalogueSize, final String observedMD5, final String catalogueMD5,
-			final Long downloadDurationMillis, final Long xrdfsDurationMillis, final String statusCode, final String statusType, final String statusMessage, final Long timestamp) {
+			final Long downloadDurationMillis, final Long xrdfsDurationMillis, final String statusCode, final String statusType, final String statusMessage, final Long timestamp, final String serverHostname) {
 		data.put("guid", guid);
 		data.put("seNumber", seNumber);
 		data.put("pfn", pfn);
@@ -47,6 +48,7 @@ public class PFNData {
 		data.put("statusType", statusType);
 		data.put("statusMessage", statusMessage);
 		data.put("timestamp", timestamp);
+		data.put("serverHostname", serverHostname);
 	}
 
 	private PFNData() {
@@ -243,6 +245,18 @@ public class PFNData {
 	public Long getOutputGeneratedTimestamp() {
 		try {
 			return Long.valueOf(this.data.get("timestamp").toString());
+		}
+		catch (@SuppressWarnings("unused") final Exception e) {
+			return null;
+		}
+	}
+
+	/**
+	 * @return the server hostname
+	 */
+	public String getServerHostname() {
+		try {
+			return this.data.get("serverHostname").toString();
 		}
 		catch (@SuppressWarnings("unused") final Exception e) {
 			return null;
