@@ -35,6 +35,8 @@ public class HTCONDOR extends BatchQueue {
 	private String htc_logdir = "$HOME/htcondor";
 	private String grid_resource = null;
 	private String local_pool = null;
+	private String token_file = System.getenv("HOME") + "/.globus/wlcg.dat";
+	private boolean use_token = false;
 	private boolean use_job_router = false;
 	private boolean use_external_cloud = false;
 	private long seq_number = 0;
@@ -116,6 +118,7 @@ public class HTCONDOR extends BatchQueue {
 		submitCmd = if_else(environment.get(ce_submit_cmd_str),
 				if_else((String) config.get(ce_submit_cmd_str), "condor_submit"));
 
+		String use_token_tmp = "0";
 		String use_job_router_tmp = "0";
 		String use_external_cloud_tmp = "0";
 
@@ -214,6 +217,18 @@ public class HTCONDOR extends BatchQueue {
 				continue;
 			}
 
+			if ("TOKEN_FILE".equals(var)) {
+				token_file = val;
+				logger.info("environment: " + var + "=" + val);
+				continue;
+			}
+
+			if ("USE_TOKEN".equals(var)) {
+				use_token_tmp = val;
+				logger.info("environment: " + var + "=" + val);
+				continue;
+			}
+
 			if ("USE_JOB_ROUTER".equals(var)) {
 				use_job_router_tmp = val;
 				logger.info("environment: " + var + "=" + val);
@@ -230,6 +245,7 @@ public class HTCONDOR extends BatchQueue {
 		htc_logdir = Functions.resolvePathWithEnv(htc_logdir);
 		logger.info("htc_logdir: " + htc_logdir);
 
+		use_token = Integer.parseInt(use_token_tmp) == 1;
 		use_job_router = Integer.parseInt(use_job_router_tmp) == 1;
 		use_external_cloud = Integer.parseInt(use_external_cloud_tmp) == 1;
 
@@ -428,7 +444,13 @@ public class HTCONDOR extends BatchQueue {
 			submit_jdl += "+WantExternalCloud = True\n";
 		}
 
-		submit_jdl += "use_x509userproxy = true\n";
+		if (use_token) {
+			submit_jdl += "use_scitokens = true\n";
+			submit_jdl += "scitokens_file = " + token_file + "\n";
+		}
+		else {
+			submit_jdl += "use_x509userproxy = true\n";
+		}
 
 		final String cm = config.get("host_host") + ":" + config.get("host_port");
 		final String env_cmd = String.format("ALIEN_CM_AS_LDAP_PROXY='%s'", cm);
