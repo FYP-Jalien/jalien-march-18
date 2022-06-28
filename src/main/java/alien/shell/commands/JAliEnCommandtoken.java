@@ -1,6 +1,9 @@
 package alien.shell.commands;
 
+import java.io.IOException;
 import java.net.InetAddress;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.List;
 import java.util.logging.Level;
 
@@ -26,6 +29,9 @@ public class JAliEnCommandtoken extends JAliEnBaseCommand {
 	private int validity; // Default validity depends on token type
 	private String extension = null; // Token extension (jobID for job tokens)
 
+	private String targetCertificatePath = null;
+	private String targetKeyPath = null;
+
 	/**
 	 * @param commander
 	 * @param alArguments
@@ -43,7 +49,17 @@ public class JAliEnCommandtoken extends JAliEnBaseCommand {
 			parser.accepts("hostname").withRequiredArg();
 			parser.accepts("f");
 
+			// intentionally not documented. Only works when running via JBox, thus on the same machine
+			parser.accepts("wcert").withRequiredArg();
+			parser.accepts("wkey").withRequiredArg();
+
 			final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
+
+			if (options.has("wcert"))
+				targetCertificatePath = options.valueOf("wcert").toString();
+
+			if (options.has("wkey"))
+				targetKeyPath = options.valueOf("wkey").toString();
 
 			if (options.has("u"))
 				requestedUser = (String) options.valueOf("u");
@@ -197,6 +213,22 @@ public class JAliEnCommandtoken extends JAliEnBaseCommand {
 			commander.printOut(tokenreq.getCertificateAsString());
 			commander.printOutln();
 			commander.printOut(tokenreq.getPrivateKeyAsString());
+
+			if (targetCertificatePath != null)
+				try {
+					Files.write(Paths.get(targetCertificatePath), tokenreq.getCertificateAsString().getBytes());
+				}
+				catch (IOException e) {
+					commander.setReturnCode(ErrNo.EIO, "Cannot store the certificate in " + targetCertificatePath + ": " + e.getMessage());
+				}
+
+			if (targetKeyPath != null)
+				try {
+					Files.write(Paths.get(targetKeyPath), tokenreq.getPrivateKeyAsString().getBytes());
+				}
+				catch (IOException e) {
+					commander.setReturnCode(ErrNo.EIO, "Cannot store the key in " + targetKeyPath + ": " + e.getMessage());
+				}
 		}
 		else
 			commander.setReturnCode(ErrNo.EINVAL, "User " + requestedUser + " cannot be found. Abort");
