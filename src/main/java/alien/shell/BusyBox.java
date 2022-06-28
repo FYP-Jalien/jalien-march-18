@@ -53,6 +53,15 @@ public class BusyBox {
 
 	private String currentDir;
 
+	private boolean lastCommandSuccessful = true;
+
+	/**
+	 * @return <code>true</code> if the last invocation did _not_ produce an Error line (thus assumed to be successful)
+	 */
+	public boolean wasLastCommandSuccessful() {
+		return lastCommandSuccessful;
+	}
+
 	/**
 	 *
 	 * @return the current directory
@@ -348,8 +357,10 @@ public class BusyBox {
 							System.out.print("\r                                        \r");
 						}
 
-						if (sLine.startsWith(JShPrintWriter.errTag))
+						if (sLine.startsWith(JShPrintWriter.errTag)) {
 							JSh.printErr("Error: " + sLine.substring(1));
+							lastCommandSuccessful = false;
+						}
 						else if (sLine.startsWith(JShPrintWriter.outputterminator))
 							updateEnvironment(sLine);
 						else if (sLine.endsWith(JShPrintWriter.lineTerm))

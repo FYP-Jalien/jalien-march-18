@@ -131,6 +131,8 @@ public class JSh {
 
 						while (st.hasMoreTokens())
 							boombox.callJBox(st.nextToken().trim());
+
+						System.exit(boombox.wasLastCommandSuccessful() ? 0 : 1);
 					}
 					else
 						printErrConnJBox();
