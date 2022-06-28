@@ -180,8 +180,10 @@ public class JAliEnCommandtoken extends JAliEnBaseCommand {
 					commander.user = switchUser;
 				else if ((switchUser = UserFactory.getByRole(requestedUser)) != null)
 					commander.user = switchUser;
-				else
+				else {
 					commander.setReturnCode(ErrNo.EINVAL, "User " + requestedUser + " cannot be found. Abort");
+					return;
+				}
 
 				commander.user.setUserCert(cert);
 				commander.user.setDefaultUser(defaultuser);
