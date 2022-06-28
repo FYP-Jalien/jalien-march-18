@@ -1,5 +1,6 @@
 package alien.api;
 
+import java.io.ByteArrayOutputStream;
 import java.io.Closeable;
 import java.io.IOException;
 import java.io.ObjectInputStream;
@@ -136,26 +137,60 @@ public class DispatchSSLServerNIO implements Runnable {
 
 	private long lastActive = System.currentTimeMillis();
 
-	private class ByteBufferOutputStream extends OutputStream {
-		private ByteBuffer buffer = ByteBuffer.allocate(1024);
+	private class ByteBufferOutputStream extends ByteArrayOutputStream {
 
-		@Override
-		public void write(int arg0) throws IOException {
-			if (buffer.remaining() <= 0)
-				flush();
-
-			buffer.put((byte) (arg0 & 0xFF));
+		public ByteBufferOutputStream() {
+			// logger.log(Level.SEVERE, "In buffer allocation");
 		}
 
 		@Override
 		public void flush() throws IOException {
-			buffer.flip();
+			super.flush();
 
-			channel.write(buffer);
+			int wrote, toWrite, ret, retries;
 
-			// channel.getSSLEngineBuffer().flushNetworkOutbound();
+			retries = 0;
+			wrote = 0;
 
-			buffer.clear();
+			final byte[] content = toByteArray();
+
+			toWrite = content.length;
+
+			final ByteBuffer bb = ByteBuffer.wrap(content);
+
+			while (wrote < toWrite) {
+				ret = channel.write(bb);
+
+				wrote += ret;
+
+				// logger.log(Level.FINEST, "wrote = " + wrote + " ret = " + ret + " toWrite = " + toWrite);
+				if (ret > 0) {
+					retries = 0;
+				}
+				else if (ret < 0) {
+					throw new IOException("Failed to send data to the client");
+				}
+				else if (ret == 0) {
+					retries++;
+					// enter fail condition
+					if (retries == ConfigUtils.getConfig().geti("alien.api.DispatchSSLServer.transferRetries", 30)) {
+						logger.log(Level.SEVERE, "Stuck for too long, will exit");
+						throw new IOException("Failed to send a chunk of data to the client after " + retries + " retries");
+					}
+
+					// logger.log(Level.FINEST, "Waiting for network buffer to free up");
+					try {
+						Thread.sleep(ConfigUtils.getConfig().geti("alien.api.DispatchSSLServerNIO.transferIntervalms", 100));
+					}
+					catch (final InterruptedException ie) {
+						throw new IOException("Interrupted while waiting to send a chunk of data to the client, was at retry no. " + retries, ie);
+					}
+				}
+			}
+
+			// System.err.println("Finished sending");
+
+			this.reset();
 		}
 	}
 
