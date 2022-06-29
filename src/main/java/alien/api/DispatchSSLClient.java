@@ -104,8 +104,11 @@ public class DispatchSSLClient {
 		if (instance != null && idleTimeout > 0 && System.currentTimeMillis() - lastCommand > idleTimeout) {
 			logger.log(Level.INFO, "Closing idle socket");
 
-			instance.close();
+			final var toClose = instance;
+			
 			instance = null;
+			
+			new Thread( () -> toClose.close()).start();
 		}
 	}
 
@@ -221,6 +224,8 @@ public class DispatchSSLClient {
 		synchronized (callback) {
 			if (ret != null) {
 				if (instance == null) {
+					lastCommand = System.currentTimeMillis();
+
 					instance = ret;
 					callback.notifyAll();
 				}
@@ -481,14 +486,25 @@ public class DispatchSSLClient {
 				instance = null;
 			}
 
-			try {
-				return dispatchARequest(r);
+			for (int i = 0; i < ConfigUtils.getConfig().geti("alien.api.DispatchSSLClient.connectAttempts", 5); i++) {
+				try {
+					return dispatchARequest(r);
+				}
+				catch (final IOException e1) {
+					// This time we give up
+					logger.log(Level.SEVERE, "Exception connecting at attempt no. " + i, e1);
+				}
+
+				try {
+					Thread.sleep(ConfigUtils.getConfig().geti("alien.api.DispatchSSLClient.sleepFactor", 1000) * (i + 1));
+				}
+				catch (InterruptedException ie) {
+					logger.log(Level.SEVERE, "Reconnect cycle interrupted at iteration " + i, ie);
+					break;
+				}
 			}
-			catch (final IOException e1) {
-				// This time we give up
-				logger.log(Level.SEVERE, "Error running request, potential connection error.", e1);
-				return null;
-			}
+
+			return null;
 		}
 		finally {
 			lastCommand = System.currentTimeMillis();
