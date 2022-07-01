@@ -9,6 +9,7 @@ import java.util.List;
 import alien.catalogue.FileSystemUtils;
 import alien.catalogue.LFN;
 import alien.catalogue.LFNUtils;
+import alien.catalogue.XmlCollection;
 import alien.shell.ErrNo;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
@@ -122,7 +123,19 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 		if (bR)
 			flags = flags | LFNUtils.FIND_REGEXP;
 
-		final String xmlCollectionPath = xmlCollectionName != null ? FileSystemUtils.getAbsolutePath(commander.user.getName(), commander.getCurrentDirName(), xmlCollectionName) : null;
+		final String xmlCollectionPath = xmlCollectionName != null && !xmlCollectionName.equals("-")
+				? FileSystemUtils.getAbsolutePath(commander.user.getName(), commander.getCurrentDirName(), xmlCollectionName)
+				: null;
+
+		final XmlCollection xmlOutput;
+
+		if (xmlCollectionName != null && xmlCollectionName.equals("-")) {
+			xmlOutput = new XmlCollection();
+			xmlOutput.setCommand("find " + String.join(" ", alArguments));
+			xmlOutput.setOwner(commander.getUsername());
+		}
+		else
+			xmlOutput = null;
 
 		String path = FileSystemUtils.getAbsolutePath(commander.user.getName(), commander.getCurrentDirName(), alPaths.get(0));
 
@@ -160,6 +173,11 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 				commander.outNextResult();
 				commander.printOut("lfn", lfn.getCanonicalName());
 
+				if (xmlOutput != null) {
+					xmlOutput.add(lfn);
+					continue;
+				}
+
 				if (bW || bF) {
 					commander.printOut("perm", lfn.perm);
 					commander.printOut("owner", lfn.owner);
@@ -193,6 +211,9 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 					commander.printOutln(lfn.getCanonicalName());
 			}
 		}
+
+		if (xmlOutput != null)
+			commander.printOutln(xmlOutput.toString());
 
 		if (bC)
 			commander.printOutln("Found " + count + " maching entries");
@@ -277,6 +298,9 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			if (options.has("x") && options.hasArgument("x")) {
 				bX = true;
 				xmlCollectionName = (String) options.valueOf("x");
+
+				if (xmlCollectionName.equals("-"))
+					bX = false;
 			}
 
 			if (options.has("j") && options.hasArgument("j")) {
