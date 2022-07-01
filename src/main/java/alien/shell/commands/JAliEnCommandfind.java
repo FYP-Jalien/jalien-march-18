@@ -239,7 +239,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 		commander.printOutln(helpOption("-a", "show hidden .* files"));
 		commander.printOutln(helpOption("-s", "no sorting"));
 		commander.printOutln(helpOption("-c", "print the number of matching files"));
-		commander.printOutln(helpOption("-x <target LFN>", "create the indicated XML collection with the results of the find operation"));
+		commander.printOutln(helpOption("-x <target LFN>", "create the indicated XML collection with the results of the find operation. Use '-' for screen output of the XML content."));
 		commander.printOutln(helpOption("-d", "return also the directories"));
 		commander.printOutln(helpOption("-w[h]", "long format, optionally human readable file sizes"));
 		commander.printOutln(helpOption("-j <queueid>", "filter files created by a certain job ID"));
