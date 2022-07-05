@@ -10,6 +10,7 @@ import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.net.Inet6Address;
 import java.net.InetSocketAddress;
+import java.net.StandardSocketOptions;
 import java.nio.ByteBuffer;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
@@ -203,6 +204,8 @@ public class DispatchSSLServerNIO implements Runnable {
 		this.channel = channel;
 
 		channel.configureBlocking(false);
+
+		channel.getWrappedSocketChannel().setOption(StandardSocketOptions.SO_KEEPALIVE, Boolean.TRUE);
 
 		key = channel.getWrappedSocketChannel().register(serverSelector, SelectionKey.OP_READ);
 
@@ -542,6 +545,8 @@ public class DispatchSSLServerNIO implements Runnable {
 		}
 	};
 
+	private static volatile long lastOperationStarted = 0;
+
 	private static Thread selectorThread = new Thread("NIO.selectorThread") {
 		@Override
 		public void run() {
@@ -586,6 +591,8 @@ public class DispatchSSLServerNIO implements Runnable {
 								// key.interestOps(0);
 								// System.err.println("Notifying of new data");
 								try {
+									lastOperationStarted = System.currentTimeMillis();
+									setName("NIO.selectorThread - " + lastOperationStarted + " " + (obj.remoteIdentity != null ? obj.remoteIdentity.getRemoteEndpoint() : "n/a"));
 									obj.notifyData();
 								}
 								catch (final Throwable t1) {
@@ -596,6 +603,10 @@ public class DispatchSSLServerNIO implements Runnable {
 									catch (final Throwable t) {
 										logger.log(Level.WARNING, "Cleaning up after an error encountered a problem", t);
 									}
+								}
+								finally {
+									lastOperationStarted = 0;
+									setName("NIO.selectorThread - idle");
 								}
 							}
 							else {
@@ -609,6 +620,30 @@ public class DispatchSSLServerNIO implements Runnable {
 				catch (final IOException ioe) {
 					System.err.println("Server selector threw an exception : " + ioe.getMessage());
 					ioe.printStackTrace();
+				}
+			}
+		}
+	};
+
+	private static final long THRESHOLD = 100;
+
+	private static Thread watcherThread = new Thread("NIO.watcherThread") {
+		@Override
+		public void run() {
+			while (true) {
+				if (System.currentTimeMillis() - lastOperationStarted > THRESHOLD && lastOperationStarted > 0) {
+					lastOperationStarted = 0;
+					final String oldName = selectorThread.getName();
+					selectorThread.interrupt();
+
+					logger.log(Level.SEVERE, "Watcher thread has interrupted an IO operation: " + oldName);
+				}
+
+				try {
+					Thread.sleep(THRESHOLD);
+				}
+				catch (@SuppressWarnings("unused") InterruptedException ie) {
+					// ignore
 				}
 			}
 		}
@@ -692,6 +727,8 @@ public class DispatchSSLServerNIO implements Runnable {
 			acceptorThread.start();
 
 			selectorThread.start();
+
+			watcherThread.start();
 
 			while (true) {
 				if (!isHostCertValid()) {
