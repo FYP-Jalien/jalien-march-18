@@ -547,6 +547,8 @@ public class DispatchSSLServerNIO implements Runnable {
 
 	private static volatile long lastOperationStarted = 0;
 
+	private static volatile DispatchSSLServerNIO connectionInstance = null;
+
 	private static Thread selectorThread = new Thread("NIO.selectorThread") {
 		@Override
 		public void run() {
@@ -593,6 +595,7 @@ public class DispatchSSLServerNIO implements Runnable {
 								try {
 									lastOperationStarted = System.currentTimeMillis();
 									setName("NIO.selectorThread - " + lastOperationStarted + " " + (obj.remoteIdentity != null ? obj.remoteIdentity.getRemoteEndpoint() : "n/a"));
+									connectionInstance = obj;
 									obj.notifyData();
 								}
 								catch (final Throwable t1) {
@@ -606,6 +609,7 @@ public class DispatchSSLServerNIO implements Runnable {
 								}
 								finally {
 									lastOperationStarted = 0;
+									connectionInstance = null;
 									setName("NIO.selectorThread - idle");
 								}
 							}
@@ -631,12 +635,23 @@ public class DispatchSSLServerNIO implements Runnable {
 		@Override
 		public void run() {
 			while (true) {
-				if (System.currentTimeMillis() - lastOperationStarted > THRESHOLD && lastOperationStarted > 0) {
-					lastOperationStarted = 0;
-					final String oldName = selectorThread.getName();
-					selectorThread.interrupt();
+				try {
+					if (System.currentTimeMillis() - lastOperationStarted > THRESHOLD && lastOperationStarted > 0 && connectionInstance != null) {
+						// lastOperationStarted = 0;
+						final String oldName = selectorThread.getName();
+						final DispatchSSLServerNIO toKill = connectionInstance;
 
-					logger.log(Level.SEVERE, "Watcher thread has interrupted an IO operation: " + oldName);
+						if (System.currentTimeMillis() - lastOperationStarted > THRESHOLD && toKill != null) {
+							toKill.cleanup();
+							logger.log(Level.SEVERE, "Watcher thread has interrupted an IO operation: " + oldName);
+						}
+						else {
+							logger.log(Level.INFO, "Watcher thread was not needed any more on: " + oldName);
+						}
+					}
+				}
+				catch (final Throwable t) {
+					logger.log(Level.SEVERE, "Error handling an interruption event", t);
 				}
 
 				try {
