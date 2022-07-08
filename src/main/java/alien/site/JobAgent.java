@@ -21,6 +21,7 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
+import java.util.ConcurrentModificationException;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Hashtable;
@@ -986,7 +987,8 @@ public class JobAgent implements Runnable {
 
 		logger.log(Level.INFO, "About to enter monitor loop. Is the JobWrapper process alive?: " + p.isAlive());
 
-		new Thread(heartbeatMonitor(p)).start();
+		final Thread heartMon = new Thread(heartbeatMonitor(p));
+		heartMon.start();
 
 		int monitor_loops = 0;
 		boolean discoveredPid = false;
@@ -999,6 +1001,7 @@ public class JobAgent implements Runnable {
 					final String error = checkProcessResources();
 					if (error != null) {
 						t.cancel();
+						heartMon.interrupt();
 						if (!jobKilled) {
 							logger.log(Level.SEVERE, "Process overusing resources: " + error);
 							putJobTrace("ERROR[FATAL]: Process overusing resources");
@@ -1281,6 +1284,9 @@ public class JobAgent implements Runnable {
 		}
 		catch (final NumberFormatException e) {
 			logger.log(Level.WARNING, "Unable to continue monitoring: " + e.toString());
+		}
+		catch (final ConcurrentModificationException e) {
+			logger.log(Level.WARNING, "Warning: an error occurred reading monitoring data:  " + e.toString());
 		}
 
 		return error;
@@ -1608,7 +1614,7 @@ public class JobAgent implements Runnable {
 					Thread.sleep(30 * 1000);
 				}
 				catch (final InterruptedException ie) {
-					// ignore
+					break;
 				}
 			}
 		};
