@@ -506,6 +506,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			sun.misc.Signal.handle(new sun.misc.Signal("TERM"), sig -> {
 				if (payload.isAlive()) {
 					logger.log(Level.SEVERE, "SIGTERM received. Killing payload");
+					putJobTrace("JobWrapper: SIGTERM received. Killing payload");
 					payload.destroyForcibly();
 				}
 			});
@@ -515,6 +516,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (payload.isAlive()) {
 				payload.destroyForcibly();
 				logger.log(Level.SEVERE, "Payload process destroyed by timeout in wrapper!");
+				putJobTrace("JobWrapper: Payload process destroyed by timeout in wrapper!");
 			}
 			logger.log(Level.SEVERE, "Payload has finished execution.");
 		}

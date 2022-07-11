@@ -1611,7 +1611,7 @@ public class JobAgent implements Runnable {
 					putJobTrace("WARNING: Something is preventing the sending of heartbeats/resource info!");
 
 				try {
-					Thread.sleep(30 * 1000);
+					Thread.sleep(60 * 1000);
 				}
 				catch (final InterruptedException ie) {
 					break;
