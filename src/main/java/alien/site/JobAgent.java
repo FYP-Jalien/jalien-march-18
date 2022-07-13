@@ -936,8 +936,10 @@ public class JobAgent implements Runnable {
 		}
 		catch (final Exception ioe) {
 			logger.log(Level.SEVERE, "Exception running " + launchCommand + " : " + ioe.getMessage());
-
 			setStatus(jaStatus.ERROR_START);
+
+			putJobTrace("Error starting JobWrapper: exception running " + launchCommand + " : " + ioe.getMessage());
+			changeJobStatus(JobStatus.ERROR_IB, null);
 
 			setUsedCores(0);
 
