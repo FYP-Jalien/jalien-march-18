@@ -36,7 +36,8 @@ public class HTCONDOR extends BatchQueue {
 	private String grid_resource = null;
 	private String local_pool = null;
 	private String token_file = System.getenv("HOME") + "/.globus/wlcg.dat";
-	private boolean use_token = false;
+	private int use_token = 0;
+	private String proxy = null;
 	private boolean use_job_router = false;
 	private boolean use_external_cloud = false;
 	private long seq_number = 0;
@@ -113,12 +114,13 @@ public class HTCONDOR extends BatchQueue {
 
 		environment.putAll(System.getenv());
 
+		proxy = environment.get("X509_USER_PROXY");
+
 		final String ce_submit_cmd_str = "CE_SUBMITCMD";
 
 		submitCmd = if_else(environment.get(ce_submit_cmd_str),
 				if_else((String) config.get(ce_submit_cmd_str), "condor_submit"));
 
-		String use_token_tmp = "0";
 		String use_job_router_tmp = "0";
 		String use_external_cloud_tmp = "0";
 
@@ -224,7 +226,7 @@ public class HTCONDOR extends BatchQueue {
 			}
 
 			if ("USE_TOKEN".equals(var)) {
-				use_token_tmp = val;
+				use_token = Integer.parseInt(val);
 				logger.info("environment: " + var + "=" + val);
 				continue;
 			}
@@ -245,7 +247,6 @@ public class HTCONDOR extends BatchQueue {
 		htc_logdir = Functions.resolvePathWithEnv(htc_logdir);
 		logger.info("htc_logdir: " + htc_logdir);
 
-		use_token = Integer.parseInt(use_token_tmp) == 1;
 		use_job_router = Integer.parseInt(use_job_router_tmp) == 1;
 		use_external_cloud = Integer.parseInt(use_external_cloud_tmp) == 1;
 
@@ -258,7 +259,6 @@ public class HTCONDOR extends BatchQueue {
 
 	private void proxyCheck() {
 
-		final String proxy = environment.get("X509_USER_PROXY");
 		final File proxy_no_check = new File(environment.get("HOME") + "/no-proxy-check");
 
 		if (proxy == null || proxy_no_check.exists()) {
@@ -444,9 +444,13 @@ public class HTCONDOR extends BatchQueue {
 			submit_jdl += "+WantExternalCloud = True\n";
 		}
 
-		if (use_token) {
+		if (use_token > 0) {
 			submit_jdl += "use_scitokens = true\n";
 			submit_jdl += "scitokens_file = " + token_file + "\n";
+
+			if (use_token > 1 && proxy != null) {
+				submit_jdl += "x509userproxy = " + proxy + "\n";
+			}
 		}
 		else {
 			submit_jdl += "use_x509userproxy = true\n";
