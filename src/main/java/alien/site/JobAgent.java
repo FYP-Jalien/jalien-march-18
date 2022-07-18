@@ -845,7 +845,7 @@ public class JobAgent implements Runnable {
 			// Main cmd for starting the JobWrapper
 			final List<String> launchCmd = new ArrayList<>();
 
-			final Process cmdChecker = Runtime.getRuntime().exec("ps -p " + MonitorFactory.getSelfProcessID() + " -o command=");
+			final Process cmdChecker = Runtime.getRuntime().exec(new String[]{"ps", "-p", String.valueOf(MonitorFactory.getSelfProcessID()),  "-o", "command="});
 			cmdChecker.waitFor();
 			try (Scanner cmdScanner = new Scanner(cmdChecker.getInputStream())) {
 				String readArg;
@@ -1459,7 +1459,7 @@ public class JobAgent implements Runnable {
 		final ArrayList<Integer> wrapperProcs = new ArrayList<>();
 
 		try {
-			final Process getWrapperProcs = Runtime.getRuntime().exec("pgrep -f " + queueId);
+			final Process getWrapperProcs = Runtime.getRuntime().exec(new String[]{"pgrep", "-f",  String.valueOf(queueId)});
 			getWrapperProcs.waitFor();
 			try (Scanner cmdScanner = new Scanner(getWrapperProcs.getInputStream())) {
 				while (cmdScanner.hasNext()) {
@@ -1497,7 +1497,7 @@ public class JobAgent implements Runnable {
 		try {
 			final int jobWrapperPid = getWrapperPid();
 			if (jobWrapperPid != 0)
-				Runtime.getRuntime().exec("kill " + jobWrapperPid);
+				Runtime.getRuntime().exec(new String[]{"kill", String.valueOf(jobWrapperPid)});
 			else
 				logger.log(Level.INFO, "Could not kill JobWrapper: not found. Already done?");
 		}
@@ -1537,7 +1537,7 @@ public class JobAgent implements Runnable {
 		try {
 			if (jobWrapperPid != 0) {
 				JobWrapper.cleanupProcesses(queueId, jobWrapperPid);
-				Runtime.getRuntime().exec("kill -9" + jobWrapperPid);
+				Runtime.getRuntime().exec(new String[]{"kill", "-9", String.valueOf(jobWrapperPid)});
 			}
 			else
 				logger.log(Level.INFO, "Could not kill JobWrapper: not found. Already done?");
