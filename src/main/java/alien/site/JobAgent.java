@@ -596,6 +596,8 @@ public class JobAgent implements Runnable {
 		}
 		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Unable to handle job", e);
+			putJobTrace("ERROR: Unable to handle job: " + Arrays.toString(e.getStackTrace()));
+			changeJobStatus(JobStatus.ERROR_E, null);
 		}
 	}
 
