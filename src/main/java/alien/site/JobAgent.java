@@ -407,16 +407,17 @@ public class JobAgent implements Runnable {
 
 	}
 
-	private static final String SITESONAR = "/cvmfs/alice.cern.ch/sitesonar/sitesonar.sh";
-
 	private void collectSystemInformation() {
-		final File f = new File(SITESONAR);
+		final String scriptPath = CVMFS.getSiteSonarScript();
+		final File f = new File(scriptPath);
 
 		if (f.exists() && f.canExecute()) {
-			final ProcessBuilder pBuilder = new ProcessBuilder(SITESONAR);
+			final ProcessBuilder pBuilder = new ProcessBuilder(scriptPath);
 
 			pBuilder.environment().put("ALIEN_JDL_CPUCORES", MAX_CPU != null ? MAX_CPU.toString() : "1");
 			pBuilder.environment().put("ALIEN_SITE", siteMap.getOrDefault("Site", "UNKNOWN").toString());
+			pBuilder.redirectError(Redirect.INHERIT);
+			pBuilder.redirectOutput(Redirect.INHERIT);
 
 			try {
 				final Process p = pBuilder.start();

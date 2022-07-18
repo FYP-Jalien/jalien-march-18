@@ -215,6 +215,13 @@ public class CVMFS extends PackMan {
 	}
 
 	/**
+	 * @return location of script used for SiteSonar
+	 */
+	public static String getSiteSonarScript() {
+		return CVMFS_BASE_DIR + "/sitesonar/sitesonar.sh";
+	}
+
+	/**
 	 * @return path to job container
 	 */
 	public static String getContainerPath() {
