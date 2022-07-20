@@ -845,28 +845,24 @@ public class JobAgent implements Runnable {
 			// Main cmd for starting the JobWrapper
 			final List<String> launchCmd = new ArrayList<>();
 
-			final Process cmdChecker = Runtime.getRuntime().exec(new String[]{"ps", "-p", String.valueOf(MonitorFactory.getSelfProcessID()),  "-o", "command="});
+			final Process cmdChecker = Runtime.getRuntime().exec(new String[] { "ps", "-p", String.valueOf(MonitorFactory.getSelfProcessID()), "-o", "command=" });
 			cmdChecker.waitFor();
 			try (Scanner cmdScanner = new Scanner(cmdChecker.getInputStream())) {
 				String readArg;
 				while (cmdScanner.hasNext()) {
 					readArg = (cmdScanner.next());
-					switch (readArg) {
-						case "-cp":
-							cmdScanner.next();
-							break;
-						case "alien.site.JobRunner":
-						case "alien.site.JobAgent":
-							launchCmd.add("-Djobagent.vmid=" + queueId);
-							launchCmd.add("-cp");
-							launchCmd.add(jarPath + jarName);
-							launchCmd.add("alien.site.JobWrapper");
-							break;
-						default:
-							launchCmd.add(readArg);
+					if (readArg.contains("-cp"))
+						cmdScanner.next();
+					else if (readArg.contains("alien.site.JobRunner") || readArg.contains("alien.site.JobAgent")) {
+						launchCmd.add("-Djobagent.vmid=" + queueId);
+						launchCmd.add("-cp");
+						launchCmd.add(jarPath + jarName);
+						launchCmd.add("alien.site.JobWrapper");
 					}
-				}
+					else if (!readArg.contains("JobRunner") && !readArg.contains("JobAgent")) //Just to be completely sure...
+						launchCmd.add(readArg);
 			}
+		}
 
 			// Check if there is container support present on site. If yes, add to launchCmd
 			final Containerizer cont = ContainerizerFactory.getContainerizer();
