@@ -572,8 +572,9 @@ public class JobAgent implements Runnable {
 		try {
 
 			if (!createWorkDir()) {
-				// changeStatus(JobStatus.ERROR_IB);
+				changeJobStatus(JobStatus.ERROR_IB, null);
 				logger.log(Level.INFO, "Error. Workdir for job could not be created");
+				putJobTrace("Error. Workdir for job could not be created");
 				return;
 			}
 			jobWrapperLogDir = jobWorkdir + "/" + jobWrapperLogName;
