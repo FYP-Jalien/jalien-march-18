@@ -869,12 +869,9 @@ public class JobAgent implements Runnable {
 			final Containerizer cont = ContainerizerFactory.getContainerizer();
 			if (cont != null) {
 				putJobTrace("Support for containers detected. Will use: " + cont.getContainerizerName());
-				monitor.sendParameter("canRunContainers", Integer.valueOf(1));
-				monitor.sendParameter("containerLayer", Integer.valueOf(1));
 				cont.setWorkdir(jobWorkdir);
 				return cont.containerize(String.join(" ", launchCmd));
 			}
-			monitor.sendParameter("canRunContainers", Integer.valueOf(0));
 			return launchCmd;
 		}
 		catch (final IOException e) {
