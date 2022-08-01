@@ -320,11 +320,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	}
 
 	private class InputFilesDownloader extends Thread {
-		private boolean downloadedOk;
+		private int downloadExitCode;
 
 		@Override
 		public void run() {
-			downloadedOk = getInputFiles();
+			downloadExitCode = getInputFiles();
 		}
 	}
 
@@ -343,9 +343,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			downloader.join();
 			packResolver.join();
 
-			if (!downloader.downloadedOk) {
+			if (downloader.downloadExitCode != 0) {
 				logger.log(Level.SEVERE, "Failed to get inputfiles");
-				changeStatus(JobStatus.ERROR_IB);
+				changeStatus(JobStatus.ERROR_IB, downloader.downloadExitCode);
 				return -1;
 			}
 
@@ -558,7 +558,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		return code;
 	}
 
-	private boolean getInputFiles() {
+		private int getInputFiles() {
 		final Set<String> filesToDownload = new HashSet<>();
 
 		List<String> list = jdl.getInputFiles(false);
@@ -588,7 +588,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (iFiles == null) {
 			logger.log(Level.WARNING, "No requested files could be located");
 			putJobTrace("ERROR: No requested files could be located: getLFNs returned null");
-			return false;
+			return -1;
 		}
 
 		if (iFiles.size() != filesToDownload.size()) {
@@ -600,7 +600,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				iFiles.remove(iFiles.size() - 1);
 			}
 			putJobTrace("ERROR: Not all requested files could be located in the catalogue. Missing files: " + Arrays.toString(filesToDownload.toArray()));
-			return false;
+			return -1;
 		}
 
 		final Map<LFN, File> localFiles = new HashMap<>();
@@ -618,7 +618,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (localFile.exists()) {
 				logger.log(Level.WARNING, "Too many occurences of " + l.getFileName() + " in " + currentDir.getAbsolutePath());
 				putJobTrace("ERROR: Too many occurences of " + l.getFileName() + " in " + currentDir.getAbsolutePath());
-				return false;
+				return -1;
 			}
 
 			localFiles.put(l, localFile);
@@ -665,7 +665,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 				putJobTrace(traceLine);
 
-				return false;
+				return commander.getLastExitCode();
 			}
 		}
 
@@ -686,7 +686,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			}
 		}
 
-		return true;
+		return 0;
 	}
 
 	private String createInputDataList() {
