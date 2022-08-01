@@ -572,6 +572,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			filesToDownload.addAll(list);
 
 		String inputDataList = createInputDataList();
+		
+		if (inputDataList == null || inputDataList.isBlank()){
+			return -2;
+		}
 
 		String s = jdl.getExecutable();
 
