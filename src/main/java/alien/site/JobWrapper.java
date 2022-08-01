@@ -558,7 +558,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		return code;
 	}
 
-		private int getInputFiles() {
+	private int getInputFiles() {
 		final Set<String> filesToDownload = new HashSet<>();
 
 		List<String> list = jdl.getInputFiles(false);
@@ -571,9 +571,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (list != null)
 			filesToDownload.addAll(list);
 
-		String inputDataList = createInputDataList();
-		
-		if (inputDataList == null || inputDataList.isBlank()){
+		String inputDataList;
+		try {
+			inputDataList = createInputDataList();
+		}
+		catch (final Exception e) {
+			logger.log(Level.SEVERE, "Problem creating XML: ", e);
 			return -2;
 		}
 
@@ -697,52 +700,46 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		logger.log(Level.INFO, "Starting XML creation");
 
 		// creates xml file with the InputData
-		try {
-			final String list = jdl.gets("InputDataList");
+		final String list = jdl.gets("InputDataList");
 
-			if (list == null) {
-				logger.log(Level.WARNING, "XML List is NULL!");
-				return null;
-			}
-			logger.log(Level.INFO, "Going to create: " + list);
-
-			final String format = jdl.gets("InputDataListFormat");
-			if (!"xml-single".equals(format) && !"txt-list".equals(format)) {
-				logger.log(Level.WARNING, "Data list format not understood: " + format);
-				return null;
-			}
-
-			final List<String> datalist = jdl.getInputData(true);
-
-			if ("txt-list".equals(format)) {
-				final StringBuilder sb = new StringBuilder();
-				for (final String s : datalist)
-					sb.append("alien://").append(s).append('\n');
-
-				return sb.toString();
-			}
-
-			final XmlCollection c = new XmlCollection();
-			c.setName("jobinputdata");
-
-			// TODO: Change
-			for (final String s : datalist) {
-				final LFN l = c_api.getLFN(s);
-				if (l == null)
-					continue;
-				c.add(l);
-			}
-
-			return c.toString();
-
-			// logger.log(Level.WARNING, "Writing XML to:" + currentDir.getAbsolutePath() + "/" + list);
-			// Files.write(Paths.get(currentDir.getAbsolutePath() + "/" + list), content.getBytes());
-
-		}
-		catch (final Exception e) {
-			logger.log(Level.SEVERE, "Problem creating XML: ", e);
+		if (list == null) {
+			logger.log(Level.WARNING, "XML List is NULL!");
 			return null;
 		}
+		logger.log(Level.INFO, "Going to create: " + list);
+
+		final String format = jdl.gets("InputDataListFormat");
+		if (!"xml-single".equals(format) && !"txt-list".equals(format)) {
+			logger.log(Level.WARNING, "Data list format not understood: " + format);
+			return null;
+		}
+
+		final List<String> datalist = jdl.getInputData(true);
+
+		if ("txt-list".equals(format)) {
+			final StringBuilder sb = new StringBuilder();
+			for (final String s : datalist)
+				sb.append("alien://").append(s).append('\n');
+
+			return sb.toString();
+		}
+
+		final XmlCollection c = new XmlCollection();
+		c.setName("jobinputdata");
+
+		// TODO: Change
+		for (final String s : datalist) {
+			final LFN l = c_api.getLFN(s);
+			if (l == null)
+				continue;
+			c.add(l);
+		}
+
+		return c.toString();
+
+		// logger.log(Level.WARNING, "Writing XML to:" + currentDir.getAbsolutePath() + "/" + list);
+		// Files.write(Paths.get(currentDir.getAbsolutePath() + "/" + list), content.getBytes());
+
 		// logger.log(Level.INFO, "XML creation has completed");;
 	}
 
