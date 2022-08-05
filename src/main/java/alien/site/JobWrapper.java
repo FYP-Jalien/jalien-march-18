@@ -942,6 +942,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					String value = "";
 					final Object val = jdl.get(s);
 
+					if (val == null) {
+						logger.log(Level.WARNING, "Skipping the JDLVariable `" + s + "` as it is not defined in the JDL");
+						continue;
+					}
+
 					if (val instanceof Collection<?>)
 						value = String.join("##", (Collection<String>) val);
 					else
