@@ -3,7 +3,9 @@ package alien.monitoring;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
@@ -213,6 +215,23 @@ public class Monitor implements Runnable {
 	}
 
 	/**
+	 * Add a transient measurement value. Same as {@link #addMeasurement(String, double)}, with the only difference that after there is no more data to report, it will send a final zero on the relevant series and then
+	 * stop reporting altogether.
+	 *
+	 * @param key
+	 * @param quantity how much to add to the previous value
+	 * @return accumulated so far, or <code>-1</code> if there was any error
+	 */
+	public double addTransientMeasurement(final String key, final double quantity) {
+		final MonitoringObject mo = monitoringObjects.computeIfAbsent(key, (k) -> new TransientMeasurement(key));
+
+		if (mo instanceof Measurement)
+			return ((Measurement) mo).addMeasurement(quantity);
+
+		return -1;
+	}
+
+	/**
 	 * Add a timing result, in milliseconds
 	 *
 	 * @param key
@@ -315,9 +334,19 @@ public class Monitor implements Runnable {
 			final Vector<String> paramNames = new Vector<>(monitoringObjects.size());
 			final Vector<Object> paramValues = new Vector<>(monitoringObjects.size());
 
-			for (final MonitoringObject mo : monitoringObjects.values()) {
-				if (!lastCall || mo instanceof DerivedDataProducer)
+			final Iterator<Map.Entry<String, MonitoringObject>> it = monitoringObjects.entrySet().iterator();
+
+			while (it.hasNext()) {
+				final MonitoringObject mo = it.next().getValue();
+
+				if (!lastCall || mo instanceof DerivedDataProducer) {
 					mo.fillValues(paramNames, paramValues);
+
+					if ((mo instanceof TransientMonitor) && ((TransientMonitor) mo).shouldStop()) {
+						System.err.println("Will stop " + mo);
+						it.remove();
+					}
+				}
 			}
 
 			sendParameters(paramNames, paramValues);
