@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
@@ -17,14 +18,12 @@ import java.lang.ProcessBuilder.Redirect;
 import java.net.HttpURLConnection;
 import java.net.URISyntaxException;
 import java.net.URL;
-import java.net.URLConnection;
 import java.net.URLEncoder;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.security.KeyManagementException;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -66,7 +65,6 @@ import alien.taskQueue.JDL;
 import alien.taskQueue.Job;
 import alien.taskQueue.JobStatus;
 import alien.taskQueue.TaskQueueUtils;
-import alien.user.JAKeyStore;
 import apmon.ApMon;
 import apmon.ApMonException;
 import apmon.ApMonMonitoringConstants;
@@ -75,16 +73,11 @@ import apmon.MonitoredJob;
 import lazyj.ExtProperties;
 import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
-import lazyj.page.tags.JS;
 import lia.util.process.ExternalProcesses;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-import utils.ProcessWithTimeout;
-
-import javax.net.ssl.HttpsURLConnection;
-import javax.net.ssl.SSLContext;
 
 /**
  * Gets matched jobs, and launches JobWrapper for executing them
@@ -105,6 +98,7 @@ public class JobAgent implements Runnable {
 	private final String jobstatusFile = ".jalienJobstatus";
 	private final String siteSonarUrl = "http://alimonitor.cern.ch/sitesonar/";
 	private final String siteSonarProbeDir = "/cvmfs/alice.cern.ch/sitesonar/sitesonar.d/";
+	private final Charset charSet = StandardCharsets.UTF_8;
 
 	// Job variables
 	private JDL jdl;
@@ -381,11 +375,11 @@ public class JobAgent implements Runnable {
 				origTtl = ((Integer) siteMap.get("TTL")).intValue();
 				RUNNING_JOBAGENTS = 0;
 
-				collectSystemInformation();
 			}
 		}
 
 		hostName = (String) siteMap.get("Localhost");
+        collectSystemInformation();
 		// alienCm = (String) siteMap.get("alienCm");
 
 		if (env.containsKey("ALIEN_JOBAGENT_ID"))
@@ -437,7 +431,8 @@ public class JobAgent implements Runnable {
 	private void collectSystemInformation() {
 
 		String nodeHostName = hostName;
-		String alienSiteName = ConfigUtils.getConfig().gets("ALIEN_SITE");
+
+		String alienSiteName = ConfigUtils.getConfig().gets("ALIEN_SITE");; //todo: This value becomes null
 
 		// PARENT_HOSTNAME variable is used at sites which the node hostname changes over time. eg: RAL
 		if (env.containsKey("PARENT_HOSTNAME")) {
@@ -446,33 +441,33 @@ public class JobAgent implements Runnable {
 
 		// Birmingham site adds a number at the end of actual hostname. eg: "hostname-25.ph.bham.ac.uk"
 		// Following filter is added to obtain the actual hostname from the given hostname variable.
-		nodeHostName = nodeHostName.replaceAll("-[0-9]*\\(.ph.bham.ac.uk\\)$", ".ph.bham.ac.uk");
+		if (!nodeHostName.isEmpty() && !alienSiteName.isEmpty()) {
+			nodeHostName = nodeHostName.replaceAll("-[0-9]*\\(.ph.bham.ac.uk\\)$", ".ph.bham.ac.uk");
+		} else {
+			// Returning because the hostname or CE name is null
+			logger.log(Level.INFO,("Site Sonar execution is skipped because hostname or CE name is null"));
+			return;
+		}
 
+		logger.log(Level.INFO,"Getting probe list from Site Sonar for : "+ nodeHostName);
 		JSONObject probeOutput = getProbes(nodeHostName, alienSiteName);
 		if (!probeOutput.isEmpty()) {
-			logger.log(Level.INFO,("===== Running the following probes on " + nodeHostName + " at " + alienSiteName + "====="));
-
-			boolean resultExists = Boolean.parseBoolean((String) probeOutput.get("resultExists"));
-			JSONObject constraintValues;
-			// If results already exists, obtain the constraint values from the output of query.jsp
-			if (resultExists) {
-				constraintValues = (JSONObject) probeOutput.get("constraintValues");
-			} else {
-				// else run the tests and obtain the constraint values from the output of upload.jsp
-				JSONObject siteSonarOutput = new JSONObject();
 				JSONArray probeList = (JSONArray) probeOutput.get("probes");
-				for (int i = 0; i < probeList.size(); i++) {
-					String testName = (String) probeList.get(i);
-					JSONObject testOutput = runProbe(testName);
-					siteSonarOutput.put(testName, testOutput);
+				if (probeList.size() > 0){
+					logger.log(Level.INFO,("===== Running following probes on " + nodeHostName + " at " + alienSiteName + "====="));
+					for (int i = 0; i < probeList.size(); i++) {
+						String testName = (String) probeList.get(i);
+						JSONObject testOutput = runProbe(testName);
+						uploadResults(nodeHostName, alienSiteName, testName, testOutput);
+					}
+				} else {
+					logger.log(Level.INFO,(" No probes returned from Site Sonar. Skipping ..."));
 				}
-				constraintValues = uploadResults(nodeHostName, alienSiteName, siteSonarOutput);
-			}
-			// todo: update sitemap with constraintValues
 		} else {
-			logger.log(Level.SEVERE,"Empty Site Sonar probe list received for node " + hostName + " in " +
+			logger.log(Level.INFO,"Empty Site Sonar probe list received for node " + hostName + " in " +
 					alienSiteName + "...");
 		}
+		addConstraintsToSiteMap(nodeHostName, alienSiteName);
 	}
 
 	/**
@@ -484,38 +479,69 @@ public class JobAgent implements Runnable {
 	 */
 	private JSONObject makeRequest(URL url, String hostName, String alienSite) {
 		try {
+			logger.log(Level.FINE,"Making HTTP call to " + url + " from " + hostName + " in " +
+					alienSite);
 			final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 			conn.setConnectTimeout(5000);
 			conn.setReadTimeout(120000);
 
-			try (InputStream is = conn.getInputStream()) {
-				byte[] buff = is.readAllBytes();
-				String output = new String(buff, StandardCharsets.UTF_8);
-				return (JSONObject) jsonParser.parse(output);
+			try (InputStream inputStream = conn.getInputStream()) {
+				byte[] buffer = inputStream.readAllBytes();
+				String output = new String(buffer, StandardCharsets.UTF_8);
+				if (!output.isBlank()){
+					return (JSONObject) jsonParser.parse(output);
+				}
 			} catch (ParseException e) {
-				logger.log(Level.SEVERE,"Failed to parse Site sonar probe list for node " + hostName + " in " +
+				logger.log(Level.SEVERE,"Failed to parse AliMonitor response for node " + hostName + " in " +
 						alienSite, e);
 			}
 		} catch (IOException e) {
-			logger.log(Level.SEVERE,"Failed to get Site sonar probe list for node " + hostName + " in " +
+			logger.log(Level.SEVERE,"IO Error in calling the url " + url + " for node " + hostName + " in " +
 				alienSite, e);
 		}
 		return new JSONObject();
 	}
 
-	private JSONObject uploadResults(String hostName, String alienSite, JSONObject siteSonarOutput) {
+	/**
+	 * Upload probe output to AliMonitor database
+	 * @param hostName hostname of the node
+	 * @param alienSite
+	 * @param siteSonarOutput Output of the probe
+	 */
+	private void uploadResults(String hostName, String alienSite, String testName, JSONObject siteSonarOutput) {
 		try {
-
-			final URL url = new URL(siteSonarUrl + "upload.jsp?hostname=" + hostName +
-					"&ce_name=" + alienSite + "&full_test_output=" + URLEncoder.encode(siteSonarOutput.toString(),
-					StandardCharsets.UTF_8));
-			JSONObject uploadOutput = makeRequest(url, hostName, alienSite);
-			return (JSONObject) uploadOutput.get("constraintValues");
+			final URL url = new URL(siteSonarUrl + "upload.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
+					"&ce_name=" + URLEncoder.encode(alienSite, charSet) + "&test_name=" + URLEncoder.encode(testName, charSet) +
+					"&test_message=" + URLEncoder.encode(siteSonarOutput.toString(), StandardCharsets.UTF_8));
+			logger.log(Level.INFO,("Uploading Site Sonar results of " + hostName + " to AliMonitor"));
+			makeRequest(url, hostName, alienSite);
 		} catch (IOException e) {
-			logger.log(Level.SEVERE,"Failed to get Site sonar probe list for node " + hostName + " in " +
+			logger.log(Level.SEVERE,"Failed to upload Site sonar probe output for node " + hostName + " in " +
 					alienSite, e);
 		}
-		return new JSONObject();
+	}
+
+	/**
+	 * Obtain values for additional constraints
+	 * @param hostName hostname of the node
+	 * @param alienSite
+	 */
+	private void addConstraintsToSiteMap(String hostName, String alienSite) {
+		try {
+
+			final URL url = new URL(siteSonarUrl + "constraints.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
+					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
+			JSONObject constraints = makeRequest(url, hostName, alienSite);
+			constraints.keySet().forEach(key ->
+			{
+				Object value = constraints.get(key);
+				siteMap.put((String) key, value);
+				logger.log(Level.INFO,("Added constraint - Key: " + key + ", Value: " + value.toString() + " to SiteMap"));
+			});
+		} catch (IOException e) {
+			logger.log(Level.SEVERE,"Failed to get Site sonar constraints list for node " + hostName + " in " +
+					alienSite, e);
+		}
 	}
 
 	/**
@@ -526,8 +552,8 @@ public class JobAgent implements Runnable {
 	 */
 	private JSONObject getProbes(String hostName, String alienSite) {
 		try {
-			final URL url = new URL(siteSonarUrl + "query.jsp?hostname=" + hostName +
-					"&ce_name=" + alienSite);
+			final URL url = new URL(siteSonarUrl + "query.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
+					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
 			return makeRequest(url, hostName, alienSite);
 		} catch (IOException e) {
 			logger.log(Level.SEVERE,"Failed to get Site sonar probe list for node " + hostName + " in " +
@@ -547,14 +573,13 @@ public class JobAgent implements Runnable {
 		try {
 			ProcessBuilder pb
 					= new ProcessBuilder("sh", siteSonarProbeDir + probeName + ".sh");
-
+			logger.log(Level.INFO,("Running " + probeName + ".sh..."));
 			long startTime = System.currentTimeMillis();
 			Process process = pb.start();
 
 			StringBuilder output = new StringBuilder();
 			BufferedReader reader
-					= new BufferedReader(new InputStreamReader(
-					process.getInputStream()));
+					= new BufferedReader(new InputStreamReader(process.getInputStream()));
 
 			String line;
 			while ((line = reader.readLine()) != null) {
@@ -678,7 +703,7 @@ public class JobAgent implements Runnable {
 			// process payload
 			handleJob();
 
-			cleanup();
+			//cleanup();
 
 			synchronized (requestSync) {
 				RUNNING_CPU += reqCPU;
