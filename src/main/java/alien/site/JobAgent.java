@@ -703,7 +703,7 @@ public class JobAgent implements Runnable {
 			// process payload
 			handleJob();
 
-			//cleanup();
+			cleanup();
 
 			synchronized (requestSync) {
 				RUNNING_CPU += reqCPU;

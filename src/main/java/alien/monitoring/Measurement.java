@@ -13,7 +13,10 @@ public class Measurement implements MonitoringObject, DerivedDataProducer {
 
 	private final String name;
 
-	private int count = 0;
+	/**
+	 * The number of values collected since the last reporting
+	 */
+	protected int count = 0;
 	private double sum = 0;
 	private double min = 0;
 	private double max = 0;
