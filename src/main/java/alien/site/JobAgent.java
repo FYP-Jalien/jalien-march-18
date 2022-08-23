@@ -75,6 +75,9 @@ import utils.ProcessWithTimeout;
  */
 public class JobAgent implements Runnable {
 
+	private static final long SEND_RESOURCES_INTERVAL = 10 * 60 * 1000L;
+	private static final long SEND_JOBINFO_INTERVAL = 60 * 1000L;
+
 	// Variables passed through VoBox environment
 	private final static Map<String, String> env = System.getenv();
 	private final String ce;
@@ -456,8 +459,8 @@ public class JobAgent implements Runnable {
 				// TODO: Hack to exclude alihyperloop jobs from nodes without avx support. Remove me soon!
 				try {
 					if (!Files.readString(Paths.get("/proc/cpuinfo")).contains("avx")) {
-							if(!((ArrayList<Object>) siteMap.computeIfAbsent("NoUsers", (k) -> new ArrayList<>())).contains("alihyperloop"))
-								((ArrayList<String>) siteMap.get("NoUsers")).add("alihyperloop");
+						if (!((ArrayList<Object>) siteMap.computeIfAbsent("NoUsers", (k) -> new ArrayList<>())).contains("alihyperloop"))
+							((ArrayList<String>) siteMap.get("NoUsers")).add("alihyperloop");
 					}
 				}
 				catch (IOException | NullPointerException ex) {
@@ -860,10 +863,10 @@ public class JobAgent implements Runnable {
 						launchCmd.add(jarPath + jarName);
 						launchCmd.add("alien.site.JobWrapper");
 					}
-					else if (!readArg.contains("JobRunner") && !readArg.contains("JobAgent")) //Just to be completely sure...
+					else if (!readArg.contains("JobRunner") && !readArg.contains("JobAgent")) // Just to be completely sure...
 						launchCmd.add(readArg);
+				}
 			}
-		}
 
 			// Check if there is container support present on site. If yes, add to launchCmd
 			final Containerizer cont = ContainerizerFactory.getContainerizer();
@@ -889,7 +892,7 @@ public class JobAgent implements Runnable {
 		final ProcessBuilder pBuilder = new ProcessBuilder(launchCommand);
 		pBuilder.environment().remove("JALIEN_TOKEN_CERT");
 		pBuilder.environment().remove("JALIEN_TOKEN_KEY");
-		pBuilder.environment().put("TMPDIR", "tmp"); //Only for JW start --> set to jobworkdir/tmp by JW for payload
+		pBuilder.environment().put("TMPDIR", "tmp"); // Only for JW start --> set to jobworkdir/tmp by JW for payload
 		pBuilder.redirectError(Redirect.INHERIT);
 		pBuilder.directory(tempDir);
 
@@ -950,16 +953,15 @@ public class JobAgent implements Runnable {
 
 			childPID = (int) p.pid();
 
-			//apmon.setNumCPUs(cpuCores);
-			//apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
+			// apmon.setNumCPUs(cpuCores);
+			// apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
 			mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
-			apmon.addJobInstanceToMonitor(mj);
 
 			String monitoring = jdl.gets("Monitoring");
 			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
 				payloadMonitoring = true;
 				mj.setWrapperPid(getWrapperPid());
-				//mjPayload = apmon.addJobToMonitor(getWrapperPid(), jobWorkdir, ce + "_JobWrapper", matchedJob.get("queueId").toString());
+				// mjPayload = apmon.addJobToMonitor(getWrapperPid(), jobWorkdir, ce + "_JobWrapper", matchedJob.get("queueId").toString());
 				mj.setPayloadMonitoring();
 			}
 
@@ -989,14 +991,15 @@ public class JobAgent implements Runnable {
 		final Thread heartMon = new Thread(heartbeatMonitor(p));
 		heartMon.start();
 
-		int monitor_loops = 0;
+		long initTimeSendResourcess = System.currentTimeMillis();
+		long initTimeJobInfo = System.currentTimeMillis();
+
 		boolean discoveredPid = false;
 		try {
 			while (p.isAlive()) {
 				logger.log(Level.FINEST, "Waiting for the JobWrapper process to finish");
 
 				if (monitorJob) {
-					monitor_loops++;
 					final String error = checkProcessResources();
 					if (error != null) {
 						t.cancel();
@@ -1015,14 +1018,15 @@ public class JobAgent implements Runnable {
 						return 1;
 					}
 					// Send report once every 10 min, or when the job changes state
-					if (monitor_loops == 120) {
-						monitor_loops = 0;
+					if ((System.currentTimeMillis() - initTimeSendResourcess) > SEND_RESOURCES_INTERVAL) {
+						initTimeSendResourcess = initTimeSendResourcess + SEND_RESOURCES_INTERVAL;
 						sendProcessResources(false);
 					}
 
-					//set to 24
-					if (monitor_loops % 12 == 0) {
-						apmon.sendOneJobInfo(mj);
+					// set to 24
+					if ((System.currentTimeMillis() - initTimeJobInfo) > SEND_JOBINFO_INTERVAL) {
+						initTimeJobInfo = initTimeJobInfo + SEND_JOBINFO_INTERVAL;
+						apmon.sendOneJobInfo(mj, true);
 					}
 
 					else if (getWrapperJobStatusTimestamp() != lastStatusChange) {
@@ -1038,10 +1042,10 @@ public class JobAgent implements Runnable {
 							discoveredPid = true;
 						}
 
-						//Check if the wrapper has exited without us knowing
+						// Check if the wrapper has exited without us knowing
 						if ("DONE".equals(wrapperStatus) || wrapperStatus.contains("ERROR")) {
 
-							//In case the wrapper was just about to exit normally, wait a few seconds
+							// In case the wrapper was just about to exit normally, wait a few seconds
 							if (!p.waitFor(15, TimeUnit.SECONDS)) {
 								putJobTrace("Warning: The JobWrapper has terminated without the JobAgent noticing. Killing leftover processes...");
 								p.destroyForcibly();
@@ -1084,7 +1088,10 @@ public class JobAgent implements Runnable {
 			catch (final Exception e) {
 				logger.log(Level.WARNING, "Not all resources from the current job could be cleared: " + e);
 			}
-			apmon.removeJobToMonitor(childPID);
+
+			if (mj != null)
+				mj.close();
+
 			if (code != 0) {
 				// Looks like something went wrong. Let's check the last reported status
 				final String lastStatus = getWrapperJobStatus();
@@ -1453,7 +1460,7 @@ public class JobAgent implements Runnable {
 		final ArrayList<Integer> wrapperProcs = new ArrayList<>();
 
 		try {
-			final Process getWrapperProcs = Runtime.getRuntime().exec(new String[]{"pgrep", "-f",  String.valueOf(queueId)});
+			final Process getWrapperProcs = Runtime.getRuntime().exec(new String[] { "pgrep", "-f", String.valueOf(queueId) });
 			getWrapperProcs.waitFor();
 			try (Scanner cmdScanner = new Scanner(getWrapperProcs.getInputStream())) {
 				while (cmdScanner.hasNext()) {
@@ -1491,7 +1498,7 @@ public class JobAgent implements Runnable {
 		try {
 			final int jobWrapperPid = getWrapperPid();
 			if (jobWrapperPid != 0)
-				Runtime.getRuntime().exec(new String[]{"kill", String.valueOf(jobWrapperPid)});
+				Runtime.getRuntime().exec(new String[] { "kill", String.valueOf(jobWrapperPid) });
 			else
 				logger.log(Level.INFO, "Could not kill JobWrapper: not found. Already done?");
 		}
@@ -1531,7 +1538,7 @@ public class JobAgent implements Runnable {
 		try {
 			if (jobWrapperPid != 0) {
 				JobWrapper.cleanupProcesses(queueId, jobWrapperPid);
-				Runtime.getRuntime().exec(new String[]{"kill", "-9", String.valueOf(jobWrapperPid)});
+				Runtime.getRuntime().exec(new String[] { "kill", "-9", String.valueOf(jobWrapperPid) });
 			}
 			else
 				logger.log(Level.INFO, "Could not kill JobWrapper: not found. Already done?");
@@ -1618,5 +1625,5 @@ public class JobAgent implements Runnable {
 			}
 		};
 	}
-	
+
 }
