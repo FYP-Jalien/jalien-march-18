@@ -563,65 +563,72 @@ public class DispatchSSLServerNIO implements Runnable {
 					while (it.hasNext()) {
 						final SelectionKey key = it.next();
 
-						if (key == null || !key.isValid()) {
-							logger.log(Level.INFO, "Detected closed key, disposing of it");
+						try {
+							if (key == null || !key.isValid()) {
+								logger.log(Level.INFO, "Detected closed key, disposing of it");
 
-							if (key != null) {
-								final DispatchSSLServerNIO obj = sessionMap.remove(key);
+								if (key != null) {
+									final DispatchSSLServerNIO obj = sessionMap.remove(key);
+
+									if (obj != null) {
+										try {
+											obj.cleanup();
+										}
+										catch (final Throwable t) {
+											logger.log(Level.WARNING, "Cleaning up an invalid key encountered a problem", t);
+										}
+									}
+								}
+
+								continue;
+							}
+
+							if (key.isValid() && key.isReadable()) {
+								final DispatchSSLServerNIO obj = sessionMap.get(key);
 
 								if (obj != null) {
+									// System.err.println("Key found in session map: " + key);
+									// System.err.println("Map content: " + sessionMap);
+									// disable future events until the dispatcher has digested the data
+									// key.interestOps(0);
+									// System.err.println("Notifying of new data");
 									try {
-										obj.cleanup();
+										lastOperationStarted = System.currentTimeMillis();
+										setName("NIO.selectorThread - " + lastOperationStarted + " " + (obj.remoteIdentity != null ? obj.remoteIdentity.getRemoteEndpoint() : "n/a"));
+										connectionInstance = obj;
+										obj.notifyData();
 									}
-									catch (final Throwable t) {
-										logger.log(Level.WARNING, "Cleaning up an invalid key encountered a problem", t);
+									catch (final Throwable t1) {
+										try {
+											logger.log(Level.WARNING, "Throwable notifying data", t1);
+											obj.cleanup();
+										}
+										catch (final Throwable t) {
+											logger.log(Level.WARNING, "Cleaning up after an error encountered a problem", t);
+										}
+									}
+									finally {
+										lastOperationStarted = 0;
+										connectionInstance = null;
+										setName("NIO.selectorThread - idle");
 									}
 								}
+								else {
+									System.err.println("Didn't find a corresponding session");
+								}
 							}
-
+						}
+						catch (final Exception e2){
+							logger.log(Level.SEVERE, "Selector thread caught an exception handling a socket", e2);
+							System.err.println("Selector thread caught an exception handling a socket: " + e2.getMessage());
+							e2.printStackTrace();
+						}
+						finally{
 							it.remove();
-							continue;
 						}
-
-						if (key.isReadable()) {
-							final DispatchSSLServerNIO obj = sessionMap.get(key);
-
-							if (obj != null) {
-								// System.err.println("Key found in session map: " + key);
-								// System.err.println("Map content: " + sessionMap);
-								// disable future events until the dispatcher has digested the data
-								// key.interestOps(0);
-								// System.err.println("Notifying of new data");
-								try {
-									lastOperationStarted = System.currentTimeMillis();
-									setName("NIO.selectorThread - " + lastOperationStarted + " " + (obj.remoteIdentity != null ? obj.remoteIdentity.getRemoteEndpoint() : "n/a"));
-									connectionInstance = obj;
-									obj.notifyData();
-								}
-								catch (final Throwable t1) {
-									try {
-										logger.log(Level.WARNING, "Throwable notifying data", t1);
-										obj.cleanup();
-									}
-									catch (final Throwable t) {
-										logger.log(Level.WARNING, "Cleaning up after an error encountered a problem", t);
-									}
-								}
-								finally {
-									lastOperationStarted = 0;
-									connectionInstance = null;
-									setName("NIO.selectorThread - idle");
-								}
-							}
-							else {
-								System.err.println("Didn't find a corresponding session");
-							}
-						}
-
-						it.remove();
 					}
 				}
-				catch (final IOException ioe) {
+				catch (final Exception ioe) {
 					System.err.println("Server selector threw an exception : " + ioe.getMessage());
 					ioe.printStackTrace();
 				}

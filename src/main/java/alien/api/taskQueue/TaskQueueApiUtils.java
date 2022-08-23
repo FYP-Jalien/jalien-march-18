@@ -223,7 +223,7 @@ public class TaskQueueApiUtils {
 	 * Set a job's status
 	 *
 	 * @param jobnumber
-	 * @param resubmission 
+	 * @param resubmission
 	 * @param status
 	 */
 	public static void setJobStatus(final long jobnumber, final int resubmission, final JobStatus status) {
@@ -251,7 +251,13 @@ public class TaskQueueApiUtils {
 		}
 		catch (final ServerException e) {
 			System.out.println("Could get not a Job's status: " + e.getMessage());
-			e.getCause().printStackTrace();
+
+			final Throwable cause = e.getCause();
+
+			if (cause != null)
+				cause.printStackTrace();
+			else
+				e.printStackTrace();
 
 			if (e instanceof JobKilledException)
 				return false;
@@ -343,7 +349,7 @@ public class TaskQueueApiUtils {
 
 	/**
 	 * @param jobid
-	 * @param resubmission 
+	 * @param resubmission
 	 * @param tag
 	 * @param message
 	 * @return <code>false</code> if the job was killed

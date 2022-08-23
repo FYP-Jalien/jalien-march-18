@@ -547,8 +547,14 @@ public final class MonitorFactory {
 
 		for (int i = 0; i < 15; i++) {
 			m.addMeasurement("key", 1);
+			m.addTransientMeasurement("transient", 1);
 			Thread.sleep(1000);
 			System.err.print(".");
+		}
+
+		for (int i = 0; i < 10; i++) {
+			System.err.println("30s sleep #" + i + " / 10");
+			Thread.sleep(30 * 1000);
 		}
 
 		System.err.println("\nExiting");

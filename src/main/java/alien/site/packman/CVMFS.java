@@ -243,6 +243,13 @@ public class CVMFS extends PackMan {
 	}
 
 	/**
+	 * @return path to Podman runtime in CVMFS
+	 */
+	public static String getPodmanPath() {
+		return CVMFS_BASE_DIR + "/containers/bin/podman/current/bin";
+	}
+
+	/**
 	 * @return the CVMFS revision of the alice.cern.ch repository mounted on the machine
 	 */
 	public static int getRevision() {
