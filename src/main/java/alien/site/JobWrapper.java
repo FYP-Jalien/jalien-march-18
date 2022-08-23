@@ -261,6 +261,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		monitor.addMonitoring("JobWrapper", this);
 	}
 
+
 	@Override
 	public void run() {
 
@@ -290,43 +291,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			System.exit(Math.abs(runCode));
 	}
 
-	private Map<String, String> installPackages(final ArrayList<String> packToInstall) {
-		if (packMan == null) {
-			logger.log(Level.WARNING, "Packman is null!");
-			return null;
-		}
-
-		try (Timing t = new Timing()) {
-			final Map<String, String> env = packMan.installPackage(username, String.join(",", packToInstall), null);
-			if (env == null) {
-				logger.log(Level.SEVERE, "Error installing " + packToInstall);
-				putJobTrace("Error setting the environment for " + packToInstall);
-				System.exit(1);
-			}
-
-			logger.log(Level.INFO, "It took " + t + " to generate the environment for " + packToInstall);
-
-			return env;
-		}
-	}
-
-	private class PackagesResolver extends Thread {
-		private Map<String, String> environment_packages;
-
-		@Override
-		public void run() {
-			environment_packages = getJobPackagesEnvironment();
-		}
-	}
-
-	private class InputFilesDownloader extends Thread {
-		private int downloadExitCode;
-
-		@Override
-		public void run() {
-			downloadExitCode = getInputFiles();
-		}
-	}
 
 	private int runJob() {
 		try {
@@ -350,7 +314,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			}
 
 			// run payload
-			final int execExitCode = execute(packResolver.environment_packages);
+			final int execExitCode = executeJob(packResolver.environment_packages);
 
 			getTraceFromFile();
 
@@ -365,7 +329,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				return uploadOutputFiles(JobStatus.ERROR_E, execExitCode) ? execExitCode : -1;
 			}
 
-			final int valExitCode = validate(packResolver.environment_packages);
+			final int valExitCode = validateJob(packResolver.environment_packages);
 
 			getTraceFromFile();
 
@@ -401,6 +365,28 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			putJobTrace(sb.toString());
 			return -1;
 		}
+	}
+
+	private int executeJob(final Map<String, String> environment_packages) {
+		putJobTrace("Starting execution");
+
+		changeStatus(JobStatus.RUNNING);
+		final int code = executeCommand(jdl.gets("Executable"), jdl.getArguments(), environment_packages, "execution");
+
+		return code;
+	}
+
+	private int validateJob(final Map<String, String> environment_packages) {
+		int code = 0;
+
+		final String validation = jdl.gets("ValidationCommand");
+
+		if (validation != null) {
+			putJobTrace("Starting validation");
+			code = executeCommand(validation, null, environment_packages, "validation");
+		}
+
+		return code;
 	}
 
 	/**
@@ -536,26 +522,42 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		return payload.exitValue();
 	}
 
-	private int execute(final Map<String, String> environment_packages) {
-		putJobTrace("Starting execution");
-
-		changeStatus(JobStatus.RUNNING);
-		final int code = executeCommand(jdl.gets("Executable"), jdl.getArguments(), environment_packages, "execution");
-
-		return code;
-	}
-
-	private int validate(final Map<String, String> environment_packages) {
-		int code = 0;
-
-		final String validation = jdl.gets("ValidationCommand");
-
-		if (validation != null) {
-			putJobTrace("Starting validation");
-			code = executeCommand(validation, null, environment_packages, "validation");
+	private Map<String, String> installPackages(final ArrayList<String> packToInstall) {
+		if (packMan == null) {
+			logger.log(Level.WARNING, "Packman is null!");
+			return null;
 		}
 
-		return code;
+		try (Timing t = new Timing()) {
+			final Map<String, String> env = packMan.installPackage(username, String.join(",", packToInstall), null);
+			if (env == null) {
+				logger.log(Level.SEVERE, "Error installing " + packToInstall);
+				putJobTrace("Error setting the environment for " + packToInstall);
+				System.exit(1);
+			}
+
+			logger.log(Level.INFO, "It took " + t + " to generate the environment for " + packToInstall);
+
+			return env;
+		}
+	}
+
+	private class PackagesResolver extends Thread {
+		private Map<String, String> environment_packages;
+
+		@Override
+		public void run() {
+			environment_packages = getJobPackagesEnvironment();
+		}
+	}
+
+	private class InputFilesDownloader extends Thread {
+		private int downloadExitCode;
+
+		@Override
+		public void run() {
+			downloadExitCode = getInputFiles();
+		}
 	}
 
 	private int getInputFiles() {
@@ -785,11 +787,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		putJobTrace("Going to uploadOutputFiles(exitStatus=" + exitStatus + ", outputDir=" + outputDir + ")");
 
-		boolean noError = true;
+		boolean jobExecutedSuccessfully = true;
 		if (exitStatus.toString().contains("ERROR")) {
 			putJobTrace("Registering temporary log files in " + outputDir + ". You must do 'registerOutput " + queueId
 					+ "' within 24 hours of the job termination to preserve them. After this period, they are automatically deleted.");
-			noError = false;
+					jobExecutedSuccessfully = false;
 		}
 
 		changeStatus(JobStatus.SAVING);
@@ -799,54 +801,15 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		logger.log(Level.INFO, "outputDir: " + outputDir);
 		logger.log(Level.INFO, "We are the current user: " + commander.getUser().getName());
 
-		final ArrayList<OutputEntry> archivesToUpload = new ArrayList<>();
-		final ArrayList<OutputEntry> standaloneFilesToUpload = new ArrayList<>();
-		final ArrayList<String> allArchiveEntries = new ArrayList<>();
-
-		final ArrayList<String> outputTags = getOutputTags(exitStatus);
-		for (final String tag : outputTags) {
-			try {
-				final ParsedOutput filesTable = new ParsedOutput(queueId, jdl, currentDir.getAbsolutePath(), tag, noError);
-				for (final OutputEntry entry : filesTable.getEntries()) {
-					if (entry.isArchive()) {
-						logger.log(Level.INFO, "This is an archive: " + entry.getName());
-						final ArrayList<String> archiveEntries = entry.createZip(currentDir.getAbsolutePath());
-						if (archiveEntries.size() == 0) {
-							logger.log(Level.WARNING, "Ignoring empty archive: " + entry.getName());
-							putJobTrace("Ignoring empty archive: " + entry.getName());
-						}
-						else {
-							for (final String archiveEntry : archiveEntries) {
-								allArchiveEntries.add(archiveEntry);
-								logger.log(Level.INFO, "Adding to archive members: " + archiveEntry);
-							}
-							archivesToUpload.add(entry);
-						}
-					}
-					else {
-						logger.log(Level.INFO, "This is not an archive: " + entry.getName());
-						final File entryFile = new File(currentDir.getAbsolutePath() + "/" + entry.getName());
-						if (entryFile.length() <= 0) { // archive files are checked for this during createZip, but standalone files still need to be checked
-							logger.log(Level.WARNING, "The following file has size 0 and will be ignored: " + entry.getName());
-							putJobTrace("The following file has size 0 and will be ignored: " + entry.getName());
-						}
-						else {
-							standaloneFilesToUpload.add(entry);
-							logger.log(Level.INFO, "Adding to standalone: " + entry.getName());
-						}
-					}
-				}
-			}
-			catch (final NullPointerException ex) {
-				logger.log(Level.SEVERE, "A required outputfile was NOT found! Aborting: " + ex.getMessage());
-				putJobTrace("Error: A required outputfile was NOT found! Aborting: " + ex.getMessage());
-				if (noError)
-					changeStatus(JobStatus.ERROR_S);
-				return false;
-			}
+		final ArrayList<OutputEntry> toUpload = getUploadEntries(getOutputTags(exitStatus), jobExecutedSuccessfully);
+		if (toUpload == null) {
+			if (jobExecutedSuccessfully)
+				changeStatus(JobStatus.ERROR_S);
+			else
+				changeStatus(exitStatus, exitCode);
+			return false;
 		}
-
-		final ArrayList<OutputEntry> toUpload = mergeAndRemoveDuplicateEntries(standaloneFilesToUpload, archivesToUpload, allArchiveEntries);
+			
 		for (final OutputEntry entry : toUpload) {
 			try {
 				final File localFile = new File(currentDir.getAbsolutePath() + "/" + entry.getName());
@@ -911,12 +874,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			}
 		}
 
-		if (!uploadedAllOutFiles && exitStatus == JobStatus.DONE) {
+		if (!uploadedAllOutFiles && jobExecutedSuccessfully) {
 			changeStatus(JobStatus.ERROR_SV);
 			return false;
-		} // else
-			// changeStatus(JobStatus.SAVED); TODO: To be put back later if still needed
-		if (exitStatus == JobStatus.DONE) {
+		}
+		if (jobExecutedSuccessfully) {
 			if (!registerEntries(toUpload, outputDir))
 				changeStatus(JobStatus.ERROR_SV);
 			else if (uploadedNotAllCopies)
@@ -1185,6 +1147,59 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		return tags;
+	}
+
+	/**
+	 * @param outputTags
+	 * @param jobExecutedSuccessfully
+	 * @return List of entries to upload, based on the outputtags. Null if at least one required file is missing
+	 */
+	private ArrayList<OutputEntry> getUploadEntries(ArrayList<String> outputTags, boolean jobExecutedSuccessfully) {
+		final ArrayList<OutputEntry> archivesToUpload = new ArrayList<>();
+		final ArrayList<OutputEntry> standaloneFilesToUpload = new ArrayList<>();
+		final ArrayList<String> allArchiveEntries = new ArrayList<>();
+
+		for (final String tag : outputTags) {
+			try {
+				final ParsedOutput filesTable = new ParsedOutput(queueId, jdl, currentDir.getAbsolutePath(), tag, jobExecutedSuccessfully);
+				for (final OutputEntry entry : filesTable.getEntries()) {
+					if (entry.isArchive()) {
+						logger.log(Level.INFO, "This is an archive: " + entry.getName());
+						final ArrayList<String> archiveEntries = entry.createZip(currentDir.getAbsolutePath());
+						if (archiveEntries.size() == 0) {
+							logger.log(Level.WARNING, "Ignoring empty archive: " + entry.getName());
+							putJobTrace("Ignoring empty archive: " + entry.getName());
+						}
+						else {
+							for (final String archiveEntry : archiveEntries) {
+								allArchiveEntries.add(archiveEntry);
+								logger.log(Level.INFO, "Adding to archive members: " + archiveEntry);
+							}
+							archivesToUpload.add(entry);
+						}
+					}
+					else {
+						logger.log(Level.INFO, "This is not an archive: " + entry.getName());
+						final File entryFile = new File(currentDir.getAbsolutePath() + "/" + entry.getName());
+						if (entryFile.length() <= 0) { // archive files are checked for this during createZip, but standalone files still need to be checked
+							logger.log(Level.WARNING, "The following file has size 0 and will be ignored: " + entry.getName());
+							putJobTrace("The following file has size 0 and will be ignored: " + entry.getName());
+						}
+						else {
+							standaloneFilesToUpload.add(entry);
+							logger.log(Level.INFO, "Adding to standalone: " + entry.getName());
+						}
+					}
+				}
+			}
+			catch (final NullPointerException ex) {
+				logger.log(Level.SEVERE, "A required outputfile was NOT found! Aborting: " + ex.getMessage());
+				putJobTrace("Error: A required outputfile was NOT found! Aborting: " + ex.getMessage());
+				return null;
+			}
+		}
+		return mergeAndRemoveDuplicateEntries(standaloneFilesToUpload, archivesToUpload, allArchiveEntries);
+
 	}
 
 	private static ArrayList<OutputEntry> mergeAndRemoveDuplicateEntries(final ArrayList<OutputEntry> filesToMerge, final ArrayList<OutputEntry> fileList, final ArrayList<String> allArchiveEntries) {

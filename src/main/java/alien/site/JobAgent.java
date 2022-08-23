@@ -106,6 +106,7 @@ public class JobAgent implements Runnable {
 	private Double prevCpuTime;
 	private long prevTime = 0;
 	private int cpuCores = 1;
+	private long ttl;
 
 	private static AtomicInteger totalJobs = new AtomicInteger(0);
 	private final int jobNumber;
@@ -407,33 +408,21 @@ public class JobAgent implements Runnable {
 
 	}
 
-	private void collectSystemInformation() {
-		final String scriptPath = CVMFS.getSiteSonarScript();
-		final File f = new File(scriptPath);
+	//#############################################################
+	//################## MAIN EXECUTION FLOW ######################
+	//#############################################################
 
-		if (f.exists() && f.canExecute()) {
-			final ProcessBuilder pBuilder = new ProcessBuilder(scriptPath);
+	/**
+	 * @param args
+	 * @throws IOException
+	 */
+	public static void main(final String[] args) throws IOException {
+		ConfigUtils.setApplicationName("JobAgent");
+		DispatchSSLClient.setIdleTimeout(30000);
+		ConfigUtils.switchToForkProcessLaunching();
 
-			pBuilder.environment().put("ALIEN_JDL_CPUCORES", MAX_CPU != null ? MAX_CPU.toString() : "1");
-			pBuilder.environment().put("ALIEN_SITE", siteMap.getOrDefault("Site", "UNKNOWN").toString());
-			pBuilder.redirectError(Redirect.INHERIT);
-			pBuilder.redirectOutput(Redirect.INHERIT);
-
-			try {
-				final Process p = pBuilder.start();
-
-				if (p != null) {
-					final ProcessWithTimeout ptimeout = new ProcessWithTimeout(p, pBuilder);
-					ptimeout.waitFor(5, TimeUnit.MINUTES);
-
-					if (!ptimeout.exitedOk())
-						logger.log(Level.WARNING, "Sitesonar didn't finish in due time");
-				}
-			}
-			catch (@SuppressWarnings("unused") final IOException | InterruptedException e) {
-				// ignore
-			}
-		}
+		final JobAgent jao = new JobAgent();
+		jao.run();
 	}
 
 	@SuppressWarnings({ "boxing", "unchecked" })
@@ -456,8 +445,8 @@ public class JobAgent implements Runnable {
 				// TODO: Hack to exclude alihyperloop jobs from nodes without avx support. Remove me soon!
 				try {
 					if (!Files.readString(Paths.get("/proc/cpuinfo")).contains("avx")) {
-							if(!((ArrayList<Object>) siteMap.computeIfAbsent("NoUsers", (k) -> new ArrayList<>())).contains("alihyperloop"))
-								((ArrayList<String>) siteMap.get("NoUsers")).add("alihyperloop");
+						if (!((ArrayList<Object>) siteMap.computeIfAbsent("NoUsers", (k) -> new ArrayList<>())).contains("alihyperloop"))
+							((ArrayList<String>) siteMap.get("NoUsers")).add("alihyperloop");
 					}
 				}
 				catch (IOException | NullPointerException ex) {
@@ -568,273 +557,38 @@ public class JobAgent implements Runnable {
 	}
 
 	private void handleJob() {
-
 		try {
-
 			if (!createWorkDir()) {
 				changeJobStatus(JobStatus.ERROR_IB, null);
 				logger.log(Level.INFO, "Error. Workdir for job could not be created");
 				putJobTrace("Error. Workdir for job could not be created");
 				return;
 			}
+
 			jobWrapperLogDir = jobWorkdir + "/" + jobWrapperLogName;
 
 			logger.log(Level.INFO, "Started JA with: " + jdl);
 
 			final String version = !Version.getTagFromEnv().isEmpty() ? Version.getTagFromEnv() : "/Git: " + Version.getGitHash() + ". Builddate: " + Version.getCompilationTimestamp();
-			putJobTrace("Running JAliEn JobAgent " + version + " on " + hostName);
+			putJobTrace("Running JAliEn JobAgent" + version + " on " + hostName);
 
 			// Set up constraints
 			getMemoryRequirements();
-
-			final List<String> launchCommand = generateLaunchCommand();
 
 			setupJobWrapperLogging();
 
 			putJobTrace("Starting JobWrapper");
 
-			launchJobWrapper(launchCommand, true);
+			ttl = ttlForJob();
 
+			//Start and monitor execution
+			monitorExecution(launchJobWrapper(generateLaunchCommand()), true);
 		}
 		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Unable to handle job", e);
 			putJobTrace("ERROR: Unable to handle job: " + Arrays.toString(e.getStackTrace()));
 			changeJobStatus(JobStatus.ERROR_E, null);
 		}
-	}
-
-	private void cleanup() {
-		logger.log(Level.INFO, "Sending monitoring values...");
-
-		setStatus(jaStatus.DONE);
-
-		monitor.sendParameter("job_id", Integer.valueOf(0));
-
-		logger.log(Level.INFO, "Cleaning up after execution...");
-		putJobTrace("Cleaning up after execution...");
-
-		try {
-			Files.walk(tempDir.toPath())
-					.map(Path::toFile)
-					.sorted(Comparator.reverseOrder()) // or else dir will appear before its contents
-					.forEach(File::delete);
-		}
-		catch (final IOException | UncheckedIOException e) {
-			logger.log(Level.WARNING, "Error deleting the job workdir, using system commands instead", e);
-
-			final CommandOutput rmOutput = SystemCommand.executeCommand(Arrays.asList("rm", "-rf", tempDir.getAbsolutePath()), true);
-
-			if (rmOutput == null)
-				logger.log(Level.SEVERE, "Cannot clean up the job dir even using system commands");
-			else
-				logger.log(Level.INFO, "System command cleaning of job work dir returned " + rmOutput.exitCode + ", full output:\n" + rmOutput.stdout);
-		}
-
-		RES_WORKDIR_SIZE = ZERO;
-		RES_VMEM = ZERO;
-		RES_RMEM = ZERO;
-		RES_VMEMMAX = ZERO;
-		RES_RMEMMAX = ZERO;
-		RES_MEMUSAGE = ZERO;
-		RES_CPUTIME = ZERO;
-		RES_CPUUSAGE = ZERO;
-		RES_RESOURCEUSAGE = "";
-		RES_RUNTIME = Long.valueOf(0);
-		RES_FRUNTIME = "";
-
-		if (mj != null)
-			mj.close();
-
-		logger.log(Level.INFO, "Done!");
-	}
-
-	/**
-	 * @param folder
-	 * @return amount of free space (in bytes) in the given folder. Or zero if there was a problem (or no free space).
-	 */
-	public static long getFreeSpace(final String folder) {
-		final File folderFile = new File(Functions.resolvePathWithEnv(folder));
-
-		try {
-			if (!folderFile.exists())
-				folderFile.mkdirs();
-		}
-		catch (Exception e) {
-			// ignore
-		}
-
-		long space = folderFile.getFreeSpace();
-		if (space <= 0) {
-			// 32b JRE returns 0 when too much space is available
-
-			try {
-				final String output = ExternalProcesses.getCmdOutput(Arrays.asList("df", "-P", "-B", "1024", folder), true, 30L, TimeUnit.SECONDS);
-
-				try (BufferedReader br = new BufferedReader(new StringReader(output))) {
-					String sLine = br.readLine();
-
-					if (sLine != null) {
-						sLine = br.readLine();
-
-						if (sLine != null) {
-							final StringTokenizer st = new StringTokenizer(sLine);
-
-							st.nextToken();
-							st.nextToken();
-							st.nextToken();
-
-							space = Long.parseLong(st.nextToken());
-						}
-					}
-				}
-			}
-			catch (IOException | InterruptedException ioe) {
-				System.out.println("Could not extract the space information from `df`: " + ioe.getMessage());
-			}
-		}
-
-		return space;
-	}
-
-	/**
-	 * updates jobagent parameters that change between job requests
-	 *
-	 * @return false if we can't run because of current conditions, true if positive
-	 */
-	public boolean checkParameters() {
-		final int timeleft = computeTimeLeft(Level.INFO);
-		if (timeleft <= 0)
-			return false;
-
-		if (RUNNING_DISK.longValue() <= 10 * 1024) {
-			if (!System.getenv().containsKey("JALIEN_IGNORE_STORAGE")) {
-				logger.log(Level.WARNING, "There is not enough space left: " + RUNNING_DISK);
-				return false;
-			}
-
-			logger.log(Level.INFO, "Ignoring the reported local disk space of " + RUNNING_DISK);
-		}
-
-		if (RUNNING_CPU.longValue() <= 0)
-			return false;
-
-		return true;
-	}
-
-	private int computeTimeLeft(final Level loggingLevel) {
-		final long jobAgentCurrentTime = System.currentTimeMillis();
-		final int time_subs = (int) (jobAgentCurrentTime - jobAgentStartTime) / 1000; // convert to seconds
-		int timeleft = origTtl - time_subs;
-
-		logger.log(loggingLevel, "Still have " + timeleft + " seconds to live (" + jobAgentCurrentTime + "-" + jobAgentStartTime + "=" + time_subs + ")");
-
-		// we check if the cert timeleft is smaller than the ttl itself
-		final int certTime = getCertTime();
-		logger.log(loggingLevel, "Certificate timeleft is " + certTime);
-		timeleft = Math.min(timeleft, certTime - 900); // (-15min)
-
-		// safety time for saving, etc
-		timeleft -= 600;
-
-		Long shutdownTime = MachineJobFeatures.getFeatureNumber("shutdowntime", MachineJobFeatures.FeatureType.MACHINEFEATURE);
-
-		if (shutdownTime != null) {
-			shutdownTime = Long.valueOf(shutdownTime.longValue() - System.currentTimeMillis() / 1000);
-			logger.log(loggingLevel, "Shutdown is" + shutdownTime);
-
-			timeleft = Integer.min(timeleft, shutdownTime.intValue());
-		}
-
-		return timeleft;
-	}
-
-	private boolean updateDynamicParameters() {
-		logger.log(Level.INFO, "Updating dynamic parameters of jobAgent map");
-
-		// ttl recalculation
-		final int timeleft = computeTimeLeft(Level.INFO);
-
-		if (!checkParameters())
-			return false;
-
-		siteMap.put("TTL", Integer.valueOf(timeleft));
-		siteMap.put("CPUCores", RUNNING_CPU);
-		siteMap.put("Disk", RUNNING_DISK);
-
-		final int cvmfsRevision = CVMFS.getRevision();
-		if (cvmfsRevision > 0)
-			siteMap.put("CVMFS_revision", Integer.valueOf(cvmfsRevision));
-
-		return true;
-	}
-
-	/**
-	 * @return the time in seconds that the certificate is still valid for
-	 */
-	private int getCertTime() {
-		return (int) TimeUnit.MILLISECONDS.toSeconds(commander.getUser().getUserCert()[0].getNotAfter().getTime() - System.currentTimeMillis());
-	}
-
-	private void getMemoryRequirements() {
-		// By default the jobs are allowed to use up to 10GB of disk space in the sandbox
-
-		cpuCores = TaskQueueUtils.getCPUCores(jdl);
-		putJobTrace("Job requested " + cpuCores + " CPU cores to run");
-
-		workdirMaxSizeMB = TaskQueueUtils.getWorkDirSizeMB(jdl, cpuCores);
-		putJobTrace("Local disk space limit: " + workdirMaxSizeMB + "MB");
-
-		// Memory use
-		final String maxmemory = jdl.gets("Memorysize");
-
-		// By default the job is limited to using 8GB of virtual memory per allocated CPU core
-		jobMaxMemoryMB = cpuCores * 8 * 1024;
-
-		if (env.containsKey("JALIEN_MEM_LIM")) {
-			try {
-				jobMaxMemoryMB = Integer.parseInt(env.get("JALIEN_MEM_LIM"));
-			}
-			catch (final NumberFormatException en) {
-				final String error = "Could not read limit from JALIEN_MEM_LIM. Using default: " + jobMaxMemoryMB + "MB";
-				logger.log(Level.WARNING, error, en);
-				putJobTrace(error);
-			}
-		}
-		else if (maxmemory != null) {
-			final Pattern pLetter = Pattern.compile("\\p{L}+");
-
-			final Matcher m = pLetter.matcher(maxmemory.trim().toUpperCase());
-			try {
-				if (m.find()) {
-					final String number = maxmemory.substring(0, m.start());
-					final String unit = maxmemory.substring(m.start()).toUpperCase();
-
-					jobMaxMemoryMB = TaskQueueUtils.convertStringUnitToIntegerMB(unit, number);
-				}
-				else
-					jobMaxMemoryMB = Integer.parseInt(maxmemory);
-
-				putJobTrace("Virtual memory limit (JDL): " + jobMaxMemoryMB + "MB");
-			}
-			catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
-				putJobTrace("Virtual memory limit specs are invalid: '" + maxmemory + "', using the default " + jobMaxMemoryMB + "MB");
-			}
-		}
-		else
-			putJobTrace("Virtual memory limit (default): " + jobMaxMemoryMB + "MB");
-	}
-
-	/**
-	 * @param args
-	 * @throws IOException
-	 */
-	public static void main(final String[] args) throws IOException {
-		ConfigUtils.setApplicationName("JobAgent");
-		DispatchSSLClient.setIdleTimeout(30000);
-		ConfigUtils.switchToForkProcessLaunching();
-
-		final JobAgent jao = new JobAgent();
-		jao.run();
 	}
 
 	/**
@@ -860,16 +614,16 @@ public class JobAgent implements Runnable {
 						launchCmd.add(jarPath + jarName);
 						launchCmd.add("alien.site.JobWrapper");
 					}
-					else if (!readArg.contains("JobRunner") && !readArg.contains("JobAgent")) //Just to be completely sure...
+					else if (!readArg.contains("JobRunner") && !readArg.contains("JobAgent")) // Just to be completely sure...
 						launchCmd.add(readArg);
+				}
 			}
-		}
 
 			// Check if there is container support present on site. If yes, add to launchCmd
 			final Containerizer cont = ContainerizerFactory.getContainerizer();
 			if (cont != null) {
 				putJobTrace("Support for containers detected. Will use: " + cont.getContainerizerName());
-				cont.setWorkdir(jobWorkdir);
+				cont.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivilegesad sd bind-mounts)
 				return cont.containerize(String.join(" ", launchCmd));
 			}
 			return launchCmd;
@@ -880,16 +634,13 @@ public class JobAgent implements Runnable {
 		}
 	}
 
-	private int launchJobWrapper(final List<String> launchCommand, final boolean monitorJob) {
+	private Process launchJobWrapper(final List<String> launchCommand) {
 		logger.log(Level.INFO, "Launching jobwrapper using the command: " + launchCommand.toString());
-		final long ttl = ttlForJob();
-
-		boolean payloadMonitoring = false;
 
 		final ProcessBuilder pBuilder = new ProcessBuilder(launchCommand);
 		pBuilder.environment().remove("JALIEN_TOKEN_CERT");
 		pBuilder.environment().remove("JALIEN_TOKEN_KEY");
-		pBuilder.environment().put("TMPDIR", "tmp"); //Only for JW start --> set to jobworkdir/tmp by JW for payload
+		pBuilder.environment().put("TMPDIR", "tmp"); // Only for JW start --> properly set to jobworkdir/tmp by JW for payload
 		pBuilder.redirectError(Redirect.INHERIT);
 		pBuilder.directory(tempDir);
 
@@ -929,7 +680,6 @@ public class JobAgent implements Runnable {
 			try (InputStream stdout = p.getInputStream()) {
 				stdout.read();
 			}
-
 		}
 		catch (final Exception ioe) {
 			logger.log(Level.SEVERE, "Exception running " + launchCommand + " : " + ioe.getMessage());
@@ -940,8 +690,17 @@ public class JobAgent implements Runnable {
 
 			setUsedCores(0);
 
-			return 1;
+			return null;
 		}
+
+		return p;
+	}
+
+	private int monitorExecution(Process p, boolean monitorJob){
+		boolean payloadMonitoring = false;
+
+		if (p == null || !p.isAlive())
+			return -1;
 
 		if (monitorJob) {
 			final String process_res_format = "FRUNTIME | RUNTIME | CPUUSAGE | MEMUSAGE | CPUTIME | RMEM | VMEM | NOCPUS | CPUFAMILY | CPUMHZ | RESOURCEUSAGE | RMEMMAX | VMEMMAX";
@@ -1079,7 +838,7 @@ public class JobAgent implements Runnable {
 		finally {
 			try {
 				t.cancel();
-				stdin.close();
+				p.getOutputStream().close();
 			}
 			catch (final Exception e) {
 				logger.log(Level.WARNING, "Not all resources from the current job could be cleared: " + e);
@@ -1102,6 +861,183 @@ public class JobAgent implements Runnable {
 				}
 			}
 		}
+	}
+
+	private void cleanup() {
+		logger.log(Level.INFO, "Sending monitoring values...");
+
+		setStatus(jaStatus.DONE);
+
+		monitor.sendParameter("job_id", Integer.valueOf(0));
+
+		logger.log(Level.INFO, "Cleaning up after execution...");
+		putJobTrace("Cleaning up after execution...");
+
+		try {
+			Files.walk(tempDir.toPath())
+					.map(Path::toFile)
+					.sorted(Comparator.reverseOrder()) // or else dir will appear before its contents
+					.forEach(File::delete);
+		}
+		catch (final IOException | UncheckedIOException e) {
+			logger.log(Level.WARNING, "Error deleting the job workdir, using system commands instead", e);
+
+			final CommandOutput rmOutput = SystemCommand.executeCommand(Arrays.asList("rm", "-rf", tempDir.getAbsolutePath()), true);
+
+			if (rmOutput == null)
+				logger.log(Level.SEVERE, "Cannot clean up the job dir even using system commands");
+			else
+				logger.log(Level.INFO, "System command cleaning of job work dir returned " + rmOutput.exitCode + ", full output:\n" + rmOutput.stdout);
+		}
+
+		RES_WORKDIR_SIZE = ZERO;
+		RES_VMEM = ZERO;
+		RES_RMEM = ZERO;
+		RES_VMEMMAX = ZERO;
+		RES_RMEMMAX = ZERO;
+		RES_MEMUSAGE = ZERO;
+		RES_CPUTIME = ZERO;
+		RES_CPUUSAGE = ZERO;
+		RES_RESOURCEUSAGE = "";
+		RES_RUNTIME = Long.valueOf(0);
+		RES_FRUNTIME = "";
+
+		if (mj != null)
+			mj.close();
+
+		logger.log(Level.INFO, "Done!");
+	}
+
+	//####################################################################
+	//################## MONITORING HELPER FUNCTIONS #####################
+	//####################################################################
+
+	/**
+	 * updates jobagent parameters that change between job requests
+	 *
+	 * @return false if we can't run because of current conditions, true if positive
+	 */
+	public boolean checkParameters() {
+		final int timeleft = computeTimeLeft(Level.INFO);
+		if (timeleft <= 0)
+			return false;
+
+		if (RUNNING_DISK.longValue() <= 10 * 1024) {
+			if (!System.getenv().containsKey("JALIEN_IGNORE_STORAGE")) {
+				logger.log(Level.WARNING, "There is not enough space left: " + RUNNING_DISK);
+				return false;
+			}
+
+			logger.log(Level.INFO, "Ignoring the reported local disk space of " + RUNNING_DISK);
+		}
+
+		if (RUNNING_CPU.longValue() <= 0)
+			return false;
+
+		return true;
+	}
+
+	private int computeTimeLeft(final Level loggingLevel) {
+		final long jobAgentCurrentTime = System.currentTimeMillis();
+		final int time_subs = (int) (jobAgentCurrentTime - jobAgentStartTime) / 1000; // convert to seconds
+		int timeleft = origTtl - time_subs;
+
+		logger.log(loggingLevel, "Still have " + timeleft + " seconds to live (" + jobAgentCurrentTime + "-" + jobAgentStartTime + "=" + time_subs + ")");
+
+		// we check if the cert timeleft is smaller than the ttl itself
+		final int certTime = getCertTime();
+		logger.log(loggingLevel, "Certificate timeleft is " + certTime);
+		timeleft = Math.min(timeleft, certTime - 900); // (-15min)
+
+		// safety time for saving, etc
+		timeleft -= 600;
+
+		Long shutdownTime = MachineJobFeatures.getFeatureNumber("shutdowntime", MachineJobFeatures.FeatureType.MACHINEFEATURE);
+
+		if (shutdownTime != null) {
+			shutdownTime = Long.valueOf(shutdownTime.longValue() - System.currentTimeMillis() / 1000);
+			logger.log(loggingLevel, "Shutdown is" + shutdownTime);
+
+			timeleft = Integer.min(timeleft, shutdownTime.intValue());
+		}
+
+		return timeleft;
+	}
+
+	private boolean updateDynamicParameters() {
+		logger.log(Level.INFO, "Updating dynamic parameters of jobAgent map");
+
+		// ttl recalculation
+		final int timeleft = computeTimeLeft(Level.INFO);
+
+		if (!checkParameters())
+			return false;
+
+		siteMap.put("TTL", Integer.valueOf(timeleft));
+		siteMap.put("CPUCores", RUNNING_CPU);
+		siteMap.put("Disk", RUNNING_DISK);
+
+		final int cvmfsRevision = CVMFS.getRevision();
+		if (cvmfsRevision > 0)
+			siteMap.put("CVMFS_revision", Integer.valueOf(cvmfsRevision));
+
+		return true;
+	}
+
+	/**
+	 * @return the time in seconds that the certificate is still valid for
+	 */
+	private int getCertTime() {
+		return (int) TimeUnit.MILLISECONDS.toSeconds(commander.getUser().getUserCert()[0].getNotAfter().getTime() - System.currentTimeMillis());
+	}
+
+	private void getMemoryRequirements() {
+		// By default the jobs are allowed to use up to 10GB of disk space in the sandbox
+
+		cpuCores = TaskQueueUtils.getCPUCores(jdl);
+		putJobTrace("Job requested " + cpuCores + " CPU cores to run");
+
+		workdirMaxSizeMB = TaskQueueUtils.getWorkDirSizeMB(jdl, cpuCores);
+		putJobTrace("Local disk space limit: " + workdirMaxSizeMB + "MB");
+
+		// Memory use
+		final String maxmemory = jdl.gets("Memorysize");
+
+		// By default the job is limited to using 8GB of virtual memory per allocated CPU core
+		jobMaxMemoryMB = cpuCores * 8 * 1024;
+
+		if (env.containsKey("JALIEN_MEM_LIM")) {
+			try {
+				jobMaxMemoryMB = Integer.parseInt(env.get("JALIEN_MEM_LIM"));
+			}
+			catch (final NumberFormatException en) {
+				final String error = "Could not read limit from JALIEN_MEM_LIM. Using default: " + jobMaxMemoryMB + "MB";
+				logger.log(Level.WARNING, error, en);
+				putJobTrace(error);
+			}
+		}
+		else if (maxmemory != null) {
+			final Pattern pLetter = Pattern.compile("\\p{L}+");
+
+			final Matcher m = pLetter.matcher(maxmemory.trim().toUpperCase());
+			try {
+				if (m.find()) {
+					final String number = maxmemory.substring(0, m.start());
+					final String unit = maxmemory.substring(m.start()).toUpperCase();
+
+					jobMaxMemoryMB = TaskQueueUtils.convertStringUnitToIntegerMB(unit, number);
+				}
+				else
+					jobMaxMemoryMB = Integer.parseInt(maxmemory);
+
+				putJobTrace("Virtual memory limit (JDL): " + jobMaxMemoryMB + "MB");
+			}
+			catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
+				putJobTrace("Virtual memory limit specs are invalid: '" + maxmemory + "', using the default " + jobMaxMemoryMB + "MB");
+			}
+		}
+		else
+			putJobTrace("Virtual memory limit (default): " + jobMaxMemoryMB + "MB");
 	}
 
 	private void setStatus(final jaStatus new_status) {
@@ -1291,20 +1227,95 @@ public class JobAgent implements Runnable {
 		return error;
 	}
 
+	private void sendBatchInfo() {
+		for (final String var : batchSystemVars) {
+			if (env.containsKey(var)) {
+				if ("_CONDOR_JOB_AD".equals(var)) {
+					try {
+						final List<String> lines = Files.readAllLines(Paths.get(env.get(var)));
+						for (final String line : lines) {
+							if (line.contains("GlobalJobId"))
+								putJobTrace("BatchId " + line);
+						}
+					}
+					catch (final IOException e) {
+						logger.log(Level.WARNING, "Error getting batch info from file " + env.get(var) + ":", e);
+					}
+				}
+				else
+					putJobTrace("BatchId " + var + ": " + env.get(var));
+			}
+		}
+	}
+
+
+	//##########################################################################
+	//######################### OTHER HELPER FUNCTIONS #########################
+	//##########################################################################
+
+
 	private long ttlForJob() {
 		final Integer iTTL = jdl.getInteger("TTL");
 
-		int ttl = (iTTL != null ? iTTL.intValue() : 3600);
+		int jobTtl = (iTTL != null ? iTTL.intValue() : 3600);
 		putJobTrace("Job asks for a TTL of " + ttl + " seconds");
-		ttl += 300; // extra time (saving)
+		jobTtl += 300; // extra time (saving)
 
 		final String proxyttl = jdl.gets("ProxyTTL");
 		if (proxyttl != null) {
-			ttl = ((Integer) siteMap.get("TTL")).intValue() - 600;
+			jobTtl = ((Integer) siteMap.get("TTL")).intValue() - 600;
 			putJobTrace("ProxyTTL enabled, running for " + ttl + " seconds");
 		}
 
-		return ttl;
+		return jobTtl;
+	}
+
+	/**
+	 * @param folder
+	 * @return amount of free space (in bytes) in the given folder. Or zero if there was a problem (or no free space).
+	 */
+	public static long getFreeSpace(final String folder) {
+		final File folderFile = new File(Functions.resolvePathWithEnv(folder));
+
+		try {
+			if (!folderFile.exists())
+				folderFile.mkdirs();
+		}
+		catch (Exception e) {
+			// ignore
+		}
+
+		long space = folderFile.getFreeSpace();
+		if (space <= 0) {
+			// 32b JRE returns 0 when too much space is available
+
+			try {
+				final String output = ExternalProcesses.getCmdOutput(Arrays.asList("df", "-P", "-B", "1024", folder), true, 30L, TimeUnit.SECONDS);
+
+				try (BufferedReader br = new BufferedReader(new StringReader(output))) {
+					String sLine = br.readLine();
+
+					if (sLine != null) {
+						sLine = br.readLine();
+
+						if (sLine != null) {
+							final StringTokenizer st = new StringTokenizer(sLine);
+
+							st.nextToken();
+							st.nextToken();
+							st.nextToken();
+
+							space = Long.parseLong(st.nextToken());
+						}
+					}
+				}
+			}
+			catch (IOException | InterruptedException ioe) {
+				System.out.println("Could not extract the space information from `df`: " + ioe.getMessage());
+			}
+		}
+
+		return space;
 	}
 
 	private boolean createWorkDir() {
@@ -1410,36 +1421,6 @@ public class JobAgent implements Runnable {
 
 	private long getWrapperJobStatusTimestamp() {
 		return new File(jobTmpDir + "/" + jobstatusFile).lastModified();
-	}
-
-	/**
-	 * Get LhcbMarks, using a specialized script in CVMFS
-	 *
-	 * @param logger
-	 *
-	 * @return script output, or null in case of error
-	 */
-	public static Float getLhcbMarks(final Logger logger) {
-		if (lhcbMarks > 0)
-			return Float.valueOf(lhcbMarks);
-
-		final File lhcbMarksScript = new File(CVMFS.getLhcbMarksScript());
-
-		if (!lhcbMarksScript.exists()) {
-			logger.log(Level.WARNING, "Script for lhcbMarksScript not found in: " + lhcbMarksScript.getAbsolutePath());
-			return null;
-		}
-
-		try {
-			String out = ExternalProcesses.getCmdOutput(lhcbMarksScript.getAbsolutePath(), true, 300L, TimeUnit.SECONDS);
-			out = out.substring(out.lastIndexOf(":") + 1);
-			lhcbMarks = Float.parseFloat(out);
-			return Float.valueOf(lhcbMarks);
-		}
-		catch (final Exception e) {
-			logger.log(Level.WARNING, "An error occurred while attempting to run process cleanup: ", e);
-			return null;
-		}
 	}
 
 	/**
@@ -1560,27 +1541,6 @@ public class JobAgent implements Runnable {
 			"JOB_ID"
 	};
 
-	private void sendBatchInfo() {
-		for (final String var : batchSystemVars) {
-			if (env.containsKey(var)) {
-				if ("_CONDOR_JOB_AD".equals(var)) {
-					try {
-						final List<String> lines = Files.readAllLines(Paths.get(env.get(var)));
-						for (final String line : lines) {
-							if (line.contains("GlobalJobId"))
-								putJobTrace("BatchId " + line);
-						}
-					}
-					catch (final IOException e) {
-						logger.log(Level.WARNING, "Error getting batch info from file " + env.get(var) + ":", e);
-					}
-				}
-				else
-					putJobTrace("BatchId " + var + ": " + env.get(var));
-			}
-		}
-	}
-
 	/**
 	 *
 	 * Reads the list of variables defined in META_VARIABLES, and returns their current value in the
@@ -1603,6 +1563,13 @@ public class JobAgent implements Runnable {
 		return metavars_map;
 	}
 
+	/**
+	 * 
+	 * Thread for checking if heartbeats are still being sent, or if something is stuck
+	 * 
+	 * @param p process for JobWrapper/Job
+	 * @return heartbeatMonitor runnable
+	 */
 	private final Runnable heartbeatMonitor(Process p) {
 		return () -> {
 			while (p.isAlive()) {
@@ -1617,6 +1584,69 @@ public class JobAgent implements Runnable {
 				}
 			}
 		};
+	}
+
+	//#################################################################
+	//############################ SCRIPTS ############################
+	//#################################################################
+
+	/**
+	 * Get LhcbMarks, using a specialized script in CVMFS
+	 *
+	 * @param logger
+	 *
+	 * @return script output, or null in case of error
+	 */
+	public static Float getLhcbMarks(final Logger logger) {
+		if (lhcbMarks > 0)
+			return Float.valueOf(lhcbMarks);
+
+		final File lhcbMarksScript = new File(CVMFS.getLhcbMarksScript());
+
+		if (!lhcbMarksScript.exists()) {
+			logger.log(Level.WARNING, "Script for lhcbMarksScript not found in: " + lhcbMarksScript.getAbsolutePath());
+			return null;
+		}
+
+		try {
+			String out = ExternalProcesses.getCmdOutput(lhcbMarksScript.getAbsolutePath(), true, 300L, TimeUnit.SECONDS);
+			out = out.substring(out.lastIndexOf(":") + 1);
+			lhcbMarks = Float.parseFloat(out);
+			return Float.valueOf(lhcbMarks);
+		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "An error occurred while attempting to run process cleanup: ", e);
+			return null;
+		}
+	}
+
+	private void collectSystemInformation() {
+		final String scriptPath = CVMFS.getSiteSonarScript();
+		final File f = new File(scriptPath);
+
+		if (f.exists() && f.canExecute()) {
+			final ProcessBuilder pBuilder = new ProcessBuilder(scriptPath);
+
+			pBuilder.environment().put("ALIEN_JDL_CPUCORES", MAX_CPU != null ? MAX_CPU.toString() : "1");
+			pBuilder.environment().put("ALIEN_SITE", siteMap.getOrDefault("Site", "UNKNOWN").toString());
+			pBuilder.redirectError(Redirect.INHERIT);
+			pBuilder.redirectOutput(Redirect.INHERIT);
+
+			try {
+				final Process p = pBuilder.start();
+
+				if (p != null) {
+					final ProcessWithTimeout ptimeout = new ProcessWithTimeout(p, pBuilder);
+					ptimeout.waitFor(5, TimeUnit.MINUTES);
+
+					if (!ptimeout.exitedOk())
+						logger.log(Level.WARNING, "Sitesonar didn't finish in due time");
+				}
+			}
+			catch (@SuppressWarnings("unused") final IOException | InterruptedException e) {
+				// ignore
+			}
+		}
 	}
 	
 }
