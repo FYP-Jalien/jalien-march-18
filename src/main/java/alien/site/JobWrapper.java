@@ -533,6 +533,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (env == null) {
 				logger.log(Level.SEVERE, "Error installing " + packToInstall);
 				putJobTrace("Error setting the environment for " + packToInstall);
+				changeStatus(JobStatus.ERROR_IB);
 				System.exit(1);
 			}
 
