@@ -78,6 +78,7 @@ import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
+import utils.ProcessWithTimeout;
 
 /**
  * Gets matched jobs, and launches JobWrapper for executing them
@@ -100,7 +101,6 @@ public class JobAgent implements Runnable {
 	private String jobWrapperLogDir;
 	private final String jobstatusFile = ".jalienJobstatus";
 	private final String siteSonarUrl = "http://alimonitor.cern.ch/sitesonar/";
-	private final String siteSonarProbeDir = "/cvmfs/alice.cern.ch/sitesonar/sitesonar.d/";
 	private final Charset charSet = StandardCharsets.UTF_8;
 
 	// Job variables
@@ -1763,34 +1763,46 @@ public class JobAgent implements Runnable {
 
 		JSONObject testOutputJson = new JSONObject();
 		try {
-			ProcessBuilder pb
-					= new ProcessBuilder("sh", siteSonarProbeDir + probeName + ".sh");
-			logger.log(Level.INFO,("Running " + probeName + ".sh..."));
-			long startTime = System.currentTimeMillis();
-			Process process = pb.start();
+			final String scriptPath = CVMFS.getSiteSonarProbeDirectory() + probeName + ".sh";
+			final File f = new File(scriptPath);
 
-			StringBuilder output = new StringBuilder();
-			BufferedReader reader
-					= new BufferedReader(new InputStreamReader(process.getInputStream()));
+			if (f.exists() && f.canExecute()) {
+				final ProcessBuilder pBuilder
+						= new ProcessBuilder("sh", scriptPath);
+				pBuilder.redirectError(Redirect.INHERIT);
+				pBuilder.redirectOutput(Redirect.INHERIT);
+				logger.log(Level.INFO,("Running " + probeName + ".sh..."));
+				long startTime = System.currentTimeMillis();
+				final Process process = pBuilder.start();
 
-			String line;
-			while ((line = reader.readLine()) != null) {
-				output.append(line);
-			}
-			int exitVal = process.waitFor();
-			if (exitVal == 0) {
-				logger.log(Level.FINE,"Output of " + probeName + ": " + output);
-				try {
-					testOutputJson = (JSONObject) jsonParser.parse(output.toString());
-				} catch (ParseException e) {
-					logger.log(Level.SEVERE,"Failed to parse the output of probe " + probeName + " in node" + hostName, e);
+				StringBuilder output = new StringBuilder();
+				BufferedReader reader
+						= new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+				String line;
+				while ((line = reader.readLine()) != null) {
+					output.append(line);
 				}
+
+				final ProcessWithTimeout pTimeout = new ProcessWithTimeout(process, pBuilder);
+				pTimeout.waitFor(1, TimeUnit.MINUTES);
+
+				if (!pTimeout.exitedOk()) {
+					logger.log(Level.WARNING, "Site Sonar probe " + probeName + " didn't finish in due time");
+				} else {
+					logger.log(Level.FINE,"Output of " + probeName + ": " + output);
+					try {
+						testOutputJson = (JSONObject) jsonParser.parse(output.toString());
+					} catch (ParseException e) {
+						logger.log(Level.SEVERE,"Failed to parse the output of probe " + probeName + " in node " + hostName, e);
+					}
+				}
+				long endTime = System.currentTimeMillis();
+				long execTime = endTime - startTime;
+				// Add execution time and exit code to test output
+				testOutputJson.put("EXECUTION_TIME", execTime);
+				testOutputJson.put("EXITCODE", pTimeout.exitValue());
 			}
-			long endTime = System.currentTimeMillis();
-			long execTime = endTime - startTime;
-			// Add execution time and exit code to test output
-			testOutputJson.put("EXECUTION_TIME", execTime);
-			testOutputJson.put("EXITCODE", exitVal);
 		} catch (IOException | InterruptedException e) {
 			logger.log(Level.SEVERE,"Error while running the probe " + probeName + " in node" + hostName, e);
 		}

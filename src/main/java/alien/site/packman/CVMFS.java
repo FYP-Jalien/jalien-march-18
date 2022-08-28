@@ -208,17 +208,10 @@ public class CVMFS extends PackMan {
 	}
 
 	/**
-	 * @return location of script used for LHCbMarks
-	 */
-	public static String getLhcbMarksScript() {
-		return CVMFS_BASE_DIR + "/scripts/lhcbmarks.sh";
-	}
-
-	/**
 	 * @return location of script used for SiteSonar
 	 */
-	public static String getSiteSonarScript() {
-		return CVMFS_BASE_DIR + "/sitesonar/sitesonar.sh";
+	public static String getSiteSonarProbeDirectory() {
+		return CVMFS_BASE_DIR + "/sitesonar/sitesonar.d/";
 	}
 
 	/**
