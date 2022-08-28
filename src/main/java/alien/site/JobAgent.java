@@ -435,8 +435,7 @@ public class JobAgent implements Runnable {
 	private void collectSystemInformation() {
 
 		String nodeHostName = hostName;
-
-		String alienSiteName = ConfigUtils.getConfig().gets("ALIEN_SITE");; //todo: This value becomes null
+		String alienSiteName = siteMap.getOrDefault("Site", "UNKNOWN").toString();
 
 		// PARENT_HOSTNAME variable is used at sites which the node hostname changes over time. eg: RAL
 		if (env.containsKey("PARENT_HOSTNAME")) {
@@ -465,11 +464,11 @@ public class JobAgent implements Runnable {
 						uploadResults(nodeHostName, alienSiteName, testName, testOutput);
 					}
 				} else {
-					logger.log(Level.INFO,(" No probes returned from Site Sonar. Skipping ..."));
+					logger.log(Level.INFO,("No probes returned from Site Sonar. Skipping ..."));
 				}
 		} else {
-			logger.log(Level.INFO,"Empty Site Sonar probe list received for node " + hostName + " in " +
-					alienSiteName + "...");
+			logger.log(Level.SEVERE,"Site Sonar probe output for node " + hostName + " in " +
+					alienSiteName + " is null");
 		}
 		addConstraintsToSiteMap(nodeHostName, alienSiteName);
 	}
@@ -514,7 +513,7 @@ public class JobAgent implements Runnable {
 	 */
 	private void uploadResults(String hostName, String alienSite, String testName, JSONObject siteSonarOutput) {
 		try {
-			final URL url = new URL(siteSonarUrl + "upload.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
+			final URL url = new URL(siteSonarUrl + "uploadResults.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
 					"&ce_name=" + URLEncoder.encode(alienSite, charSet) + "&test_name=" + URLEncoder.encode(testName, charSet) +
 					"&test_message=" + URLEncoder.encode(siteSonarOutput.toString(), StandardCharsets.UTF_8));
 			logger.log(Level.INFO,("Uploading Site Sonar results of " + hostName + " to AliMonitor"));
@@ -536,28 +535,39 @@ public class JobAgent implements Runnable {
 			final URL url = new URL(siteSonarUrl + "constraints.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
 					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
 			JSONObject constraints = makeRequest(url, hostName, alienSite);
-			constraints.keySet().forEach(key ->
-			{
-				Object value = constraints.get(key);
-				siteMap.put((String) key, value);
-				logger.log(Level.INFO,("Added constraint - Key: " + key + ", Value: " + value.toString() + " to SiteMap"));
-			});
+			if (constraints != null && constraints.keySet().size() > 0) {
+				constraints.keySet().forEach(key ->
+				{
+					Object value = constraints.get(key);
+					if (value != null) {
+						siteMap.put((String) key, value);
+						logger.log(Level.INFO,("Added constraint - Key: " + key + ", Value: " + value.toString() + " to SiteMap"));
+					}
+				});
+			}
+
 		} catch (IOException e) {
-			logger.log(Level.SEVERE,"Failed to get Site sonar constraints list for node " + hostName + " in " +
+			logger.log(Level.SEVERE,"Failed to get Site Sonar constraints list for node " + hostName + " in " +
 					alienSite, e);
 		}
 	}
 
 	/**
-	 * @param args
-	 * @throws IOException
+	 * Obtain Site sonar probes to run
+	 * @param hostName hostname of the node
+	 * @param alienSite
+	 * @return List of probes to be run / Results from the existing run
 	 */
-	public static void main(final String[] args) throws IOException {
-		ConfigUtils.setApplicationName("JobAgent");
-		DispatchSSLClient.setIdleTimeout(30000);
-		ConfigUtils.switchToForkProcessLaunching();
-		final JobAgent jao = new JobAgent();
-		jao.run();
+	private JSONObject getProbes(String hostName, String alienSite) {
+		try {
+			final URL url = new URL(siteSonarUrl + "queryProbes.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
+					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
+			return makeRequest(url, hostName, alienSite);
+		} catch (IOException e) {
+			logger.log(Level.SEVERE,"Failed to get Site sonar probe list for node " + hostName + " in " +
+					alienSite, e);
+		}
+		return new JSONObject();
 	}
 
 	/**
@@ -601,6 +611,18 @@ public class JobAgent implements Runnable {
 			logger.log(Level.SEVERE,"Error while running the probe " + probeName + " in node" + hostName, e);
 		}
 		return testOutputJson;
+	}
+
+	/**
+	 * @param args
+	 * @throws IOException
+	 */
+	public static void main(final String[] args) throws IOException {
+		ConfigUtils.setApplicationName("JobAgent");
+		DispatchSSLClient.setIdleTimeout(30000);
+		ConfigUtils.switchToForkProcessLaunching();
+		final JobAgent jao = new JobAgent();
+		jao.run();
 	}
 
 	@SuppressWarnings({ "boxing", "unchecked" })
@@ -1766,69 +1788,6 @@ public class JobAgent implements Runnable {
 				}
 			}
 		};
-	}
-
-	//#################################################################
-	//############################ SCRIPTS ############################
-	//#################################################################
-
-	/**
-	 * Get LhcbMarks, using a specialized script in CVMFS
-	 *
-	 * @param logger
-	 *
-	 * @return script output, or null in case of error
-	 */
-	public static Float getLhcbMarks(final Logger logger) {
-		if (lhcbMarks > 0)
-			return Float.valueOf(lhcbMarks);
-
-		final File lhcbMarksScript = new File(CVMFS.getLhcbMarksScript());
-
-		if (!lhcbMarksScript.exists()) {
-			logger.log(Level.WARNING, "Script for lhcbMarksScript not found in: " + lhcbMarksScript.getAbsolutePath());
-			return null;
-		}
-
-		try {
-			String out = ExternalProcesses.getCmdOutput(lhcbMarksScript.getAbsolutePath(), true, 300L, TimeUnit.SECONDS);
-			out = out.substring(out.lastIndexOf(":") + 1);
-			lhcbMarks = Float.parseFloat(out);
-			return Float.valueOf(lhcbMarks);
-		}
-		catch (final Exception e) {
-			logger.log(Level.WARNING, "An error occurred while attempting to run process cleanup: ", e);
-			return null;
-		}
-	}
-
-	private void collectSystemInformation() {
-		final String scriptPath = CVMFS.getSiteSonarScript();
-		final File f = new File(scriptPath);
-
-		if (f.exists() && f.canExecute()) {
-			final ProcessBuilder pBuilder = new ProcessBuilder(scriptPath);
-
-			pBuilder.environment().put("ALIEN_JDL_CPUCORES", MAX_CPU != null ? MAX_CPU.toString() : "1");
-			pBuilder.environment().put("ALIEN_SITE", siteMap.getOrDefault("Site", "UNKNOWN").toString());
-			pBuilder.redirectError(Redirect.INHERIT);
-			pBuilder.redirectOutput(Redirect.INHERIT);
-
-			try {
-				final Process p = pBuilder.start();
-
-				if (p != null) {
-					final ProcessWithTimeout ptimeout = new ProcessWithTimeout(p, pBuilder);
-					ptimeout.waitFor(5, TimeUnit.MINUTES);
-
-					if (!ptimeout.exitedOk())
-						logger.log(Level.WARNING, "Sitesonar didn't finish in due time");
-				}
-			}
-			catch (@SuppressWarnings("unused") final IOException | InterruptedException e) {
-				// ignore
-			}
-		}
 	}
 	
 }
