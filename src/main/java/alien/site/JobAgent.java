@@ -84,6 +84,9 @@ import org.json.simple.parser.ParseException;
  */
 public class JobAgent implements Runnable {
 
+	private static final long SEND_RESOURCES_INTERVAL = 10 * 60 * 1000L;
+	private static final long SEND_JOBINFO_INTERVAL = 60 * 1000L;
+
 	// Variables passed through VoBox environment
 	private final static Map<String, String> env = System.getenv();
 	private final String ce;
@@ -118,6 +121,7 @@ public class JobAgent implements Runnable {
 	private Double prevCpuTime;
 	private long prevTime = 0;
 	private int cpuCores = 1;
+	private long ttl;
 
 	private static AtomicInteger totalJobs = new AtomicInteger(0);
 	private final int jobNumber;
@@ -545,21 +549,15 @@ public class JobAgent implements Runnable {
 	}
 
 	/**
-	 * Obtain Site sonar probes to run
-	 * @param hostName hostname of the node
-	 * @param alienSite
-	 * @return List of probes to be run / Results from the existing run
+	 * @param args
+	 * @throws IOException
 	 */
-	private JSONObject getProbes(String hostName, String alienSite) {
-		try {
-			final URL url = new URL(siteSonarUrl + "query.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
-					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
-			return makeRequest(url, hostName, alienSite);
-		} catch (IOException e) {
-			logger.log(Level.SEVERE,"Failed to get Site sonar probe list for node " + hostName + " in " +
-					alienSite, e);
-		}
-		return new JSONObject();
+	public static void main(final String[] args) throws IOException {
+		ConfigUtils.setApplicationName("JobAgent");
+		DispatchSSLClient.setIdleTimeout(30000);
+		ConfigUtils.switchToForkProcessLaunching();
+		final JobAgent jao = new JobAgent();
+		jao.run();
 	}
 
 	/**
@@ -625,8 +623,8 @@ public class JobAgent implements Runnable {
 				// TODO: Hack to exclude alihyperloop jobs from nodes without avx support. Remove me soon!
 				try {
 					if (!Files.readString(Paths.get("/proc/cpuinfo")).contains("avx")) {
-							if(!((ArrayList<Object>) siteMap.computeIfAbsent("NoUsers", (k) -> new ArrayList<>())).contains("alihyperloop"))
-								((ArrayList<String>) siteMap.get("NoUsers")).add("alihyperloop");
+						if (!((ArrayList<Object>) siteMap.computeIfAbsent("NoUsers", (k) -> new ArrayList<>())).contains("alihyperloop"))
+							((ArrayList<String>) siteMap.get("NoUsers")).add("alihyperloop");
 					}
 				}
 				catch (IOException | NullPointerException ex) {
@@ -737,38 +735,313 @@ public class JobAgent implements Runnable {
 	}
 
 	private void handleJob() {
-
 		try {
-
 			if (!createWorkDir()) {
 				changeJobStatus(JobStatus.ERROR_IB, null);
 				logger.log(Level.INFO, "Error. Workdir for job could not be created");
 				putJobTrace("Error. Workdir for job could not be created");
 				return;
 			}
+
 			jobWrapperLogDir = jobWorkdir + "/" + jobWrapperLogName;
 
 			logger.log(Level.INFO, "Started JA with: " + jdl);
 
 			final String version = !Version.getTagFromEnv().isEmpty() ? Version.getTagFromEnv() : "/Git: " + Version.getGitHash() + ". Builddate: " + Version.getCompilationTimestamp();
-			putJobTrace("Running JAliEn JobAgent " + version + " on " + hostName);
+			putJobTrace("Running JAliEn JobAgent" + version + " on " + hostName);
 
 			// Set up constraints
 			getMemoryRequirements();
-
-			final List<String> launchCommand = generateLaunchCommand();
 
 			setupJobWrapperLogging();
 
 			putJobTrace("Starting JobWrapper");
 
-			launchJobWrapper(launchCommand, true);
+			ttl = ttlForJob();
 
+			//Start and monitor execution
+			monitorExecution(launchJobWrapper(generateLaunchCommand()), true);
 		}
 		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Unable to handle job", e);
 			putJobTrace("ERROR: Unable to handle job: " + Arrays.toString(e.getStackTrace()));
 			changeJobStatus(JobStatus.ERROR_E, null);
+		}
+	}
+
+	/**
+	 * @return Command w/arguments for starting the JobWrapper, based on the command used for the JobAgent
+	 * @throws InterruptedException
+	 */
+	public List<String> generateLaunchCommand() throws InterruptedException {
+		try {
+			// Main cmd for starting the JobWrapper
+			final List<String> launchCmd = new ArrayList<>();
+
+			final Process cmdChecker = Runtime.getRuntime().exec(new String[] { "ps", "-p", String.valueOf(MonitorFactory.getSelfProcessID()), "-o", "command=" });
+			cmdChecker.waitFor();
+			try (Scanner cmdScanner = new Scanner(cmdChecker.getInputStream())) {
+				String readArg;
+				while (cmdScanner.hasNext()) {
+					readArg = (cmdScanner.next());
+					if (readArg.contains("-cp"))
+						cmdScanner.next();
+					else if (readArg.contains("alien.site.JobRunner") || readArg.contains("alien.site.JobAgent")) {
+						launchCmd.add("-Djobagent.vmid=" + queueId);
+						launchCmd.add("-cp");
+						launchCmd.add(jarPath + jarName);
+						launchCmd.add("alien.site.JobWrapper");
+					}
+					else if (!readArg.contains("JobRunner") && !readArg.contains("JobAgent")) // Just to be completely sure...
+						launchCmd.add(readArg);
+				}
+			}
+
+			// Check if there is container support present on site. If yes, add to launchCmd
+			final Containerizer cont = ContainerizerFactory.getContainerizer();
+			if (cont != null) {
+				putJobTrace("Support for containers detected. Will use: " + cont.getContainerizerName());
+				cont.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivilegesad sd bind-mounts)
+				return cont.containerize(String.join(" ", launchCmd));
+			}
+			return launchCmd;
+		}
+		catch (final IOException e) {
+			logger.log(Level.SEVERE, "Could not generate JobWrapper launch command: " + e.toString());
+			return null;
+		}
+	}
+
+	private Process launchJobWrapper(final List<String> launchCommand) {
+		logger.log(Level.INFO, "Launching jobwrapper using the command: " + launchCommand.toString());
+
+		final ProcessBuilder pBuilder = new ProcessBuilder(launchCommand);
+		pBuilder.environment().remove("JALIEN_TOKEN_CERT");
+		pBuilder.environment().remove("JALIEN_TOKEN_KEY");
+		pBuilder.environment().put("TMPDIR", "tmp"); // Only for JW start --> set to jobworkdir/tmp by JW for payload
+		pBuilder.redirectError(Redirect.INHERIT);
+		pBuilder.directory(tempDir);
+
+		setStatus(jaStatus.RUNNING_JOB);
+
+		final Process p;
+
+		// stdin from the viewpoint of the wrapper
+		final OutputStream stdin;
+
+		try {
+			p = pBuilder.start();
+
+			stdin = p.getOutputStream();
+			try (ObjectOutputStream stdinObj = new ObjectOutputStream(stdin)) {
+				stdinObj.writeObject(jdl);
+				stdinObj.writeObject(username);
+				stdinObj.writeObject(Long.valueOf(queueId));
+				stdinObj.writeObject(Integer.valueOf(resubmission));
+				stdinObj.writeObject(tokenCert);
+				stdinObj.writeObject(tokenKey);
+				stdinObj.writeObject(ce);
+				stdinObj.writeObject(siteMap);
+				stdinObj.writeObject(defaultOutputDirPrefix);
+				stdinObj.writeObject(legacyToken);
+				stdinObj.writeObject(Long.valueOf(ttl));
+				stdinObj.writeObject(env.getOrDefault("PARENT_HOSTNAME", ""));
+				stdinObj.writeObject(getMetaVariables());
+
+				stdinObj.flush();
+			}
+
+			logger.log(Level.INFO, "JDL info sent to JobWrapper");
+			putJobTrace("JobWrapper started");
+
+			// Wait for JobWrapper to start
+			try (InputStream stdout = p.getInputStream()) {
+				stdout.read();
+			}
+		}
+		catch (final Exception ioe) {
+			logger.log(Level.SEVERE, "Exception running " + launchCommand + " : " + ioe.getMessage());
+			setStatus(jaStatus.ERROR_START);
+
+			putJobTrace("Error starting JobWrapper: exception running " + launchCommand + " : " + ioe.getMessage());
+			changeJobStatus(JobStatus.ERROR_IB, null);
+
+			setUsedCores(0);
+
+			return null;
+		}
+
+		return p;
+	}
+
+	private int monitorExecution(Process p, boolean monitorJob){
+		boolean payloadMonitoring = false;
+
+		if (p == null || !p.isAlive())
+			return -1;
+
+		if (monitorJob) {
+			final String process_res_format = "FRUNTIME | RUNTIME | CPUUSAGE | MEMUSAGE | CPUTIME | RMEM | VMEM | NOCPUS | CPUFAMILY | CPUMHZ | RESOURCEUSAGE | RMEMMAX | VMEMMAX";
+			logger.log(Level.INFO, process_res_format);
+			putJobLog("procfmt", process_res_format);
+
+			childPID = (int) p.pid();
+
+			// apmon.setNumCPUs(cpuCores);
+			// apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
+			mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
+
+			String monitoring = jdl.gets("Monitoring");
+			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
+				payloadMonitoring = true;
+				mj.setWrapperPid(getWrapperPid());
+				// mjPayload = apmon.addJobToMonitor(getWrapperPid(), jobWorkdir, ce + "_JobWrapper", matchedJob.get("queueId").toString());
+				mj.setPayloadMonitoring();
+			}
+
+			final String fs = checkProcessResources();
+			if (fs == null)
+				sendProcessResources(false);
+		}
+
+		final TimerTask killPayload = new TimerTask() {
+			@Override
+			public void run() {
+				logger.log(Level.SEVERE, "Timeout has occurred. Killing job!");
+				putJobTrace("Killing the job (it was running for longer than its TTL)");
+				killGracefully(p);
+			}
+		};
+
+		final Timer t = new Timer();
+		t.schedule(killPayload, TimeUnit.MILLISECONDS.convert(ttl, TimeUnit.SECONDS)); // TODO: ttlForJob
+
+		long lastStatusChange = getWrapperJobStatusTimestamp();
+
+		int code = -1;
+
+		logger.log(Level.INFO, "About to enter monitor loop. Is the JobWrapper process alive?: " + p.isAlive());
+
+		final Thread heartMon = new Thread(heartbeatMonitor(p));
+		heartMon.start();
+
+		long initTimeSendResourcess = System.currentTimeMillis();
+		long initTimeJobInfo = System.currentTimeMillis();
+
+		boolean discoveredPid = false;
+		try {
+			while (p.isAlive()) {
+				logger.log(Level.FINEST, "Waiting for the JobWrapper process to finish");
+
+				if (monitorJob) {
+					final String error = checkProcessResources();
+					if (error != null) {
+						t.cancel();
+						heartMon.interrupt();
+						if (!jobKilled) {
+							logger.log(Level.SEVERE, "Process overusing resources: " + error);
+							putJobTrace("ERROR[FATAL]: Process overusing resources");
+							putJobTrace(error);
+							killGracefully(p);
+						}
+						else {
+							logger.log(Level.SEVERE, "ERROR[FATAL]: Job KILLED by user! Terminating...");
+							putJobTrace("ERROR[FATAL]: Job KILLED by user! Terminating...");
+							killForcibly(p);
+						}
+						return 1;
+					}
+					// Send report once every 10 min, or when the job changes state
+					if ((System.currentTimeMillis() - initTimeSendResourcess) > SEND_RESOURCES_INTERVAL) {
+						initTimeSendResourcess = initTimeSendResourcess + SEND_RESOURCES_INTERVAL;
+						sendProcessResources(false);
+					}
+
+					// set to 24
+					if ((System.currentTimeMillis() - initTimeJobInfo) > SEND_JOBINFO_INTERVAL) {
+						initTimeJobInfo = initTimeJobInfo + SEND_JOBINFO_INTERVAL;
+						apmon.sendOneJobInfo(mj, true);
+					}
+
+					else if (getWrapperJobStatusTimestamp() != lastStatusChange) {
+						final String wrapperStatus = getWrapperJobStatus();
+
+						if (!"STARTED".equals(wrapperStatus) && !"RUNNING".equals(wrapperStatus)) {
+							lastStatusChange = getWrapperJobStatusTimestamp();
+							sendProcessResources(false);
+						}
+
+						if ("RUNNING".equals(wrapperStatus) && payloadMonitoring == true && mj != null && discoveredPid == false) {
+							mj.discoverPayloadPid("payload-" + queueId);
+							discoveredPid = true;
+						}
+
+						// Check if the wrapper has exited without us knowing
+						if ("DONE".equals(wrapperStatus) || wrapperStatus.contains("ERROR")) {
+
+							// In case the wrapper was just about to exit normally, wait a few seconds
+							if (!p.waitFor(15, TimeUnit.SECONDS)) {
+								putJobTrace("Warning: The JobWrapper has terminated without the JobAgent noticing. Killing leftover processes...");
+								p.destroyForcibly();
+							}
+						}
+
+					}
+				}
+				try {
+					Thread.sleep(5 * 1000);
+				}
+				catch (final InterruptedException ie) {
+					logger.log(Level.WARNING, "Interrupted while waiting for the JobWrapper to finish execution: " + ie.getMessage());
+					return 1;
+				}
+			}
+			code = p.exitValue();
+
+			// Send a final report once the payload completes
+			sendProcessResources(true);
+
+			logger.log(Level.INFO, "JobWrapper has finished execution. Exit code: " + code);
+			logger.log(Level.INFO, "All done for job " + queueId + ". Final status: " + getWrapperJobStatus());
+			putJobTrace("JobWrapper exit code: " + code);
+			if (code != 0)
+				logger.log(Level.WARNING, "Error encountered: see the JobWrapper logs in: " + env.getOrDefault("TMPDIR", "/tmp") + "/jalien-jobwrapper.log " + " for more details");
+
+			return code;
+		}
+		catch (Exception ex) {
+			logger.log(Level.WARNING, "Error encountered while running job: ", ex);
+			putJobTrace("Error encountered while running job: " + ex);
+			return -1;
+		}
+		finally {
+			try {
+				t.cancel();
+				p.getOutputStream().close();
+			}
+			catch (final Exception e) {
+				logger.log(Level.WARNING, "Not all resources from the current job could be cleared: " + e);
+			}
+
+			if (mj != null)
+				mj.close();
+
+			if (code != 0) {
+				// Looks like something went wrong. Let's check the last reported status
+				final String lastStatus = getWrapperJobStatus();
+				if ("STARTED".equals(lastStatus) || "RUNNING".equals(lastStatus)) {
+					putJobTrace("ERROR: The JobWrapper was killed before job could complete");
+					changeJobStatus(JobStatus.ERROR_E, null); // JobWrapper was killed before the job could be completed
+				}
+				else if ("SAVING".equals(lastStatus)) {
+					putJobTrace("ERROR: The JobWrapper was killed during saving");
+					changeJobStatus(JobStatus.ERROR_SV, null); // JobWrapper was killed during saving
+				}
+				else if (lastStatus.isBlank()) {
+					putJobTrace("ERROR: The JobWrapper was killed before job start");
+					changeJobStatus(JobStatus.ERROR_IB, null); // JobWrapper was killed before payload start
+				}
+			}
 		}
 	}
 
@@ -817,53 +1090,9 @@ public class JobAgent implements Runnable {
 		logger.log(Level.INFO, "Done!");
 	}
 
-	/**
-	 * @param folder
-	 * @return amount of free space (in bytes) in the given folder. Or zero if there was a problem (or no free space).
-	 */
-	public static long getFreeSpace(final String folder) {
-		final File folderFile = new File(Functions.resolvePathWithEnv(folder));
-
-		try {
-			if (!folderFile.exists())
-				folderFile.mkdirs();
-		}
-		catch (Exception e) {
-			// ignore
-		}
-
-		long space = folderFile.getFreeSpace();
-		if (space <= 0) {
-			// 32b JRE returns 0 when too much space is available
-
-			try {
-				final String output = ExternalProcesses.getCmdOutput(Arrays.asList("df", "-P", "-B", "1024", folder), true, 30L, TimeUnit.SECONDS);
-
-				try (BufferedReader br = new BufferedReader(new StringReader(output))) {
-					String sLine = br.readLine();
-
-					if (sLine != null) {
-						sLine = br.readLine();
-
-						if (sLine != null) {
-							final StringTokenizer st = new StringTokenizer(sLine);
-
-							st.nextToken();
-							st.nextToken();
-							st.nextToken();
-
-							space = Long.parseLong(st.nextToken());
-						}
-					}
-				}
-			}
-			catch (IOException | InterruptedException ioe) {
-				System.out.println("Could not extract the space information from `df`: " + ioe.getMessage());
-			}
-		}
-
-		return space;
-	}
+	//####################################################################
+	//################## MONITORING HELPER FUNCTIONS #####################
+	//####################################################################
 
 	/**
 	 * updates jobagent parameters that change between job requests
@@ -991,286 +1220,6 @@ public class JobAgent implements Runnable {
 		}
 		else
 			putJobTrace("Virtual memory limit (default): " + jobMaxMemoryMB + "MB");
-	}
-
-	/**
-	 * @param args
-	 * @throws IOException
-	 */
-	public static void main(final String[] args) throws IOException {
-		ConfigUtils.setApplicationName("JobAgent");
-		DispatchSSLClient.setIdleTimeout(30000);
-		ConfigUtils.switchToForkProcessLaunching();
-
-		final JobAgent jao = new JobAgent();
-		jao.run();
-	}
-
-	/**
-	 * @return Command w/arguments for starting the JobWrapper, based on the command used for the JobAgent
-	 * @throws InterruptedException
-	 */
-	public List<String> generateLaunchCommand() throws InterruptedException {
-		try {
-			// Main cmd for starting the JobWrapper
-			final List<String> launchCmd = new ArrayList<>();
-
-			final Process cmdChecker = Runtime.getRuntime().exec(new String[] { "ps", "-p", String.valueOf(MonitorFactory.getSelfProcessID()), "-o", "command=" });
-			cmdChecker.waitFor();
-			try (Scanner cmdScanner = new Scanner(cmdChecker.getInputStream())) {
-				String readArg;
-				while (cmdScanner.hasNext()) {
-					readArg = (cmdScanner.next());
-					if (readArg.contains("-cp"))
-						cmdScanner.next();
-					else if (readArg.contains("alien.site.JobRunner") || readArg.contains("alien.site.JobAgent")) {
-						launchCmd.add("-Djobagent.vmid=" + queueId);
-						launchCmd.add("-cp");
-						launchCmd.add(jarPath + jarName);
-						launchCmd.add("alien.site.JobWrapper");
-					}
-					else if (!readArg.contains("JobRunner") && !readArg.contains("JobAgent")) //Just to be completely sure...
-						launchCmd.add(readArg);
-			}
-		}
-
-			// Check if there is container support present on site. If yes, add to launchCmd
-			final Containerizer cont = ContainerizerFactory.getContainerizer();
-			if (cont != null) {
-				putJobTrace("Support for containers detected. Will use: " + cont.getContainerizerName());
-				cont.setWorkdir(jobWorkdir);
-				return cont.containerize(String.join(" ", launchCmd));
-			}
-			return launchCmd;
-		}
-		catch (final IOException e) {
-			logger.log(Level.SEVERE, "Could not generate JobWrapper launch command: " + e.toString());
-			return null;
-		}
-	}
-
-	private int launchJobWrapper(final List<String> launchCommand, final boolean monitorJob) {
-		logger.log(Level.INFO, "Launching jobwrapper using the command: " + launchCommand.toString());
-		final long ttl = ttlForJob();
-
-		boolean payloadMonitoring = false;
-
-		final ProcessBuilder pBuilder = new ProcessBuilder(launchCommand);
-		pBuilder.environment().remove("JALIEN_TOKEN_CERT");
-		pBuilder.environment().remove("JALIEN_TOKEN_KEY");
-		pBuilder.environment().put("TMPDIR", "tmp"); //Only for JW start --> set to jobworkdir/tmp by JW for payload
-		pBuilder.redirectError(Redirect.INHERIT);
-		pBuilder.directory(tempDir);
-
-		setStatus(jaStatus.RUNNING_JOB);
-
-		final Process p;
-
-		// stdin from the viewpoint of the wrapper
-		final OutputStream stdin;
-
-		try {
-			p = pBuilder.start();
-
-			stdin = p.getOutputStream();
-			try (ObjectOutputStream stdinObj = new ObjectOutputStream(stdin)) {
-				stdinObj.writeObject(jdl);
-				stdinObj.writeObject(username);
-				stdinObj.writeObject(Long.valueOf(queueId));
-				stdinObj.writeObject(Integer.valueOf(resubmission));
-				stdinObj.writeObject(tokenCert);
-				stdinObj.writeObject(tokenKey);
-				stdinObj.writeObject(ce);
-				stdinObj.writeObject(siteMap);
-				stdinObj.writeObject(defaultOutputDirPrefix);
-				stdinObj.writeObject(legacyToken);
-				stdinObj.writeObject(Long.valueOf(ttl));
-				stdinObj.writeObject(env.getOrDefault("PARENT_HOSTNAME", ""));
-				stdinObj.writeObject(getMetaVariables());
-
-				stdinObj.flush();
-			}
-
-			logger.log(Level.INFO, "JDL info sent to JobWrapper");
-			putJobTrace("JobWrapper started");
-
-			// Wait for JobWrapper to start
-			try (InputStream stdout = p.getInputStream()) {
-				stdout.read();
-			}
-
-		}
-		catch (final Exception ioe) {
-			logger.log(Level.SEVERE, "Exception running " + launchCommand + " : " + ioe.getMessage());
-			setStatus(jaStatus.ERROR_START);
-
-			putJobTrace("Error starting JobWrapper: exception running " + launchCommand + " : " + ioe.getMessage());
-			changeJobStatus(JobStatus.ERROR_IB, null);
-
-			setUsedCores(0);
-
-			return 1;
-		}
-
-		if (monitorJob) {
-			final String process_res_format = "FRUNTIME | RUNTIME | CPUUSAGE | MEMUSAGE | CPUTIME | RMEM | VMEM | NOCPUS | CPUFAMILY | CPUMHZ | RESOURCEUSAGE | RMEMMAX | VMEMMAX";
-			logger.log(Level.INFO, process_res_format);
-			putJobLog("procfmt", process_res_format);
-
-			childPID = (int) p.pid();
-
-			//apmon.setNumCPUs(cpuCores);
-			//apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
-			mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
-			apmon.addJobInstanceToMonitor(mj);
-
-			String monitoring = jdl.gets("Monitoring");
-			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
-				payloadMonitoring = true;
-				mj.setWrapperPid(getWrapperPid());
-				//mjPayload = apmon.addJobToMonitor(getWrapperPid(), jobWorkdir, ce + "_JobWrapper", matchedJob.get("queueId").toString());
-				mj.setPayloadMonitoring();
-			}
-
-			final String fs = checkProcessResources();
-			if (fs == null)
-				sendProcessResources(false);
-		}
-
-		final TimerTask killPayload = new TimerTask() {
-			@Override
-			public void run() {
-				logger.log(Level.SEVERE, "Timeout has occurred. Killing job!");
-				putJobTrace("Killing the job (it was running for longer than its TTL)");
-				killGracefully(p);
-			}
-		};
-
-		final Timer t = new Timer();
-		t.schedule(killPayload, TimeUnit.MILLISECONDS.convert(ttl, TimeUnit.SECONDS)); // TODO: ttlForJob
-
-		long lastStatusChange = getWrapperJobStatusTimestamp();
-
-		int code = -1;
-
-		logger.log(Level.INFO, "About to enter monitor loop. Is the JobWrapper process alive?: " + p.isAlive());
-
-		final Thread heartMon = new Thread(heartbeatMonitor(p));
-		heartMon.start();
-
-		int monitor_loops = 0;
-		boolean discoveredPid = false;
-		try {
-			while (p.isAlive()) {
-				logger.log(Level.FINEST, "Waiting for the JobWrapper process to finish");
-
-				if (monitorJob) {
-					monitor_loops++;
-					final String error = checkProcessResources();
-					if (error != null) {
-						t.cancel();
-						heartMon.interrupt();
-						if (!jobKilled) {
-							logger.log(Level.SEVERE, "Process overusing resources: " + error);
-							putJobTrace("ERROR[FATAL]: Process overusing resources");
-							putJobTrace(error);
-							killGracefully(p);
-						}
-						else {
-							logger.log(Level.SEVERE, "ERROR[FATAL]: Job KILLED by user! Terminating...");
-							putJobTrace("ERROR[FATAL]: Job KILLED by user! Terminating...");
-							killForcibly(p);
-						}
-						return 1;
-					}
-					// Send report once every 10 min, or when the job changes state
-					if (monitor_loops == 120) {
-						monitor_loops = 0;
-						sendProcessResources(false);
-					}
-
-					//set to 24
-					if (monitor_loops % 12 == 0) {
-						apmon.sendOneJobInfo(mj);
-					}
-
-					else if (getWrapperJobStatusTimestamp() != lastStatusChange) {
-						final String wrapperStatus = getWrapperJobStatus();
-
-						if (!"STARTED".equals(wrapperStatus) && !"RUNNING".equals(wrapperStatus)) {
-							lastStatusChange = getWrapperJobStatusTimestamp();
-							sendProcessResources(false);
-						}
-
-						if ("RUNNING".equals(wrapperStatus) && payloadMonitoring == true && mj != null && discoveredPid == false) {
-							mj.discoverPayloadPid("payload-" + queueId);
-							discoveredPid = true;
-						}
-
-						//Check if the wrapper has exited without us knowing
-						if ("DONE".equals(wrapperStatus) || wrapperStatus.contains("ERROR")) {
-
-							//In case the wrapper was just about to exit normally, wait a few seconds
-							if (!p.waitFor(15, TimeUnit.SECONDS)) {
-								putJobTrace("Warning: The JobWrapper has terminated without the JobAgent noticing. Killing leftover processes...");
-								p.destroyForcibly();
-							}
-						}
-
-					}
-				}
-				try {
-					Thread.sleep(5 * 1000);
-				}
-				catch (final InterruptedException ie) {
-					logger.log(Level.WARNING, "Interrupted while waiting for the JobWrapper to finish execution: " + ie.getMessage());
-					return 1;
-				}
-			}
-			code = p.exitValue();
-
-			// Send a final report once the payload completes
-			sendProcessResources(true);
-
-			logger.log(Level.INFO, "JobWrapper has finished execution. Exit code: " + code);
-			logger.log(Level.INFO, "All done for job " + queueId + ". Final status: " + getWrapperJobStatus());
-			putJobTrace("JobWrapper exit code: " + code);
-			if (code != 0)
-				logger.log(Level.WARNING, "Error encountered: see the JobWrapper logs in: " + env.getOrDefault("TMPDIR", "/tmp") + "/jalien-jobwrapper.log " + " for more details");
-
-			return code;
-		}
-		catch (Exception ex) {
-			logger.log(Level.WARNING, "Error encountered while running job: ", ex);
-			putJobTrace("Error encountered while running job: " + ex);
-			return -1;
-		}
-		finally {
-			try {
-				t.cancel();
-				stdin.close();
-			}
-			catch (final Exception e) {
-				logger.log(Level.WARNING, "Not all resources from the current job could be cleared: " + e);
-			}
-			apmon.removeJobToMonitor(childPID);
-			if (code != 0) {
-				// Looks like something went wrong. Let's check the last reported status
-				final String lastStatus = getWrapperJobStatus();
-				if ("STARTED".equals(lastStatus) || "RUNNING".equals(lastStatus)) {
-					putJobTrace("ERROR: The JobWrapper was killed before job could complete");
-					changeJobStatus(JobStatus.ERROR_E, null); // JobWrapper was killed before the job could be completed
-				}
-				else if ("SAVING".equals(lastStatus)) {
-					putJobTrace("ERROR: The JobWrapper was killed during saving");
-					changeJobStatus(JobStatus.ERROR_SV, null); // JobWrapper was killed during saving
-				}
-				else if (lastStatus.isBlank()) {
-					putJobTrace("ERROR: The JobWrapper was killed before job start");
-					changeJobStatus(JobStatus.ERROR_IB, null); // JobWrapper was killed before payload start
-				}
-			}
-		}
 	}
 
 	private void setStatus(final jaStatus new_status) {
@@ -1460,20 +1409,95 @@ public class JobAgent implements Runnable {
 		return error;
 	}
 
+	private void sendBatchInfo() {
+		for (final String var : batchSystemVars) {
+			if (env.containsKey(var)) {
+				if ("_CONDOR_JOB_AD".equals(var)) {
+					try {
+						final List<String> lines = Files.readAllLines(Paths.get(env.get(var)));
+						for (final String line : lines) {
+							if (line.contains("GlobalJobId"))
+								putJobTrace("BatchId " + line);
+						}
+					}
+					catch (final IOException e) {
+						logger.log(Level.WARNING, "Error getting batch info from file " + env.get(var) + ":", e);
+					}
+				}
+				else
+					putJobTrace("BatchId " + var + ": " + env.get(var));
+			}
+		}
+	}
+
+
+	//##########################################################################
+	//######################### OTHER HELPER FUNCTIONS #########################
+	//##########################################################################
+
+
 	private long ttlForJob() {
 		final Integer iTTL = jdl.getInteger("TTL");
 
-		int ttl = (iTTL != null ? iTTL.intValue() : 3600);
+		int jobTtl = (iTTL != null ? iTTL.intValue() : 3600);
 		putJobTrace("Job asks for a TTL of " + ttl + " seconds");
-		ttl += 300; // extra time (saving)
+		jobTtl += 300; // extra time (saving)
 
 		final String proxyttl = jdl.gets("ProxyTTL");
 		if (proxyttl != null) {
-			ttl = ((Integer) siteMap.get("TTL")).intValue() - 600;
+			jobTtl = ((Integer) siteMap.get("TTL")).intValue() - 600;
 			putJobTrace("ProxyTTL enabled, running for " + ttl + " seconds");
 		}
 
-		return ttl;
+		return jobTtl;
+	}
+
+	/**
+	 * @param folder
+	 * @return amount of free space (in bytes) in the given folder. Or zero if there was a problem (or no free space).
+	 */
+	public static long getFreeSpace(final String folder) {
+		final File folderFile = new File(Functions.resolvePathWithEnv(folder));
+
+		try {
+			if (!folderFile.exists())
+				folderFile.mkdirs();
+		}
+		catch (Exception e) {
+			// ignore
+		}
+
+		long space = folderFile.getFreeSpace();
+		if (space <= 0) {
+			// 32b JRE returns 0 when too much space is available
+
+			try {
+				final String output = ExternalProcesses.getCmdOutput(Arrays.asList("df", "-P", "-B", "1024", folder), true, 30L, TimeUnit.SECONDS);
+
+				try (BufferedReader br = new BufferedReader(new StringReader(output))) {
+					String sLine = br.readLine();
+
+					if (sLine != null) {
+						sLine = br.readLine();
+
+						if (sLine != null) {
+							final StringTokenizer st = new StringTokenizer(sLine);
+
+							st.nextToken();
+							st.nextToken();
+							st.nextToken();
+
+							space = Long.parseLong(st.nextToken());
+						}
+					}
+				}
+			}
+			catch (IOException | InterruptedException ioe) {
+				System.out.println("Could not extract the space information from `df`: " + ioe.getMessage());
+			}
+		}
+
+		return space;
 	}
 
 	private boolean createWorkDir() {
@@ -1582,36 +1606,6 @@ public class JobAgent implements Runnable {
 	}
 
 	/**
-	 * Get LhcbMarks, using a specialized script in CVMFS
-	 *
-	 * @param logger
-	 *
-	 * @return script output, or null in case of error
-	 */
-	public static Float getLhcbMarks(final Logger logger) {
-		if (lhcbMarks > 0)
-			return Float.valueOf(lhcbMarks);
-
-		final File lhcbMarksScript = new File(CVMFS.getLhcbMarksScript());
-
-		if (!lhcbMarksScript.exists()) {
-			logger.log(Level.WARNING, "Script for lhcbMarksScript not found in: " + lhcbMarksScript.getAbsolutePath());
-			return null;
-		}
-
-		try {
-			String out = ExternalProcesses.getCmdOutput(lhcbMarksScript.getAbsolutePath(), true, 300L, TimeUnit.SECONDS);
-			out = out.substring(out.lastIndexOf(":") + 1);
-			lhcbMarks = Float.parseFloat(out);
-			return Float.valueOf(lhcbMarks);
-		}
-		catch (final Exception e) {
-			logger.log(Level.WARNING, "An error occurred while attempting to run process cleanup: ", e);
-			return null;
-		}
-	}
-
-	/**
 	 *
 	 * Identifies the JobWrapper in list of child PIDs
 	 * (these may be shifted when using containers)
@@ -1622,7 +1616,7 @@ public class JobAgent implements Runnable {
 		final ArrayList<Integer> wrapperProcs = new ArrayList<>();
 
 		try {
-			final Process getWrapperProcs = Runtime.getRuntime().exec(new String[]{"pgrep", "-f",  String.valueOf(queueId)});
+			final Process getWrapperProcs = Runtime.getRuntime().exec(new String[] { "pgrep", "-f", String.valueOf(queueId) });
 			getWrapperProcs.waitFor();
 			try (Scanner cmdScanner = new Scanner(getWrapperProcs.getInputStream())) {
 				while (cmdScanner.hasNext()) {
@@ -1660,7 +1654,7 @@ public class JobAgent implements Runnable {
 		try {
 			final int jobWrapperPid = getWrapperPid();
 			if (jobWrapperPid != 0)
-				Runtime.getRuntime().exec(new String[]{"kill", String.valueOf(jobWrapperPid)});
+				Runtime.getRuntime().exec(new String[] { "kill", String.valueOf(jobWrapperPid) });
 			else
 				logger.log(Level.INFO, "Could not kill JobWrapper: not found. Already done?");
 		}
@@ -1700,7 +1694,7 @@ public class JobAgent implements Runnable {
 		try {
 			if (jobWrapperPid != 0) {
 				JobWrapper.cleanupProcesses(queueId, jobWrapperPid);
-				Runtime.getRuntime().exec(new String[]{"kill", "-9", String.valueOf(jobWrapperPid)});
+				Runtime.getRuntime().exec(new String[] { "kill", "-9", String.valueOf(jobWrapperPid) });
 			}
 			else
 				logger.log(Level.INFO, "Could not kill JobWrapper: not found. Already done?");
@@ -1729,27 +1723,6 @@ public class JobAgent implements Runnable {
 			"JOB_ID"
 	};
 
-	private void sendBatchInfo() {
-		for (final String var : batchSystemVars) {
-			if (env.containsKey(var)) {
-				if ("_CONDOR_JOB_AD".equals(var)) {
-					try {
-						final List<String> lines = Files.readAllLines(Paths.get(env.get(var)));
-						for (final String line : lines) {
-							if (line.contains("GlobalJobId"))
-								putJobTrace("BatchId " + line);
-						}
-					}
-					catch (final IOException e) {
-						logger.log(Level.WARNING, "Error getting batch info from file " + env.get(var) + ":", e);
-					}
-				}
-				else
-					putJobTrace("BatchId " + var + ": " + env.get(var));
-			}
-		}
-	}
-
 	/**
 	 *
 	 * Reads the list of variables defined in META_VARIABLES, and returns their current value in the
@@ -1772,6 +1745,13 @@ public class JobAgent implements Runnable {
 		return metavars_map;
 	}
 
+	/**
+	 * 
+	 * Thread for checking if heartbeats are still being sent, or if something is stuck
+	 * 
+	 * @param p process for JobWrapper/Job
+	 * @return heartbeatMonitor runnable
+	 */
 	private final Runnable heartbeatMonitor(Process p) {
 		return () -> {
 			while (p.isAlive()) {
@@ -1786,6 +1766,69 @@ public class JobAgent implements Runnable {
 				}
 			}
 		};
+	}
+
+	//#################################################################
+	//############################ SCRIPTS ############################
+	//#################################################################
+
+	/**
+	 * Get LhcbMarks, using a specialized script in CVMFS
+	 *
+	 * @param logger
+	 *
+	 * @return script output, or null in case of error
+	 */
+	public static Float getLhcbMarks(final Logger logger) {
+		if (lhcbMarks > 0)
+			return Float.valueOf(lhcbMarks);
+
+		final File lhcbMarksScript = new File(CVMFS.getLhcbMarksScript());
+
+		if (!lhcbMarksScript.exists()) {
+			logger.log(Level.WARNING, "Script for lhcbMarksScript not found in: " + lhcbMarksScript.getAbsolutePath());
+			return null;
+		}
+
+		try {
+			String out = ExternalProcesses.getCmdOutput(lhcbMarksScript.getAbsolutePath(), true, 300L, TimeUnit.SECONDS);
+			out = out.substring(out.lastIndexOf(":") + 1);
+			lhcbMarks = Float.parseFloat(out);
+			return Float.valueOf(lhcbMarks);
+		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "An error occurred while attempting to run process cleanup: ", e);
+			return null;
+		}
+	}
+
+	private void collectSystemInformation() {
+		final String scriptPath = CVMFS.getSiteSonarScript();
+		final File f = new File(scriptPath);
+
+		if (f.exists() && f.canExecute()) {
+			final ProcessBuilder pBuilder = new ProcessBuilder(scriptPath);
+
+			pBuilder.environment().put("ALIEN_JDL_CPUCORES", MAX_CPU != null ? MAX_CPU.toString() : "1");
+			pBuilder.environment().put("ALIEN_SITE", siteMap.getOrDefault("Site", "UNKNOWN").toString());
+			pBuilder.redirectError(Redirect.INHERIT);
+			pBuilder.redirectOutput(Redirect.INHERIT);
+
+			try {
+				final Process p = pBuilder.start();
+
+				if (p != null) {
+					final ProcessWithTimeout ptimeout = new ProcessWithTimeout(p, pBuilder);
+					ptimeout.waitFor(5, TimeUnit.MINUTES);
+
+					if (!ptimeout.exitedOk())
+						logger.log(Level.WARNING, "Sitesonar didn't finish in due time");
+				}
+			}
+			catch (@SuppressWarnings("unused") final IOException | InterruptedException e) {
+				// ignore
+			}
+		}
 	}
 	
 }

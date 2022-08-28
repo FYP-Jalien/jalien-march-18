@@ -474,7 +474,7 @@ public class LFN implements Comparable<LFN>, CatalogEntity {
 			return lfn.compareTo(o.lfn);
 		}
 
-		System.err.println("Comparing " + getCanonicalName() + " to " + o.getCanonicalName());
+		// System.err.println("Comparing " + getCanonicalName() + " to " + o.getCanonicalName());
 
 		// in the general case we compare full paths
 		return getCanonicalName().compareTo(o.getCanonicalName());
