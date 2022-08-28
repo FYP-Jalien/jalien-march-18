@@ -383,7 +383,7 @@ public class JobAgent implements Runnable {
 		}
 
 		hostName = (String) siteMap.get("Localhost");
-        collectSystemInformation();
+		collectSystemInformation();
 		// alienCm = (String) siteMap.get("alienCm");
 
 		if (env.containsKey("ALIEN_JOBAGENT_ID"))
@@ -428,191 +428,9 @@ public class JobAgent implements Runnable {
 
 	}
 
-	/**
-	 * Site Sonar controller function
-	 * Updates the Site Map with Site Sonar constraint values
-	 */
-	private void collectSystemInformation() {
-
-		String nodeHostName = hostName;
-		String alienSiteName = siteMap.getOrDefault("Site", "UNKNOWN").toString();
-
-		// PARENT_HOSTNAME variable is used at sites which the node hostname changes over time. eg: RAL
-		if (env.containsKey("PARENT_HOSTNAME")) {
-			nodeHostName = env.get("PARENT_HOSTNAME");
-		}
-
-		// Birmingham site adds a number at the end of actual hostname. eg: "hostname-25.ph.bham.ac.uk"
-		// Following filter is added to obtain the actual hostname from the given hostname variable.
-		if (!nodeHostName.isEmpty() && !alienSiteName.isEmpty()) {
-			nodeHostName = nodeHostName.replaceAll("-[0-9]*\\(.ph.bham.ac.uk\\)$", ".ph.bham.ac.uk");
-		} else {
-			// Returning because the hostname or CE name is null
-			logger.log(Level.INFO,("Site Sonar execution is skipped because hostname or CE name is null"));
-			return;
-		}
-
-		logger.log(Level.INFO,"Getting probe list from Site Sonar for : "+ nodeHostName);
-		JSONObject probeOutput = getProbes(nodeHostName, alienSiteName);
-		if (!probeOutput.isEmpty()) {
-				JSONArray probeList = (JSONArray) probeOutput.get("probes");
-				if (probeList.size() > 0){
-					logger.log(Level.INFO,("===== Running following probes on " + nodeHostName + " at " + alienSiteName + " ====="));
-					for (int i = 0; i < probeList.size(); i++) {
-						String testName = (String) probeList.get(i);
-						JSONObject testOutput = runProbe(testName);
-						uploadResults(nodeHostName, alienSiteName, testName, testOutput);
-					}
-				} else {
-					logger.log(Level.INFO,("No probes returned from Site Sonar. Skipping ..."));
-				}
-		} else {
-			logger.log(Level.SEVERE,"Site Sonar probe output for node " + hostName + " in " +
-					alienSiteName + " is null");
-		}
-		addConstraintsToSiteMap(nodeHostName, alienSiteName);
-	}
-
-	/**
-	 * Make HTTP request and return JSON output
-	 * @param url Request URI
-	 * @param hostName Hostname
-	 * @param alienSite
-	 * @return Request output
-	 */
-	private JSONObject makeRequest(URL url, String hostName, String alienSite) {
-		try {
-			logger.log(Level.FINE,"Making HTTP call to " + url + " from " + hostName + " in " +
-					alienSite);
-			final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-			conn.setConnectTimeout(5000);
-			conn.setReadTimeout(120000);
-
-			try (InputStream inputStream = conn.getInputStream()) {
-				byte[] buffer = inputStream.readAllBytes();
-				String output = new String(buffer, StandardCharsets.UTF_8);
-				if (!output.isBlank()){
-					return (JSONObject) jsonParser.parse(output);
-				}
-			} catch (ParseException e) {
-				logger.log(Level.SEVERE,"Failed to parse AliMonitor response for node " + hostName + " in " +
-						alienSite, e);
-			}
-		} catch (IOException e) {
-			logger.log(Level.SEVERE,"IO Error in calling the url " + url + " for node " + hostName + " in " +
-				alienSite, e);
-		}
-		return new JSONObject();
-	}
-
-	/**
-	 * Upload probe output to AliMonitor database
-	 * @param hostName hostname of the node
-	 * @param alienSite
-	 * @param siteSonarOutput Output of the probe
-	 */
-	private void uploadResults(String hostName, String alienSite, String testName, JSONObject siteSonarOutput) {
-		try {
-			final URL url = new URL(siteSonarUrl + "uploadResults.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
-					"&ce_name=" + URLEncoder.encode(alienSite, charSet) + "&test_name=" + URLEncoder.encode(testName, charSet) +
-					"&test_message=" + URLEncoder.encode(siteSonarOutput.toString(), StandardCharsets.UTF_8));
-			logger.log(Level.INFO,("Uploading Site Sonar results of " + hostName + " to AliMonitor"));
-			makeRequest(url, hostName, alienSite);
-		} catch (IOException e) {
-			logger.log(Level.SEVERE,"Failed to upload Site sonar probe output for node " + hostName + " in " +
-					alienSite, e);
-		}
-	}
-
-	/**
-	 * Obtain values for additional constraints
-	 * @param hostName hostname of the node
-	 * @param alienSite
-	 */
-	private void addConstraintsToSiteMap(String hostName, String alienSite) {
-		try {
-
-			final URL url = new URL(siteSonarUrl + "constraints.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
-					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
-			JSONObject constraints = makeRequest(url, hostName, alienSite);
-			if (constraints != null && constraints.keySet().size() > 0) {
-				constraints.keySet().forEach(key ->
-				{
-					Object value = constraints.get(key);
-					if (value != null) {
-						siteMap.put((String) key, value);
-						logger.log(Level.INFO,("Added constraint - Key: " + key + ", Value: " + value.toString() + " to SiteMap"));
-					}
-				});
-			}
-
-		} catch (IOException e) {
-			logger.log(Level.SEVERE,"Failed to get Site Sonar constraints list for node " + hostName + " in " +
-					alienSite, e);
-		}
-	}
-
-	/**
-	 * Obtain Site sonar probes to run
-	 * @param hostName hostname of the node
-	 * @param alienSite
-	 * @return List of probes to be run / Results from the existing run
-	 */
-	private JSONObject getProbes(String hostName, String alienSite) {
-		try {
-			final URL url = new URL(siteSonarUrl + "queryProbes.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
-					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
-			return makeRequest(url, hostName, alienSite);
-		} catch (IOException e) {
-			logger.log(Level.SEVERE,"Failed to get Site sonar probe list for node " + hostName + " in " +
-					alienSite, e);
-		}
-		return new JSONObject();
-	}
-
-	/**
-	 * Run site sonar probes
-	 * @param probeName Test Name
-	 * @return Test output
-	 */
-	private JSONObject runProbe(String probeName) {
-
-		JSONObject testOutputJson = new JSONObject();
-		try {
-			ProcessBuilder pb
-					= new ProcessBuilder("sh", siteSonarProbeDir + probeName + ".sh");
-			logger.log(Level.INFO,("Running " + probeName + ".sh..."));
-			long startTime = System.currentTimeMillis();
-			Process process = pb.start();
-
-			StringBuilder output = new StringBuilder();
-			BufferedReader reader
-					= new BufferedReader(new InputStreamReader(process.getInputStream()));
-
-			String line;
-			while ((line = reader.readLine()) != null) {
-				output.append(line);
-			}
-			int exitVal = process.waitFor();
-			if (exitVal == 0) {
-				logger.log(Level.FINE,"Output of " + probeName + ": " + output);
-				try {
-					testOutputJson = (JSONObject) jsonParser.parse(output.toString());
-				} catch (ParseException e) {
-					logger.log(Level.SEVERE,"Failed to parse the output of probe " + probeName + " in node" + hostName, e);
-				}
-			}
-			long endTime = System.currentTimeMillis();
-			long execTime = endTime - startTime;
-			// Add execution time and exit code to test output
-			testOutputJson.put("EXECUTION_TIME", execTime);
-			testOutputJson.put("EXITCODE", exitVal);
-		} catch (IOException | InterruptedException e) {
-			logger.log(Level.SEVERE,"Error while running the probe " + probeName + " in node" + hostName, e);
-		}
-		return testOutputJson;
-	}
-
+	//#############################################################
+	//################## MAIN EXECUTION FLOW ######################
+	//#############################################################
 	/**
 	 * @param args
 	 * @throws IOException
@@ -1789,5 +1607,193 @@ public class JobAgent implements Runnable {
 			}
 		};
 	}
+
+	//#################################################################
+	//############################ SCRIPTS ############################
+	//#################################################################
 	
+	/**
+	 * Site Sonar controller function
+	 * Updates the Site Map with Site Sonar constraint values
+	 */
+	private void collectSystemInformation() {
+
+		String nodeHostName = hostName;
+		String alienSiteName = siteMap.getOrDefault("Site", "UNKNOWN").toString();
+
+		// PARENT_HOSTNAME variable is used at sites which the node hostname changes over time. eg: RAL
+		if (env.containsKey("PARENT_HOSTNAME")) {
+			nodeHostName = env.get("PARENT_HOSTNAME");
+		}
+
+		// Birmingham site adds a number at the end of actual hostname. eg: "hostname-25.ph.bham.ac.uk"
+		// Following filter is added to obtain the actual hostname from the given hostname variable.
+		if (!nodeHostName.isEmpty() && !alienSiteName.isEmpty()) {
+			nodeHostName = nodeHostName.replaceAll("-[0-9]*\\(.ph.bham.ac.uk\\)$", ".ph.bham.ac.uk");
+		} else {
+			// Returning because the hostname or CE name is null
+			logger.log(Level.INFO,("Site Sonar execution is skipped because hostname or CE name is null"));
+			return;
+		}
+
+		logger.log(Level.INFO,"Getting probe list from Site Sonar for : "+ nodeHostName);
+		JSONObject probeOutput = getProbes(nodeHostName, alienSiteName);
+		if (!probeOutput.isEmpty()) {
+			JSONArray probeList = (JSONArray) probeOutput.get("probes");
+			if (probeList.size() > 0){
+				logger.log(Level.INFO,("===== Running following probes on " + nodeHostName + " at " + alienSiteName + " ====="));
+				for (int i = 0; i < probeList.size(); i++) {
+					String testName = (String) probeList.get(i);
+					JSONObject testOutput = runProbe(testName);
+					uploadResults(nodeHostName, alienSiteName, testName, testOutput);
+				}
+			} else {
+				logger.log(Level.INFO,("No probes returned from Site Sonar. Skipping ..."));
+			}
+		} else {
+			logger.log(Level.SEVERE,"Site Sonar probe output for node " + hostName + " in " +
+					alienSiteName + " is null");
+		}
+		addConstraintsToSiteMap(nodeHostName, alienSiteName);
+	}
+
+	/**
+	 * Make HTTP request and return JSON output
+	 * @param url Request URI
+	 * @param hostName Hostname
+	 * @param alienSite
+	 * @return Request output
+	 */
+	private JSONObject makeRequest(URL url, String hostName, String alienSite) {
+		try {
+			logger.log(Level.FINE,"Making HTTP call to " + url + " from " + hostName + " in " +
+					alienSite);
+			final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+			conn.setConnectTimeout(5000);
+			conn.setReadTimeout(120000);
+
+			try (InputStream inputStream = conn.getInputStream()) {
+				byte[] buffer = inputStream.readAllBytes();
+				String output = new String(buffer, StandardCharsets.UTF_8);
+				if (!output.isBlank()){
+					return (JSONObject) jsonParser.parse(output);
+				}
+			} catch (ParseException e) {
+				logger.log(Level.SEVERE,"Failed to parse AliMonitor response for node " + hostName + " in " +
+						alienSite, e);
+			}
+		} catch (IOException e) {
+			logger.log(Level.SEVERE,"IO Error in calling the url " + url + " for node " + hostName + " in " +
+					alienSite, e);
+		}
+		return new JSONObject();
+	}
+
+	/**
+	 * Upload probe output to AliMonitor database
+	 * @param hostName hostname of the node
+	 * @param alienSite
+	 * @param siteSonarOutput Output of the probe
+	 */
+	private void uploadResults(String hostName, String alienSite, String testName, JSONObject siteSonarOutput) {
+		try {
+			final URL url = new URL(siteSonarUrl + "uploadResults.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
+					"&ce_name=" + URLEncoder.encode(alienSite, charSet) + "&test_name=" + URLEncoder.encode(testName, charSet) +
+					"&test_message=" + URLEncoder.encode(siteSonarOutput.toString(), StandardCharsets.UTF_8));
+			logger.log(Level.INFO,("Uploading Site Sonar results of " + hostName + " to AliMonitor"));
+			makeRequest(url, hostName, alienSite);
+		} catch (IOException e) {
+			logger.log(Level.SEVERE,"Failed to upload Site sonar probe output for node " + hostName + " in " +
+					alienSite, e);
+		}
+	}
+
+	/**
+	 * Obtain values for additional constraints
+	 * @param hostName hostname of the node
+	 * @param alienSite
+	 */
+	private void addConstraintsToSiteMap(String hostName, String alienSite) {
+		try {
+
+			final URL url = new URL(siteSonarUrl + "constraints.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
+					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
+			JSONObject constraints = makeRequest(url, hostName, alienSite);
+			if (constraints != null && constraints.keySet().size() > 0) {
+				constraints.keySet().forEach(key ->
+				{
+					Object value = constraints.get(key);
+					if (value != null) {
+						siteMap.put((String) key, value);
+						logger.log(Level.INFO,("Added constraint - Key: " + key + ", Value: " + value.toString() + " to SiteMap"));
+					}
+				});
+			}
+
+		} catch (IOException e) {
+			logger.log(Level.SEVERE,"Failed to get Site Sonar constraints list for node " + hostName + " in " +
+					alienSite, e);
+		}
+	}
+
+	/**
+	 * Obtain Site sonar probes to run
+	 * @param hostName hostname of the node
+	 * @param alienSite
+	 * @return List of probes to be run / Results from the existing run
+	 */
+	private JSONObject getProbes(String hostName, String alienSite) {
+		try {
+			final URL url = new URL(siteSonarUrl + "queryProbes.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
+					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
+			return makeRequest(url, hostName, alienSite);
+		} catch (IOException e) {
+			logger.log(Level.SEVERE,"Failed to get Site sonar probe list for node " + hostName + " in " +
+					alienSite, e);
+		}
+		return new JSONObject();
+	}
+
+	/**
+	 * Run site sonar probes
+	 * @param probeName Test Name
+	 * @return Test output
+	 */
+	private JSONObject runProbe(String probeName) {
+
+		JSONObject testOutputJson = new JSONObject();
+		try {
+			ProcessBuilder pb
+					= new ProcessBuilder("sh", siteSonarProbeDir + probeName + ".sh");
+			logger.log(Level.INFO,("Running " + probeName + ".sh..."));
+			long startTime = System.currentTimeMillis();
+			Process process = pb.start();
+
+			StringBuilder output = new StringBuilder();
+			BufferedReader reader
+					= new BufferedReader(new InputStreamReader(process.getInputStream()));
+
+			String line;
+			while ((line = reader.readLine()) != null) {
+				output.append(line);
+			}
+			int exitVal = process.waitFor();
+			if (exitVal == 0) {
+				logger.log(Level.FINE,"Output of " + probeName + ": " + output);
+				try {
+					testOutputJson = (JSONObject) jsonParser.parse(output.toString());
+				} catch (ParseException e) {
+					logger.log(Level.SEVERE,"Failed to parse the output of probe " + probeName + " in node" + hostName, e);
+				}
+			}
+			long endTime = System.currentTimeMillis();
+			long execTime = endTime - startTime;
+			// Add execution time and exit code to test output
+			testOutputJson.put("EXECUTION_TIME", execTime);
+			testOutputJson.put("EXITCODE", exitVal);
+		} catch (IOException | InterruptedException e) {
+			logger.log(Level.SEVERE,"Error while running the probe " + probeName + " in node" + hostName, e);
+		}
+		return testOutputJson;
+	}
 }
