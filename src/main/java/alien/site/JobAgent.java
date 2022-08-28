@@ -457,7 +457,7 @@ public class JobAgent implements Runnable {
 		if (!probeOutput.isEmpty()) {
 				JSONArray probeList = (JSONArray) probeOutput.get("probes");
 				if (probeList.size() > 0){
-					logger.log(Level.INFO,("===== Running following probes on " + nodeHostName + " at " + alienSiteName + "====="));
+					logger.log(Level.INFO,("===== Running following probes on " + nodeHostName + " at " + alienSiteName + " ====="));
 					for (int i = 0; i < probeList.size(); i++) {
 						String testName = (String) probeList.get(i);
 						JSONObject testOutput = runProbe(testName);
