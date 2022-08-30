@@ -1683,12 +1683,12 @@ public class JobAgent implements Runnable {
 					return (JSONObject) jsonParser.parse(output);
 				}
 			}
-			catch (ParseException e) {
+			catch (final ParseException e) {
 				logger.log(Level.SEVERE, "Failed to parse AliMonitor response for node " + hostName + " in " +
 						alienSite, e);
 			}
 		}
-		catch (IOException e) {
+		catch (final IOException e) {
 			logger.log(Level.SEVERE, "IO Error in calling the url " + url + " for node " + hostName + " in " +
 					alienSite, e);
 		}
@@ -1710,7 +1710,7 @@ public class JobAgent implements Runnable {
 			logger.log(Level.INFO, ("Uploading Site Sonar results of " + hostName + " to AliMonitor"));
 			makeRequest(url, hostName, alienSite);
 		}
-		catch (IOException e) {
+		catch (final IOException e) {
 			logger.log(Level.SEVERE, "Failed to upload Site sonar probe output for node " + hostName + " in " +
 					alienSite, e);
 		}
@@ -1740,7 +1740,7 @@ public class JobAgent implements Runnable {
 			}
 
 		}
-		catch (IOException e) {
+		catch (final IOException e) {
 			logger.log(Level.SEVERE, "Failed to get Site Sonar constraints list for node " + hostName + " in " +
 					alienSite, e);
 		}
@@ -1759,7 +1759,7 @@ public class JobAgent implements Runnable {
 					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
 			return makeRequest(url, hostName, alienSite);
 		}
-		catch (IOException e) {
+		catch (final IOException e) {
 			logger.log(Level.SEVERE, "Failed to get Site sonar probe list for node " + hostName + " in " +
 					alienSite, e);
 		}
@@ -1781,8 +1781,8 @@ public class JobAgent implements Runnable {
 
 			if (f.exists() && f.canExecute()) {
 				final ProcessBuilder pBuilder = new ProcessBuilder("sh", scriptPath);
-				pBuilder.redirectError(Redirect.INHERIT);
-				pBuilder.redirectOutput(Redirect.INHERIT);
+		//		pBuilder.redirectError(Redirect.INHERIT);
+		//		pBuilder.redirectOutput(Redirect.INHERIT);
 				logger.log(Level.INFO, ("Running " + probeName + ".sh..."));
 				long startTime = System.currentTimeMillis();
 				final Process process = pBuilder.start();
@@ -1817,7 +1817,7 @@ public class JobAgent implements Runnable {
 				testOutputJson.put("EXITCODE", pTimeout.exitValue());
 			}
 		}
-		catch (IOException | InterruptedException e) {
+		catch (final IOException | InterruptedException e) {
 			logger.log(Level.SEVERE, "Error while running the probe " + probeName + " in node" + hostName, e);
 		}
 		return testOutputJson;
