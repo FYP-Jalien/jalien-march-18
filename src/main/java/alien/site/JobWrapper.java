@@ -1095,39 +1095,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				if (!registered)
 					registeredAll = false;
 			}
-			// TODO: Move up a layer, as this is not unique to registerEntry
 			catch (final NullPointerException npe) {
 				logger.log(Level.WARNING, "An error occurred while registering " + entry + ". Bad connection?", npe);
 				putJobTrace("An error occurred while registering " + entry + ". Bad connection?");
 
-				final int retries = 3;
-				for (int i = 1; i <= retries; i++) {
-					try {
-						final boolean retrySuccess = CatalogueApiUtils.registerEntry(entry, outputDir + "/", UserFactory.getByUsername(username));
-						if (retrySuccess) {
-							logger.log(Level.INFO, "Entry " + entry + " successfully registered on attempt " + i);
-							putJobTrace("Entry " + entry + " successfully registered on attempt " + i);
-							break;
-						}
-
-						throw new NullPointerException("registerEntry returned `false`");
-					}
-					catch (final NullPointerException npe2) {
-						logger.log(Level.WARNING, "Retry " + i + " failed.", npe2);
-						if (i == 3) {
-							logger.log(Level.SEVERE, "Registration of entry " + entry + " failed after 3 attempts. Aborting.");
-							putJobTrace("Registration of entry " + entry + " failed after 3 attempts. Aborting.");
-							return false;
-						}
-
-						try {
-							Thread.sleep(30 * 1000);
-						}
-						catch (@SuppressWarnings("unused") final InterruptedException ie) {
-							return false;
-						}
-					}
-				}
+				changeStatus(JobStatus.ERROR_SV);
+				System.exit(1);
 			}
 		}
 		return registeredAll;
