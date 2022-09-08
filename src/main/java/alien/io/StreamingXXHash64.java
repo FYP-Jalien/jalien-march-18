@@ -24,6 +24,9 @@ import static java.lang.Long.rotateLeft;
 */
 
 
+/**
+ * @author lz4-java team
+ */
 public class StreamingXXHash64 {
     private int memSize;
     private long v1, v2, v3, v4;
@@ -37,6 +40,9 @@ public class StreamingXXHash64 {
     private final long PRIME4 = -8796714831421723037L; //9650029242287828579
     private final long PRIME5 = 2870177450012600261L;
 
+    /**
+     * @param seed
+     */
     public StreamingXXHash64(long seed) {
         totalLen = 0;
         memSize = 0;
@@ -48,19 +54,26 @@ public class StreamingXXHash64 {
         this.seed = seed;
     }
 
-    private long readLongLE(byte[] buf, int i) {
+    private static long readLongLE(byte[] buf, int i) {
         return (buf[i] & 0xFFL) | ((buf[i+1] & 0xFFL) << 8) | ((buf[i+2] & 0xFFL) << 16) | ((buf[i+3] & 0xFFL) << 24)
                 | ((buf[i+4] & 0xFFL) << 32) | ((buf[i+5] & 0xFFL) << 40) | ((buf[i+6] & 0xFFL) << 48) | ((buf[i+7] & 0xFFL) << 56);
     }
 
-    private int readIntLE(byte[] buf, int i) {
+    private static int readIntLE(byte[] buf, int i) {
         return (buf[i] & 0xFF) | ((buf[i+1] & 0xFF) << 8) | ((buf[i+2] & 0xFF) << 16) | ((buf[i+3] & 0xFF) << 24);
     }
 
-    public void update(byte[] buf, int off, int len) {
-        if (off < 0 || off >= buf.length) {
-            throw new ArrayIndexOutOfBoundsException(off);
+    /**
+     * @param buf
+     * @param offset
+     * @param len
+     */
+    public void update(final byte[] buf, final int offset, final int len) {
+        if (offset < 0 || offset >= buf.length) {
+            throw new ArrayIndexOutOfBoundsException(offset);
         }
+        
+        int off = offset;
 
         totalLen += len;
 
@@ -97,37 +110,37 @@ public class StreamingXXHash64 {
 
         {
             final int limit = end - 32;
-            long v1 = this.v1;
-            long v2 = this.v2;
-            long v3 = this.v3;
-            long v4 = this.v4;
+            long lv1 = this.v1;
+            long lv2 = this.v2;
+            long lv3 = this.v3;
+            long lv4 = this.v4;
 
             while (off <= limit) {
-                v1 += readLongLE(buf, off) * PRIME2;
-                v1 = rotateLeft(v1, 31);
-                v1 *= PRIME1;
+                lv1 += readLongLE(buf, off) * PRIME2;
+                lv1 = rotateLeft(lv1, 31);
+                lv1 *= PRIME1;
                 off += 8;
 
-                v2 += readLongLE(buf, off) * PRIME2;
-                v2 = rotateLeft(v2, 31);
-                v2 *= PRIME1;
+                lv2 += readLongLE(buf, off) * PRIME2;
+                lv2 = rotateLeft(lv2, 31);
+                lv2 *= PRIME1;
                 off += 8;
 
-                v3 += readLongLE(buf, off) * PRIME2;
-                v3 = rotateLeft(v3, 31);
-                v3 *= PRIME1;
+                lv3 += readLongLE(buf, off) * PRIME2;
+                lv3 = rotateLeft(lv3, 31);
+                lv3 *= PRIME1;
                 off += 8;
 
-                v4 += readLongLE(buf, off) * PRIME2;
-                v4 = rotateLeft(v4, 31);
-                v4 *= PRIME1;
+                lv4 += readLongLE(buf, off) * PRIME2;
+                lv4 = rotateLeft(lv4, 31);
+                lv4 *= PRIME1;
                 off += 8;
             }
 
-            this.v1 = v1;
-            this.v2 = v2;
-            this.v3 = v3;
-            this.v4 = v4;
+            this.v1 = lv1;
+            this.v2 = lv2;
+            this.v3 = lv3;
+            this.v4 = lv4;
         }
 
         if (off < end) {
@@ -136,26 +149,29 @@ public class StreamingXXHash64 {
         }
     }
 
+    /**
+     * @return hash value
+     */
     public long getValue() {
         long h64;
         if (totalLen >= 32) {
-            long v1 = this.v1;
-            long v2 = this.v2;
-            long v3 = this.v3;
-            long v4 = this.v4;
+            long lv1 = this.v1;
+            long lv2 = this.v2;
+            long lv3 = this.v3;
+            long lv4 = this.v4;
 
-            h64 = rotateLeft(v1, 1) + rotateLeft(v2, 7) + rotateLeft(v3, 12) + rotateLeft(v4, 18);
+            h64 = rotateLeft(lv1, 1) + rotateLeft(lv2, 7) + rotateLeft(lv3, 12) + rotateLeft(lv4, 18);
 
-            v1 *= PRIME2; v1 = rotateLeft(v1, 31); v1 *= PRIME1; h64 ^= v1;
+            lv1 *= PRIME2; lv1 = rotateLeft(lv1, 31); lv1 *= PRIME1; h64 ^= lv1;
             h64 = h64* PRIME1 + PRIME4;
 
-            v2 *= PRIME2; v2 = rotateLeft(v2, 31); v2 *= PRIME1; h64 ^= v2;
+            lv2 *= PRIME2; lv2 = rotateLeft(lv2, 31); lv2 *= PRIME1; h64 ^= lv2;
             h64 = h64* PRIME1 + PRIME4;
 
-            v3 *= PRIME2; v3 = rotateLeft(v3, 31); v3 *= PRIME1; h64 ^= v3;
+            lv3 *= PRIME2; lv3 = rotateLeft(lv3, 31); lv3 *= PRIME1; h64 ^= lv3;
             h64 = h64* PRIME1 + PRIME4;
 
-            v4 *= PRIME2; v4 = rotateLeft(v4, 31); v4 *= PRIME1; h64 ^= v4;
+            lv4 *= PRIME2; lv4 = rotateLeft(lv4, 31); lv4 *= PRIME1; h64 ^= lv4;
             h64 = h64* PRIME1 + PRIME4;
         } else {
             h64 = seed + PRIME5;
