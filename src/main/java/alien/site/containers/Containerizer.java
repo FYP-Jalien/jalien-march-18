@@ -91,7 +91,7 @@ public abstract class Containerizer {
 	/**
 	 * @return String representing supported GPUs by the system. Will contain either 'nvidia[0-9]' (Nvidia), 'kfd' (AMD), or none.
 	 */
-	public final String getGPUString() {
+	public final static String getGPUString() {
 		final Pattern p = Pattern.compile("^nvidia\\d+$");
 		String[] names = new File("/dev").list((dir, name) -> name.equals("kfd") || p.matcher(name).matches());
 
