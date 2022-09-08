@@ -17,6 +17,9 @@ import alien.site.Functions;
 import lia.util.process.ExternalProcess.ExecutorFinishStatus;
 import lia.util.process.ExternalProcess.ExitStatus;
 
+/**
+ * PBS CE interface
+ */
 public class PBS extends BatchQueue {
 
 	private final Map<String, String> environment;
@@ -126,7 +129,7 @@ public class PBS extends BatchQueue {
 		submit_cmd += "#PBS -V \n";
 
 		// Name must be max 15 characters long
-		final String name = String.format("jobagent_%d", timestamp % 1000000L);
+		final String name = String.format("jobagent_%d", Long.valueOf(timestamp.longValue() % 1000000L));
 		submit_cmd += String.format("#PBS -N %s%n", name);
 
 		// Stage jobagent startup script to PBS node if no "alien_not_stage_files" declared
@@ -157,7 +160,7 @@ public class PBS extends BatchQueue {
 
 	}
 
-	public int getStatus(final String status) {
+	private int getStatus(final String status) {
 		int numberedStatus = 0;
 		final ExitStatus exitStatus = executeCommand(statusCmd);
 		final List<String> output_list = getStdOut(exitStatus);
@@ -211,8 +214,8 @@ public class PBS extends BatchQueue {
 			final String arg = config.get(argToRead).toString();
 			if (!arg.equalsIgnoreCase("alien_not_stage_files"))
 				return arg;
-			else
-				stageIn = false;
+
+			stageIn = false;
 			return "";
 		}
 	}
