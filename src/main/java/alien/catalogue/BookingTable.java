@@ -572,7 +572,7 @@ public class BookingTable {
 				bookForWriting(user, member_lfn, member_g, member_pfn, se);
 			}
 		}
-		catch (final IOException e) {
+		catch (@SuppressWarnings("unused") final IOException e) {
 			return false;
 		}
 		return true;
