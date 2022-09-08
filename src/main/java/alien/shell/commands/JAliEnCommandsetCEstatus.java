@@ -23,7 +23,7 @@ public class JAliEnCommandsetCEstatus extends JAliEnBaseCommand {
 				commander.printOutln(ShellColor.jobStateGreen() + "Success: " + ShellColor.reset() + " Status " + statusValue + " correctly set to CEs " + updatedCEs);
 			else
 				commander.printOutln(ShellColor.jobStateRed() + "Error: " + ShellColor.reset() + " Could not set status " + statusValue + " to CEs " + ceNames);
-		} catch (Exception e) {
+		} catch (@SuppressWarnings("unused") Exception e) {
 			commander.printOutln("Users must have the admin role to perform this action");
 		}
 	}
