@@ -43,6 +43,7 @@ public class TitanJobStatus {
 	 *
 	 * @param r
 	 * @param qid
+	 * @param resubmission 
 	 * @param job_folder
 	 * @param st
 	 * @param exec_code
