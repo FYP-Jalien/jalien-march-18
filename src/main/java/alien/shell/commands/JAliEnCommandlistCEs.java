@@ -98,6 +98,9 @@ public class JAliEnCommandlistCEs extends JAliEnBaseCommand {
 			commander.printOut("maxRunning", String.valueOf(maxRunning));
 			commander.printOut("maxQueued", String.valueOf(maxQueued));
 			commander.printOut("partitions", partitions);
+			commander.printOut("TTL", Long.valueOf(ttl));
+			commander.printOut("type", type);
+			commander.printOut("host", host);
 			commander.outNextResult();
 		}
 
