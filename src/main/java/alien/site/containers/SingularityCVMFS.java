@@ -9,8 +9,6 @@ import alien.site.packman.CVMFS;
  * @author mstoretv
  */
 public class SingularityCVMFS extends Containerizer {
-
-	private static String dirsToMountForGPU = "/opt:/opt,/etc/alternatives:/etc/alternatives,";
 	
 	@Override
 	public List<String> containerize(final String cmd) {
@@ -20,16 +18,18 @@ public class SingularityCVMFS extends Containerizer {
 		singularityCmd.add("-C");
 
 		final String gpuString = getGPUString();
+		String gpuDirs = getGPUdirs();
+
 		if (gpuString.contains("nvidia"))
 			singularityCmd.add("--nv");
 		else if (gpuString.contains("kfd"))
 			singularityCmd.add("--rocm");
 		else
-			dirsToMountForGPU = "";
+			gpuDirs= "";
 
 		singularityCmd.add("-B");
 		if(workdir != null) {
-			singularityCmd.add(dirsToMountForGPU + "/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + workdir + "/tmp:/tmp");
+			singularityCmd.add(gpuDirs + "/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + workdir + "/tmp:/tmp");
 			singularityCmd.add("--pwd");
 			singularityCmd.add(CONTAINER_JOBDIR);
 		}

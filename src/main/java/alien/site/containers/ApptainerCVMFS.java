@@ -18,14 +18,18 @@ public class ApptainerCVMFS extends Containerizer {
 		apptainerCmd.add("-C");
 
 		final String gpuString = getGPUString();
+		String gpuDirs = getGPUdirs();
+
 		if (gpuString.contains("nvidia"))
 			apptainerCmd.add("--nv");
-		if (gpuString.contains("kfd"))
+		else if (gpuString.contains("kfd"))
 			apptainerCmd.add("--rocm");
+		else
+			gpuDirs = "";
 
 		apptainerCmd.add("-B");
 		if(workdir != null) {
-			apptainerCmd.add("/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + workdir + "/tmp:/tmp");
+			apptainerCmd.add(gpuDirs + "/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + workdir + "/tmp:/tmp");
 			apptainerCmd.add("--pwd");
 			apptainerCmd.add(CONTAINER_JOBDIR);
 		}
