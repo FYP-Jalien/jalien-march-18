@@ -1280,13 +1280,13 @@ public class JobAgent implements Runnable {
 		final Integer iTTL = jdl.getInteger("TTL");
 
 		int jobTtl = (iTTL != null ? iTTL.intValue() : 3600);
-		putJobTrace("Job asks for a TTL of " + ttl + " seconds");
+		putJobTrace("Job asks for a TTL of " + jobTtl + " seconds");
 		jobTtl += 300; // extra time (saving)
 
 		final String proxyttl = jdl.gets("ProxyTTL");
 		if (proxyttl != null) {
 			jobTtl = ((Integer) siteMap.get("TTL")).intValue() - 600;
-			putJobTrace("ProxyTTL enabled, running for " + ttl + " seconds");
+			putJobTrace("ProxyTTL enabled, running for " + jobTtl + " seconds");
 		}
 
 		return jobTtl;
