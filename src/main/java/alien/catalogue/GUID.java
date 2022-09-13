@@ -550,6 +550,8 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 	 */
 	static final HashMap<Integer, GUIDCleanup> pfnDeleteQueue = new HashMap<>();
 
+	private static final Object globalLock = new Object();
+	
 	private static void offer(final HashMap<Integer, GUIDCleanup> queue, final Host h, final Integer tableName, final Integer guidId) {
 		GUIDCleanup g;
 
@@ -564,7 +566,7 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 
 		g.guidIDs.offer(guidId);
 
-		synchronized (queue) {
+		synchronized (globalLock) {
 			if (refCleanupThread == null) {
 				refCleanupThread = new CleanupThread(refDeleteQueue, "_REF");
 				refCleanupThread.start();
@@ -612,7 +614,7 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 
 					if (!any) {
 						if (++idleIterations > 30)
-							synchronized (queue) {
+							synchronized (globalLock) {
 								if (queue == refDeleteQueue)
 									refCleanupThread = null;
 								else
