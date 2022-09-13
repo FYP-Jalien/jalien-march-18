@@ -1,7 +1,6 @@
 package alien.site.containers;
 
 import java.io.File;
-import java.nio.file.Files;
 import java.util.List;
 import java.util.Scanner;
 import java.util.logging.Level;
@@ -101,7 +100,7 @@ public abstract class Containerizer {
 	/**
 	 * @return String for binding a number of predefined directories in a container, as required for GPU
 	 */
-	public final String getGPUdirs() {
+	public static final String getGPUdirs() {
 		String toBind = "";
 
 		if (new File("/etc/alternatives").exists())
