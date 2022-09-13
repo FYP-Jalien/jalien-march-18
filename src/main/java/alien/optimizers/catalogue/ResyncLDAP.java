@@ -1,6 +1,7 @@
 package alien.optimizers.catalogue;
 
 import java.io.IOException;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -8,12 +9,10 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
-import java.util.UUID;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import alien.api.Request;
 import alien.catalogue.LFN;
 import alien.catalogue.LFNUtils;
 import alien.config.ConfigUtils;
@@ -23,9 +22,9 @@ import alien.user.AliEnPrincipal;
 import alien.user.LDAPHelper;
 import alien.user.UserFactory;
 import alien.user.UsersHelper;
-import utils.DBUtils;
 import lazyj.DBFunctions;
 import lazyj.Format;
+import utils.DBUtils;
 
 /**
  * @author Marta
@@ -66,7 +65,7 @@ public class ResyncLDAP extends Optimizer {
 		DBSyncUtils.checkLdapSyncTable();
 		while (true) {
 			try {
-				resyncLDAP(Request.getVMID());
+				resyncLDAP();
 			}
 			catch (final Exception e) {
 				logger.log(Level.WARNING, "Exception running the LDAP resync", e);
@@ -127,7 +126,7 @@ public class ResyncLDAP extends Optimizer {
 	 * @param usersdb Database instance for SE, SE_VOLUMES and LDAP_SYNC tables
 	 * @param admindb Database instance for USERS_LDAP and USERS_LDAP_ROLE tables
 	 */
-	private static void resyncLDAP(UUID uuid) {
+	private static void resyncLDAP() {
 		final int frequency = 3600 * 1000; // 1 hour default
 		logOutput = "";
 
@@ -217,27 +216,29 @@ public class ResyncLDAP extends Optimizer {
 					currentDns.add(trimmedDN);
 					try (DBUtils dbu = new DBUtils(db.getConnection())) {
 						dbu.lockTables("USERS_LDAP WRITE");
-						try{
+						try {
 							String selectQuery = "SELECT COUNT(*) FROM USERS_LDAP WHERE user='" + Format.escSQL(user) + "' AND dn='" + Format.escSQL(trimmedDN) + "'";
 							if (!dbu.executeQuery(selectQuery)) {
 								logger.log(Level.SEVERE, "Error getting users from DB");
 								return;
 							}
 
-							if (dbu.getResultSet().next()) {
-								final int valuecounts = dbu.getResultSet().getInt(1);
-								if (valuecounts == 0) {
-									String insertQuery = "INSERT INTO USERS_LDAP (user, dn, up) VALUES ('" + Format.escSQL(user) + "','" + Format.escSQL(trimmedDN) + "', 1)";
-									if (!dbu.executeQuery(insertQuery)) {
-										logger.log(Level.SEVERE, "Error inserting user " + user + " in DB");
-										return;
+							try (ResultSet rs = dbu.getResultSet()) {
+								if (rs.next()) {
+									final int valuecounts = rs.getInt(1);
+									if (valuecounts == 0) {
+										String insertQuery = "INSERT INTO USERS_LDAP (user, dn, up) VALUES ('" + Format.escSQL(user) + "','" + Format.escSQL(trimmedDN) + "', 1)";
+										if (!dbu.executeQuery(insertQuery)) {
+											logger.log(Level.SEVERE, "Error inserting user " + user + " in DB");
+											return;
+										}
 									}
 								}
 							}
 							dbUsersNew.computeIfAbsent(user, (k) -> new LinkedHashSet<>()).add(trimmedDN);
 						}
-						finally{
-						         dbu.unlockTables();
+						finally {
+							dbu.unlockTables();
 						}
 					}
 					catch (SQLException e) {
@@ -285,8 +286,8 @@ public class ResyncLDAP extends Optimizer {
 						}
 					}
 				}
-				finally{
-				         dbu.unlockTables();
+				finally {
+					dbu.unlockTables();
 				}
 			}
 			catch (IOException e) {
@@ -360,10 +361,12 @@ public class ResyncLDAP extends Optimizer {
 						return;
 					}
 
-					while (dbu.getResultSet().next()) {
-						final String role = dbu.getResultSet().getString("role");
-						if (!roles.contains(role)) {
-							modifications.put(role, role + ": deleted role \n");
+					try (ResultSet rs = dbu.getResultSet()) {
+						while (rs.next()) {
+							final String role = rs.getString("role");
+							if (!roles.contains(role)) {
+								modifications.put(role, role + ": deleted role \n");
+							}
 						}
 					}
 
@@ -379,8 +382,11 @@ public class ResyncLDAP extends Optimizer {
 							return;
 						}
 
-						while (dbu.getResultSet().next())
-							originalUsers.add(dbu.getResultSet().getString("user"));
+						try (ResultSet rs = dbu.getResultSet()) {
+							while (rs.next())
+								originalUsers.add(rs.getString("user"));
+						}
+
 						dbRolesOld.put(role, new HashSet<>(originalUsers));
 
 						if (originalUsers.isEmpty())
@@ -395,22 +401,24 @@ public class ResyncLDAP extends Optimizer {
 								return;
 							}
 
-							if (dbu.getResultSet().next()) {
-								final int userInstances = dbu.getResultSet().getInt(1);
-								if (userInstances == 0) {
-									logger.log(Level.WARNING, "An already deleted user is still associated with role " + role + ". Consider cleaning ldap");
-									if (originalUsers.contains(user))
-										originalUsers.remove(user);
-								}
-								else {
-									currentUsers.add(user);
-									if (!originalUsers.contains(user)) {
-										String insertQuery = "INSERT INTO USERS_LDAP_ROLE (user, role, up) VALUES ('" + Format.escSQL(user) + "','" + Format.escSQL(role) + "', 1)";
-										if (!dbu.executeQuery(insertQuery)) {
-											logger.log(Level.SEVERE, "Error inserting user " + user + " with role " + role + " in USERS_LDAP_ROLE table");
-											return;
-										}
+							try (ResultSet rs = dbu.getResultSet()) {
+								if (rs.next()) {
+									final int userInstances = rs.getInt(1);
+									if (userInstances == 0) {
+										logger.log(Level.WARNING, "An already deleted user is still associated with role " + role + ". Consider cleaning ldap");
+										if (originalUsers.contains(user))
+											originalUsers.remove(user);
+									}
+									else {
+										currentUsers.add(user);
+										if (!originalUsers.contains(user)) {
+											String insertQuery = "INSERT INTO USERS_LDAP_ROLE (user, role, up) VALUES ('" + Format.escSQL(user) + "','" + Format.escSQL(role) + "', 1)";
+											if (!dbu.executeQuery(insertQuery)) {
+												logger.log(Level.SEVERE, "Error inserting user " + user + " with role " + role + " in USERS_LDAP_ROLE table");
+												return;
+											}
 
+										}
 									}
 								}
 							}
@@ -438,8 +446,8 @@ public class ResyncLDAP extends Optimizer {
 						}
 					}
 				}
-				finally{
-				         dbu.unlockTables();
+				finally {
+					dbu.unlockTables();
 				}
 			}
 			catch (SQLException e) {
@@ -526,14 +534,17 @@ public class ResyncLDAP extends Optimizer {
 								return;
 							}
 
-							if (dbu.getResultSet().next()) {
-								siteId = dbu.getResultSet().getInt("siteId");
-								originalCEs = populateCERegistry(dbu.getResultSet().getString("site"), dbu.getResultSet().getString("maxrunning"), dbu.getResultSet().getString("maxqueued"));
+							try (ResultSet rs = dbu.getResultSet()) {
+								if (rs.next()) {
+									siteId = rs.getInt("siteId");
+									originalCEs = populateCERegistry(rs.getString("site"), rs.getString("maxrunning"), rs.getString("maxqueued"));
+								}
 							}
 
 							logger.log(Level.INFO, "Inserting or updating database entry for CE " + ceName);
 							if (siteId != -1) {
-								String updateQuery = "UPDATE SITEQUEUES SET maxrunning=" + Integer.valueOf(maxjobs) + ", maxqueued=" + Integer.valueOf(maxqueuedjobs) + " WHERE site='" + Format.escSQL(ceName) + "'";
+								String updateQuery = "UPDATE SITEQUEUES SET maxrunning=" + Integer.valueOf(maxjobs) + ", maxqueued=" + Integer.valueOf(maxqueuedjobs) + " WHERE site='"
+										+ Format.escSQL(ceName) + "'";
 								if (!dbu.executeQuery(updateQuery)) {
 									logger.log(Level.SEVERE, "Error updating CEs to DB");
 									return;
@@ -548,8 +559,8 @@ public class ResyncLDAP extends Optimizer {
 								}
 							}
 						}
-						finally{
-						         dbu.unlockTables();
+						finally {
+							dbu.unlockTables();
 						}
 					}
 					catch (SQLException e) {
@@ -575,12 +586,16 @@ public class ResyncLDAP extends Optimizer {
 							logger.log(Level.SEVERE, "Error getting CEs from DB");
 							return;
 						}
-						while (dbu.getResultSet().next()) {
-							String ce = dbu.getResultSet().getString("site");
-							if (!updatedCEs.contains(ce) && !ce.equals("unassigned::site")) {
-								toDelete.add(ce);
+
+						try (ResultSet rs = dbu.getResultSet()) {
+							while (rs.next()) {
+								String ce = rs.getString("site");
+								if (!updatedCEs.contains(ce) && !ce.equals("unassigned::site")) {
+									toDelete.add(ce);
+								}
 							}
 						}
+
 						for (String element : toDelete) {
 							logger.log(Level.INFO, "Deleting CE " + element + " from CE database");
 							String deleteQuery = "DELETE from `SITEQUEUES` where site='" + Format.escSQL(element) + "'";
@@ -590,8 +605,8 @@ public class ResyncLDAP extends Optimizer {
 							}
 						}
 					}
-					finally{
-					         dbu.unlockTables();
+					finally {
+						dbu.unlockTables();
 					}
 				}
 				catch (SQLException e) {
@@ -717,19 +732,26 @@ public class ResyncLDAP extends Optimizer {
 									logger.log(Level.SEVERE, "Error getting SE volumes from DB");
 									return;
 								}
-								while (dbu.getResultSet().next()) {
-									originalSEVolumes = populateSEVolumesRegistry(dbu.getResultSet().getString("sename"), dbu.getResultSet().getString("volume"), dbu.getResultSet().getString("method"), dbu.getResultSet().getString("mountpoint"), dbu.getResultSet().getString("size"));
-									volumeId = dbu.getResultSet().getInt("volumeId");
+
+								try (ResultSet rs = dbu.getResultSet()) {
+									while (rs.next()) {
+										originalSEVolumes = populateSEVolumesRegistry(rs.getString("sename"), rs.getString("volume"),
+												rs.getString("method"), rs.getString("mountpoint"), rs.getString("size"));
+										volumeId = rs.getInt("volumeId");
+									}
 								}
+
 								if (volumeId != -1) {
-									String updateQuery = "UPDATE SE_VOLUMES SET volume='" + Format.escSQL(path) + "',method='" + Format.escSQL(method) + "',size=" + Long.valueOf(size) + " WHERE seName='" + Format.escSQL(seName) + "' AND mountpoint='" + Format.escSQL(path) + "' and volumeId=" + Integer.valueOf(volumeId);
+									String updateQuery = "UPDATE SE_VOLUMES SET volume='" + Format.escSQL(path) + "',method='" + Format.escSQL(method) + "',size=" + Long.valueOf(size)
+											+ " WHERE seName='" + Format.escSQL(seName) + "' AND mountpoint='" + Format.escSQL(path) + "' and volumeId=" + Integer.valueOf(volumeId);
 									if (!dbu.executeQuery(updateQuery)) {
 										logger.log(Level.SEVERE, "Error updating SE_VOLUMES from DB");
 										return;
 									}
 								}
 								else {
-									String insertQuery = "INSERT INTO SE_VOLUMES(sename,volume,method,mountpoint,size) values ('" + Format.escSQL(seName) + "','" + Format.escSQL(path) + "','" + Format.escSQL(method) + "','" + Format.escSQL(path) + "'," + Long.valueOf(size) + ")";
+									String insertQuery = "INSERT INTO SE_VOLUMES(sename,volume,method,mountpoint,size) values ('" + Format.escSQL(seName) + "','" + Format.escSQL(path) + "','"
+											+ Format.escSQL(method) + "','" + Format.escSQL(path) + "'," + Long.valueOf(size) + ")";
 									if (!dbu.executeQuery(insertQuery)) {
 										logger.log(Level.SEVERE, "Error inserting SE_VOLUMES to DB");
 										return;
@@ -739,8 +761,8 @@ public class ResyncLDAP extends Optimizer {
 								printModifications(modifications, originalSEVolumes, currentSEVolumes, seName, "SE Volumes");
 
 							}
-							finally{
-							         dbu.unlockTables();
+							finally {
+								dbu.unlockTables();
 							}
 						}
 						catch (SQLException e) {
@@ -812,11 +834,16 @@ public class ResyncLDAP extends Optimizer {
 								logger.log(Level.SEVERE, "Error getting SEs from DB");
 								return;
 							}
-							if (dbu.getResultSet().next()) {
-								originalSEs = populateSERegistry(dbu.getResultSet().getString("seName"), dbu.getResultSet().getString("seioDaemons"), dbu.getResultSet().getString("seStoragePath"), dbu.getResultSet().getString("seMinSize"), dbu.getResultSet().getString("seType"), dbu.getResultSet().getString("seQoS"),
-										dbu.getResultSet().getString("seExclusiveWrite"), dbu.getResultSet().getString("seExclusiveRead"), dbu.getResultSet().getString("seVersion"));
-								seNumber = dbu.getResultSet().getInt("seNumber");
+
+							try (ResultSet rs = dbu.getResultSet()) {
+								if (rs.next()) {
+									originalSEs = populateSERegistry(rs.getString("seName"), rs.getString("seioDaemons"), rs.getString("seStoragePath"),
+											rs.getString("seMinSize"), rs.getString("seType"), rs.getString("seQoS"),
+											rs.getString("seExclusiveWrite"), rs.getString("seExclusiveRead"), rs.getString("seVersion"));
+									seNumber = rs.getInt("seNumber");
+								}
 							}
+
 							if (originalSEs.isEmpty())
 								modifications.put(seName, seName + " : new storage element, \n");
 
@@ -824,7 +851,9 @@ public class ResyncLDAP extends Optimizer {
 							printModifications(modifications, originalSEs, currentSEs, seName, "SEs");
 
 							if (seNumber != -1) {
-								String updateQuery = "UPDATE SE SET seMinSize=" + Integer.valueOf(minSize) + ", seType='" + Format.escSQL(mss) + "', seQoS='" + Format.escSQL(qos) + "', seExclusiveWrite='" + Format.escSQL(seExclusiveWrite) + "', seExclusiveRead='" + Format.escSQL(seExclusiveWrite) + "', seVersion='" + seVersion + "', seStoragePath='" + Format.escSQL(path) + "', seioDaemons='" + Format.escSQL(seioDaemons)
+								String updateQuery = "UPDATE SE SET seMinSize=" + Integer.valueOf(minSize) + ", seType='" + Format.escSQL(mss) + "', seQoS='" + Format.escSQL(qos)
+										+ "', seExclusiveWrite='" + Format.escSQL(seExclusiveWrite) + "', seExclusiveRead='" + Format.escSQL(seExclusiveWrite) + "', seVersion='" + seVersion
+										+ "', seStoragePath='" + Format.escSQL(path) + "', seioDaemons='" + Format.escSQL(seioDaemons)
 										+ "' WHERE seNumber=" + Integer.valueOf(seNumber) + " and seName='" + Format.escSQL(seName) + "'";
 								if (!dbu.executeQuery(updateQuery)) {
 									logger.log(Level.SEVERE, "Error updating SEs from DB");
@@ -833,7 +862,9 @@ public class ResyncLDAP extends Optimizer {
 							}
 							else {
 								String insertQuery = "INSERT INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
-										+ "values ('" + Format.escSQL(seName) + "'," + Integer.valueOf(minSize) + ",'" + Format.escSQL(mss) + "','" + Format.escSQL(qos) + "','" + Format.escSQL(seExclusiveWrite) + "','" + Format.escSQL(seExclusiveRead) + "','" + Format.escSQL(seVersion) + "','" + Format.escSQL(path) + "','" + Format.escSQL(seioDaemons) + "')";
+										+ "values ('" + Format.escSQL(seName) + "'," + Integer.valueOf(minSize) + ",'" + Format.escSQL(mss) + "','" + Format.escSQL(qos) + "','"
+										+ Format.escSQL(seExclusiveWrite) + "','" + Format.escSQL(seExclusiveRead) + "','" + Format.escSQL(seVersion) + "','" + Format.escSQL(path) + "','"
+										+ Format.escSQL(seioDaemons) + "')";
 								if (!dbu.executeQuery(insertQuery)) {
 									logger.log(Level.SEVERE, "Error inserting SEs to DB");
 									return;
@@ -841,8 +872,8 @@ public class ResyncLDAP extends Optimizer {
 							}
 							logger.log(Level.INFO, "Added or updated entry for SE " + seName);
 						}
-						finally{
-						         dbu.unlockTables();
+						finally {
+							dbu.unlockTables();
 						}
 					}
 					catch (SQLException e) {
@@ -864,28 +895,32 @@ public class ResyncLDAP extends Optimizer {
 							for (String combined : updatedProtocolsNTransfers) {
 								String seName = combined.split("#")[0];
 								String protocol = combined.split("#")[1];
-								int numTransfers = ((combined.split("#").length == 3 &&  !combined.split("#")[2].equals("null")) ? Integer.parseInt(combined.split("#")[2]) : 0);
+								int numTransfers = ((combined.split("#").length == 3 && !combined.split("#")[2].equals("null")) ? Integer.parseInt(combined.split("#")[2]) : 0);
 								String selectQuery = "SELECT seName, protocol from `PROTOCOLS` WHERE sename='" + Format.escSQL(seName) + "' and protocol='" + Format.escSQL(protocol) + "'";
 								if (!dbu.executeQuery(selectQuery)) {
 									logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
 									return;
 								}
 
-								if (dbu.getResultSet().next()) {
-									logger.log(Level.INFO, "Updating protocol " + protocol + " on SE " + seName);
-									String updateQuery = "UPDATE PROTOCOLS SET max_transfers=" + Integer.valueOf(numTransfers) + " where sename='"  + Format.escSQL(seName) + "' and protocol='" + Format.escSQL(protocol) + "'";
-									if (!dbu.executeQuery(updateQuery)) {
-										logger.log(Level.SEVERE, "Error updating protocol " + protocol + " in SE " + seName);
-										return;
+								try (ResultSet rs = dbu.getResultSet()) {
+									if (rs.next()) {
+										logger.log(Level.INFO, "Updating protocol " + protocol + " on SE " + seName);
+										String updateQuery = "UPDATE PROTOCOLS SET max_transfers=" + Integer.valueOf(numTransfers) + " where sename='" + Format.escSQL(seName) + "' and protocol='"
+												+ Format.escSQL(protocol) + "'";
+										if (!dbu.executeQuery(updateQuery)) {
+											logger.log(Level.SEVERE, "Error updating protocol " + protocol + " in SE " + seName);
+											return;
+										}
 									}
-								}
-								else {
-									modificationsProtocols.put("\t" + seName + " - " + protocol, protocol + " : new protocol in " + seName + "\n");
-									logger.log(Level.INFO, "Inserting protocol " + protocol + " on SE " + seName);
-									String insertQuery = "INSERT INTO PROTOCOLS(sename,protocol,max_transfers) values ('" + Format.escSQL(seName) + "','" + Format.escSQL(protocol) + "'," + Integer.valueOf(numTransfers) + ")";
-									if (!dbu.executeQuery(insertQuery)) {
-										logger.log(Level.SEVERE, "Error inserting protocol " + protocol + " in SE " + seName);
-										return;
+									else {
+										modificationsProtocols.put("\t" + seName + " - " + protocol, protocol + " : new protocol in " + seName + "\n");
+										logger.log(Level.INFO, "Inserting protocol " + protocol + " on SE " + seName);
+										String insertQuery = "INSERT INTO PROTOCOLS(sename,protocol,max_transfers) values ('" + Format.escSQL(seName) + "','" + Format.escSQL(protocol) + "',"
+												+ Integer.valueOf(numTransfers) + ")";
+										if (!dbu.executeQuery(insertQuery)) {
+											logger.log(Level.SEVERE, "Error inserting protocol " + protocol + " in SE " + seName);
+											return;
+										}
 									}
 								}
 							}
@@ -896,10 +931,13 @@ public class ResyncLDAP extends Optimizer {
 								logger.log(Level.SEVERE, "Error getting PROTOCOLS from DB");
 								return;
 							}
-							while (dbu.getResultSet().next()) {
-								String composed = dbu.getResultSet().getString(1);
-								if (!updatedProtocols.contains(composed))
-									toDelete.add(composed);
+
+							try (ResultSet rs = dbu.getResultSet()) {
+								while (rs.next()) {
+									String composed = rs.getString(1);
+									if (!updatedProtocols.contains(composed))
+										toDelete.add(composed);
+								}
 							}
 
 							for (String element : toDelete) {
@@ -919,8 +957,8 @@ public class ResyncLDAP extends Optimizer {
 								}
 							}
 						}
-						finally{
-						         dbu.unlockTables();
+						finally {
+							dbu.unlockTables();
 						}
 					}
 					catch (SQLException e) {
@@ -939,7 +977,8 @@ public class ResyncLDAP extends Optimizer {
 				String sesLog = "SEs: " + length + " synchronized. " + modifications.size() + " changes. \n" + String.join("\n", modifications.values());
 				if (modifications.size() > 0)
 					sesLog = sesLog + "\n";
-				final String protocolsLog = "Protocols: " + updatedProtocols.size() + " synchronized. " + modificationsProtocols.size() + " changes. \n" + String.join("", modificationsProtocols.values());
+				final String protocolsLog = "Protocols: " + updatedProtocols.size() + " synchronized. " + modificationsProtocols.size() + " changes. \n"
+						+ String.join("", modificationsProtocols.values());
 
 				logOutput = logOutput + "\n" + sesLog + "\n" + protocolsLog;
 				if (periodic.get())
