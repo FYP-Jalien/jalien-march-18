@@ -1303,7 +1303,7 @@ public class JobAgent implements Runnable {
 			if (!folderFile.exists())
 				folderFile.mkdirs();
 		}
-		catch (Exception e) {
+		catch (@SuppressWarnings("unused") Exception e) {
 			// ignore
 		}
 
@@ -1601,7 +1601,7 @@ public class JobAgent implements Runnable {
 				try {
 					Thread.sleep(60 * 1000);
 				}
-				catch (final InterruptedException ie) {
+				catch (@SuppressWarnings("unused") final InterruptedException ie) {
 					break;
 				}
 			}
@@ -1664,13 +1664,13 @@ public class JobAgent implements Runnable {
 	 * Make HTTP request and return JSON output
 	 * 
 	 * @param url Request URI
-	 * @param hostName Hostname
+	 * @param nodeName Hostname
 	 * @param alienSite
 	 * @return Request output
 	 */
-	private JSONObject makeRequest(URL url, String hostName, String alienSite) {
+	private JSONObject makeRequest(URL url, String nodeName, String alienSite) {
 		try {
-			logger.log(Level.FINE, "Making HTTP call to " + url + " from " + hostName + " in " +
+			logger.log(Level.FINE, "Making HTTP call to " + url + " from " + nodeName + " in " +
 					alienSite);
 			final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 			conn.setConnectTimeout(5000);
@@ -1684,12 +1684,12 @@ public class JobAgent implements Runnable {
 				}
 			}
 			catch (final ParseException e) {
-				logger.log(Level.SEVERE, "Failed to parse AliMonitor response for node " + hostName + " in " +
+				logger.log(Level.SEVERE, "Failed to parse AliMonitor response for node " + nodeName + " in " +
 						alienSite, e);
 			}
 		}
 		catch (final IOException e) {
-			logger.log(Level.SEVERE, "IO Error in calling the url " + url + " for node " + hostName + " in " +
+			logger.log(Level.SEVERE, "IO Error in calling the url " + url + " for node " + nodeName + " in " +
 					alienSite, e);
 		}
 		return new JSONObject();
@@ -1698,20 +1698,20 @@ public class JobAgent implements Runnable {
 	/**
 	 * Upload probe output to AliMonitor database
 	 * 
-	 * @param hostName hostname of the node
+	 * @param nodeName hostname of the node
 	 * @param alienSite
 	 * @param siteSonarOutput Output of the probe
 	 */
-	private void uploadResults(String hostName, String alienSite, String testName, JSONObject siteSonarOutput) {
+	private void uploadResults(String nodeName, String alienSite, String testName, JSONObject siteSonarOutput) {
 		try {
-			final URL url = new URL(siteSonarUrl + "uploadResults.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
+			final URL url = new URL(siteSonarUrl + "uploadResults.jsp?hostname=" + URLEncoder.encode(nodeName, charSet) +
 					"&ce_name=" + URLEncoder.encode(alienSite, charSet) + "&test_name=" + URLEncoder.encode(testName, charSet) +
 					"&test_message=" + URLEncoder.encode(siteSonarOutput.toString(), StandardCharsets.UTF_8));
-			logger.log(Level.INFO, ("Uploading Site Sonar results of " + hostName + " to AliMonitor"));
-			makeRequest(url, hostName, alienSite);
+			logger.log(Level.INFO, ("Uploading Site Sonar results of " + nodeName + " to AliMonitor"));
+			makeRequest(url, nodeName, alienSite);
 		}
 		catch (final IOException e) {
-			logger.log(Level.SEVERE, "Failed to upload Site sonar probe output for node " + hostName + " in " +
+			logger.log(Level.SEVERE, "Failed to upload Site sonar probe output for node " + nodeName + " in " +
 					alienSite, e);
 		}
 	}
@@ -1719,16 +1719,16 @@ public class JobAgent implements Runnable {
 	/**
 	 * Obtain values for additional constraints
 	 * 
-	 * @param hostName hostname of the node
+	 * @param nodeName hostname of the node
 	 * @param alienSite
 	 */
 	@SuppressWarnings("unchecked")
-	private void addConstraintsToSiteMap(String hostName, String alienSite) {
+	private void addConstraintsToSiteMap(String nodeName, String alienSite) {
 		try {
 
-			final URL url = new URL(siteSonarUrl + "constraints.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
+			final URL url = new URL(siteSonarUrl + "constraints.jsp?hostname=" + URLEncoder.encode(nodeName, charSet) +
 					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
-			JSONObject constraints = makeRequest(url, hostName, alienSite);
+			JSONObject constraints = makeRequest(url, nodeName, alienSite);
 			if (constraints != null && constraints.keySet().size() > 0) {
 				constraints.keySet().forEach(key -> {
 					Object value = constraints.get(key);
@@ -1741,7 +1741,7 @@ public class JobAgent implements Runnable {
 
 		}
 		catch (final IOException e) {
-			logger.log(Level.SEVERE, "Failed to get Site Sonar constraints list for node " + hostName + " in " +
+			logger.log(Level.SEVERE, "Failed to get Site Sonar constraints list for node " + nodeName + " in " +
 					alienSite, e);
 		}
 	}
@@ -1749,18 +1749,18 @@ public class JobAgent implements Runnable {
 	/**
 	 * Obtain Site sonar probes to run
 	 * 
-	 * @param hostName hostname of the node
+	 * @param nodeName hostname of the node
 	 * @param alienSite
 	 * @return List of probes to be run / Results from the existing run
 	 */
-	private JSONObject getProbes(String hostName, String alienSite) {
+	private JSONObject getProbes(String nodeName, String alienSite) {
 		try {
-			final URL url = new URL(siteSonarUrl + "queryProbes.jsp?hostname=" + URLEncoder.encode(hostName, charSet) +
+			final URL url = new URL(siteSonarUrl + "queryProbes.jsp?hostname=" + URLEncoder.encode(nodeName, charSet) +
 					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
-			return makeRequest(url, hostName, alienSite);
+			return makeRequest(url, nodeName, alienSite);
 		}
 		catch (final IOException e) {
-			logger.log(Level.SEVERE, "Failed to get Site sonar probe list for node " + hostName + " in " +
+			logger.log(Level.SEVERE, "Failed to get Site sonar probe list for node " + nodeName + " in " +
 					alienSite, e);
 		}
 		return new JSONObject();
@@ -1813,8 +1813,8 @@ public class JobAgent implements Runnable {
 				long endTime = System.currentTimeMillis();
 				long execTime = endTime - startTime;
 				// Add execution time and exit code to test output
-				testOutputJson.put("EXECUTION_TIME", execTime);
-				testOutputJson.put("EXITCODE", pTimeout.exitValue());
+				testOutputJson.put("EXECUTION_TIME", Long.valueOf(execTime));
+				testOutputJson.put("EXITCODE", Integer.valueOf(pTimeout.exitValue()));
 			}
 		}
 		catch (final IOException | InterruptedException e) {
