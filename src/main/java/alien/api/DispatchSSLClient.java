@@ -105,10 +105,10 @@ public class DispatchSSLClient {
 			logger.log(Level.INFO, "Closing idle socket");
 
 			final var toClose = instance;
-			
+
 			instance = null;
-			
-			new Thread( () -> toClose.close()).start();
+
+			new Thread(() -> toClose.close()).start();
 		}
 	}
 
@@ -150,6 +150,8 @@ public class DispatchSSLClient {
 	public String toString() {
 		return this.connection.getInetAddress().toString();
 	}
+
+	private static final Object globalLock = new Object();
 
 	private static DispatchSSLClient instance = null;
 
@@ -221,13 +223,15 @@ public class DispatchSSLClient {
 			}
 		}
 
-		synchronized (callback) {
+		synchronized (globalLock) {
 			if (ret != null) {
 				if (instance == null) {
 					lastCommand = System.currentTimeMillis();
 
 					instance = ret;
-					callback.notifyAll();
+					synchronized (callback) {
+						callback.notifyAll();
+					}
 				}
 				else {
 					ret.close();
