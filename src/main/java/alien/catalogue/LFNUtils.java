@@ -18,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -1585,7 +1586,7 @@ public class LFNUtils {
 			}
 
 			// generate a name for the destination table
-			int tableName = Math.abs(lfn.lfn.hashCode());
+			int tableName = (int) (Math.abs((long) (lfn.lfn.hashCode()) % Integer.MAX_VALUE));
 			// check if table name exists
 			do {
 				String tableNameQuery = "SELECT indexId FROM INDEXTABLE WHERE tablename=?";
@@ -1593,10 +1594,15 @@ public class LFNUtils {
 					return "DB query failed";
 				}
 
-				tableName++;
-			} while (db.moveNext());
+				if (db.moveNext()) {
+					tableName++;
 
-			tableName--;
+					if (tableName <= 0)
+						tableName = ThreadLocalRandom.current().nextInt(2, Integer.MAX_VALUE - 2);
+				}
+				else
+					break;
+			} while (true);
 
 			// create the destination table
 			String createTableQuery = "CREATE TABLE L" + tableName + "L LIKE L" + lfn.indexTableEntry.tableName + "L";
@@ -1631,9 +1637,9 @@ public class LFNUtils {
 
 					String columns = "entryId, owner, replicated, ctime, guidtime, jobid, aclId, lfn, broken, expiretime, size, dir, gowner, type, guid, md5, perm";
 					String insertQuery = "INSERT INTO L" + tableName + "L (" + columns
-						+ ") SELECT entryId, owner, replicated, ctime, guidtime, jobid, aclId, " + newLFN
-						+ " as lfn, broken, expiretime, size, dir, gowner, type, guid, md5, perm FROM L" + lfn.indexTableEntry.tableName + "L WHERE lfn LIKE \""
-						+ Format.escSQL(lfn.lfn + "_%") + "\"";
+							+ ") SELECT entryId, owner, replicated, ctime, guidtime, jobid, aclId, " + newLFN
+							+ " as lfn, broken, expiretime, size, dir, gowner, type, guid, md5, perm FROM L" + lfn.indexTableEntry.tableName + "L WHERE lfn LIKE \""
+							+ Format.escSQL(lfn.lfn + "_%") + "\"";
 
 					if (!dbu.executeQuery(insertQuery))
 						return "Failed to insert into the newly created table:\n" + insertQuery;
@@ -1651,7 +1657,7 @@ public class LFNUtils {
 
 					// insert lfn into indextable
 					String indexTableEntryQuery = "INSERT INTO INDEXTABLE (hostIndex, tableName, lfn) VALUES (" + lfn.indexTableEntry.hostIndex + ", " + tableName + ", \""
-						+ Format.escSQL(lfn.getCanonicalName()) + "\")";
+							+ Format.escSQL(lfn.getCanonicalName()) + "\")";
 
 					if (!dbu.executeQuery(indexTableEntryQuery))
 						return "Failed inserting the new table in the INDEXTABLE:\n" + indexTableEntryQuery;
