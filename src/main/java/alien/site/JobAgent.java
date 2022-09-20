@@ -1162,6 +1162,11 @@ public class JobAgent implements Runnable {
 		if (jobKilled)
 			return "Job was killed";
 
+		final Pattern coreDirPattern = Pattern.compile("core.*");
+		String[] coreDirs = new File(jobWorkdir).list((dir, name) -> coreDirPattern.matcher(name).matches());
+		if (coreDirs.length != 0)
+			return "Core directory detected: " + coreDirs[0] + ". Aborting!";
+
 		String error = null;
 		// logger.log(Level.INFO, "Checking resources usage");
 
