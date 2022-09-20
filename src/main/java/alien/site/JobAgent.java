@@ -833,10 +833,10 @@ public class JobAgent implements Runnable {
 				}
 				catch (final InterruptedException ie) {
 					logger.log(Level.WARNING, "Interrupted while waiting for the JobWrapper to finish execution: " + ie.getMessage());
-					//return 1;
+					return 1;
 				}
 			}
-			code = p.exitValue();
+			code = p.exitValue(); 
 
 			// Send a final report once the payload completes
 			sendProcessResources(true);
