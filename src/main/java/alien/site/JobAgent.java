@@ -833,7 +833,7 @@ public class JobAgent implements Runnable {
 				}
 				catch (final InterruptedException ie) {
 					logger.log(Level.WARNING, "Interrupted while waiting for the JobWrapper to finish execution: " + ie.getMessage());
-					return 1;
+					//return 1;
 				}
 			}
 			code = p.exitValue();
@@ -857,6 +857,7 @@ public class JobAgent implements Runnable {
 		finally {
 			try {
 				t.cancel();
+				heartMon.interrupt();
 				p.getOutputStream().close();
 			}
 			catch (final Exception e) {
@@ -1597,7 +1598,6 @@ public class JobAgent implements Runnable {
 			while (p.isAlive()) {
 				if (System.currentTimeMillis() - lastHeartbeat > 900000)
 					putJobTrace("WARNING: Something is preventing the sending of heartbeats/resource info!");
-
 				try {
 					Thread.sleep(60 * 1000);
 				}
