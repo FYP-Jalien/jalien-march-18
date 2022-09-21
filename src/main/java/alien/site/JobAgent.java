@@ -252,7 +252,7 @@ public class JobAgent implements Runnable {
 	/**
 	 * Boolean for CPU isolation
 	 */
-	static boolean cpuIsolation;
+	private boolean cpuIsolation;
 	//static boolean cpuIsolation = true;
 
 	private jaStatus status;
@@ -402,7 +402,7 @@ public class JobAgent implements Runnable {
 
 		if (env.containsKey("cpuIsolation"))
 			cpuIsolation = Boolean.parseBoolean(env.get("cpuIsolation"));
-		cpuIsolation=false;
+		cpuIsolation=true;
 
 		logger.log(Level.INFO, "cpuIsolation = " + cpuIsolation);
 
@@ -1182,25 +1182,6 @@ public class JobAgent implements Runnable {
 			}
 		}*/
 
-
-		//For a fixed config
-		//INTEL test cases
-		//int[] randomidx = new int[]{31,26,21,16,15,10,5,0}; // different numa node but sharing l1,l2 cache
-		//int[] randomidx = new int[]{19,18,17,16,3,2,1,0}; // Same numa node but sharing l1,l2 cache
-		//int[] randomidx = new int[]{11,10,9,8,3,2,1}; // different numa node and different l1,l2 cache
-
-		//AMD Test cases
-		//int[] randomidx = new int[]{32,33,34,35,36,37,38,39}; // same numa node and different L1,L2 caches
-		//int[] randomidx = new int[]{0,8,16,24,32,40,48,56}; // different numa node and different L1,L2 caches
-		//int[] randomidx = new int[]{0,64,8,72,16,80,24,88}; //different NUMA node and same caches (2 in each NUMA node)
-		//int[] randomidx = new int[]{24,88,25,89,26,90,27,91}; // same numa node sharing l1,l2 caches
-		//int[] randomidx = new int[]{67,66,65,64,3,2,1,0};
-		/*int[] randomidx = new int[]{25,89,33,97,54,118,58,122};
-		for (int i : randomidx) {
-			logger.log(Level.INFO, "DBG: Assigning to " + i);
-			finalMask[i] = 1L;
-		}
-		remainingCPU = 0;*/
 		logger.log(Level.INFO, "Process is going to be pinned to CPU mask " + getMaskString(finalMask));
 
 		if (remainingCPU != 0)
@@ -1706,11 +1687,11 @@ public class JobAgent implements Runnable {
 				prevTime = time;
 			}
 
-			/*if (cpuIsolation == false && mj.isOverConsuming()) {
+			if (cpuIsolation == false && mj.isOverConsuming()) {
 				cpuIsolation = true;
-				logger.log(Level.SEVERE, "CPU resources overconsumption detected. Going to constrain job to allocated cores.");
+				logger.log(Level.SEVERE, "CPU resources overconsumption detected in job " + queueId + ". Going to constrain job to allocated cores.");
 				constrainJobCPU();
-			}*/
+			}
 
 
 		}
