@@ -34,6 +34,7 @@ import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.Vector;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.FileHandler;
@@ -1073,13 +1074,13 @@ public class JobAgent implements Runnable {
 	String pickCPUs(long[] mask) {
 		long remainingCPU = reqCPU.longValue();
 		long[] newMask = new long[RES_NOCPUS.intValue()];
-		int freeCPU = 0;
+		//int freeCPU = 0;
 
 		for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
 			// for (int i = 0; i < RES_NOCPUS.intValue() && remainingCPU > 0; i++) {
 			if (mask[i] != 1 && usedCPUs[i] == 0) {
 				newMask[i] = 1;
-				freeCPU += 1;
+				//freeCPU += 1;
 				// remainingCPU--;
 			}
 		}
@@ -1100,7 +1101,11 @@ public class JobAgent implements Runnable {
 
 		long[] finalMask = new long[RES_NOCPUS.intValue()];
 		//algorithm 1
-		for (int cpu = 0; cpu < newMask.length; cpu ++) {
+		//for (int cpu = 0; cpu < newMask.length; cpu ++) {
+		int cpu = 0;
+		for (int cpuCounter = 0; cpuCounter < newMask.length; cpuCounter ++) {
+			cpu = ThreadLocalRandom.current().nextInt(0, RES_NOCPUS.intValue() - 1);
+			logger.log(Level.INFO, "DBG: Will start from cpu " + cpu);
 			if (newMask[cpu] == 1) {
 				remainingCPU = reqCPU.longValue();
 				finalMask = new long[RES_NOCPUS.intValue()];
@@ -1108,14 +1113,17 @@ public class JobAgent implements Runnable {
 		        //int cores = countCores(rangeSharingCPUs);
 		        //if (cores < remainingCPU)
 				long[] rangeSharingCPUs = getNUMARange(cpu);
-				for (int i = cpu; i < rangeSharingCPUs.length && remainingCPU > 0; i++) {
-					if (rangeSharingCPUs[i] == 1 && newMask[i] == 1) {
+				while (remainingCPU > 0) {
+					if (cpu == rangeSharingCPUs.length)
+						cpu = 0;
+					if (rangeSharingCPUs[cpu] == 1 && newMask[cpu] == 1) {
 						remainingCPU--;
-						finalMask[i] = 1;
-						if (remainingCPU == 0) {
-							break;
-						}
+						finalMask[cpu] = 1;
 					}
+					cpu += 1;
+						//if (remainingCPU == 0) {
+							//break;
+						//}
 				}
 				if (remainingCPU == 0)
 					break;
