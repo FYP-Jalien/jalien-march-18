@@ -429,6 +429,8 @@ public final class ComputingElement extends Thread {
 			before += "export MAX_RETRIES='" + config.get("MAX_RETRIES") + "'\n";
 		if (config.containsKey("ce_matcharg") && getValuesFromLDAPField(config.get("ce_matcharg")).containsKey("cpucores"))
 			before += "export CPUCores=\"" + getValuesFromLDAPField(config.get("ce_matcharg")).get("cpucores") + "\"\n";
+		if (config.containsKey("cpuIsolation"))
+			before += "export cpuIsolation=\"" + config.get("cpuIsolation") + "\"\n";
 		if (siteMap.containsKey("closeSE"))
 			before += "export closeSE=\"" + siteMap.get("closeSE") + "\"\n";
 
@@ -502,7 +504,7 @@ public final class ComputingElement extends Thread {
 		if (jarDirCustom != null && !jarDirCustom.isBlank())
 			return javaDir + javaCmd + " " + jarDirCustom + jarAndClass;
 
-		return javaDir + javaCmd + " " + jarDir + jarAndClass;	
+		return javaDir + javaCmd + " " + jarDir + jarAndClass;
 	}
 
 	/**

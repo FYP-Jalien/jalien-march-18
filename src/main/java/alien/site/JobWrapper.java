@@ -442,6 +442,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					while (st.hasMoreTokens())
 						cmd.add(st.nextToken());
 				}
+
 		cmd.add("; echo payload-" + queueId);
 
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
@@ -512,7 +513,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		if (trackTime) {
 			try {
-				putJobTrace("Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile + "-" + executionType)).replace("\n", ", "));
+
+				putJobLog("proc", "Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile + "-" + executionType)).replace("\n", ", "));
 			}
 			catch (@SuppressWarnings("unused") final Exception te) {
 				// Ignore
