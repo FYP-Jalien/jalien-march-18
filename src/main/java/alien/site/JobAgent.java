@@ -424,7 +424,7 @@ public class JobAgent implements Runnable {
 
 		if (env.containsKey("cpuIsolation"))
 			cpuIsolation = Boolean.parseBoolean(env.get("cpuIsolation"));
-		cpuIsolation=true;
+		cpuIsolation = true;
 
 		logger.log(Level.INFO, "cpuIsolation = " + cpuIsolation);
 
@@ -664,7 +664,7 @@ public class JobAgent implements Runnable {
 	public List<String> generateLaunchCommand() throws InterruptedException {
 		try {
 			// Main cmd for starting the JobWrapper
-			final List<String> launchCmd = new ArrayList<>();
+			List<String> launchCmd = new ArrayList<>();
 
 			final Process cmdChecker = Runtime.getRuntime().exec(new String[] { "ps", "-p", String.valueOf(MonitorFactory.getSelfProcessID()), "-o", "command=" });
 			cmdChecker.waitFor();
@@ -690,7 +690,7 @@ public class JobAgent implements Runnable {
 			if (cont != null) {
 				putJobTrace("Support for containers detected. Will use: " + cont.getContainerizerName());
 				cont.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivilegesad sd bind-mounts)
-				return cont.containerize(String.join(" ", launchCmd));
+				launchCmd = cont.containerize(String.join(" ", launchCmd));
 			}
 
 			// Run jobs in isolated environment
