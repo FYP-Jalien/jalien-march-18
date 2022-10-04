@@ -115,6 +115,18 @@ public abstract class Containerizer {
 		return toBind;
 	}
 
+	public static final String getCustomBinds() {
+		try {
+			final String customBinds = ConfigUtils.getConfiguration("container").gets("additional.binds");
+			if (customBinds != null && !customBinds.isBlank())
+				return customBinds + ",";
+		}
+		catch (final NullPointerException e) {
+			// ignore
+		}
+		return "";
+	}
+
 	/**
 	 * Decorating arguments to run the given command under a container. Returns a
 	 * list for use with ProcessBuilders
