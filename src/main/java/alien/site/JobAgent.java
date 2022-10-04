@@ -48,6 +48,7 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import alien.api.DispatchSSLClient;
 import alien.api.Request;
@@ -1163,9 +1164,19 @@ public class JobAgent implements Runnable {
 			return "Job was killed";
 
 		final Pattern coreDirPattern = Pattern.compile("core.*");
-		String[] coreDirs = new File(jobWorkdir).list((dir, name) -> coreDirPattern.matcher(name).matches());
-		if (coreDirs.length != 0)
-			return "Core directory detected: " + coreDirs[0] + ". Aborting!";
+		try {
+			List<File> coreDirs = Files.walk(new File(jobWorkdir).toPath())
+					.map(Path::toFile)
+					.sorted(Comparator.reverseOrder())
+					.filter(file -> coreDirPattern.matcher(file.getName()).matches())
+					.collect(Collectors.toList());
+
+			if (coreDirs != null && coreDirs.size() != 0)
+				return "Core directory detected: " + coreDirs.get(0).getName() + ". Aborting!";
+		}
+		catch (Exception e1) {
+			logger.log(Level.WARNING, "Exception while checking for core files: ", e1);
+		}
 
 		String error = null;
 		// logger.log(Level.INFO, "Checking resources usage");
