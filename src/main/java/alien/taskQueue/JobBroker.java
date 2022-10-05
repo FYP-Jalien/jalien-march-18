@@ -715,8 +715,6 @@ public class JobBroker {
 							parsedConstraintValue = Boolean.valueOf(constraintValue);
 						} else if (constraintValue.chars().allMatch(Character::isDigit)) {
 							parsedConstraintValue = Integer.valueOf(constraintValue);
-						} else if (constraintValue.chars().allMatch(Character::isAlphabetic)) {
-							// todo: do we ignore case sensitivity?
 						}
 
 						if (constraintExpression.equals("equality")) {
