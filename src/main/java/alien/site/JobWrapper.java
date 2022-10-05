@@ -2,12 +2,14 @@ package alien.site;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.lang.ProcessBuilder.Redirect;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -261,7 +263,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		monitor.addMonitoring("JobWrapper", this);
 	}
 
-
 	@Override
 	public void run() {
 
@@ -290,7 +291,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		else
 			System.exit(Math.abs(runCode));
 	}
-
 
 	private int runJob() {
 		try {
@@ -454,8 +454,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		processEnv.putAll(environment_packages);
 		processEnv.putAll(loadJDLEnvironmentVariables());
 		processEnv.putAll(jBoxEnv);
-		processEnv.put("JALIEN_TOKEN_CERT", tokenCert);
-		processEnv.put("JALIEN_TOKEN_KEY", tokenKey);
+		processEnv.put("JALIEN_TOKEN_CERT", saveToFile(tokenCert));
+		processEnv.put("JALIEN_TOKEN_KEY", saveToFile(tokenKey));
 		processEnv.put("ALIEN_JOB_TOKEN", legacyToken); // add legacy token
 		processEnv.put("ALIEN_PROC_ID", String.valueOf(queueId));
 		processEnv.put("ALIEN_MASTERJOB_ID", String.valueOf(masterjobID != null ? masterjobID.longValue() : queueId));
@@ -520,6 +520,41 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		return payload.exitValue();
+	}
+
+	private String saveToFile(final String content) {
+		File f;
+		try {
+			f = File.createTempFile("jobtoken", ".pem", currentDir);
+
+		}
+		catch (final IOException e) {
+			logger.log(Level.WARNING, "Exception creating temporary file", e);
+			return content;
+		}
+		f.deleteOnExit();
+
+		try (FileWriter fo = new FileWriter(f)) {
+			final Set<PosixFilePermission> attrs = new HashSet<>();
+			attrs.add(PosixFilePermission.OWNER_READ);
+			attrs.add(PosixFilePermission.OWNER_WRITE);
+
+			try {
+				Files.setPosixFilePermissions(f.toPath(), attrs);
+			}
+			catch (final IOException io2) {
+				logger.log(Level.WARNING, "Could not protect your keystore " + f.getAbsolutePath() + " with POSIX attributes", io2);
+			}
+
+			fo.write(content);
+
+			return f.getCanonicalPath();
+		}
+		catch (final IOException e1) {
+			logger.log(Level.WARNING, "Exception saving content to file", e1);
+		}
+
+		return content;
 	}
 
 	private Map<String, String> installPackages(final ArrayList<String> packToInstall) {
@@ -792,7 +827,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (exitStatus.toString().contains("ERROR")) {
 			putJobTrace("Registering temporary log files in " + outputDir + ". You must do 'registerOutput " + queueId
 					+ "' within 24 hours of the job termination to preserve them. After this period, they are automatically deleted.");
-					jobExecutedSuccessfully = false;
+			jobExecutedSuccessfully = false;
 		}
 
 		changeStatus(JobStatus.SAVING);
@@ -810,7 +845,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				changeStatus(exitStatus, exitCode);
 			return false;
 		}
-			
+
 		for (final OutputEntry entry : toUpload) {
 			try {
 				final File localFile = new File(currentDir.getAbsolutePath() + "/" + entry.getName());
@@ -1133,7 +1168,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @param jobExecutedSuccessfully
 	 * @return List of entries to upload, based on the outputtags. Null if at least one required file is missing
 	 */
-	private ArrayList<OutputEntry> getUploadEntries(ArrayList<String> outputTags, boolean jobExecutedSuccessfully) {
+	private ArrayList<OutputEntry> getUploadEntries(final ArrayList<String> outputTags, final boolean jobExecutedSuccessfully) {
 		final ArrayList<OutputEntry> archivesToUpload = new ArrayList<>();
 		final ArrayList<OutputEntry> standaloneFilesToUpload = new ArrayList<>();
 		final ArrayList<String> allArchiveEntries = new ArrayList<>();
