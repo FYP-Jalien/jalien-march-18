@@ -1167,7 +1167,6 @@ public class JobAgent implements Runnable {
 		try {
 			List<File> coreDirs = Files.walk(new File(jobWorkdir).toPath())
 					.map(Path::toFile)
-					.sorted(Comparator.reverseOrder())
 					.filter(file -> coreDirPattern.matcher(file.getName()).matches())
 					.collect(Collectors.toList());
 

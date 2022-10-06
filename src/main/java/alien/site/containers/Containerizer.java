@@ -2,6 +2,7 @@ package alien.site.containers;
 
 import java.io.File;
 import java.util.List;
+import java.util.Objects;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -10,6 +11,7 @@ import java.util.regex.Pattern;
 import alien.config.ConfigUtils;
 import alien.site.JobAgent;
 import alien.site.packman.CVMFS;
+import lazyj.ExtProperties;
 
 /**
  * @author mstoretv
@@ -116,15 +118,12 @@ public abstract class Containerizer {
 	}
 
 	public static final String getCustomBinds() {
-		try {
-			final String customBinds = ConfigUtils.getConfiguration("container").gets("additional.binds");
-			if (customBinds != null && !customBinds.isBlank())
-				return customBinds + ",";
-		}
-		catch (final NullPointerException e) {
-			// ignore
-		}
-		return "";
+		final ExtProperties containerConfig = ConfigUtils.getConfiguration("container");
+		final String customBinds = Objects.nonNull(containerConfig) ? containerConfig.gets("additional.binds") : "";
+		if (customBinds != null && !customBinds.isBlank())
+			return customBinds + ",";
+		else
+			return "";
 	}
 
 	/**
