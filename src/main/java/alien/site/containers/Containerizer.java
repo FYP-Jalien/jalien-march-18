@@ -111,9 +111,6 @@ public abstract class Containerizer {
 		if (new File("/opt").exists())
 			toBind += "/opt:/opt,";
 
-		if (!toBind.isBlank())
-			toBind += "/etc/group:/etc/group,";
-
 		return toBind;
 	}
 
