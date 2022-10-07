@@ -21,9 +21,9 @@ public abstract class Containerizer {
 	private static final String DEFAULT_JOB_CONTAINER_PATH = CVMFS.getContainerPath();
 
 	/**
-	 * Optional config if container.properties present
+	 * Config if container.properties present
 	 */
-	final static ExtProperties containerConfig = ConfigUtils.getConfiguration("container");
+	final static ExtProperties containerConfig = Objects.nonNull(ConfigUtils.getConfiguration("container")) ? ConfigUtils.getConfiguration("container") : new ExtProperties();
 	
 	/**
 	 * Sandbox location
@@ -59,11 +59,11 @@ public abstract class Containerizer {
 	protected static final String envSetup = "source <( " + CVMFS.getAlienvPrint() + apmonConfig + cudaDevices +  rocrDevices + " ); ";
 
 	/**
-	 * Simple constructor, initializing the container path from default location or from the environment (DEFAULT_JOB_CONTAINER_PATH key)
+	 * Simple constructor, initializing the container path from default location or from config/environment (DEFAULT_JOB_CONTAINER_PATH key)
 	 */
 	public Containerizer() {
-		containerImgPath = Objects.nonNull(containerConfig) ? containerConfig.gets("job.container.path", DEFAULT_JOB_CONTAINER_PATH)
-				: System.getenv().getOrDefault("JOB_CONTAINER_PATH", DEFAULT_JOB_CONTAINER_PATH);
+		containerImgPath = containerConfig.gets("job.container.path").isBlank() ? System.getenv().getOrDefault("JOB_CONTAINER_PATH", DEFAULT_JOB_CONTAINER_PATH)
+				: containerConfig.gets("job.container.path");
 		if (containerImgPath.equals(DEFAULT_JOB_CONTAINER_PATH)) {
 			logger.log(Level.INFO, "Custom JOB_CONTAINER_PATH not set. Using default path instead: " + DEFAULT_JOB_CONTAINER_PATH);
 		}
@@ -121,11 +121,7 @@ public abstract class Containerizer {
 	}
 
 	public static final String getCustomBinds() {
-		final String customBinds = Objects.nonNull(containerConfig) ? containerConfig.gets("additional.binds") : "";
-		if (customBinds != null && !customBinds.isBlank())
-			return customBinds + ",";
-		else
-			return "";
+		return containerConfig.gets("additional.binds").isBlank() ? "" : containerConfig.gets("additional.binds") + ",";
 	}
 
 	/**
