@@ -19,6 +19,11 @@ import lazyj.ExtProperties;
 public abstract class Containerizer {
 
 	private static final String DEFAULT_JOB_CONTAINER_PATH = CVMFS.getContainerPath();
+
+	/**
+	 * Optional config if container.properties present
+	 */
+	final static ExtProperties containerConfig = ConfigUtils.getConfiguration("container");
 	
 	/**
 	 * Sandbox location
@@ -57,9 +62,10 @@ public abstract class Containerizer {
 	 * Simple constructor, initializing the container path from default location or from the environment (DEFAULT_JOB_CONTAINER_PATH key)
 	 */
 	public Containerizer() {
-		containerImgPath = System.getenv().getOrDefault("JOB_CONTAINER_PATH", DEFAULT_JOB_CONTAINER_PATH);
+		containerImgPath = Objects.nonNull(containerConfig) ? containerConfig.gets("job.container.path", DEFAULT_JOB_CONTAINER_PATH)
+				: System.getenv().getOrDefault("JOB_CONTAINER_PATH", DEFAULT_JOB_CONTAINER_PATH);
 		if (containerImgPath.equals(DEFAULT_JOB_CONTAINER_PATH)) {
-			logger.log(Level.INFO, "Environment variable JOB_CONTAINER_PATH not set. Using default path instead: " + DEFAULT_JOB_CONTAINER_PATH);
+			logger.log(Level.INFO, "Custom JOB_CONTAINER_PATH not set. Using default path instead: " + DEFAULT_JOB_CONTAINER_PATH);
 		}
 	}
 
@@ -115,7 +121,6 @@ public abstract class Containerizer {
 	}
 
 	public static final String getCustomBinds() {
-		final ExtProperties containerConfig = ConfigUtils.getConfiguration("container");
 		final String customBinds = Objects.nonNull(containerConfig) ? containerConfig.gets("additional.binds") : "";
 		if (customBinds != null && !customBinds.isBlank())
 			return customBinds + ",";
