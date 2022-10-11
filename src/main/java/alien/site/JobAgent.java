@@ -34,7 +34,6 @@ import java.util.Hashtable;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
-import java.util.Objects;
 import java.util.Properties;
 import java.util.Scanner;
 import java.util.StringTokenizer;
@@ -1590,8 +1589,7 @@ public class JobAgent implements Runnable {
 	 * @return map of env variables defined in META_VARIABLES and their current value.
 	 */
 	private static Map<String, String> getMetaVariables() {
-		final ExtProperties containerConfig = ConfigUtils.getConfiguration("container");
-		final String metavars = Objects.nonNull(containerConfig) ? containerConfig.gets("meta.variables", "") : env.getOrDefault("META_VARIABLES", "");
+		String metavars = env.getOrDefault("META_VARIABLES", "");
 
 		List<String> metavars_list = Arrays.asList(metavars.split("\\s*,\\s*"));
 		System.err.println("Detected metavars: " + metavars_list.toString());

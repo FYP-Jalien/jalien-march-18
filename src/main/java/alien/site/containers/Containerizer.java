@@ -2,7 +2,6 @@ package alien.site.containers;
 
 import java.io.File;
 import java.util.List;
-import java.util.Objects;
 import java.util.Scanner;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -11,7 +10,6 @@ import java.util.regex.Pattern;
 import alien.config.ConfigUtils;
 import alien.site.JobAgent;
 import alien.site.packman.CVMFS;
-import lazyj.ExtProperties;
 
 /**
  * @author mstoretv
@@ -19,11 +17,6 @@ import lazyj.ExtProperties;
 public abstract class Containerizer {
 
 	private static final String DEFAULT_JOB_CONTAINER_PATH = CVMFS.getContainerPath();
-
-	/**
-	 * Config if container.properties present
-	 */
-	final static ExtProperties containerConfig = Objects.nonNull(ConfigUtils.getConfiguration("container")) ? ConfigUtils.getConfiguration("container") : new ExtProperties();
 	
 	/**
 	 * Sandbox location
@@ -62,10 +55,9 @@ public abstract class Containerizer {
 	 * Simple constructor, initializing the container path from default location or from config/environment (DEFAULT_JOB_CONTAINER_PATH key)
 	 */
 	public Containerizer() {
-		containerImgPath = containerConfig.gets("job.container.path").isBlank() ? System.getenv().getOrDefault("JOB_CONTAINER_PATH", DEFAULT_JOB_CONTAINER_PATH)
-				: containerConfig.gets("job.container.path");
+		containerImgPath = System.getenv().getOrDefault("JOB_CONTAINER_PATH", DEFAULT_JOB_CONTAINER_PATH);
 		if (containerImgPath.equals(DEFAULT_JOB_CONTAINER_PATH)) {
-			logger.log(Level.INFO, "Custom JOB_CONTAINER_PATH not set. Using default path instead: " + DEFAULT_JOB_CONTAINER_PATH);
+			logger.log(Level.INFO, "Environment variable JOB_CONTAINER_PATH not set. Using default path instead: " + DEFAULT_JOB_CONTAINER_PATH);
 		}
 	}
 
@@ -121,7 +113,7 @@ public abstract class Containerizer {
 	}
 
 	public static final String getCustomBinds() {
-		return containerConfig.gets("additional.binds").isBlank() ? "" : containerConfig.gets("additional.binds") + ",";
+		return System.getenv().getOrDefault("ADDITIONAL_BINDS", "").isBlank() ? "" : System.getenv().get("ADDITIONAL_BINDS") + ",";
 	}
 
 	/**
