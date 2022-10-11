@@ -433,16 +433,16 @@ public final class ComputingElement extends Thread {
 		if (siteMap.containsKey("closeSE"))
 			before += "export closeSE=\"" + siteMap.get("closeSE") + "\"\n";
 
-		ExtProperties containerConfig = ConfigUtils.getConfiguration("container");
-		if (Objects.nonNull(containerConfig)){
+		final ExtProperties containerConfig = ConfigUtils.getConfiguration("container");
+		if (Objects.nonNull(containerConfig)) {
 			if (!containerConfig.gets("additional.binds").isBlank())
 				before += "export ADDITIONAL_BINDS='" + containerConfig.gets("additional.binds") + "'\n";
 			if (!containerConfig.gets("meta.variables", "").isBlank())
 				before += "export META_VARIABLES='" + containerConfig.gets("meta.variables") + "'\n";
 			if (!containerConfig.gets("job.container.path").isBlank())
-				before += "export JOB_CONTAINER_PATH'" + containerConfig.gets("job.container.path") + "'\n";
+				before += "export JOB_CONTAINER_PATH='" + containerConfig.gets("job.container.path") + "'\n";
 		}
-			
+		
 		//
 		// allow any shell code to be inserted for debugging, testing etc.
 		//
