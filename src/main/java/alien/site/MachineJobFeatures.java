@@ -1,10 +1,12 @@
 package alien.site;
 
 import java.io.File;
-import java.io.FileInputStream;
 import java.io.IOException;
+import java.nio.file.Files;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import alien.config.ConfigUtils;
 
@@ -36,8 +38,6 @@ public class MachineJobFeatures {
 	 * @return the MJF parameters from files
 	 */
 	public static String getValueFromFile(final String fullPath) {
-		String output = null;
-
 		if (fullPath == null) {
 			logger.log(Level.WARNING, "Can't pass null to getValueFromFile()");
 			return null;
@@ -52,15 +52,13 @@ public class MachineJobFeatures {
 			return null;
 		}
 
-		try (FileInputStream fis = new FileInputStream(f)) {
-			output = String.valueOf(fis.readAllBytes());
+		try {
+			return Files.readString(f.toPath());
 		}
 		catch (final IOException e) {
 			logger.log(Level.WARNING, "Cannot read content of " + fullPath, e);
 			return null;
 		}
-
-		return output;
 	}
 
 	private static String resolvePath(final String featureString, final FeatureType type) {
@@ -98,6 +96,8 @@ public class MachineJobFeatures {
 		return output != null ? output : defaultString;
 	}
 
+	private static final Pattern pNumber = Pattern.compile(".*?((-)?\\d+).*?", Pattern.DOTALL);
+
 	/**
 	 * @param featureString
 	 * @param type
@@ -111,7 +111,15 @@ public class MachineJobFeatures {
 		if (logger.isLoggable(Level.FINER))
 			logger.log(Level.FINER, "Got value for " + featureString + " = " + output);
 
-		return output != null ? Long.valueOf(output) : null;
+		if (output == null)
+			return null;
+
+		final Matcher m = pNumber.matcher(output);
+
+		if (m.matches())
+			return Long.valueOf(m.group(1));
+
+		return null;
 	}
 
 	/**
