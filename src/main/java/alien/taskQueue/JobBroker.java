@@ -16,6 +16,8 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import lazyj.cache.ExpirationCache;
+import lia.Monitor.Store.Fast.DB;
 import org.nfunk.jep.JEP;
 
 import alien.api.Dispatcher;
@@ -31,6 +33,7 @@ import alien.user.AliEnPrincipal;
 import lazyj.DBFunctions;
 import lazyj.DBFunctions.DBConnection;
 import lazyj.Format;
+import org.nfunk.jep.function.Str;
 
 /**
  *
@@ -692,48 +695,54 @@ public class JobBroker {
 				}
 			}
 
-			final String constraintQuery = "select * from SITESONAR_CONSTRAINTS";
-			db.query(constraintQuery, false);
-			while (db.moveNext()) {
-				String constraintName = db.gets("name");
-				String constraintExpression = db.gets("expression");
-				boolean isEnabled = db.getb("enabled", true);
+			// Add Site Sonar Constraints
+			ExpirationCache<String, Constraint> constraintCache = TaskQueueUtils.getConstraintCache();
+			if (constraintCache == null) {
+				constraintCache = TaskQueueUtils.setConstraintCache();
+			}
 
-				logger.log(Level.FINE, "Enforcing additional constraints for " + matchRequest.get("Localhost"));
-				logger.log(Level.FINE, "Constraint name : " + constraintName);
-				logger.log(Level.FINE, "Constraint expression : " + constraintExpression);
-				logger.log(Level.FINE, "Constraint enabled : " + isEnabled);
+			if (constraintCache != null && constraintCache.size() > 0) {
+				// Constraint name is the constraint key
+				for ( String key : constraintCache.getKeys()) {
+					Constraint constraint = constraintCache.get(key);
+					String constraintExpression = constraint.getExpression();
+					boolean isEnabled = constraint.isEnabled();
+					logger.log(Level.FINE, "Enforcing additional constraints for " + matchRequest.get("Localhost"));
+					logger.log(Level.FINE, "Constraint name : " + key);
+					logger.log(Level.FINE, "Constraint expression : " + constraintExpression);
+					logger.log(Level.FINE, "Constraint enabled : " + isEnabled);
 
-				// If the site map has a value for the constraint and if its enabled, add the constraint check
-				if (matchRequest.containsKey(constraintName) && isEnabled) {
-					String constraintValue = (String) matchRequest.get(constraintName);
-					Object parsedConstraintValue = constraintValue;
-					logger.log(Level.FINE, "Constraint value : " + constraintValue);
-					if (!constraintValue.isEmpty()) {
-						// Type conversion
-						if ((constraintValue.equalsIgnoreCase("true") || constraintValue.equalsIgnoreCase("false"))) {
-							parsedConstraintValue = Boolean.valueOf(constraintValue);
-						} else if (constraintValue.chars().allMatch(Character::isDigit)) {
-							parsedConstraintValue = Integer.valueOf(constraintValue);
+					// If the site map has a value for the constraint and if its enabled, add the constraint check
+					if (matchRequest.containsKey(key) && isEnabled) {
+						String constraintValue = (String) matchRequest.get(key);
+						Object parsedConstraintValue = constraintValue;
+						logger.log(Level.FINE, "Constraint value : " + constraintValue);
+						if (!constraintValue.isEmpty()) {
+							// Type conversion
+							if ((constraintValue.equalsIgnoreCase("true") || constraintValue.equalsIgnoreCase("false"))) {
+								parsedConstraintValue = Boolean.valueOf(constraintValue);
+							} else if (constraintValue.chars().allMatch(Character::isDigit)) {
+								parsedConstraintValue = Integer.valueOf(constraintValue);
+							}
+
+							if (constraintExpression.equals("equality")) {
+								//eg:- SELECT * FROM JOB_AGENT WHERE... AND ((? = OS_NAME) OR (OS_NAME is null))
+								// SELECT * FROM JOB_AGENT WHERE... (('centos' = OS_NAME) OR (OS_NAME is null))
+								where += " and (( ? = " + key + ") or (" + key + " is null))";
+							} else if (constraintExpression.equals("regex")) {
+								// SELECT * FROM JOB_AGENT WHERE... AND ((? LIKE CPU_FLAGS) OR (CPU_FLAGS is null))
+								// SELECT * FROM JOB_AGENT WHERE... AND ((flag1 flag2 avx LIKE %avx%) OR (CPU_FLAGS is null))
+								where += " and (( ? LIKE " + key + ") or (" + key + " is null))";
+							} else {
+								// stop matching because the constraint type is not supported
+								logger.log(Level.SEVERE, "Incorrect expression type provided: " + constraintExpression);
+								return matchAnswer;
+							}
+
+							bindValues.add(parsedConstraintValue);
 						}
 
-						if (constraintExpression.equals("equality")) {
-							//eg:- SELECT * FROM JOB_AGENT WHERE... AND ((? = OS_NAME) OR (OS_NAME is null))
-							// SELECT * FROM JOB_AGENT WHERE... (('centos' = OS_NAME) OR (OS_NAME is null))
-							where += " and (( ? = " + constraintName + ") or (" + constraintName + " is null))";
-						} else if (constraintExpression.equals("regex")) {
-							// SELECT * FROM JOB_AGENT WHERE... AND ((? LIKE CPU_FLAGS) OR (CPU_FLAGS is null))
-							// SELECT * FROM JOB_AGENT WHERE... AND ((flag1 flag2 avx LIKE %avx%) OR (CPU_FLAGS is null))
-							where += " and (( ? LIKE " + constraintName + ") or (" + constraintName + " is null))";
-						} else {
-							// stop matching because the constraint type is not supported
-							logger.log(Level.SEVERE, "Incorrect expression type provided: " + constraintExpression);
-							return matchAnswer;
-						}
-
-						bindValues.add(parsedConstraintValue);
 					}
-
 				}
 			}
 

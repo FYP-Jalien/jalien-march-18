@@ -2735,6 +2735,46 @@ public class TaskQueueUtils {
 		siteQueueStatusCache.put(ce, status, 1000 * 60);
 	}
 
+	private static final ExpirationCache<String, Constraint> constraintCache = new ExpirationCache<>();
+	private static long lastConstraintUpdatedTimestamp = System.currentTimeMillis();
+	private static boolean isConstraintCacheInitialized = false;
+
+	/**
+	 * Cache Site Sonar constraints
+	 */
+	public static ExpirationCache<String, Constraint> setConstraintCache() {
+		long currentTimestamp = System.currentTimeMillis();
+		if ((!isConstraintCacheInitialized) || (lastConstraintUpdatedTimestamp - currentTimestamp > 5000)) {
+			try (DBFunctions db = getQueueDB()) {
+				if (db == null)
+					return null;
+				db.setQueryTimeout(30);
+				db.query("SELECT * FROM SITESONAR_CONSTRAINTS", false);
+
+				logger.log(Level.INFO, "Updating constraint cache at " + currentTimestamp);
+				while (db.moveNext()) {
+					String constraintName = db.gets("name");
+					String constraintExpression = db.gets("expression");
+					boolean isEnabled = db.getb("enabled", true);
+					Constraint constraint = new Constraint(constraintName, constraintExpression, isEnabled);
+					if (constraintCache.get(constraintName) != null ){
+						constraintCache.overwrite(constraintName, constraint, 1000 * 5);
+					} else {
+						constraintCache.put(constraintName, constraint, 1000 * 5);
+					}
+				}
+				isConstraintCacheInitialized = true;
+				lastConstraintUpdatedTimestamp = currentTimestamp;
+			}
+		}
+
+		return constraintCache;
+	}
+
+	public static ExpirationCache<String, Constraint> getConstraintCache() {
+		return constraintCache;
+	}
+
 	private static volatile boolean dbStructureInitialized = false;
 
 	private static void tqDBStructureInit() {
