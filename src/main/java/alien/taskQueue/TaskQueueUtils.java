@@ -2736,8 +2736,10 @@ public class TaskQueueUtils {
 	}
 
 	private static final ExpirationCache<String, Constraint> constraintCache = new ExpirationCache<>();
+	private static final ExpirationCache<String, Pattern> constraintPatternCache = new ExpirationCache<>();
 	private static long lastConstraintUpdatedTimestamp = System.currentTimeMillis();
 	private static boolean isConstraintCacheInitialized = false;
+	private static final long cacheExpiryTime = 5000;
 
 	/**
 	 * Cache Site Sonar constraints
@@ -2757,10 +2759,14 @@ public class TaskQueueUtils {
 					String constraintExpression = db.gets("expression");
 					boolean isEnabled = db.getb("enabled", true);
 					Constraint constraint = new Constraint(constraintName, constraintExpression, isEnabled);
+					//todo
+					Pattern patConstraint = Pattern.compile("other.LocalDiskSpace\\s*>\\s*(\\d+)");
 					if (constraintCache.get(constraintName) != null ){
-						constraintCache.overwrite(constraintName, constraint, 1000 * 5);
+						constraintCache.overwrite(constraintName, constraint, cacheExpiryTime);
+						constraintPatternCache.overwrite(constraintName, patConstraint, cacheExpiryTime);
 					} else {
-						constraintCache.put(constraintName, constraint, 1000 * 5);
+						constraintCache.put(constraintName, constraint, cacheExpiryTime);
+						constraintPatternCache.put(constraintName, patConstraint, cacheExpiryTime);
 					}
 				}
 				isConstraintCacheInitialized = true;
@@ -2771,8 +2777,16 @@ public class TaskQueueUtils {
 		return constraintCache;
 	}
 
+	public static boolean isIsConstraintCacheInitialized() {
+		return isConstraintCacheInitialized;
+	}
+
 	public static ExpirationCache<String, Constraint> getConstraintCache() {
 		return constraintCache;
+	}
+
+	public static ExpirationCache<String, Pattern> getConstraintPatternCache() {
+		return constraintPatternCache;
 	}
 
 	private static volatile boolean dbStructureInitialized = false;
