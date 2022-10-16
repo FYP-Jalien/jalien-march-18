@@ -2759,7 +2759,7 @@ public class TaskQueueUtils {
 					String constraintExpression = db.gets("expression");
 					boolean isEnabled = db.getb("enabled", true);
 					Constraint constraint = new Constraint(constraintName, constraintExpression, isEnabled);
-					//todo
+					//todo: Create generic pattern for constraint keys
 					Pattern patConstraint = Pattern.compile("other.LocalDiskSpace\\s*>\\s*(\\d+)");
 					if (constraintCache.get(constraintName) != null ){
 						constraintCache.overwrite(constraintName, constraint, cacheExpiryTime);
@@ -2774,14 +2774,6 @@ public class TaskQueueUtils {
 			}
 		}
 
-		return constraintCache;
-	}
-
-	public static boolean isIsConstraintCacheInitialized() {
-		return isConstraintCacheInitialized;
-	}
-
-	public static ExpirationCache<String, Constraint> getConstraintCache() {
 		return constraintCache;
 	}
 

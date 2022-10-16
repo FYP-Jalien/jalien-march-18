@@ -694,10 +694,8 @@ public class JobBroker {
 			}
 
 			// Add Site Sonar Constraints
-			if (!TaskQueueUtils.isIsConstraintCacheInitialized()) {
-				TaskQueueUtils.setConstraintCache();
-			}
-			ExpirationCache<String, Constraint> constraintCache = TaskQueueUtils.getConstraintCache();
+			// Initialize or refresh constraint cache
+			ExpirationCache<String, Constraint> constraintCache = TaskQueueUtils.setConstraintCache();
 
 			if (constraintCache != null && constraintCache.size() > 0) {
 				// Constraint name is the constraint key
