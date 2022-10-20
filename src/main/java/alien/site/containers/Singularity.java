@@ -14,10 +14,20 @@ public class Singularity extends Containerizer {
 		singularityCmd.add("singularity");
 		singularityCmd.add("exec");
 		singularityCmd.add("-C");
-		singularityCmd.add("-B");
 
+		final String gpuString = getGPUString();
+		String gpuDirs = getGPUdirs();
+
+		if (gpuString.contains("nvidia"))
+			singularityCmd.add("--nv");
+		else if (gpuString.contains("kfd"))
+			singularityCmd.add("--rocm");
+		else
+			gpuDirs = "";
+
+		singularityCmd.add("-B");
 		if(workdir != null) {
-			singularityCmd.add("/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + workdir + "/tmp:/tmp");
+			singularityCmd.add(getCustomBinds() + gpuDirs + "/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + "/tmp:/tmp");
 			singularityCmd.add("--pwd");
 			singularityCmd.add(CONTAINER_JOBDIR);
 		}
