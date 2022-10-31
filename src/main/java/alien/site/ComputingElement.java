@@ -585,8 +585,6 @@ public final class ComputingElement extends Thread {
 		else
 			smenv.put("TTL", "86400");
 
-		smenv.put("Disk", "100000000"); // TODO: df
-
 		// if (System.getenv().containsKey("cerequirements"))
 		// smenv.put("cerequirements", System.getenv().get("cerequirements")); //Local overrides value in LDAP if present
 		// else
@@ -614,6 +612,9 @@ public final class ComputingElement extends Thread {
 			config.putAll(ce_environment);
 
 		siteMap = (new SiteMap()).getSiteParameters(smenv);
+
+		//CE storage space does not matter to WNs
+		siteMap.remove("Disk");
 
 		if (config.containsKey("ce_matcharg") && getValuesFromLDAPField(config.get("ce_matcharg")).containsKey("cpucores")) {
 			siteMap.put("CPUCores", Integer.valueOf(getValuesFromLDAPField(config.get("ce_matcharg")).get("cpucores")));
