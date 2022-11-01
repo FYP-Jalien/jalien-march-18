@@ -71,7 +71,7 @@ public class GetMasterjob extends Request {
 
 		System.out.println("running with GetMasterJob");
 
-		subJobs = TaskQueueUtils.getMasterJobStat(jobId, status, id, site, 10000);
+		subJobs = TaskQueueUtils.getMasterJobStat(jobId, status, id, site, TaskQueueUtils.job_limit);
 
 		System.out.println("got subjosb, in GetMasterJob");
 
