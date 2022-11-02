@@ -160,10 +160,10 @@ public class SiteMap {
 		if (env.containsKey("CPUCores")) {
 			numCpus = Long.parseLong(env.get("CPUCores"));
 			if (numCpus == 0) {
+				siteMap.put("WholeNode", Boolean.valueOf(true));
 				try {
 					// get from system
 					numCpus = BkThread.getNumCPUs();
-
 					potentialCpus = memorySize / (2 * 1024 * 1024 * 1024L);
 					if (numCpus > potentialCpus)
 						numCpus = potentialCpus;
