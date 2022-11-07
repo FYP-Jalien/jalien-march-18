@@ -101,6 +101,22 @@ public class CatalogueApiUtils {
 	}
 
 	/**
+	 * @param lfns
+	 * @return the mapping of LFN to physical (real) locations of each
+	 */
+	public Map<LFN, Set<PFN>> getPFNs(final Collection<String> lfns) {
+		try {
+			return Dispatcher.execute(new RealPFNs(commander.getUser(), lfns)).getMap();
+		}
+		catch (final ServerException e) {
+			logger.log(Level.WARNING, "Could not get physical locations of: " + lfns);
+			e.getCause().printStackTrace();
+		}
+
+		return null;
+	}
+
+	/**
 	 * Get LFN from String
 	 *
 	 * @param slfn

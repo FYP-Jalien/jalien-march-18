@@ -23,6 +23,7 @@ import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.Vector;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -31,6 +32,7 @@ import alien.api.catalogue.CatalogueApiUtils;
 import alien.api.taskQueue.TaskQueueApiUtils;
 import alien.catalogue.FileSystemUtils;
 import alien.catalogue.LFN;
+import alien.catalogue.PFN;
 import alien.catalogue.XmlCollection;
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
@@ -38,6 +40,7 @@ import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.MonitoringObject;
 import alien.monitoring.Timing;
+import alien.se.SE;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.shell.commands.JAliEnCommandcp;
 import alien.site.packman.CVMFS;
@@ -823,6 +826,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		putJobTrace("Going to uploadOutputFiles(exitStatus=" + exitStatus + ", outputDir=" + outputDir + ")");
 
+		contextualizeJDL();
+
 		boolean jobExecutedSuccessfully = true;
 		if (exitStatus.toString().contains("ERROR")) {
 			putJobTrace("Registering temporary log files in " + outputDir + ". You must do 'registerOutput " + queueId
@@ -926,6 +931,61 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			changeStatus(exitStatus, exitCode);
 
 		return uploadedAllOutFiles;
+	}
+
+	private void contextualizeJDL() {
+		final Set<String> tagsToPatch = new HashSet<>();
+
+		for (final String key : jdl.keySet()) {
+			if (key.toUpperCase().startsWith("OUTPUT")) {
+				if (jdl.get(key).toString().contains("@inheritlocation"))
+					tagsToPatch.add(key);
+			}
+		}
+
+		if (tagsToPatch.size() > 0) {
+			final List<String> inputData = jdl.getInputData(false);
+
+			final Set<String> sesToReplaceWith = new HashSet<>();
+
+			if (inputData != null && inputData.size() > 0) {
+				int replicas = 0;
+
+				final Map<SE, AtomicInteger> ses = new HashMap<>();
+
+				final Map<LFN, Set<PFN>> locations = commander.c_api.getPFNs(inputData);
+
+				if (locations != null && locations.size() > 0) {
+					for (final Set<PFN> pfns : locations.values()) {
+						replicas += pfns.size();
+
+						for (final PFN p : pfns)
+							ses.computeIfAbsent(p.getSE(), (k) -> new AtomicInteger(0)).incrementAndGet();
+					}
+
+					final int targetReplicas = Math.round((float) replicas / locations.size());
+
+					final List<Map.Entry<SE, AtomicInteger>> sortedLocations = new ArrayList<>(ses.entrySet());
+					sortedLocations.sort((e1, e2) -> Integer.compare(e2.getValue().intValue(), e1.getValue().intValue()));
+
+					for (int i = 0; i < targetReplicas && i < sortedLocations.size(); i++)
+						sesToReplaceWith.add(sortedLocations.get(i).getKey().getName());
+				}
+			}
+
+			final String valueToReplaceWith = sesToReplaceWith.size() > 0 ? "@" + String.join(",", sesToReplaceWith) : "";
+
+			putJobTrace("Output will be saved together with the input files in `" + valueToReplaceWith + "`");
+
+			for (final String tag : tagsToPatch) {
+				final Collection<String> values = jdl.getList(tag);
+
+				jdl.delete(tag);
+
+				for (final String value : values)
+					jdl.append(tag, Format.replace(value, "@inheritlocation", valueToReplaceWith));
+			}
+		}
 	}
 
 	@SuppressWarnings("unchecked")
