@@ -944,7 +944,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		if (tagsToPatch.size() > 0) {
-			final List<String> inputData = jdl.getInputData(false);
+			final List<String> inputData = jdl.getInputData(true);
 
 			final Set<String> sesToReplaceWith = new HashSet<>();
 
