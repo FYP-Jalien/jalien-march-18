@@ -642,7 +642,11 @@ public class JobAgent implements Runnable {
 			final Containerizer cont = ContainerizerFactory.getContainerizer();
 			if (cont != null) {
 				putJobTrace("Support for containers detected. Will use: " + cont.getContainerizerName());
-				cont.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivilegesad sd bind-mounts)
+				cont.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
+
+				if(!getDebugTags(jdl).isBlank())
+					cont.setContainerPath(getDebugTags(jdl)); //Only override the container for now (to be used for debug purposes)
+
 				return cont.containerize(String.join(" ", launchCmd));
 			}
 			return launchCmd;
@@ -1836,5 +1840,12 @@ public class JobAgent implements Runnable {
 			logger.log(Level.SEVERE, "Error while running the probe " + probeName + " in node" + hostName, e);
 		}
 		return testOutputJson;
+	}
+
+	private String getDebugTags(final JDL jobJDL) {
+		if (jobJDL.gets("DebugTag") != null)
+			return jobJDL.gets("DebugTag");
+		else
+			return "";
 	}
 }
