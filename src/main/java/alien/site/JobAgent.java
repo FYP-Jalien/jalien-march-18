@@ -273,7 +273,7 @@ public class JobAgent implements Runnable {
 	/**
 	 * Boolean for CPU isolation
 	 */
-	private boolean cpuIsolation=true;
+	static boolean cpuIsolation = true;
 
 	private jaStatus status;
 
@@ -293,9 +293,9 @@ public class JobAgent implements Runnable {
 	protected static final AtomicInteger retries = new AtomicInteger(0);
 
 	static NUMAExplorer numaExplorer;
-	static long[] initialMask;
-	static HashMap<Integer, Integer> JAToPid;
-
+	//static final NUMAExplorer numaExplorer = new NUMAExplorer(Runtime.getRuntime().availableProcessors());
+	static boolean wholeNode;
+	static byte[] initialMask;
 
 	/**
 	 */
@@ -437,12 +437,12 @@ public class JobAgent implements Runnable {
 			logger.log(Level.WARNING, "Problem with the monitoring objects ApMon Exception: " + e.toString());
 		}
 
-		 synchronized (cpuSync) {
-                        if (numaExplorer == null)
-				numaExplorer = new NUMAExplorer(RES_NOCPUS.intValue());
-                        if (JAToPid == null)
-                                JAToPid = new HashMap<>();
-                }
+		wholeNode = ((Boolean)siteMap.getOrDefault("WholeNode", Boolean.valueOf(false))).booleanValue();
+		initialMask = getInitialMask();
+		synchronized (cpuSync) {
+			if (numaExplorer == null && cpuIsolation == true)
+				numaExplorer = new NUMAExplorer(Runtime.getRuntime().availableProcessors());
+		}
 
 		try {
 			final File filepath = new java.io.File(JobAgent.class.getProtectionDomain().getCodeSource().getLocation().toURI().getPath());
@@ -583,11 +583,6 @@ public class JobAgent implements Runnable {
 
 				requestSync.notifyAll();
 			}
-
-			synchronized (cpuSync) {
-				numaExplorer.refillAvailable(jobNumber);
-			}
-
 		}
 		catch (final Exception e) {
 			if (!(e instanceof EOFException))
@@ -600,6 +595,9 @@ public class JobAgent implements Runnable {
 			// synchronized (requestSync) {
 			// requestSync.notify();
 			// }
+		} finally {
+			if (cpuIsolation == true)
+				numaExplorer.refillAvailable(jobNumber);
 		}
 
 		setStatus(jaStatus.FINISHING_JA);
@@ -638,8 +636,15 @@ public class JobAgent implements Runnable {
 
 			ttl = ttlForJob();
 
+			Process p;
+			synchronized (cpuSync) {
+				p = launchJobWrapper(generateLaunchCommand());
+				if (p != null && p.isAlive())
+					childPID = (int) p.pid();
+			}
+
 			//Start and monitor execution
-			monitorExecution(launchJobWrapper(generateLaunchCommand()), true);
+			monitorExecution(p, true);
 		}
 		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Unable to handle job", e);
@@ -701,7 +706,7 @@ public class JobAgent implements Runnable {
 		}
 	}
 
-	long[] getFreeCPUs() {
+	byte[] getFreeCPUs() {
 		BigInteger newVal;
 		BigInteger mask = BigInteger.ZERO;
 
@@ -736,34 +741,20 @@ public class JobAgent implements Runnable {
 		return null;
 	}
 
-	static long[] valueToArray(BigInteger v, int size) {
-		long[] maskArray = new long[size];
+	static byte[] valueToArray(BigInteger v, int size) {
+		byte[] maskArray = new byte[size];
 		int count = 0;
 		BigInteger vAux = v;
 
 		while (vAux.compareTo(BigInteger.ZERO)  > 0 && count < size) {
-			maskArray[count] = vAux.testBit(0) ? 1 : 0;
+			maskArray[count] = vAux.testBit(0) ? (byte) 1 : (byte) 0;
 			vAux = vAux.shiftRight(1);
 			count++;
 		}
 		return maskArray;
 	}
 
-	static String arrayToTaskset(long[] array) {
-		String out = "";
-
-		for (int i = (array.length - 1); i >= 0; i--) {
-			if (array[i] == 1) {
-				if (out.length() != 0)
-					out += ",";
-				out += i;
-			}
-		}
-
-		return out;
-	}
-
-	long[] getHostMask() {
+	byte[] getHostMask() {
 		String cmd = "taskset -p $$ | cut -d' ' -f6";
 
 		try {
@@ -781,75 +772,33 @@ public class JobAgent implements Runnable {
 		return null;
 	}
 
-	private String getMaskString(long[] cpuRange) {
-		// Aux printing for debugging purposes
-		String rangeStr = "";
-		for (int i = 0; i < cpuRange.length; i++) {
-			//if (cpuRange[i] == 1)
-				rangeStr = rangeStr + cpuRange[i] + " ";
-		}
-		return rangeStr;
-	}
-
-	private String getMaskString(int[] cpuRange) {
-		// Aux printing for debugging purposes
-			String rangeStr = "";
-			for (int i = 0; i < cpuRange.length; i++) {
-				//if (cpuRange[i] == 1)
-					rangeStr = rangeStr + cpuRange[i] + " ";
-			}
-			return rangeStr;
-	}
-
-	private long[] getWholeNodeMask(long[] mask) {
-		if (runningWholeNode()) {
-			if (initialMask == null) {
-				initialMask = mask.clone();
-			} else {
-				for (int i = 0; i < initialMask.length; i++) {
-					int[] used = numaExplorer.getUsedCPUs();
-					if (initialMask[i] == 1 && mask[i] == 1 && used[i] == 0)
-						mask[i] = 0;
-				}
+	public byte[] getInitialMask() {
+		byte[] mask;
+		byte[] hostMask;
+		mask = getFreeCPUs();
+		hostMask = getHostMask();
+		if (mask == null || hostMask == null)
+			return null;
+		boolean check = true;
+		for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
+			if (hostMask[i] != 0) {
+				check = false;
+				break;
 			}
 		}
-		return mask;
+		if (check == true)
+			return mask;
+		else
+			return hostMask;
 	}
-
 
 	private String addIsolation(long cpuSize) {
-		long[] mask;
-		long[] hostMask;
 		long ret = 0;
 		String isolatedCPUs = "";
-
 		synchronized (cpuSync) {
-			mask = getFreeCPUs();
-			hostMask = getHostMask();
-			if (mask == null || hostMask == null)
-				return null;
-
-			boolean check = true;
-			for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
-				if (hostMask[i] != 0) {
-					check = false;
-					break;
-				}
-			}
-
-			if (check == true)
-				isolatedCPUs = numaExplorer.pickCPUs(getWholeNodeMask(mask), reqCPU, queueId, jobNumber);
-			else {
-				isolatedCPUs = numaExplorer.pickCPUs(getWholeNodeMask(hostMask), reqCPU, queueId, jobNumber);
-			}
-
-			//putJobTrace("Job will be pinned to CPUs " + isolatedCPUs);
+			numaExplorer.activeJAInstances.put(Integer.valueOf(jobNumber), this);
+			isolatedCPUs = numaExplorer.pickCPUs(reqCPU, jobNumber);
 			putJobLog("proc", "Job will be pinned to CPUs " + isolatedCPUs);
-
-			if (ret != 0) {
-				logger.log(Level.SEVERE, "Could not isolate job to " + cpuSize + " CPUs");
-				return null;
-			}
 		}
 
 		return isolatedCPUs;
@@ -927,9 +876,6 @@ public class JobAgent implements Runnable {
 			final String process_res_format = "FRUNTIME | RUNTIME | CPUUSAGE | MEMUSAGE | CPUTIME | RMEM | VMEM | NOCPUS | CPUFAMILY | CPUMHZ | RESOURCEUSAGE | RMEMMAX | VMEMMAX";
 			logger.log(Level.INFO, process_res_format);
 			putJobLog("procfmt", process_res_format);
-
-			childPID = (int) p.pid();
-                        JAToPid.put(Integer.valueOf(jobNumber), Integer.valueOf(childPID));
 
 			// apmon.setNumCPUs(cpuCores);
 			// apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
@@ -1162,6 +1108,26 @@ public class JobAgent implements Runnable {
 		return true;
 	}
 
+	public void checkAndApplyIsolation(int jobRunnerPid) {
+		synchronized (cpuSync) {
+			byte[] hostMask = getHostMask();
+			boolean alreadyIsol = false;
+			for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
+				if (hostMask[i] != 0) {
+					alreadyIsol = true;
+					break;
+				}
+			}
+
+			if (wholeNode == false && alreadyIsol == false) {
+				logger.log(Level.INFO, "Applying isolation to the whole JobRunner CPU allocation - Allocation of " + RUNNING_CPU + " cores");
+				String initMask = numaExplorer.computeInitialMask(Long.valueOf(RUNNING_CPU));
+				numaExplorer.applyTaskset(initMask, jobRunnerPid);
+				logger.log(Level.INFO, "JobRunner pinned to mask " + initMask);
+			}
+		}
+	}
+
 	private int computeTimeLeft(final Level loggingLevel) {
 		final long jobAgentCurrentTime = System.currentTimeMillis();
 		final int time_subs = (int) (jobAgentCurrentTime - jobAgentStartTime) / 1000; // convert to seconds
@@ -1207,13 +1173,6 @@ public class JobAgent implements Runnable {
 			siteMap.put("CVMFS_revision", Integer.valueOf(cvmfsRevision));
 
 		return true;
-	}
-
-	/**
-	 * @return if whole node scheduling is being used
-	 */
-	protected boolean runningWholeNode() {
-		return ((Boolean)siteMap.getOrDefault("WholeNode", Boolean.valueOf(false))).booleanValue();
 	}
 
 	/**
@@ -1561,6 +1520,14 @@ public class JobAgent implements Runnable {
 		}
 
 		return space;
+	}
+
+	public long getQueueId() {
+		return this.queueId;
+	}
+
+	public int getChildPID() {
+		return this.childPID;
 	}
 
 	private boolean createWorkDir() {

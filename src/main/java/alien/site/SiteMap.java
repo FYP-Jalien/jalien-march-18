@@ -159,6 +159,7 @@ public class SiteMap {
 		// get from env or LDAP to cap number of CPUs
 		if (env.containsKey("CPUCores")) {
 			numCpus = Long.parseLong(env.get("CPUCores"));
+			siteMap.put("WholeNode", Boolean.valueOf(false));
 			if (numCpus == 0) {
 				siteMap.put("WholeNode", Boolean.valueOf(true));
 				try {
