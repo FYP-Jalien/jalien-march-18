@@ -441,7 +441,7 @@ public class JobAgent implements Runnable {
 		initialMask = getInitialMask();
 		synchronized (cpuSync) {
 			if (numaExplorer == null && cpuIsolation == true)
-				numaExplorer = new NUMAExplorer(Runtime.getRuntime().availableProcessors());
+				numaExplorer = new NUMAExplorer(RES_NOCPUS);
 		}
 
 		try {
@@ -777,8 +777,9 @@ public class JobAgent implements Runnable {
 		byte[] hostMask;
 		mask = getFreeCPUs();
 		hostMask = getHostMask();
+		// In case we could not parse the mask of other processes we get it empty
 		if (mask == null || hostMask == null)
-			return null;
+			return (new byte[RES_NOCPUS.intValue()]);
 		boolean check = true;
 		for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
 			if (hostMask[i] != 0) {
@@ -1397,13 +1398,13 @@ public class JobAgent implements Runnable {
 				prevCpuTime = RES_CPUTIME;
 				prevTime = time;
 			}
-
+/*
 			if (cpuIsolation == false && mj.isOverConsuming()) {
 				cpuIsolation = true;
 				logger.log(Level.SEVERE, "CPU resources overconsumption detected in job " + queueId + ". Going to constrain job to allocated cores.");
 				constrainJobCPU();
 			}
-
+*/
 
 		}
 		catch (final IOException e) {
