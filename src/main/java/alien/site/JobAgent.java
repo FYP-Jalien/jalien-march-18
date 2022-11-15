@@ -735,6 +735,7 @@ public class JobAgent implements Runnable {
 			// apmon.setNumCPUs(cpuCores);
 			// apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
 			mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
+			mj.setJobStartupTime(System.currentTimeMillis());
 
 			String monitoring = jdl.gets("Monitoring");
 			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
