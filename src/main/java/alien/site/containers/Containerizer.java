@@ -36,6 +36,11 @@ public abstract class Containerizer {
 	String workdir = null;
 
 	/**
+	 * For resource constraints
+	 */
+	protected int memLimit = 0;
+
+	/**
 	 * GPU
 	 */
 	private static final String cudaDevices = System.getenv().containsKey("CUDA_VISIBLE_DEVICES") ? " && echo export CUDA_VISIBLE_DEVICES=" + System.getenv().get("CUDA_VISIBLE_DEVICES") : "";
@@ -155,6 +160,15 @@ public abstract class Containerizer {
 	 */
 	public void setWorkdir(final String newWorkdir) {
 		workdir = newWorkdir;
+	}
+
+	/**
+	 * Provide JDL to use with cgroups v2
+	 * 
+	 * @param memLimit
+	 */
+	public void setMemLimit(final int newMemLimit) {
+		memLimit = newMemLimit;
 	}
 
 	/**

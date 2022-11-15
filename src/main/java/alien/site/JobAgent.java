@@ -640,12 +640,18 @@ public class JobAgent implements Runnable {
 
 			// Check if there is container support present on site. If yes, add to launchCmd
 			final Containerizer cont = ContainerizerFactory.getContainerizer();
+			
 			if (cont != null) {
 				putJobTrace("Support for containers detected. Will use: " + cont.getContainerizerName());
 				cont.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
 
-				if(!getDebugTags(jdl).isBlank())
-					cont.setContainerPath(getDebugTags(jdl)); //Only override the container for now (to be used for debug purposes)
+				if (hasCgroupsv2()) {
+					putJobTrace("Warning: This host has support for cgroups v2. New features will be used.");
+					cont.setMemLimit(jobMaxMemoryMB);
+				}
+
+				if (!getDebugTags(jdl).isBlank())
+					cont.setContainerPath(getDebugTags(jdl)); // Only override the container for now (to be used for debug purposes)
 
 				return cont.containerize(String.join(" ", launchCmd));
 			}
@@ -1168,6 +1174,7 @@ public class JobAgent implements Runnable {
 		if (jobKilled)
 			return "Job was killed";
 
+		//Also check for core directories, and abort if found to avoid filling up disk space
 		final Pattern coreDirPattern = Pattern.compile("core.*");
 		try {
 			List<File> coreDirs = Files.walk(new File(jobWorkdir).toPath())
@@ -1849,4 +1856,26 @@ public class JobAgent implements Runnable {
 		else
 			return "";
 	}
+
+	private boolean hasCgroupsv2() {
+		try {
+			final ProcessBuilder mntCheck = new ProcessBuilder(new String[] { "/bin/bash", "-c", "mount -l | grep cgroup" });
+			final Process mntCheckPs = mntCheck.start();
+			mntCheckPs.waitFor(15, TimeUnit.SECONDS);
+
+			try (Scanner cmdScanner = new Scanner(mntCheckPs.getInputStream())) {
+				while (cmdScanner.hasNext()) {
+					if (cmdScanner.next().contains("cgroup2")) {
+						return true;
+					}
+				}
+			}
+		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "Failed to check for cgroupsv2 support: " + e.toString());
+		}
+		return false;
+	}
+
+	
 }

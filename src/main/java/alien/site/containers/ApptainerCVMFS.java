@@ -39,6 +39,14 @@ public class ApptainerCVMFS extends Containerizer {
 		apptainerCmd.add("--no-mount");
 		apptainerCmd.add("tmp");
 
+		//For cgroups v2
+		if (memLimit != 0) {
+			apptainerCmd.add("--memory");
+			apptainerCmd.add(Integer.toString(memLimit) + "M");
+			apptainerCmd.add("--memory-swap");
+			apptainerCmd.add("0");
+		}
+
 		apptainerCmd.add(containerImgPath);
 		apptainerCmd.add("/bin/bash");
 		apptainerCmd.add("-c");

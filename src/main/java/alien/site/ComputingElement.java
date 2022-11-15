@@ -613,7 +613,7 @@ public final class ComputingElement extends Thread {
 
 		siteMap = (new SiteMap()).getSiteParameters(smenv);
 
-		//CE storage space does not matter to WNs
+		//CE storage space does not matter for WNs
 		siteMap.remove("Disk");
 
 		if (config.containsKey("ce_matcharg") && getValuesFromLDAPField(config.get("ce_matcharg")).containsKey("cpucores")) {
