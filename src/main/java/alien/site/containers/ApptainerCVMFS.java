@@ -50,7 +50,7 @@ public class ApptainerCVMFS extends Containerizer {
 		apptainerCmd.add(containerImgPath);
 		apptainerCmd.add("/bin/bash");
 		apptainerCmd.add("-c");
-		apptainerCmd.add(envSetup + cmd);
+		apptainerCmd.add(envSetup + debugCmd + cmd);
 
 		return apptainerCmd;
 	}

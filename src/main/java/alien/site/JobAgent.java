@@ -650,8 +650,8 @@ public class JobAgent implements Runnable {
 					cont.setMemLimit(jobMaxMemoryMB);
 				}
 
-				if (!getDebugTags(jdl).isBlank())
-					cont.setContainerPath(getDebugTags(jdl)); // Only override the container for now (to be used for debug purposes)
+				if (jdl.gets("DebugTag") != null)
+					cont.enableDebug(jdl.gets("DebugTag"));
 
 				return cont.containerize(String.join(" ", launchCmd));
 			}
@@ -1848,13 +1848,6 @@ public class JobAgent implements Runnable {
 			logger.log(Level.SEVERE, "Error while running the probe " + probeName + " in node" + hostName, e);
 		}
 		return testOutputJson;
-	}
-
-	private String getDebugTags(final JDL jobJDL) {
-		if (jobJDL.gets("DebugTag") != null)
-			return jobJDL.gets("DebugTag");
-		else
-			return "";
 	}
 
 	private boolean hasCgroupsv2() {

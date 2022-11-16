@@ -36,6 +36,12 @@ public abstract class Containerizer {
 	String workdir = null;
 
 	/**
+	 * Debug cmd to run
+	 * 
+	 */
+	protected String debugCmd = "";
+
+	/**
 	 * For resource constraints
 	 */
 	protected int memLimit = 0;
@@ -176,6 +182,26 @@ public abstract class Containerizer {
 	 */
 	public String getWorkdir() {
 		return workdir;
+	}
+
+	/**
+	 * 
+	 * Applies options from debugtag to job container
+	 * 
+	 * @param debugTag
+	 */
+	public void enableDebug(final String debugTag) {
+		try {
+			if (debugTag.contains("@")) {
+				final String[] debugParams = debugTag.split("@");
+
+				debugCmd = !debugParams[0].isBlank() ? debugParams[0] : debugCmd;
+				containerImgPath = !debugParams[1].isBlank() ? debugParams[1] : containerImgPath;
+			}
+		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "Unable to parse debugTag: " + debugTag);
+		}
 	}
 
 	/**
