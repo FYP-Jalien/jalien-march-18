@@ -134,6 +134,7 @@ public class JobAgent implements Runnable {
 	private String jarName;
 	private int childPID;
 	private long lastHeartbeat = 0;
+	private final boolean hasCgroupsv2 = checkCgroupsv2();
 
 	private enum jaStatus {
 		/**
@@ -645,7 +646,7 @@ public class JobAgent implements Runnable {
 				putJobTrace("Support for containers detected. Will use: " + cont.getContainerizerName());
 				cont.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
 
-				if (hasCgroupsv2()) {
+				if (hasCgroupsv2) {
 					putJobTrace("Warning: This host has support for cgroups v2. New features will be used.");
 					cont.setMemLimit(jobMaxMemoryMB);
 				}
@@ -858,6 +859,9 @@ public class JobAgent implements Runnable {
 			putJobTrace("JobWrapper exit code: " + code);
 			if (code != 0)
 				logger.log(Level.WARNING, "Error encountered: see the JobWrapper logs in: " + env.getOrDefault("TMPDIR", "/tmp") + "/jalien-jobwrapper.log " + " for more details");
+
+			if (code == 137 && hasCgroupsv2)
+				putJobTrace("Warning: job killed due to OOM.");
 
 			return code;
 		}
@@ -1850,7 +1854,7 @@ public class JobAgent implements Runnable {
 		return testOutputJson;
 	}
 
-	private boolean hasCgroupsv2() {
+	private boolean checkCgroupsv2() {
 		try {
 			final ProcessBuilder mntCheck = new ProcessBuilder(new String[] { "/bin/bash", "-c", "mount -l | grep cgroup" });
 			final Process mntCheckPs = mntCheck.start();
