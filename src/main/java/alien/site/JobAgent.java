@@ -731,14 +731,11 @@ public class JobAgent implements Runnable {
 				return valueToArray(mask, RES_NOCPUS.intValue());
 			}
 		}
-		catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-		catch (IOException e) {
-			e.printStackTrace();
+		catch (IOException | IllegalArgumentException | InterruptedException e) {
+			logger.log(Level.WARNING, "Exception when getting free CPUs ", e);
 		}
 
-		return null;
+		return new byte[RES_NOCPUS.intValue()];
 	}
 
 	static byte[] valueToArray(BigInteger v, int size) {
@@ -762,14 +759,11 @@ public class JobAgent implements Runnable {
 			// return valueToArray((~Long.parseLong(out.trim(), 16) & (1 << RES_NOCPUS.intValue()) - 1), RES_NOCPUS.intValue());
 			return valueToArray((new BigInteger(out.trim(), 16)).not().and(BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE)), RES_NOCPUS.intValue());
 		}
-		catch (IOException e) {
-			e.printStackTrace();
-		}
-		catch (InterruptedException e) {
-			e.printStackTrace();
+		catch (IOException | IllegalArgumentException | InterruptedException e) {
+			logger.log(Level.WARNING, "Exception when getting host mask ", e);
 		}
 
-		return null;
+		return new byte[RES_NOCPUS.intValue()];
 	}
 
 	public byte[] getInitialMask() {
@@ -880,9 +874,8 @@ public class JobAgent implements Runnable {
 
 			// apmon.setNumCPUs(cpuCores);
 			// apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
-			if (mj == null)
-				mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
-
+			mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
+			mj.setJobStartupTime(System.currentTimeMillis());	
 			String monitoring = jdl.gets("Monitoring");
 			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
 				payloadMonitoring = true;
@@ -1525,6 +1518,10 @@ public class JobAgent implements Runnable {
 
 	public long getQueueId() {
 		return this.queueId;
+	}
+
+	public int getResubmission() {
+		return this.resubmission;
 	}
 
 	public int getChildPID() {
