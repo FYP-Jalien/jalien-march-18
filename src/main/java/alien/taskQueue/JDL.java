@@ -1614,4 +1614,15 @@ public class JDL implements Serializable {
 
 		return false;
 	}
+	
+	/**
+	 * @return the JSON-serialized content of the JDL
+	 */
+	public String toJson(){
+		final Map<String, Object> sorted = sortContent();
+
+		Format.JSONFragment jsonFragment = Format.toJSON(sorted, true);
+
+		return jsonFragment.toString();
+	}
 }

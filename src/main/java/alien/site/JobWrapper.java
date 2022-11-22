@@ -2,12 +2,14 @@ package alien.site;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.lang.ProcessBuilder.Redirect;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.attribute.PosixFilePermission;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -21,6 +23,7 @@ import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.Vector;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -29,6 +32,7 @@ import alien.api.catalogue.CatalogueApiUtils;
 import alien.api.taskQueue.TaskQueueApiUtils;
 import alien.catalogue.FileSystemUtils;
 import alien.catalogue.LFN;
+import alien.catalogue.PFN;
 import alien.catalogue.XmlCollection;
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
@@ -36,6 +40,7 @@ import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.MonitoringObject;
 import alien.monitoring.Timing;
+import alien.se.SE;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.shell.commands.JAliEnCommandcp;
 import alien.site.packman.CVMFS;
@@ -261,7 +266,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		monitor.addMonitoring("JobWrapper", this);
 	}
 
-
 	@Override
 	public void run() {
 
@@ -290,7 +294,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		else
 			System.exit(Math.abs(runCode));
 	}
-
 
 	private int runJob() {
 		try {
@@ -455,8 +458,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		processEnv.putAll(environment_packages);
 		processEnv.putAll(loadJDLEnvironmentVariables());
 		processEnv.putAll(jBoxEnv);
-		processEnv.put("JALIEN_TOKEN_CERT", tokenCert);
-		processEnv.put("JALIEN_TOKEN_KEY", tokenKey);
+		processEnv.put("JALIEN_TOKEN_CERT", saveToFile(tokenCert));
+		processEnv.put("JALIEN_TOKEN_KEY", saveToFile(tokenKey));
 		processEnv.put("ALIEN_JOB_TOKEN", legacyToken); // add legacy token
 		processEnv.put("ALIEN_PROC_ID", String.valueOf(queueId));
 		processEnv.put("ALIEN_MASTERJOB_ID", String.valueOf(masterjobID != null ? masterjobID.longValue() : queueId));
@@ -522,6 +525,41 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		return payload.exitValue();
+	}
+
+	private String saveToFile(final String content) {
+		File f;
+		try {
+			f = File.createTempFile("jobtoken", ".pem", currentDir);
+
+		}
+		catch (final IOException e) {
+			logger.log(Level.WARNING, "Exception creating temporary file", e);
+			return content;
+		}
+		f.deleteOnExit();
+
+		try (FileWriter fo = new FileWriter(f)) {
+			final Set<PosixFilePermission> attrs = new HashSet<>();
+			attrs.add(PosixFilePermission.OWNER_READ);
+			attrs.add(PosixFilePermission.OWNER_WRITE);
+
+			try {
+				Files.setPosixFilePermissions(f.toPath(), attrs);
+			}
+			catch (final IOException io2) {
+				logger.log(Level.WARNING, "Could not protect your keystore " + f.getAbsolutePath() + " with POSIX attributes", io2);
+			}
+
+			fo.write(content);
+
+			return f.getCanonicalPath();
+		}
+		catch (final IOException e1) {
+			logger.log(Level.WARNING, "Exception saving content to file", e1);
+		}
+
+		return content;
 	}
 
 	private Map<String, String> installPackages(final ArrayList<String> packToInstall) {
@@ -790,11 +828,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		putJobTrace("Going to uploadOutputFiles(exitStatus=" + exitStatus + ", outputDir=" + outputDir + ")");
 
+		contextualizeJDL();
+
 		boolean jobExecutedSuccessfully = true;
 		if (exitStatus.toString().contains("ERROR")) {
 			putJobTrace("Registering temporary log files in " + outputDir + ". You must do 'registerOutput " + queueId
 					+ "' within 24 hours of the job termination to preserve them. After this period, they are automatically deleted.");
-					jobExecutedSuccessfully = false;
+			jobExecutedSuccessfully = false;
 		}
 
 		changeStatus(JobStatus.SAVING);
@@ -812,7 +852,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				changeStatus(exitStatus, exitCode);
 			return false;
 		}
-			
+
 		for (final OutputEntry entry : toUpload) {
 			try {
 				final File localFile = new File(currentDir.getAbsolutePath() + "/" + entry.getName());
@@ -893,6 +933,61 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			changeStatus(exitStatus, exitCode);
 
 		return uploadedAllOutFiles;
+	}
+
+	private void contextualizeJDL() {
+		final Set<String> tagsToPatch = new HashSet<>();
+
+		for (final String key : jdl.keySet()) {
+			if (key.toUpperCase().startsWith("OUTPUT")) {
+				if (jdl.get(key).toString().contains("@inheritlocation"))
+					tagsToPatch.add(key);
+			}
+		}
+
+		if (tagsToPatch.size() > 0) {
+			final List<String> inputData = jdl.getInputData(true);
+
+			final Set<String> sesToReplaceWith = new HashSet<>();
+
+			if (inputData != null && inputData.size() > 0) {
+				int replicas = 0;
+
+				final Map<SE, AtomicInteger> ses = new HashMap<>();
+
+				final Map<LFN, Set<PFN>> locations = commander.c_api.getPFNs(inputData);
+
+				if (locations != null && locations.size() > 0) {
+					for (final Set<PFN> pfns : locations.values()) {
+						replicas += pfns.size();
+
+						for (final PFN p : pfns)
+							ses.computeIfAbsent(p.getSE(), (k) -> new AtomicInteger(0)).incrementAndGet();
+					}
+
+					final int targetReplicas = Math.round((float) replicas / locations.size());
+
+					final List<Map.Entry<SE, AtomicInteger>> sortedLocations = new ArrayList<>(ses.entrySet());
+					sortedLocations.sort((e1, e2) -> Integer.compare(e2.getValue().intValue(), e1.getValue().intValue()));
+
+					for (int i = 0; i < targetReplicas && i < sortedLocations.size(); i++)
+						sesToReplaceWith.add(sortedLocations.get(i).getKey().getName());
+				}
+			}
+
+			final String valueToReplaceWith = sesToReplaceWith.size() > 0 ? "@" + String.join(",", sesToReplaceWith) : "";
+
+			putJobTrace("Output will be saved together with the input files in `" + valueToReplaceWith + "`");
+
+			for (final String tag : tagsToPatch) {
+				final Collection<String> values = jdl.getList(tag);
+
+				jdl.delete(tag);
+
+				for (final String value : values)
+					jdl.append(tag, Format.replace(value, "@inheritlocation", valueToReplaceWith));
+			}
+		}
 	}
 
 	@SuppressWarnings("unchecked")
@@ -1135,7 +1230,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @param jobExecutedSuccessfully
 	 * @return List of entries to upload, based on the outputtags. Null if at least one required file is missing
 	 */
-	private ArrayList<OutputEntry> getUploadEntries(ArrayList<String> outputTags, boolean jobExecutedSuccessfully) {
+	private ArrayList<OutputEntry> getUploadEntries(final ArrayList<String> outputTags, final boolean jobExecutedSuccessfully) {
 		final ArrayList<OutputEntry> archivesToUpload = new ArrayList<>();
 		final ArrayList<OutputEntry> standaloneFilesToUpload = new ArrayList<>();
 		final ArrayList<String> allArchiveEntries = new ArrayList<>();

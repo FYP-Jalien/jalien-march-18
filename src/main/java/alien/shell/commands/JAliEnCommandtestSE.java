@@ -457,6 +457,8 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 					infoPFN.ticket = null;
 
 					final SpaceInfo info = xrootd.getSpaceInfo(infoPFN);
+					
+					info.applyReplicaCorrection(se.getReplicationFactor());
 
 					commander.printOutln(info.toString());
 				}

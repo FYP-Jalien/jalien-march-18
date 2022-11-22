@@ -97,4 +97,15 @@ public class SpaceInfo {
 
 		return sb.toString();
 	}
+
+	/**
+	 * @param factor Internal replication factor to apply to the apparent size
+	 */
+	public void applyReplicaCorrection(double factor) {
+		if (spaceInfoSet) {
+			totalSpace = Math.round(totalSpace / factor);
+			freeSpace = Math.round(freeSpace / factor);
+			usedSpace = Math.round(usedSpace / factor);
+		}
+	}
 }

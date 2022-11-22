@@ -50,7 +50,11 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+<<<<<<< HEAD
 import java.math.BigInteger;
+=======
+import java.util.stream.Collectors;
+>>>>>>> upstream/master
 
 import alien.api.DispatchSSLClient;
 import alien.api.Request;
@@ -136,6 +140,7 @@ public class JobAgent implements Runnable {
 	private String jarName;
 	private int childPID;
 	private long lastHeartbeat = 0;
+	private final boolean hasCgroupsv2 = checkCgroupsv2();
 
 	private enum jaStatus {
 		/**
@@ -683,10 +688,20 @@ public class JobAgent implements Runnable {
 
 			// Check if there is container support present on site. If yes, add to launchCmd
 			final Containerizer cont = ContainerizerFactory.getContainerizer();
+
 			if (cont != null) {
 				putJobTrace("Support for containers detected. Will use: " + cont.getContainerizerName());
-				cont.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivilegesad sd bind-mounts)
-				launchCmd = cont.containerize(String.join(" ", launchCmd));
+				cont.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
+
+				if (hasCgroupsv2) {
+					putJobTrace("Warning: This host has support for cgroups v2. New features will be used.");
+					cont.setMemLimit(jobMaxMemoryMB);
+				}
+
+				if (jdl.gets("DebugTag") != null)
+					cont.enableDebug(jdl.gets("DebugTag"));
+
+				return cont.containerize(String.join(" ", launchCmd));
 			}
 
 			// Run jobs in isolated environment
@@ -875,7 +890,8 @@ public class JobAgent implements Runnable {
 			// apmon.setNumCPUs(cpuCores);
 			// apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
 			mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
-			mj.setJobStartupTime(System.currentTimeMillis());	
+			mj.setJobStartupTime(System.currentTimeMillis());
+
 			String monitoring = jdl.gets("Monitoring");
 			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
 				payloadMonitoring = true;
@@ -990,6 +1006,9 @@ public class JobAgent implements Runnable {
 			if (code != 0)
 				logger.log(Level.WARNING, "Error encountered: see the JobWrapper logs in: " + env.getOrDefault("TMPDIR", "/tmp") + "/jalien-jobwrapper.log " + " for more details");
 
+			if (code == 137 && hasCgroupsv2)
+				putJobTrace("Warning: job killed due to OOM.");
+
 			return code;
 		}
 		catch (Exception ex) {
@@ -1000,6 +1019,7 @@ public class JobAgent implements Runnable {
 		finally {
 			try {
 				t.cancel();
+				heartMon.interrupt();
 				p.getOutputStream().close();
 			}
 			catch (final Exception e) {
@@ -1324,6 +1344,21 @@ public class JobAgent implements Runnable {
 		if (jobKilled)
 			return "Job was killed";
 
+		//Also check for core directories, and abort if found to avoid filling up disk space
+		final Pattern coreDirPattern = Pattern.compile("core.*");
+		try {
+			List<File> coreDirs = Files.walk(new File(jobWorkdir).toPath())
+					.map(Path::toFile)
+					.filter(file -> coreDirPattern.matcher(file.getName()).matches())
+					.collect(Collectors.toList());
+
+			if (coreDirs != null && coreDirs.size() != 0)
+				return "Core directory detected: " + coreDirs.get(0).getName() + ". Aborting!";
+		}
+		catch (Exception e1) {
+			logger.log(Level.WARNING, "Exception while checking for core files: ", e1);
+		}
+
 		String error = null;
 		// logger.log(Level.INFO, "Checking resources usage");
 
@@ -1451,7 +1486,7 @@ public class JobAgent implements Runnable {
 		logger.log(Level.SEVERE, "IsolCmd command" + isolCmd);
 		numaExplorer.applyTaskset(isolCmd, childPID);
 	}
-	
+
 	private long ttlForJob() {
 		final Integer iTTL = jdl.getInteger("TTL");
 
@@ -1785,7 +1820,6 @@ public class JobAgent implements Runnable {
 			while (p.isAlive()) {
 				if (System.currentTimeMillis() - lastHeartbeat > 900000)
 					putJobTrace("WARNING: Something is preventing the sending of heartbeats/resource info!");
-
 				try {
 					Thread.sleep(60 * 1000);
 				}
@@ -2010,4 +2044,26 @@ public class JobAgent implements Runnable {
 		}
 		return testOutputJson;
 	}
+
+	private boolean checkCgroupsv2() {
+		try {
+			final ProcessBuilder mntCheck = new ProcessBuilder(new String[] { "/bin/bash", "-c", "mount -l | grep cgroup" });
+			final Process mntCheckPs = mntCheck.start();
+			mntCheckPs.waitFor(15, TimeUnit.SECONDS);
+
+			try (Scanner cmdScanner = new Scanner(mntCheckPs.getInputStream())) {
+				while (cmdScanner.hasNext()) {
+					if (cmdScanner.next().contains("cgroup2")) {
+						return true;
+					}
+				}
+			}
+		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "Failed to check for cgroupsv2 support: " + e.toString());
+		}
+		return false;
+	}
+
+
 }

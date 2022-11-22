@@ -28,12 +28,23 @@ public abstract class Containerizer {
 	/**
 	 * Location of the container
 	 */
-	protected final String containerImgPath;
+	protected String containerImgPath;
 
 	/**
 	 * Working directory
 	 */
 	String workdir = null;
+
+	/**
+	 * Debug cmd to run
+	 * 
+	 */
+	protected String debugCmd = "";
+
+	/**
+	 * For resource constraints
+	 */
+	protected int memLimit = 0;
 
 	/**
 	 * GPU
@@ -49,15 +60,15 @@ public abstract class Containerizer {
 	/**
 	 * Command to set the environment for container
 	 */
-	protected static final String envSetup = "source <( " + CVMFS.getAlienvPrint() + apmonConfig + cudaDevices +  rocrDevices + " ); ";
+	protected static final String envSetup = "source <( " + CVMFS.getAlienvPrint() + apmonConfig + cudaDevices + rocrDevices + " ); ";
 
 	/**
-	 * Simple constructor, initializing the container path from default location or from the environment (DEFAULT_JOB_CONTAINER_PATH key)
+	 * Simple constructor, initializing the container path from default location or from config/environment (DEFAULT_JOB_CONTAINER_PATH key)
 	 */
 	public Containerizer() {
 		containerImgPath = System.getenv().getOrDefault("JOB_CONTAINER_PATH", DEFAULT_JOB_CONTAINER_PATH);
-		if (containerImgPath.equals(DEFAULT_JOB_CONTAINER_PATH)) {
-			logger.log(Level.INFO, "Environment variable JOB_CONTAINER_PATH not set. Using default path instead: " + DEFAULT_JOB_CONTAINER_PATH);
+		if (!containerImgPath.equals(DEFAULT_JOB_CONTAINER_PATH)) {
+			logger.log(Level.INFO, "Custom JOB_CONTAINER_PATH set. Will use the following image instead: " + containerImgPath);
 		}
 	}
 
@@ -105,11 +116,15 @@ public abstract class Containerizer {
 
 		if (new File("/etc/alternatives").exists())
 			toBind += "/etc/alternatives:/etc/alternatives,";
-		
+
 		if (new File("/opt").exists())
 			toBind += "/opt:/opt,";
 
 		return toBind;
+	}
+
+	public static final String getCustomBinds() {
+		return System.getenv().getOrDefault("ADDITIONAL_BINDS", "").isBlank() ? "" : System.getenv().get("ADDITIONAL_BINDS") + ",";
 	}
 
 	/**
@@ -136,6 +151,15 @@ public abstract class Containerizer {
 	}
 
 	/**
+	 * Override the container to be used for job
+	 * 
+	 * @param newContainerPath
+	 */
+	public void setContainerPath(final String newContainerPath) {
+		containerImgPath = newContainerPath;
+	}
+
+	/**
 	 * Workdir to be mounted in the container as CONTAINER_JOBDIR
 	 * 
 	 * @param newWorkdir
@@ -145,10 +169,39 @@ public abstract class Containerizer {
 	}
 
 	/**
+	 * Provide JDL to use with cgroups v2
+	 * 
+	 * @param memLimit
+	 */
+	public void setMemLimit(final int newMemLimit) {
+		memLimit = newMemLimit;
+	}
+
+	/**
 	 * @return working directory
 	 */
 	public String getWorkdir() {
 		return workdir;
+	}
+
+	/**
+	 * 
+	 * Applies options from debugtag to job container
+	 * 
+	 * @param debugTag
+	 */
+	public void enableDebug(final String debugTag) {
+		try {
+			if (debugTag.contains("@")) {
+				final String[] debugParams = debugTag.split("@");
+
+				debugCmd = !debugParams[0].isBlank() ? debugParams[0] : debugCmd;
+				containerImgPath = !debugParams[1].isBlank() ? debugParams[1] : containerImgPath;
+			}
+		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "Unable to parse debugTag: " + debugTag);
+		}
 	}
 
 	/**
