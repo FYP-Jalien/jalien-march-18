@@ -686,7 +686,8 @@ public class JobAgent implements Runnable {
 				cont.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
 
 				//Only used on Cgroupsv2 hosts
-				cont.setMemLimit(jobMaxMemoryMB);
+				if(cont.setMemLimit(jobMaxMemoryMB))
+					putJobTrace("Warning: This host has support for cgroups v2. New features will be used.");
 
 				if (jdl.gets("DebugTag") != null)
 					cont.enableDebug(jdl.gets("DebugTag"));
