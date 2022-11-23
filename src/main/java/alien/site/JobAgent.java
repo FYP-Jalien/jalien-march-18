@@ -606,8 +606,6 @@ public class JobAgent implements Runnable {
 
 		MonitorFactory.stopMonitor(monitor);
 
-
-
 		logger.log(Level.INFO, "JobAgent finished, id: " + jobAgentId + " totalJobs: " + totalJobs.get());
 	}
 
@@ -714,109 +712,6 @@ public class JobAgent implements Runnable {
 			logger.log(Level.SEVERE, "Could not generate JobWrapper launch command: " + e.toString());
 			return null;
 		}
-	}
-
-	/**
-	 * @return mask with already pinned cores by other running workloads
-	 */
-	byte[] getFreeCPUs() {
-		BigInteger newVal;
-		BigInteger mask = BigInteger.ZERO;
-
-		try {
-			String cmd = "pgrep -v -U root -u root | xargs -L1 taskset -a -p 2>/dev/null | cut -d' ' -f6 | sort -u";
-
-			final Process affinityCmd = Runtime.getRuntime().exec(new String[] { "/bin/bash", "-c", cmd });
-			affinityCmd.waitFor();
-			try (Scanner cmdScanner = new Scanner(affinityCmd.getInputStream())) {
-				String readArg;
-				while (cmdScanner.hasNext()) {
-					readArg = (cmdScanner.next());
-
-					newVal = new BigInteger(readArg.trim(), 16);
-
-					if (BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE).equals(newVal))
-						continue;
-
-					mask = mask.or(newVal);
-
-				}
-				return valueToArray(mask, RES_NOCPUS.intValue());
-			}
-		}
-		catch (IOException | IllegalArgumentException | InterruptedException e) {
-			logger.log(Level.WARNING, "Exception when getting free CPUs ", e);
-		}
-
-		return new byte[RES_NOCPUS.intValue()];
-	}
-
-	static byte[] valueToArray(BigInteger v, int size) {
-		byte[] maskArray = new byte[size];
-		int count = 0;
-		BigInteger vAux = v;
-
-		while (vAux.compareTo(BigInteger.ZERO)  > 0 && count < size) {
-			maskArray[count] = vAux.testBit(0) ? (byte) 1 : (byte) 0;
-			vAux = vAux.shiftRight(1);
-			count++;
-		}
-		return maskArray;
-	}
-
-	/**
-	 * @return mask our workload has already been pinned to
-	 */
-	byte[] getHostMask() {
-		String cmd = "taskset -p $$ | cut -d' ' -f6";
-
-		try {
-			final String out = ExternalProcesses.getCmdOutput(Arrays.asList("/bin/bash", "-c", cmd), true, 30L, TimeUnit.SECONDS);
-			// return valueToArray((~Long.parseLong(out.trim(), 16) & (1 << RES_NOCPUS.intValue()) - 1), RES_NOCPUS.intValue());
-			return valueToArray((new BigInteger(out.trim(), 16)).not().and(BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE)), RES_NOCPUS.intValue());
-		}
-		catch (IOException | IllegalArgumentException | InterruptedException e) {
-			logger.log(Level.WARNING, "Exception when getting host mask ", e);
-		}
-
-		return new byte[RES_NOCPUS.intValue()];
-	}
-
-	/**
-	 * @return mask from which we start CPU assignment
-	 */
-	public byte[] getInitialMask() {
-		byte[] mask;
-		byte[] hostMask;
-		mask = getFreeCPUs();
-		hostMask = getHostMask();
-		// In case we could not parse the mask of other processes we get it empty
-		if (mask == null || hostMask == null)
-			return (new byte[RES_NOCPUS.intValue()]);
-		boolean check = true;
-		for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
-			if (hostMask[i] != 0) {
-				check = false;
-				break;
-			}
-		}
-		if (check == true)
-			return mask;
-		return hostMask;
-	}
-
-	/**
-	 * @return CPU cores to which the job has to be pinned to
-	 */
-	private String addIsolation() {
-		String isolatedCPUs = "";
-		synchronized (cpuSync) {
-			numaExplorer.activeJAInstances.put(Integer.valueOf(jobNumber), this);
-			isolatedCPUs = numaExplorer.pickCPUs(reqCPU, jobNumber);
-			putJobLog("proc", "Job will be pinned to CPUs " + isolatedCPUs);
-		}
-
-		return isolatedCPUs;
 	}
 
 	private Process launchJobWrapper(final List<String> launchCommand) {
@@ -1097,6 +992,113 @@ public class JobAgent implements Runnable {
 			mj.close();
 
 		logger.log(Level.INFO, "Done!");
+	}
+
+	// ####################################################################
+	// ########################### CPU Isolation ##########################
+	// ####################################################################
+
+	/**
+	 * @return mask with already pinned cores by other running workloads
+	 */
+	byte[] getFreeCPUs() {
+		BigInteger newVal;
+		BigInteger mask = BigInteger.ZERO;
+
+		try {
+			String cmd = "pgrep -v -U root -u root | xargs -L1 taskset -a -p 2>/dev/null | cut -d' ' -f6 | sort -u";
+
+			final Process affinityCmd = Runtime.getRuntime().exec(new String[] { "/bin/bash", "-c", cmd });
+			affinityCmd.waitFor();
+			try (Scanner cmdScanner = new Scanner(affinityCmd.getInputStream())) {
+				String readArg;
+				while (cmdScanner.hasNext()) {
+					readArg = (cmdScanner.next());
+
+					newVal = new BigInteger(readArg.trim(), 16);
+
+					if (BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE).equals(newVal))
+						continue;
+
+					mask = mask.or(newVal);
+
+				}
+				return valueToArray(mask, RES_NOCPUS.intValue());
+			}
+		}
+		catch (IOException | IllegalArgumentException | InterruptedException e) {
+			logger.log(Level.WARNING, "Exception when getting free CPUs ", e);
+		}
+
+		return new byte[RES_NOCPUS.intValue()];
+	}
+
+	static byte[] valueToArray(BigInteger v, int size) {
+		byte[] maskArray = new byte[size];
+		int count = 0;
+		BigInteger vAux = v;
+
+		while (vAux.compareTo(BigInteger.ZERO) > 0 && count < size) {
+			maskArray[count] = vAux.testBit(0) ? (byte) 1 : (byte) 0;
+			vAux = vAux.shiftRight(1);
+			count++;
+		}
+		return maskArray;
+	}
+
+	/**
+	 * @return mask our workload has already been pinned to
+	 */
+	byte[] getHostMask() {
+		String cmd = "taskset -p $$ | cut -d' ' -f6";
+
+		try {
+			final String out = ExternalProcesses.getCmdOutput(Arrays.asList("/bin/bash", "-c", cmd), true, 30L, TimeUnit.SECONDS);
+			// return valueToArray((~Long.parseLong(out.trim(), 16) & (1 << RES_NOCPUS.intValue()) - 1), RES_NOCPUS.intValue());
+			return valueToArray((new BigInteger(out.trim(), 16)).not().and(BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE)), RES_NOCPUS.intValue());
+		}
+		catch (IOException | IllegalArgumentException | InterruptedException e) {
+			logger.log(Level.WARNING, "Exception when getting host mask ", e);
+		}
+
+		return new byte[RES_NOCPUS.intValue()];
+	}
+
+	/**
+	 * @return mask from which we start CPU assignment
+	 */
+	public byte[] getInitialMask() {
+		byte[] mask;
+		byte[] hostMask;
+		mask = getFreeCPUs();
+		hostMask = getHostMask();
+		// In case we could not parse the mask of other processes we get it empty
+		if (mask == null || hostMask == null)
+			return (new byte[RES_NOCPUS.intValue()]);
+		boolean check = true;
+		for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
+			if (hostMask[i] != 0) {
+				check = false;
+				break;
+			}
+		}
+		if (check == true)
+			return mask;
+		return hostMask;
+	}
+
+	/**
+	 * @return CPU cores to which the job has to be pinned to
+	 */
+	private String addIsolation() {
+		String isolatedCPUs = "";
+		synchronized (cpuSync) {
+			numaExplorer.activeJAInstances.put(Integer.valueOf(jobNumber), this);
+			isolatedCPUs = numaExplorer.pickCPUs(reqCPU, jobNumber);
+			putJobLog("proc", "Job will be pinned to CPUs " + isolatedCPUs);
+		}
+
+		return isolatedCPUs;
 	}
 
 	//####################################################################
