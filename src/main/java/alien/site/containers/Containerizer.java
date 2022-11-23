@@ -3,6 +3,7 @@ package alien.site.containers;
 import java.io.File;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -44,7 +45,13 @@ public abstract class Containerizer {
 	/**
 	 * For resource constraints
 	 */
+	protected boolean useCgroupsv2 = false;
+
+	/**
+	 * For resource constraints
+	 */
 	protected int memLimit = 0;
+	
 
 	/**
 	 * GPU
@@ -96,6 +103,38 @@ public abstract class Containerizer {
 			logger.log(Level.WARNING, "Failed to start container: " + e.toString());
 		}
 		return supported;
+	}
+
+	/**
+	 * @return <code>true</code> if running a simple command (java -version) is possible with cgv2 constraints
+	 */
+	public boolean checkCgroupsv2() {
+		useCgroupsv2 = false;
+		try {
+			final ProcessBuilder mntCheck = new ProcessBuilder(new String[] { "/bin/bash", "-c", "mount -l | grep cgroup" });
+			final Process mntCheckPs = mntCheck.start();
+			mntCheckPs.waitFor(15, TimeUnit.SECONDS);
+
+			try (Scanner cmdScanner = new Scanner(mntCheckPs.getInputStream())) {
+				while (cmdScanner.hasNext()) {
+					if (cmdScanner.next().contains("cgroup2")) {
+						useCgroupsv2 = true;
+					}
+				}
+			}
+		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "Failed to check for cgroupsv2 support: " + e.toString());
+			return false;
+		}
+
+		if (useCgroupsv2 == false)
+			return false;
+
+		if (!isSupported())
+			useCgroupsv2 = false;
+
+		return useCgroupsv2;
 	}
 
 	/**
@@ -169,12 +208,14 @@ public abstract class Containerizer {
 	}
 
 	/**
-	 * Provide JDL to use with cgroups v2
+	 * Memlimit for container
 	 * 
 	 * @param memLimit
+	 * @return true/false depending on if limit will be applied (requires cgroupsv2)
 	 */
-	public void setMemLimit(final int newMemLimit) {
+	public boolean setMemLimit(final int newMemLimit) {
 		memLimit = newMemLimit;
+		return checkCgroupsv2();
 	}
 
 	/**
