@@ -63,7 +63,12 @@ public class NUMAExplorer {
 		fillNumaTopology(JobAgent.initialMask, JobAgent.wholeNode);
 	}
 
-
+	/**
+	 * Fills initial structures
+	 *
+	 * @param initMask mask from which allocation starts
+	 * @param wholeNode wether if we run in a whole-node scenario
+	 */
 	private void fillNumaTopology(byte[] initMask, boolean wholeNode) {
 		int subcounter = 0;
 		String filename = "/sys/devices/system/node/";
@@ -110,7 +115,7 @@ public class NUMAExplorer {
 											divisionedNUMA.put(Integer.valueOf(subcounter), Integer.valueOf(numaId));
 											structurePerNode.put(Integer.valueOf(subcounter), cpuRange);
 											initialStructurePerNode.put(Integer.valueOf(subcounter), cpuRange.clone());
-											logger.log(Level.INFO, "Filling initial structure of sub-node counter " + subcounter + " and mask " + getMaskString(initialStructurePerNode.get(subcounter)));
+											logger.log(Level.INFO, "Filling initial structure of sub-node counter " + subcounter + " and mask " + getMaskString(initialStructurePerNode.get(Integer.valueOf(subcounter))));
 											int coreCount = countAvailableCores(cpuRange);
 											availablePerNode.put(Integer.valueOf(subcounter), Integer.valueOf(coreCount));
 											initialAvailablePerNode.put(Integer.valueOf(subcounter), Integer.valueOf(coreCount));
@@ -143,7 +148,7 @@ public class NUMAExplorer {
 			}
 			divisionedNUMA.put(Integer.valueOf(0), Integer.valueOf(0));
 			structurePerNode.put(Integer.valueOf(0), cpuRange);
-			initialStructurePerNode.put(0, cpuRange.clone());
+			initialStructurePerNode.put(Integer.valueOf(0), cpuRange.clone());
 			availablePerNode.put(Integer.valueOf(0), Integer.valueOf(numCPUs));
 			initialAvailablePerNode.put(Integer.valueOf(0), Integer.valueOf(numCPUs));
 		}
@@ -194,8 +199,12 @@ public class NUMAExplorer {
 		return arrayToTaskset(finalMask);
 	}
 
+	/**
+	 * @param reqCPU cores to allocate to job
+	 * @param jobNumber job identifier
+	 * @return mask of cores to pin
+	 */
 	String pickCPUs(Long reqCPU, int jobNumber) {
-		byte[] newMask = new byte[numCPUs];
 		byte[] finalMask = new byte[numCPUs];
 
 		boolean rearrangementNeeded = true;
@@ -260,6 +269,11 @@ public class NUMAExplorer {
 		return numaNode;
 	}
 
+	/**
+	 * In case of rearrangement, move jobs to the newly selected cores if needed
+	 *
+	 * @param auxUsedCPUs new job allocation
+	 */
 	private void changePinningConfig(int[] auxUsedCPUs) {
 		HashMap<Integer, byte[]> masksToPin = new HashMap<>();
 		for (int i = 0; i < numCPUs; i++) {
@@ -288,8 +302,13 @@ public class NUMAExplorer {
 		}
 	}
 
+	/**
+	 * Applies taskset to cores for a given pid
+	 *
+	 * @param isolCmd cores to pin the job to
+	 * @param pidToConstrain PID to pin to the cores
+	 */
 	public static void applyTaskset(String isolCmd, int pidToConstrain) {
-
 		Vector<Integer> children = MonitoredJob.getChildrenProcessIDs(pidToConstrain);
 
 		if (children != null && isolCmd != null && isolCmd.compareTo("") != 0) {
@@ -306,6 +325,11 @@ public class NUMAExplorer {
 		}
 	}
 
+	/**
+	 * After CPU rearrangement, fill structures
+	 *
+	 * @param auxUsedCPUs new job allocation
+	 */
 	private void restartStructures(int[] auxUsedCPUs) {
 		logger.log(Level.INFO, "NUMAExplorer reconfiguring after job rescheduling.");
 		changePinningConfig(auxUsedCPUs);
@@ -344,7 +368,7 @@ public class NUMAExplorer {
 		byte[] availableMask = new byte[numCPUs];
 		int availableCores = freestEntry.getValue().intValue();
 		if (prevAbsoluteNuma < -1) {
-			Integer absoluteNuma = (prevAbsoluteNuma + 2) * (-1);
+			Integer absoluteNuma = Integer.valueOf((prevAbsoluteNuma + 2) * (-1));
 			if (freeOnNuma.get(absoluteNuma).intValue() >= reqCPU.intValue()) {
 				availableCores = freeOnNuma.get(absoluteNuma).intValue();
 				freestIdx = absoluteNuma;
@@ -356,7 +380,7 @@ public class NUMAExplorer {
 					availableMask = addPinnedCores(structure.get(Integer.valueOf(i)), availableMask);
 				}
 			}
-			jobToNuma.put(Integer.valueOf(jobNumber), Integer.valueOf(-1 * freestIdx - 2));
+			jobToNuma.put(Integer.valueOf(jobNumber), Integer.valueOf(-1 * freestIdx.intValue() - 2));
 		}
 		else {
 			for (int i = 0; i < divisionedNUMA.keySet().size(); i++) {
@@ -368,6 +392,11 @@ public class NUMAExplorer {
 		return finalMask;
 	}
 
+	/**
+	 * After job ends, fills up structures
+	 *
+	 * @param jobNumber job identifier
+	 */
 	public synchronized void refillAvailable(int jobNumber) {
 		logger.log(Level.INFO, "Reconfiguring structures of NUMAExplorer. Taking out job " + jobNumber);
 		for (int i = 0; i < numCPUs; i++) {
@@ -395,6 +424,13 @@ public class NUMAExplorer {
 		return freeList;
 	}
 
+	/**
+	 * Core rearrangement for an optimal allocation
+	 *
+	 * @param newJobNumber job identifier
+	 * @param newReqCPU amount of cores requested by new job
+	 * @return array containing allocation per job
+	 */
 	private int[] rearrangeCores(int newJobNumber, Long newReqCPU) {
 		logger.log(Level.INFO, "Starting job CPU cores rearrangement");
 		coresPerJob.put(Integer.valueOf(newJobNumber), newReqCPU);
@@ -419,7 +455,7 @@ public class NUMAExplorer {
 
 			// We have not found the space needed in any node. Proceed to partition
 			if (numaNode < 0) {
-				if (previousNuma != null && previousNuma < 0) {
+				if (previousNuma != null && previousNuma.intValue() < 0) {
 					getPartitionedMask(reqCPU, jobNumber, auxStructurePerNode, auxAvailablePerNode, auxUsedCPUs, previousNuma.intValue(), false);
 				} else
 					getPartitionedMask(reqCPU, jobNumber, auxStructurePerNode, auxAvailablePerNode, auxUsedCPUs, numaNode, false);

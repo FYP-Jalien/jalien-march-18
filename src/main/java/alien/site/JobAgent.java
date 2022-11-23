@@ -39,8 +39,6 @@ import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.TimerTask;
-import java.util.Vector;
-import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.FileHandler;
@@ -50,11 +48,8 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-<<<<<<< HEAD
 import java.math.BigInteger;
-=======
 import java.util.stream.Collectors;
->>>>>>> upstream/master
 
 import alien.api.DispatchSSLClient;
 import alien.api.Request;
@@ -141,6 +136,7 @@ public class JobAgent implements Runnable {
 	private int childPID;
 	private long lastHeartbeat = 0;
 	private final boolean hasCgroupsv2 = checkCgroupsv2();
+	private long jobStartupTime;
 
 	private enum jaStatus {
 		/**
@@ -278,7 +274,7 @@ public class JobAgent implements Runnable {
 	/**
 	 * Boolean for CPU isolation
 	 */
-	static boolean cpuIsolation = true;
+	static boolean cpuIsolation;
 
 	private jaStatus status;
 
@@ -416,7 +412,6 @@ public class JobAgent implements Runnable {
 
 		if (env.containsKey("cpuIsolation"))
 			cpuIsolation = Boolean.parseBoolean(env.get("cpuIsolation"));
-		//cpuIsolation = true;
 
 		logger.log(Level.INFO, "cpuIsolation = " + cpuIsolation);
 
@@ -446,7 +441,7 @@ public class JobAgent implements Runnable {
 		initialMask = getInitialMask();
 		synchronized (cpuSync) {
 			if (numaExplorer == null && cpuIsolation == true)
-				numaExplorer = new NUMAExplorer(RES_NOCPUS);
+				numaExplorer = new NUMAExplorer(RES_NOCPUS.intValue());
 		}
 
 		try {
@@ -578,7 +573,7 @@ public class JobAgent implements Runnable {
 			// process payload
 			handleJob();
 
-			//cleanup();
+			cleanup();
 
 			synchronized (requestSync) {
 				RUNNING_CPU += reqCPU;
@@ -701,12 +696,12 @@ public class JobAgent implements Runnable {
 				if (jdl.gets("DebugTag") != null)
 					cont.enableDebug(jdl.gets("DebugTag"));
 
-				return cont.containerize(String.join(" ", launchCmd));
+				launchCmd = cont.containerize(String.join(" ", launchCmd));
 			}
 
 			// Run jobs in isolated environment
 			if (cpuIsolation == true) {
-				String isolCmd = addIsolation((int) reqCPU.longValue());
+				String isolCmd = addIsolation();
 				logger.log(Level.SEVERE, "IsolCmd command" + isolCmd);
 				if (isolCmd != null && isolCmd.compareTo("") != 0)
 					launchCmd.addAll(0, Arrays.asList("taskset", "-c", isolCmd));
@@ -721,6 +716,9 @@ public class JobAgent implements Runnable {
 		}
 	}
 
+	/**
+	 * @return mask with already pinned cores by other running workloads
+	 */
 	byte[] getFreeCPUs() {
 		BigInteger newVal;
 		BigInteger mask = BigInteger.ZERO;
@@ -766,6 +764,9 @@ public class JobAgent implements Runnable {
 		return maskArray;
 	}
 
+	/**
+	 * @return mask our workload has already been pinned to
+	 */
 	byte[] getHostMask() {
 		String cmd = "taskset -p $$ | cut -d' ' -f6";
 
@@ -781,6 +782,9 @@ public class JobAgent implements Runnable {
 		return new byte[RES_NOCPUS.intValue()];
 	}
 
+	/**
+	 * @return mask from which we start CPU assignment
+	 */
 	public byte[] getInitialMask() {
 		byte[] mask;
 		byte[] hostMask;
@@ -798,12 +802,13 @@ public class JobAgent implements Runnable {
 		}
 		if (check == true)
 			return mask;
-		else
-			return hostMask;
+		return hostMask;
 	}
 
-	private String addIsolation(long cpuSize) {
-		long ret = 0;
+	/**
+	 * @return CPU cores to which the job has to be pinned to
+	 */
+	private String addIsolation() {
 		String isolatedCPUs = "";
 		synchronized (cpuSync) {
 			numaExplorer.activeJAInstances.put(Integer.valueOf(jobNumber), this);
@@ -824,6 +829,7 @@ public class JobAgent implements Runnable {
 		pBuilder.redirectError(Redirect.INHERIT);
 		pBuilder.directory(tempDir);
 
+		jobStartupTime = System.currentTimeMillis();
 		setStatus(jaStatus.RUNNING_JOB);
 
 		final Process p;
@@ -890,7 +896,7 @@ public class JobAgent implements Runnable {
 			// apmon.setNumCPUs(cpuCores);
 			// apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
 			mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
-			mj.setJobStartupTime(System.currentTimeMillis());
+			mj.setJobStartupTime(jobStartupTime);
 
 			String monitoring = jdl.gets("Monitoring");
 			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
@@ -1122,6 +1128,11 @@ public class JobAgent implements Runnable {
 		return true;
 	}
 
+	/**
+	 * Checks if the workload is already constrained to run in certain cores. If not in whole-node scenario, CPU cores are selected and workload is pinned.
+	 *
+	 * @param jobRunnerPid Process ID of the running JobRunner
+	 */
 	public void checkAndApplyIsolation(int jobRunnerPid) {
 		synchronized (cpuSync) {
 			byte[] hostMask = getHostMask();
@@ -1135,8 +1146,8 @@ public class JobAgent implements Runnable {
 
 			if (wholeNode == false && alreadyIsol == false) {
 				logger.log(Level.INFO, "Applying isolation to the whole JobRunner CPU allocation - Allocation of " + RUNNING_CPU + " cores");
-				String initMask = numaExplorer.computeInitialMask(Long.valueOf(RUNNING_CPU));
-				numaExplorer.applyTaskset(initMask, jobRunnerPid);
+				String initMask = numaExplorer.computeInitialMask(RUNNING_CPU);
+				NUMAExplorer.applyTaskset(initMask, jobRunnerPid);
 				logger.log(Level.INFO, "JobRunner pinned to mask " + initMask);
 			}
 		}
@@ -1480,12 +1491,12 @@ public class JobAgent implements Runnable {
 	//######################### OTHER HELPER FUNCTIONS #########################
 	//##########################################################################
 
-	private void constrainJobCPU() {
+	/*private void constrainJobCPU() {
 		//get CPU cores to constrain the job
-		String isolCmd = addIsolation((int) reqCPU.longValue());
+		String isolCmd = addIsolation();
 		logger.log(Level.SEVERE, "IsolCmd command" + isolCmd);
-		numaExplorer.applyTaskset(isolCmd, childPID);
-	}
+		NUMAExplorer.applyTaskset(isolCmd, childPID);
+	}*/
 
 	private long ttlForJob() {
 		final Integer iTTL = jdl.getInteger("TTL");
