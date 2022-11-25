@@ -218,7 +218,7 @@ public class SiteMap {
 		if (extrasites.size() > 0)
 			siteMap.put("Extrasites", extrasites);
 		if (cpuIsolation.size() > 0)
-			siteMap.put("cpuIsolation", cpuIsolation);
+			siteMap.put("cpuIsolation", cpuIsolation.get(0));
 
 		siteMap.put("Host", alienCm.split(":")[0]);
 
