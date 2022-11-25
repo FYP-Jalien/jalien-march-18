@@ -94,17 +94,32 @@ public class NUMAExplorer {
 									String patternStr = "(\\d+)-(\\d+)";
 									Pattern pattern = Pattern.compile(patternStr);
 									Matcher matcher = pattern.matcher(range);
-									if (matcher.matches()) {
-										int rangeidx = Integer.parseInt(matcher.group(1));
-										int maxRangeidx = Integer.parseInt(matcher.group(2));
-										while (rangeidx <= maxRangeidx) {
-											coresPerNode.put(Integer.valueOf(rangeidx), Integer.valueOf(subcounter));
-											if (wholeNode == false && initMask[rangeidx] == 1) {
-												cpuRange[rangeidx] = 0;
-												usedCPUs[rangeidx] = -1;
-											} else
-												cpuRange[rangeidx] = 1;
-											rangeidx += 1;
+									String patternStr2 = "\\d+(,\\d+)*";
+									Pattern pattern2 = Pattern.compile(patternStr2);
+									Matcher matcher2 = pattern2.matcher(range);
+									if (matcher.matches() || matcher2.matches()) {
+										if (matcher.matches()) {
+											logger.log(Level.INFO, "CPU listing in form of range " + range);
+											int rangeidx = Integer.parseInt(matcher.group(1));
+											int maxRangeidx = Integer.parseInt(matcher.group(2));
+											int[] rangeArray = new int[maxRangeidx - rangeidx + 1];
+											int i = 0;
+											while (rangeidx <= maxRangeidx) {
+												rangeArray[i] = rangeidx;
+												rangeidx += 1;
+												i += 1;
+											}
+											cpuRange = buildCPURange(initMask, wholeNode, subcounter, rangeArray);
+										} else if (matcher2.matches()) {
+											logger.log(Level.INFO, "CPU listing in form of comma-sepparated cores " + range);
+											String[] cores = range.split(",");
+											int[] rangeArray = new int[cores.length];
+											int i = 0;
+											for (String core : cores) {
+												rangeArray[i] = Integer.parseInt(core);
+												i +=1;
+											}
+											cpuRange = buildCPURange(initMask, wholeNode, subcounter, rangeArray);
 										}
 
 										String patternNumaStr = ".*(\\d+).*";
@@ -121,37 +136,58 @@ public class NUMAExplorer {
 											initialAvailablePerNode.put(Integer.valueOf(subcounter), Integer.valueOf(coreCount));
 											subcounter = subcounter + 1;
 										}
-										else
+										else {
 											logger.log(Level.INFO, "Format error found when getting NUMA node id");
+											fillDefaultStructures(initMask, wholeNode);
+										}
 									}
-									else
+									else {
 										logger.log(Level.INFO, "Format error on getting NUMA range");
+										fillDefaultStructures(initMask, wholeNode);
+									}
 								}
 							}
 						}
 						catch (IOException e) {
 							logger.log(Level.WARNING, "Could not access " + filename + " " + e);
+							fillDefaultStructures(initMask, wholeNode);
 						}
 					}
 				}
 			}
-		} else {
-			// In case the files are not present in the machine, we just set a single NUMA node.
-			byte[] cpuRange = new byte[numCPUs];
-			for (int core = 0; core < cpuRange.length; core++) {
-				if (wholeNode == false && initMask[core] == 1) {
-					cpuRange[core] = 0;
-					usedCPUs[core] = -1;
-				} else
-					cpuRange[core] = 1;
-				coresPerNode.put(Integer.valueOf(core), Integer.valueOf(0));
-			}
-			divisionedNUMA.put(Integer.valueOf(0), Integer.valueOf(0));
-			structurePerNode.put(Integer.valueOf(0), cpuRange);
-			initialStructurePerNode.put(Integer.valueOf(0), cpuRange.clone());
-			availablePerNode.put(Integer.valueOf(0), Integer.valueOf(numCPUs));
-			initialAvailablePerNode.put(Integer.valueOf(0), Integer.valueOf(numCPUs));
 		}
+	}
+
+	private byte[] buildCPURange(byte[] initMask, boolean wholeNode, int subcounter, int[] rangeArray) {
+		logger.log(Level.INFO, "Filling structure with CPUs " + getMaskString(rangeArray) + "for NUMA node " + subcounter);
+		byte[] cpuRange = new byte[numCPUs];
+		for (int core : rangeArray) {
+			coresPerNode.put(Integer.valueOf(core), Integer.valueOf(subcounter));
+			if (wholeNode == false && initMask[core] == 1) {
+				cpuRange[core] = 0;
+				usedCPUs[core] = -1;
+			} else
+				cpuRange[core] = 1;
+		}
+		return cpuRange;
+	}
+
+	private void fillDefaultStructures(byte[] initMask, boolean wholeNode) {
+		// In case the files are not present in the machine, we just set a single NUMA node.
+		byte[] cpuRange = new byte[numCPUs];
+		for (int core = 0; core < cpuRange.length; core++) {
+			if (wholeNode == false && initMask[core] == 1) {
+				cpuRange[core] = 0;
+				usedCPUs[core] = -1;
+			} else
+				cpuRange[core] = 1;
+			coresPerNode.put(Integer.valueOf(core), Integer.valueOf(0));
+		}
+		divisionedNUMA.put(Integer.valueOf(0), Integer.valueOf(0));
+		structurePerNode.put(Integer.valueOf(0), cpuRange);
+		initialStructurePerNode.put(Integer.valueOf(0), cpuRange.clone());
+		availablePerNode.put(Integer.valueOf(0), Integer.valueOf(numCPUs));
+		initialAvailablePerNode.put(Integer.valueOf(0), Integer.valueOf(numCPUs));
 	}
 
 	private static int countAvailableCores(byte[] cpuRange) {
@@ -163,7 +199,7 @@ public class NUMAExplorer {
 		return counter;
 	}
 
-	private static String getMaskString(byte[] cpuRange) {
+	static String getMaskString(byte[] cpuRange) {
 		// Aux printing for debugging purposes
 		String rangeStr = "";
 		for (int i = 0; i < cpuRange.length; i++) {

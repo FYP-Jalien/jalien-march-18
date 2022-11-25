@@ -404,6 +404,8 @@ public final class ComputingElement extends Thread {
 		// before += "export partition=\"" + System.getenv().get("partition") + "\"\n";
 		if (siteMap.containsKey("RequiredCpusCe"))
 			before += "export RequiredCpusCe=\"" + siteMap.get("RequiredCpusCe") + "\"\n";
+		if (siteMap.containsKey("cpuIsolation"))
+			before += "export cpuIsolation=\"" + siteMap.get("cpuIsolation") + "\"\n";
 		before += "export ALIEN_CM_AS_LDAP_PROXY=\"" + config.get("ALIEN_CM_AS_LDAP_PROXY") + "\"\n";
 		before += "export site=\"" + site + "\"\n";
 		before += "export CE=\"" + siteMap.get("CE") + "\"\n";
@@ -430,8 +432,6 @@ public final class ComputingElement extends Thread {
 			before += "export MAX_RETRIES='" + config.get("MAX_RETRIES") + "'\n";
 		if (config.containsKey("ce_matcharg") && getValuesFromLDAPField(config.get("ce_matcharg")).containsKey("cpucores"))
 			before += "export CPUCores=\"" + getValuesFromLDAPField(config.get("ce_matcharg")).get("cpucores") + "\"\n";
-		if (config.containsKey("cpuIsolation"))
-			before += "export cpuIsolation=\"" + config.get("cpuIsolation") + "\"\n";
 		if (siteMap.containsKey("closeSE"))
 			before += "export closeSE=\"" + siteMap.get("closeSE") + "\"\n";
 
@@ -444,7 +444,7 @@ public final class ComputingElement extends Thread {
 			if (!containerConfig.gets("job.container.path").isBlank())
 				before += "export JOB_CONTAINER_PATH='" + containerConfig.gets("job.container.path") + "'\n";
 		}
-		
+
 		//
 		// allow any shell code to be inserted for debugging, testing etc.
 		//

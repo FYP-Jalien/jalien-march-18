@@ -794,7 +794,7 @@ public class JobAgent implements Runnable {
 			String monitoring = jdl.gets("Monitoring");
 			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
 				payloadMonitoring = true;
-				mj.setWrapperPid(getWrapperPid());
+				mj.setWrapperPid(getWrapperPid(0));
 				// mjPayload = apmon.addJobToMonitor(getWrapperPid(), jobWorkdir, ce + "_JobWrapper", matchedJob.get("queueId").toString());
 				mj.setPayloadMonitoring();
 			}
@@ -999,9 +999,10 @@ public class JobAgent implements Runnable {
 	/**
 	 * @return mask with already pinned cores by other running workloads
 	 */
-	byte[] getFreeCPUs() {
+	byte[] getFreeCPUs(int catchExceptionRetries) {
 		BigInteger newVal;
 		BigInteger mask = BigInteger.ZERO;
+		logger.log(Level.INFO, "DBG: Getting FreeCPUs with counter " + catchExceptionRetries);
 
 		try {
 			String cmd = "pgrep -v -U root -u root | xargs -L1 taskset -a -p 2>/dev/null | cut -d' ' -f6 | sort -u";
@@ -1025,7 +1026,11 @@ public class JobAgent implements Runnable {
 			}
 		}
 		catch (IOException | IllegalArgumentException | InterruptedException e) {
-			logger.log(Level.WARNING, "Exception when getting free CPUs ", e);
+			if (catchExceptionRetries < 5) {
+				logger.log(Level.WARNING, "Retrying getFreeCPUs(). Counter = " + catchExceptionRetries);
+				getFreeCPUs(catchExceptionRetries + 1);
+			} else
+				logger.log(Level.WARNING, "Exception when getting free CPUs. Already tried 5 times without success. ", e);
 		}
 
 		return new byte[RES_NOCPUS.intValue()];
@@ -1047,16 +1052,21 @@ public class JobAgent implements Runnable {
 	/**
 	 * @return mask our workload has already been pinned to
 	 */
-	byte[] getHostMask() {
+	byte[] getHostMask(int catchExceptionRetries) {
+		logger.log(Level.INFO, "DBG: Getting Host mask with counter " + catchExceptionRetries);
+
 		String cmd = "taskset -p $$ | cut -d' ' -f6";
 
 		try {
 			final String out = ExternalProcesses.getCmdOutput(Arrays.asList("/bin/bash", "-c", cmd), true, 30L, TimeUnit.SECONDS);
-			// return valueToArray((~Long.parseLong(out.trim(), 16) & (1 << RES_NOCPUS.intValue()) - 1), RES_NOCPUS.intValue());
 			return valueToArray((new BigInteger(out.trim(), 16)).not().and(BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE)), RES_NOCPUS.intValue());
 		}
 		catch (IOException | IllegalArgumentException | InterruptedException e) {
-			logger.log(Level.WARNING, "Exception when getting host mask ", e);
+			if (catchExceptionRetries < 5) {
+				logger.log(Level.WARNING, "Retrying getHostMask(). Counter = " + catchExceptionRetries);
+				getHostMask(catchExceptionRetries + 1);
+			} else
+				logger.log(Level.WARNING, "Exception when getting host mask. Already tried 5 times without success. ", e);
 		}
 
 		return new byte[RES_NOCPUS.intValue()];
@@ -1068,8 +1078,8 @@ public class JobAgent implements Runnable {
 	public byte[] getInitialMask() {
 		byte[] mask;
 		byte[] hostMask;
-		mask = getFreeCPUs();
-		hostMask = getHostMask();
+		mask = getFreeCPUs(0);
+		hostMask = getHostMask(0);
 		// In case we could not parse the mask of other processes we get it empty
 		if (mask == null || hostMask == null)
 			return (new byte[RES_NOCPUS.intValue()]);
@@ -1135,7 +1145,7 @@ public class JobAgent implements Runnable {
 	 */
 	public void checkAndApplyIsolation(int jobRunnerPid) {
 		synchronized (cpuSync) {
-			byte[] hostMask = getHostMask();
+			byte[] hostMask = getHostMask(0);
 			boolean alreadyIsol = false;
 			for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
 				if (hostMask[i] != 0) {
@@ -1686,7 +1696,8 @@ public class JobAgent implements Runnable {
 	 *
 	 * @return JobWrapper PID
 	 */
-	private int getWrapperPid() {
+	private int getWrapperPid(int catchExceptionRetries) {
+		logger.log(Level.INFO, "DBG: Getting Wrapper PID with counter " + catchExceptionRetries);
 		final ArrayList<Integer> wrapperProcs = new ArrayList<>();
 
 		try {
@@ -1699,7 +1710,11 @@ public class JobAgent implements Runnable {
 			}
 		}
 		catch (final Exception e) {
-			logger.log(Level.WARNING, "Could not get JobWrapper PID", e);
+			if (catchExceptionRetries < 5) {
+				logger.log(Level.WARNING, "Retrying getWrapperPid(). Counter is " + catchExceptionRetries);
+				getWrapperPid(catchExceptionRetries + 1);
+			} else
+				logger.log(Level.WARNING, "Could not get JobWrapper PID. Already tried 5 times without success. ", e);
 			return 0;
 		}
 
@@ -1726,7 +1741,7 @@ public class JobAgent implements Runnable {
 	 */
 	private void killGracefully(final Process p) {
 		try {
-			final int jobWrapperPid = getWrapperPid();
+			final int jobWrapperPid = getWrapperPid(0);
 			if (jobWrapperPid != 0)
 				Runtime.getRuntime().exec(new String[] { "kill", String.valueOf(jobWrapperPid) });
 			else
@@ -1764,7 +1779,7 @@ public class JobAgent implements Runnable {
 	 * @param p process for JobWrapper
 	 */
 	private void killForcibly(final Process p) {
-		final int jobWrapperPid = getWrapperPid();
+		final int jobWrapperPid = getWrapperPid(0);
 		try {
 			if (jobWrapperPid != 0) {
 				JobWrapper.cleanupProcesses(queueId, jobWrapperPid);
