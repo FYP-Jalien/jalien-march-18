@@ -2735,50 +2735,33 @@ public class TaskQueueUtils {
 		siteQueueStatusCache.put(ce, status, 1000 * 60);
 	}
 
-	private static final ExpirationCache<String, Constraint> constraintCache = new ExpirationCache<>();
-	private static final ExpirationCache<String, Pattern> constraintPatternCache = new ExpirationCache<>();
-	private static long lastConstraintUpdatedTimestamp = System.currentTimeMillis();
-	private static boolean isConstraintCacheInitialized = false;
-	private static final long cacheExpiryTime = 5000;
+	private static final HashMap<String, String> constraintCache = new HashMap<>();
+	private static long lastConstraintUpdatedTimestamp = 0;
 
 	/**
 	 * Cache Site Sonar constraints
 	 */
-	public static ExpirationCache<String, Constraint> setConstraintCache() {
+	public static synchronized HashMap<String, String> setConstraintCache() {
 		long currentTimestamp = System.currentTimeMillis();
-		if ((!isConstraintCacheInitialized) || (lastConstraintUpdatedTimestamp - currentTimestamp > 5000)) {
+		if (currentTimestamp - lastConstraintUpdatedTimestamp > 10) {
+			System.err.println("refreshing cache as it is expired"); //todo: remove and update 5000
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return null;
 				db.setQueryTimeout(30);
-				db.query("SELECT * FROM SITESONAR_CONSTRAINTS", false);
+				db.query("SELECT * FROM SITESONAR_CONSTRAINTS WHERE enabled=true", false);
 
 				logger.log(Level.INFO, "Updating constraint cache at " + currentTimestamp);
 				while (db.moveNext()) {
 					String constraintName = db.gets("name");
 					String constraintExpression = db.gets("expression");
-					boolean isEnabled = db.getb("enabled", true);
-					Constraint constraint = new Constraint(constraintName, constraintExpression, isEnabled);
-					//todo: Create generic pattern for constraint keys
-					Pattern patConstraint = Pattern.compile("other.LocalDiskSpace\\s*>\\s*(\\d+)");
-					if (constraintCache.get(constraintName) != null ){
-						constraintCache.overwrite(constraintName, constraint, cacheExpiryTime);
-						constraintPatternCache.overwrite(constraintName, patConstraint, cacheExpiryTime);
-					} else {
-						constraintCache.put(constraintName, constraint, cacheExpiryTime);
-						constraintPatternCache.put(constraintName, patConstraint, cacheExpiryTime);
-					}
+					constraintCache.put(constraintName, constraintExpression);
 				}
-				isConstraintCacheInitialized = true;
 				lastConstraintUpdatedTimestamp = currentTimestamp;
 			}
 		}
 
 		return constraintCache;
-	}
-
-	public static ExpirationCache<String, Pattern> getConstraintPatternCache() {
-		return constraintPatternCache;
 	}
 
 	private static volatile boolean dbStructureInitialized = false;
@@ -3783,6 +3766,28 @@ public class TaskQueueUtils {
 
 		params.put("disk", Integer.valueOf(getWorkDirSizeMB(jdl, cpuCores) * 1024));
 
+		// Parse Site Sonar constraints
+
+		// Initialize or refresh constraint cache
+		HashMap<String, String> constraintCache = TaskQueueUtils.setConstraintCache();
+		if (constraintCache != null && constraintCache.size() > 0) {
+			// Constraint name is the constraint key
+			for ( String key : constraintCache.keySet()) {
+				// eg - key : CGROUPSV2_AVAILABLE
+				// eg - value : taken from JDL
+				String constraintValue = jdl.gets(key); // check if JDL has a pattern matching the constraint key
+				if (constraintValue != null) {
+					Object parsedConstraintValue = constraintValue;
+					if ((constraintValue.equalsIgnoreCase("true") || constraintValue.equalsIgnoreCase("false"))) {
+						parsedConstraintValue = Boolean.valueOf(constraintValue);
+					} else if (constraintValue.chars().allMatch(Character::isDigit)) {
+						parsedConstraintValue = Integer.valueOf(constraintValue);
+					}
+					params.put(key, parsedConstraintValue);
+				}
+			}
+		}
+
 		// parse the other.CloseSE (and !)
 
 		final String reqs = jdl.gets("Requirements");
@@ -3867,8 +3872,6 @@ public class TaskQueueUtils {
 
 			// parse CVMFS_revision
 			m = patCVMFS.matcher(reqs);
-			if (m.find())
-				params.put("revision", Integer.valueOf(m.group(1)));
 		}
 
 		if (logger.isLoggable(Level.FINER))

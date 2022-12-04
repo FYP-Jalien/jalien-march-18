@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -695,47 +696,37 @@ public class JobBroker {
 
 			// Add Site Sonar Constraints
 			// Initialize or refresh constraint cache
-			ExpirationCache<String, Constraint> constraintCache = TaskQueueUtils.setConstraintCache();
+			HashMap<String, String> constraintCache = TaskQueueUtils.setConstraintCache();
 
 			if (constraintCache != null && constraintCache.size() > 0) {
 				// Constraint name is the constraint key
-				for ( String key : constraintCache.getKeys()) {
-					Constraint constraint = constraintCache.get(key);
-					String constraintExpression = constraint.getExpression();
-					boolean isEnabled = constraint.isEnabled();
+				for ( Map.Entry<String, String> entry : constraintCache.entrySet()) {
+					String constraintName = entry.getKey();
+					String constraintType = entry.getValue();
 					logger.log(Level.FINE, "Enforcing additional constraints for " + matchRequest.get("Localhost"));
-					logger.log(Level.FINE, "Constraint name : " + key);
-					logger.log(Level.FINE, "Constraint expression : " + constraintExpression);
-					logger.log(Level.FINE, "Constraint enabled : " + isEnabled);
+					logger.log(Level.FINE, "Constraint name : " + constraintName);
+					logger.log(Level.FINE, "Constraint expression : " + constraintType);
 
 					// If the site map has a value for the constraint and if its enabled, add the constraint check
-					if (matchRequest.containsKey(key) && isEnabled) {
-						String constraintValue = (String) matchRequest.get(key);
-						Object parsedConstraintValue = constraintValue;
+					if (matchRequest.containsKey(constraintName)) {
+						Object constraintValue = matchRequest.get(constraintName);
 						logger.log(Level.FINE, "Constraint value : " + constraintValue);
-						if (!constraintValue.isEmpty()) {
-							// Type conversion
-							if ((constraintValue.equalsIgnoreCase("true") || constraintValue.equalsIgnoreCase("false"))) {
-								parsedConstraintValue = Boolean.valueOf(constraintValue);
-							} else if (constraintValue.chars().allMatch(Character::isDigit)) {
-								parsedConstraintValue = Integer.valueOf(constraintValue);
-							}
-
-							if (constraintExpression.equals("equality")) {
+						if (constraintValue != null) {
+							if (constraintType.equals("equality")) {
 								//eg:- SELECT * FROM JOB_AGENT WHERE... AND ((? = OS_NAME) OR (OS_NAME is null))
 								// SELECT * FROM JOB_AGENT WHERE... (('centos' = OS_NAME) OR (OS_NAME is null))
-								where += " and (( ? = " + key + ") or (" + key + " is null))";
-							} else if (constraintExpression.equals("regex")) {
+								where += " and (( ? = " + constraintName + ") or (" + constraintName + " is null))";
+							} else if (constraintType.equals("regex")) {
 								// SELECT * FROM JOB_AGENT WHERE... AND ((? LIKE CPU_FLAGS) OR (CPU_FLAGS is null))
 								// SELECT * FROM JOB_AGENT WHERE... AND ((flag1 flag2 avx LIKE %avx%) OR (CPU_FLAGS is null))
-								where += " and (( ? LIKE " + key + ") or (" + key + " is null))";
+								where += " and (( ? LIKE " + constraintName + ") or (" + constraintName + " is null))";
 							} else {
 								// stop matching because the constraint type is not supported
-								logger.log(Level.SEVERE, "Incorrect expression type provided: " + constraintExpression);
+								logger.log(Level.SEVERE, "Incorrect expression type provided: " + constraintType);
 								return matchAnswer;
 							}
-
-							bindValues.add(parsedConstraintValue);
+							// todo: ensure constraint.jsp send the right data type and sitemap use the same data type
+							bindValues.add(constraintValue);
 						}
 
 					}
