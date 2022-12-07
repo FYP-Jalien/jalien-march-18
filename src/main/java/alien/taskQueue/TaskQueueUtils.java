@@ -2737,14 +2737,16 @@ public class TaskQueueUtils {
 
 	private static final HashMap<String, String> constraintCache = new HashMap<>();
 	private static long lastConstraintUpdatedTimestamp = 0;
+	private static final long CACHE_REFRESH_INTERVAL = 5 * 60 * 1000L;
 
 	/**
 	 * Cache Site Sonar constraints
 	 */
 	public static synchronized HashMap<String, String> setConstraintCache() {
 		long currentTimestamp = System.currentTimeMillis();
-		if (currentTimestamp - lastConstraintUpdatedTimestamp > 10) {
-			System.err.println("refreshing cache as it is expired"); //todo: remove and update 5000
+		// Refresh constraint cache every 10 minutes
+		if (currentTimestamp - lastConstraintUpdatedTimestamp > CACHE_REFRESH_INTERVAL) {
+			System.err.println("Refreshing constraint cache as it is expired");
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return null;
@@ -2756,6 +2758,8 @@ public class TaskQueueUtils {
 					String constraintName = db.gets("name");
 					String constraintExpression = db.gets("expression");
 					constraintCache.put(constraintName, constraintExpression);
+					logger.log(Level.INFO, "Added the constraint name: " + constraintName + ", type: "
+							+ constraintExpression + " to the constraint cache");
 				}
 				lastConstraintUpdatedTimestamp = currentTimestamp;
 			}
@@ -3770,20 +3774,15 @@ public class TaskQueueUtils {
 
 		// Initialize or refresh constraint cache
 		HashMap<String, String> constraintCache = TaskQueueUtils.setConstraintCache();
+
 		if (constraintCache != null && constraintCache.size() > 0) {
 			// Constraint name is the constraint key
-			for ( String key : constraintCache.keySet()) {
-				// eg - key : CGROUPSV2_AVAILABLE
-				// eg - value : taken from JDL
-				String constraintValue = jdl.gets(key); // check if JDL has a pattern matching the constraint key
+			for (String key : constraintCache.keySet()) {
+				// eg - key : CGROUPSv2_AVAILABLE
+				// eg - value : taken from JDL (true)
+				Object constraintValue = jdl.get(key); // check if JDL has a pattern matching the constraint key
 				if (constraintValue != null) {
-					Object parsedConstraintValue = constraintValue;
-					if ((constraintValue.equalsIgnoreCase("true") || constraintValue.equalsIgnoreCase("false"))) {
-						parsedConstraintValue = Boolean.valueOf(constraintValue);
-					} else if (constraintValue.chars().allMatch(Character::isDigit)) {
-						parsedConstraintValue = Integer.valueOf(constraintValue);
-					}
-					params.put(key, parsedConstraintValue);
+					params.put(key, constraintValue);
 				}
 			}
 		}
