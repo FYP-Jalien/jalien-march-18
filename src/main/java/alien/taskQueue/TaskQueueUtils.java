@@ -3871,6 +3871,8 @@ public class TaskQueueUtils {
 
 			// parse CVMFS_revision
 			m = patCVMFS.matcher(reqs);
+			if (m.find())
+				params.put("revision", Integer.valueOf(m.group(1)));
 		}
 
 		if (logger.isLoggable(Level.FINER))
