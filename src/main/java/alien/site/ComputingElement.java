@@ -14,6 +14,7 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.Vector;
@@ -403,6 +404,8 @@ public final class ComputingElement extends Thread {
 		// before += "export partition=\"" + System.getenv().get("partition") + "\"\n";
 		if (siteMap.containsKey("RequiredCpusCe"))
 			before += "export RequiredCpusCe=\"" + siteMap.get("RequiredCpusCe") + "\"\n";
+		if (siteMap.containsKey("cpuIsolation"))
+			before += "export cpuIsolation=\"" + siteMap.get("cpuIsolation") + "\"\n";
 		before += "export ALIEN_CM_AS_LDAP_PROXY=\"" + config.get("ALIEN_CM_AS_LDAP_PROXY") + "\"\n";
 		before += "export site=\"" + site + "\"\n";
 		before += "export CE=\"" + siteMap.get("CE") + "\"\n";
@@ -431,6 +434,16 @@ public final class ComputingElement extends Thread {
 			before += "export CPUCores=\"" + getValuesFromLDAPField(config.get("ce_matcharg")).get("cpucores") + "\"\n";
 		if (siteMap.containsKey("closeSE"))
 			before += "export closeSE=\"" + siteMap.get("closeSE") + "\"\n";
+
+		final ExtProperties containerConfig = ConfigUtils.getConfiguration("container");
+		if (Objects.nonNull(containerConfig)) {
+			if (!containerConfig.gets("additional.binds").isBlank())
+				before += "export ADDITIONAL_BINDS='" + containerConfig.gets("additional.binds") + "'\n";
+			if (!containerConfig.gets("meta.variables", "").isBlank())
+				before += "export META_VARIABLES='" + containerConfig.gets("meta.variables") + "'\n";
+			if (!containerConfig.gets("job.container.path").isBlank())
+				before += "export JOB_CONTAINER_PATH='" + containerConfig.gets("job.container.path") + "'\n";
+		}
 
 		//
 		// allow any shell code to be inserted for debugging, testing etc.
@@ -502,8 +515,9 @@ public final class ComputingElement extends Thread {
 		if (jarDirCustom != null && !jarDirCustom.isBlank())
 			return javaDir + javaCmd + " " + jarDirCustom + jarAndClass;
 
-		return javaDir + javaCmd + " " + jarDir + jarAndClass;	
+		return javaDir + javaCmd + " " + jarDir + jarAndClass;
 	}
+
 
 	/**
 	 * Class to periodically update the JA token in a shared folder, for long waiting JAs in the queue to find a fresh one at startup
@@ -573,8 +587,6 @@ public final class ComputingElement extends Thread {
 		else
 			smenv.put("TTL", "86400");
 
-		smenv.put("Disk", "100000000"); // TODO: df
-
 		// if (System.getenv().containsKey("cerequirements"))
 		// smenv.put("cerequirements", System.getenv().get("cerequirements")); //Local overrides value in LDAP if present
 		// else
@@ -602,6 +614,9 @@ public final class ComputingElement extends Thread {
 			config.putAll(ce_environment);
 
 		siteMap = (new SiteMap()).getSiteParameters(smenv);
+
+		//CE storage space does not matter for WNs
+		siteMap.remove("Disk");
 
 		if (config.containsKey("ce_matcharg") && getValuesFromLDAPField(config.get("ce_matcharg")).containsKey("cpucores")) {
 			siteMap.put("CPUCores", Integer.valueOf(getValuesFromLDAPField(config.get("ce_matcharg")).get("cpucores")));

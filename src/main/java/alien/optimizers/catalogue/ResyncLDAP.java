@@ -590,7 +590,7 @@ public class ResyncLDAP extends Optimizer {
 						try (ResultSet rs = dbu.getResultSet()) {
 							while (rs.next()) {
 								String ce = rs.getString("site");
-								if (!updatedCEs.contains(ce) && !ce.equals("unassigned::site")) {
+								if (!updatedCEs.stream().anyMatch(ce::equalsIgnoreCase) && !ce.equals("unassigned::site")) {
 									toDelete.add(ce);
 								}
 							}
@@ -935,7 +935,7 @@ public class ResyncLDAP extends Optimizer {
 							try (ResultSet rs = dbu.getResultSet()) {
 								while (rs.next()) {
 									String composed = rs.getString(1);
-									if (!updatedProtocols.contains(composed))
+									if (!updatedProtocols.stream().anyMatch(composed::equalsIgnoreCase))
 										toDelete.add(composed);
 								}
 							}

@@ -1022,7 +1022,7 @@ public final class SEUtils {
 					db.setReadOnly(false);
 					db.setQueryTimeout(60);
 
-					if (!db.query("UPDATE SE SET seUsedSpace=greatest(seUsedSpace" + (deltaBytes >= 0 ? "+" : "") + "?, 0), seNumFiles=greatest(seNumFiles" + (deltaFiles >= 0 ? "+" : "")
+					if (!db.query("UPDATE SE SET seUsedSpace=greatest(coalesce(seUsedSpace,0)" + (deltaBytes >= 0 ? "+" : "") + "?, 0), seNumFiles=greatest(coalesce(seNumFiles,0)" + (deltaFiles >= 0 ? "+" : "")
 							+ "?, 0) WHERE seNumber=?;", false, Long.valueOf(deltaBytes), Long.valueOf(deltaFiles), seNumber)) {
 						aiFiles.addAndGet(deltaFiles);
 						aiBytes.addAndGet(deltaBytes);
