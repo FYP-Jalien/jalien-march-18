@@ -696,7 +696,7 @@ public class JobBroker {
 
 			// Add Site Sonar Constraints
 			// Initialize or refresh constraint cache
-			HashMap<String, String> constraintCache = TaskQueueUtils.setConstraintCache();
+			HashMap<String, String> constraintCache = TaskQueueUtils.getConstraintCache();
 
 			if (constraintCache != null && constraintCache.size() > 0) {
 				// Constraint name is the constraint key

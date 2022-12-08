@@ -2742,7 +2742,7 @@ public class TaskQueueUtils {
 	/**
 	 * Cache Site Sonar constraints
 	 */
-	public static synchronized HashMap<String, String> setConstraintCache() {
+	public static synchronized HashMap<String, String> getConstraintCache() {
 		long currentTimestamp = System.currentTimeMillis();
 		// Refresh constraint cache every 10 minutes
 		if (currentTimestamp - lastConstraintUpdatedTimestamp > CACHE_REFRESH_INTERVAL) {
@@ -3773,7 +3773,7 @@ public class TaskQueueUtils {
 		// Parse Site Sonar constraints
 
 		// Initialize or refresh constraint cache
-		HashMap<String, String> constraintCache = TaskQueueUtils.setConstraintCache();
+		HashMap<String, String> constraintCache = TaskQueueUtils.getConstraintCache();
 
 		if (constraintCache != null && constraintCache.size() > 0) {
 			// Constraint name is the constraint key
