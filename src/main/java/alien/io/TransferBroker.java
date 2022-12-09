@@ -199,7 +199,7 @@ public class TransferBroker {
 
 				dbCached.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
 				dbCached.query(
-						"select /*! SQL_BUFFER_RESULT */ /*! SQL_SMALL_RESULT */  transferId, lfn, destination, remove_replica from TRANSFERS_DIRECT inner join (select sename, sum(max_transfers) mt, coalesce(max(active_cnt),0) at from PROTOCOLS left outer join (select se_name, count(1) as active_cnt from active_transfers group by se_name) a on (se_name=sename) group by sename having at<mt) b ON destination=sename where status='WAITING' order by at/mt asc, transferId-1000*attempts asc limit 100;");
+						"select /*! SQL_BUFFER_RESULT */ /*! SQL_SMALL_RESULT */  transferId, lfn, destination, remove_replica from TRANSFERS_DIRECT inner join (select sename, sum(max_transfers) mt, coalesce(max(active_cnt),0) at from PROTOCOLS left outer join (select se_name, count(1) as active_cnt from active_transfers group by se_name) a on (se_name=sename) group by sename having at<mt) b ON destination=sename where status='WAITING' order by at/mt asc, transferId-1000*attempts asc limit 500;");
 				dbCached.setTransactionIsolation(-1);
 				
 				if (!dbCached.moveNext()) {
