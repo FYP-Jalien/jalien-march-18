@@ -616,7 +616,7 @@ public class JobAgent implements Runnable {
 				putJobTrace("Error. Workdir for job could not be created");
 				return;
 			}
-
+			
 			jobWrapperLogDir = jobWorkdir + "/" + jobWrapperLogName;
 
 			logger.log(Level.INFO, "Started JA with: " + jdl);
@@ -645,7 +645,7 @@ public class JobAgent implements Runnable {
 		}
 		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Unable to handle job", e);
-			putJobTrace("ERROR: Unable to handle job: " + Arrays.toString(e.getStackTrace()));
+			putJobTrace("ERROR: Unable to handle job: " + e.toString() + " " + Arrays.toString(e.getStackTrace()));
 			changeJobStatus(JobStatus.ERROR_E, null);
 		}
 	}
@@ -703,7 +703,6 @@ public class JobAgent implements Runnable {
 					launchCmd.addAll(0, Arrays.asList("taskset", "-c", isolCmd));
 			}
 
-			logger.log(Level.SEVERE, "Launching command" + launchCmd);
 			return launchCmd;
 		}
 		catch (final IOException e) {
