@@ -451,9 +451,11 @@ public final class ComputingElement extends Thread {
 
 		before += startup_customization(0);
 
-		before += "source <( " + CVMFS.getAlienvPrint() + " ); " + "\n";
+		before += "export ALIENV='$((" + CVMFS.getAlienvPrint() + ") 2> >(if grep -q 'ERROR'; then echo ALIENV_ERRORS=TRUE; fi;) >&1 )" + "'\n";
 
 		before += startup_customization(1);
+
+		before += "source <( echo $ALIENV ); " + "\n";
 
 		final String content_str = before + getStartup() + "\n" + startup_customization(2);
 
