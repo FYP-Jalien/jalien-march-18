@@ -136,6 +136,7 @@ public class JobAgent implements Runnable {
 	private int childPID;
 	private long lastHeartbeat = 0;
 	private long jobStartupTime;
+	private final Containerizer containerizer = ContainerizerFactory.getContainerizer();
 
 	private enum jaStatus {
 		/**
@@ -501,6 +502,12 @@ public class JobAgent implements Runnable {
 					logger.log(Level.WARNING, "Unable to check for AVX support", ex);
 				}
 
+				//Do not match jobs here if broken environment, and we can't use containers to get a clean one
+				if (env.containsKey("ALIENV_ERRORS") && containerizer == null){
+					logger.log(Level.SEVERE, "The environment on this node appears to be broken. Please do " + CVMFS.getAlienvPrint() + " for more debug info.");
+					throw new EOFException("Job matching aborted due to potentially misconfigured environment");
+				}
+					
 				setStatus(jaStatus.REQUESTING_JOB);
 
 				if (siteMap.containsKey("Disk"))
@@ -678,21 +685,19 @@ public class JobAgent implements Runnable {
 				}
 			}
 
-			// Check if there is container support present on site. If yes, add to launchCmd
-			final Containerizer cont = ContainerizerFactory.getContainerizer();
-
-			if (cont != null) {
-				putJobTrace("Support for containers detected. Will use: " + cont.getContainerizerName());
-				cont.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
+			// If there is container support present on site, add to launchCmd
+			if (containerizer != null) {
+				putJobTrace("Support for containers detected. Will use: " + containerizer.getContainerizerName());
+				containerizer.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
 
 				//Only used on Cgroupsv2 hosts
-				if(cont.setMemLimit(jobMaxMemoryMB))
+				if(containerizer.setMemLimit(jobMaxMemoryMB))
 					putJobTrace("Warning: This host has support for cgroups v2. New features will be used.");
 
 				if (jdl.gets("DebugTag") != null)
-					cont.enableDebug(jdl.gets("DebugTag"));
+					containerizer.enableDebug(jdl.gets("DebugTag"));
 
-				launchCmd = cont.containerize(String.join(" ", launchCmd));
+				launchCmd = containerizer.containerize(String.join(" ", launchCmd));
 			}
 
 			// Run jobs in isolated environment
