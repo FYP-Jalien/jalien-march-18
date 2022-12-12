@@ -451,7 +451,7 @@ public final class ComputingElement extends Thread {
 
 		before += startup_customization(0);
 
-		before += "export ALIENV='$((" + CVMFS.getAlienvPrint() + ") 2> >(if grep -q 'ERROR'; then echo ALIENV_ERRORS=TRUE; fi;) >&1 )" + "'\n";
+		before += "export ALIENV='$((" + CVMFS.getAlienvPrint() + ") 2> >(if grep -q 'ERROR'; then echo \"export ALIENV_ERRORS='TRUE';\"; fi;) >&1 )" + "'\n";
 
 		before += startup_customization(1);
 
