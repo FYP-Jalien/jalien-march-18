@@ -6,6 +6,8 @@ import java.util.Iterator;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import alien.catalogue.LFN;
 import alien.catalogue.LFNUtils;
@@ -24,6 +26,8 @@ import lazyj.Format;
  * @since 2016-06-21
  */
 public class StagingService {
+	private static final Logger logger = Logger.getLogger(StagingService.class.getCanonicalName());
+
 	private static final int executorThreads = ConfigUtils.getConfig().geti("utils.StagingService.executorThreads", 16);
 	private static final int bgexecutorThreads = ConfigUtils.getConfig().geti("utils.StagingService.bgexecutorThreads", 16);
 
@@ -87,6 +91,8 @@ public class StagingService {
 
 					Iterator<PFN> it = pfns.iterator();
 
+					final int replicas = pfns.size();
+
 					// first pass: remove non-existing SEs and check if it has a copy on disk at CERN
 					while (it.hasNext()) {
 						final PFN p = it.next();
@@ -113,6 +119,8 @@ public class StagingService {
 								it.remove();
 						}
 					}
+
+					logger.log(Level.FINE, l.getCanonicalName() + " has " + pfns.size() + " replicas to stage (out of " + replicas + " initially), any on CERN disks = " + hasDiskCopyAtCern);
 
 					// stage the remaining tape replicas
 					for (final PFN p : pfns)
