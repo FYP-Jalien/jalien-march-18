@@ -696,7 +696,7 @@ public class JobBroker {
 
 			// Add Site Sonar Constraints
 			// Initialize or refresh constraint cache
-			HashMap<String, String> constraintCache = TaskQueueUtils.setConstraintCache();
+			HashMap<String, String> constraintCache = TaskQueueUtils.getConstraintCache();
 
 			if (constraintCache != null && constraintCache.size() > 0) {
 				// Constraint name is the constraint key
@@ -707,13 +707,16 @@ public class JobBroker {
 					logger.log(Level.FINE, "Constraint name : " + constraintName);
 					logger.log(Level.FINE, "Constraint expression : " + constraintType);
 
-					// If the site map has a value for the constraint and if its enabled, add the constraint check
+					// If the site map has a value for the constraint, add the constraint check
 					if (matchRequest.containsKey(constraintName)) {
 						Object constraintValue = matchRequest.get(constraintName);
 						logger.log(Level.FINE, "Constraint value : " + constraintValue);
 						if (constraintValue != null) {
+							// By default, any node that either match the constraint value or does not have the constraint
+							// values defined will be matched to the node. Only the jobs that specifically does not match to
+							// the constraint value will be rejected
 							if (constraintType.equals("equality")) {
-								//eg:- SELECT * FROM JOB_AGENT WHERE... AND ((? = OS_NAME) OR (OS_NAME is null))
+								// eg:- SELECT * FROM JOB_AGENT WHERE... AND ((? = OS_NAME) OR (OS_NAME is null))
 								// SELECT * FROM JOB_AGENT WHERE... (('centos' = OS_NAME) OR (OS_NAME is null))
 								where += " and (( ? = " + constraintName + ") or (" + constraintName + " is null))";
 							} else if (constraintType.equals("regex")) {
@@ -725,10 +728,13 @@ public class JobBroker {
 								logger.log(Level.SEVERE, "Incorrect expression type provided: " + constraintType);
 								return matchAnswer;
 							}
-							// todo: ensure constraint.jsp send the right data type and sitemap use the same data type
+							// It is necessary to ensure constraint.jsp send the right data type and sitemap use the same data type
+							// because the value comparison is done at runtime with type "Object"
 							bindValues.add(constraintValue);
 						}
-
+					} else {
+						logger.log(Level.FINE, "Site map does not contain a value for : " + constraintName +
+								". Skipping the constraint");
 					}
 				}
 			}
