@@ -313,6 +313,7 @@ public final class CatalogueUtils {
 			if (db == null)
 				return 0;
 
+			db.setQueryTimeout(5);
 			db.setReadOnly(true);
 
 			String selectQuery = "SELECT UNIX_TIMESTAMP(last_updated) FROM INDEXTABLE_UPDATE";

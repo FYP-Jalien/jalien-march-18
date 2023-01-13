@@ -481,7 +481,12 @@ public class SE implements Serializable, Comparable<SE> {
 			logger.log(Level.WARNING, "Got exception getting access tokens to read the space information of " + originalName, t);
 		}
 
-		return Factory.xrootd.getSpaceInfo(pfn);
+		final SpaceInfo info = Factory.xrootd.getSpaceInfo(pfn);
+
+		if (info != null)
+			info.applyReplicaCorrection(getReplicationFactor());
+
+		return info;
 	}
 
 	/**
@@ -502,6 +507,24 @@ public class SE implements Serializable, Comparable<SE> {
 			logger.log(Level.WARNING, "HTTP port is defined but not as a number for " + seName);
 			return -2;
 		}
+	}
+
+	/**
+	 * @return the SE internal replication factor, by which the total and used space will be divided for accounting purposes
+	 */
+	public double getReplicationFactor() {
+		final String factor = options.get("replicationfactor");
+
+		if (factor != null) {
+			try {
+				return Double.parseDouble(factor);
+			}
+			catch (NumberFormatException nfe) {
+				logger.log(Level.WARNING, "Replication factor is not a number for " + seName);
+			}
+		}
+
+		return 1;
 	}
 
 	/**

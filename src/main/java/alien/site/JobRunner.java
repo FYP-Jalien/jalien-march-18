@@ -53,6 +53,8 @@ public class JobRunner extends JobAgent {
 
 		final int maxRetries = Integer.parseInt(System.getenv().getOrDefault("MAX_RETRIES", "2"));
 
+		int jrPid = MonitorFactory.getSelfProcessID();
+
 		while (timestamp < ttlEnd) {
 			synchronized (JobAgent.requestSync) {
 				try {
@@ -60,6 +62,8 @@ public class JobRunner extends JobAgent {
 						logger.log(Level.INFO, "Spawned thread nr " + i);
 						jaThread = new Thread(new JobAgent());
 						jaThread.start();
+						if (cpuIsolation == true)
+							checkAndApplyIsolation(jrPid);
 						monitor.sendParameter("state", "Waiting for JA to get a job");
 						monitor.sendParameter("statenumeric", Long.valueOf(1));
 						i++;

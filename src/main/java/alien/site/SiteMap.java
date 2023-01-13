@@ -120,6 +120,9 @@ public class SiteMap {
 		// Get required cpu cores from cerequirements field
 		final ArrayList<String> requiredCpus = getFieldContentsFromCerequirements(ceRequirements, CE_FIELD.RequiredCpuCores);
 
+		// Get cpuIsolation from cerequirements field
+		final ArrayList<String> cpuIsolation = getFieldContentsFromCerequirements(ceRequirements, CE_FIELD.CPUIsolation);
+
 		// Workdir
 		String workdir = UserFactory.getUserHome();
 		if (env.containsKey("HOME"))
@@ -159,11 +162,12 @@ public class SiteMap {
 		// get from env or LDAP to cap number of CPUs
 		if (env.containsKey("CPUCores")) {
 			numCpus = Long.parseLong(env.get("CPUCores"));
+			siteMap.put("WholeNode", Boolean.valueOf(false));
 			if (numCpus == 0) {
+				siteMap.put("WholeNode", Boolean.valueOf(true));
 				try {
 					// get from system
 					numCpus = BkThread.getNumCPUs();
-
 					potentialCpus = memorySize / (2 * 1024 * 1024 * 1024L);
 					if (numCpus > potentialCpus)
 						numCpus = potentialCpus;
@@ -213,6 +217,8 @@ public class SiteMap {
 			siteMap.put("RequiredCpusCe", requiredCpus.size() > 0 ? requiredCpus.get(0) : env.get("RequiredCpusCe"));
 		if (extrasites.size() > 0)
 			siteMap.put("Extrasites", extrasites);
+		if (cpuIsolation.size() > 0)
+			siteMap.put("cpuIsolation", cpuIsolation.get(0));
 
 		siteMap.put("Host", alienCm.split(":")[0]);
 
@@ -261,7 +267,12 @@ public class SiteMap {
 		/**
 		 * CPU Cores pattern in matcharg
 		 */
-		MatchCpuCores(Pattern.compile("\\s*CPUCORES\\s*=\\s*([0-9]+)"));
+		MatchCpuCores(Pattern.compile("\\s*CPUCORES\\s*=\\s*([0-9]+)")),
+
+		/**
+		 * CPU isolation in ceRequirements
+		 */
+		CPUIsolation(Pattern.compile("\\s*cpuIsolation\\s*=\\s*\"(\\w+)\""));
 
 		private final Pattern pattern;
 

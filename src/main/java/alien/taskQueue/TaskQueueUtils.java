@@ -87,6 +87,11 @@ public class TaskQueueUtils {
 	 */
 	public static final boolean dbStructure2_20;
 
+	/**
+	 * Limit the number of jobs selected from DB
+	 */
+	public static final int job_limit = 50000;
+
 	private static final Map<String, String> fieldMap;
 
 	static {
@@ -590,8 +595,8 @@ public class TaskQueueUtils {
 			else
 				where += " status!='KILLED' ";
 
-			int lim = 20000;
-			if (limit > 0 && limit < 100000)
+			int lim = job_limit;
+			if (limit > 0 && limit < job_limit)
 				lim = limit;
 
 			final String q;
@@ -1061,9 +1066,9 @@ public class TaskQueueUtils {
 			if (monitor != null)
 				monitor.incrementCounter("TQ_db_lookup");
 
-			int lim = 20000;
+			int lim = job_limit;
 
-			if (limit > 0 && limit < 50000)
+			if (limit > 0 && limit < job_limit)
 				lim = limit;
 
 			String where = "";
