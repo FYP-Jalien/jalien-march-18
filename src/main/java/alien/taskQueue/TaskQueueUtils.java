@@ -2740,6 +2740,39 @@ public class TaskQueueUtils {
 		siteQueueStatusCache.put(ce, status, 1000 * 60);
 	}
 
+	private static final HashMap<String, String> constraintCache = new HashMap<>();
+	private static long lastConstraintUpdatedTimestamp = 0;
+	private static final long CACHE_REFRESH_INTERVAL = 5 * 60 * 1000L;
+
+	/**
+	 * Cache Site Sonar constraints
+	 */
+	public static synchronized HashMap<String, String> getConstraintCache() {
+		long currentTimestamp = System.currentTimeMillis();
+		// Refresh constraint cache every 10 minutes
+		if (currentTimestamp - lastConstraintUpdatedTimestamp > CACHE_REFRESH_INTERVAL) {
+			System.err.println("Refreshing constraint cache as it is expired");
+			try (DBFunctions db = getQueueDB()) {
+				if (db == null)
+					return null;
+				db.setQueryTimeout(30);
+				db.query("SELECT * FROM SITESONAR_CONSTRAINTS WHERE enabled=true", false);
+
+				logger.log(Level.INFO, "Updating constraint cache at " + currentTimestamp);
+				while (db.moveNext()) {
+					String constraintName = db.gets("name");
+					String constraintExpression = db.gets("expression");
+					constraintCache.put(constraintName, constraintExpression);
+					logger.log(Level.INFO, "Added the constraint name: " + constraintName + ", type: "
+							+ constraintExpression + " to the constraint cache");
+				}
+				lastConstraintUpdatedTimestamp = currentTimestamp;
+			}
+		}
+
+		return constraintCache;
+	}
+
 	private static volatile boolean dbStructureInitialized = false;
 
 	private static void tqDBStructureInit() {
@@ -3741,6 +3774,23 @@ public class TaskQueueUtils {
 		params.put("cpucores", Integer.valueOf(cpuCores));
 
 		params.put("disk", Integer.valueOf(getWorkDirSizeMB(jdl, cpuCores) * 1024));
+
+		// Parse Site Sonar constraints
+
+		// Initialize or refresh constraint cache
+		HashMap<String, String> constraintCache = TaskQueueUtils.getConstraintCache();
+
+		if (constraintCache != null && constraintCache.size() > 0) {
+			// Constraint name is the constraint key
+			for (String key : constraintCache.keySet()) {
+				// eg - key : CGROUPSv2_AVAILABLE
+				// eg - value : taken from JDL (true)
+				Object constraintValue = jdl.get(key); // check if JDL has a pattern matching the constraint key
+				if (constraintValue != null) {
+					params.put(key, constraintValue);
+				}
+			}
+		}
 
 		// parse the other.CloseSE (and !)
 

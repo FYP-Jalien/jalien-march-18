@@ -10,12 +10,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import lazyj.cache.ExpirationCache;
 import org.nfunk.jep.JEP;
 
 import alien.api.Dispatcher;
@@ -689,6 +691,51 @@ public class JobBroker {
 					final String operator = "==".equals(m.group(1)) ? "=" : m.group(1);
 					where += " and cpucores " + operator + " ? ";
 					bindValues.add(Integer.valueOf(m.group(2)));
+				}
+			}
+
+			// Add Site Sonar Constraints
+			// Initialize or refresh constraint cache
+			HashMap<String, String> constraintCache = TaskQueueUtils.getConstraintCache();
+
+			if (constraintCache != null && constraintCache.size() > 0) {
+				// Constraint name is the constraint key
+				for ( Map.Entry<String, String> entry : constraintCache.entrySet()) {
+					String constraintName = entry.getKey();
+					String constraintType = entry.getValue();
+					logger.log(Level.FINE, "Enforcing additional constraints for " + matchRequest.get("Localhost"));
+					logger.log(Level.FINE, "Constraint name : " + constraintName);
+					logger.log(Level.FINE, "Constraint expression : " + constraintType);
+
+					// If the site map has a value for the constraint, add the constraint check
+					if (matchRequest.containsKey(constraintName)) {
+						Object constraintValue = matchRequest.get(constraintName);
+						logger.log(Level.FINE, "Constraint value : " + constraintValue);
+						if (constraintValue != null) {
+							// By default, any node that either match the constraint value or does not have the constraint
+							// values defined will be matched to the node. Only the jobs that specifically does not match to
+							// the constraint value will be rejected
+							if (constraintType.equals("equality")) {
+								// eg:- SELECT * FROM JOB_AGENT WHERE... AND ((? = OS_NAME) OR (OS_NAME is null))
+								// SELECT * FROM JOB_AGENT WHERE... (('centos' = OS_NAME) OR (OS_NAME is null))
+								where += " and (( ? = " + constraintName + ") or (" + constraintName + " is null))";
+							} else if (constraintType.equals("regex")) {
+								// SELECT * FROM JOB_AGENT WHERE... AND ((? LIKE CPU_FLAGS) OR (CPU_FLAGS is null))
+								// SELECT * FROM JOB_AGENT WHERE... AND ((flag1 flag2 avx LIKE %avx%) OR (CPU_FLAGS is null))
+								where += " and (( ? LIKE " + constraintName + ") or (" + constraintName + " is null))";
+							} else {
+								// stop matching because the constraint type is not supported
+								logger.log(Level.SEVERE, "Incorrect expression type provided: " + constraintType);
+								return matchAnswer;
+							}
+							// It is necessary to ensure constraint.jsp send the right data type and sitemap use the same data type
+							// because the value comparison is done at runtime with type "Object"
+							bindValues.add(constraintValue);
+						}
+					} else {
+						logger.log(Level.FINE, "Site map does not contain a value for : " + constraintName +
+								". Skipping the constraint");
+					}
 				}
 			}
 
