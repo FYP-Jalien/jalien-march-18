@@ -134,11 +134,11 @@ public abstract class BatchQueue {
 	}
 
 	static List<String> getStdOut(ExitStatus exitStatus) {
-		return Arrays.asList(exitStatus.getStdOut().split("\n")).stream().map(String::trim).collect(Collectors.toList());
+		return Arrays.asList(exitStatus.getStdOut().split("\n")).stream().map(String::trim).filter((s) -> !s.isBlank()).collect(Collectors.toList());
 	}
 
 	static List<String> getStdErr(ExitStatus exitStatus) {
-		return Arrays.asList(exitStatus.getStdOut().split("\n")).stream().map(String::trim).collect(Collectors.toList());
+		return Arrays.asList(exitStatus.getStdErr().split("\n")).stream().map(String::trim).filter((s) -> !s.isBlank()).collect(Collectors.toList());
 	}
 
 	/**
