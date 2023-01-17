@@ -1098,6 +1098,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 					catch (final IOException ioe) {
 						// ignore, will try next protocol or fetch another replica to replace this one
 						protocolUploadErrors += System.lineSeparator() + ioe.toString();
+						commander.printErrln(ioe.toString());
 					}
 				}
 				catch (@SuppressWarnings("unused") final Exception e) {
