@@ -710,7 +710,18 @@ public class JobAgent implements Runnable {
 			return launchCmd;
 		}
 		catch (final IOException e) {
-			logger.log(Level.SEVERE, "Could not generate JobWrapper launch command: " + e.toString());
+			logger.log(Level.SEVERE, ": ", e);
+			putJobTrace("Could not generate JobWrapper launch command " + e.toString());
+
+			try {
+				File[] listOfFiles = new File("/proc/" + MonitorFactory.getSelfProcessID() + "/fd").listFiles();
+				putJobTrace("Length of /proc/" + MonitorFactory.getSelfProcessID() + "/fd is: " + listOfFiles.length);
+				logger.log(Level.INFO, "Length of /proc/" + MonitorFactory.getSelfProcessID() + "/fd is: " + listOfFiles.length);
+			}
+			catch (final Exception e2) {
+				putJobTrace("Could not run debug for launchCommand: " + e2.toString());
+				logger.log(Level.SEVERE, "Could not run debug for launchCommand: ", e2);
+			}
 			return null;
 		}
 	}
