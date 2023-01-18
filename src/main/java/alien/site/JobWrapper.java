@@ -1072,13 +1072,14 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		try {
+			// Write status to file for the JobAgent to see
+			Files.writeString(Paths.get(tmpDir + "/" + jobstatusFile), newStatus.name());
+
 			// Set the updated status
 			if (!TaskQueueApiUtils.setJobStatus(queueId, resubmission, newStatus, extrafields)) {
 				jobKilled = true;
 				return false;
 			}
-			// Also write status to file for the JobAgent to see
-			Files.writeString(Paths.get(tmpDir + "/" + jobstatusFile), newStatus.name());
 		}
 		catch (final Exception e) {
 			logger.log(Level.WARNING, "An error occurred when attempting to change current job status: " + e);

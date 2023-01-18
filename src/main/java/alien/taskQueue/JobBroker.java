@@ -17,7 +17,6 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import lazyj.cache.ExpirationCache;
 import org.nfunk.jep.JEP;
 
 import alien.api.Dispatcher;

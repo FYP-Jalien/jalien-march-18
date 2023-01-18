@@ -124,6 +124,7 @@ public class JobAgent implements Runnable {
 	private long prevTime = 0;
 	private int cpuCores = 1;
 	private long ttl;
+	private String endState = "";
 
 	private static AtomicInteger totalJobs = new AtomicInteger(0);
 	private final int jobNumber;
@@ -293,8 +294,13 @@ public class JobAgent implements Runnable {
 	 */
 	protected static final AtomicInteger retries = new AtomicInteger(0);
 
+	/**
+	 * Number of attempts since last successful job
+	 */
+	protected static final AtomicInteger attempts = new AtomicInteger(1);
+
 	static NUMAExplorer numaExplorer;
-	//static final NUMAExplorer numaExplorer = new NUMAExplorer(Runtime.getRuntime().availableProcessors());
+	// static final NUMAExplorer numaExplorer = new NUMAExplorer(Runtime.getRuntime().availableProcessors());
 	static boolean wholeNode;
 	static byte[] initialMask;
 
@@ -437,7 +443,7 @@ public class JobAgent implements Runnable {
 			logger.log(Level.WARNING, "Problem with the monitoring objects ApMon Exception: " + e.toString());
 		}
 
-		wholeNode = ((Boolean)siteMap.getOrDefault("WholeNode", Boolean.valueOf(false))).booleanValue();
+		wholeNode = ((Boolean) siteMap.getOrDefault("WholeNode", Boolean.valueOf(false))).booleanValue();
 		initialMask = getInitialMask();
 		synchronized (cpuSync) {
 			if (numaExplorer == null && cpuIsolation == true)
@@ -459,9 +465,9 @@ public class JobAgent implements Runnable {
 
 	}
 
-	//#############################################################
-	//################## MAIN EXECUTION FLOW ######################
-	//#############################################################
+	// #############################################################
+	// ################## MAIN EXECUTION FLOW ######################
+	// #############################################################
 	/**
 	 * @param args
 	 * @throws IOException
@@ -478,6 +484,18 @@ public class JobAgent implements Runnable {
 	@Override
 	public void run() {
 		logger.log(Level.INFO, "Starting JobAgent " + jobNumber + " in " + hostName);
+
+		// Wait before matching if previous jobs have been failing
+		if (attempts.getAcquire() > 1) {
+			try {
+				final int timeToWait = (int) Math.pow(5, attempts.getAcquire());
+				logger.log(Level.INFO, "A previous job failed. Will wait " + timeToWait + "s before continuing...");
+				Thread.sleep(timeToWait * 1000);
+			}
+			catch (InterruptedException e1) {
+				// ignore
+			}
+		}
 
 		logger.log(Level.INFO, siteMap.toString());
 		try {
@@ -597,12 +615,16 @@ public class JobAgent implements Runnable {
 
 			if (RUNNING_CPU.equals(MAX_CPU))
 				retries.getAndIncrement();
-			// synchronized (requestSync) {
-			// requestSync.notify();
-			// }
-		} finally {
+
+		}
+		finally {
 			if (cpuIsolation == true)
 				numaExplorer.refillAvailable(jobNumber);
+
+			if (!"DONE".equals(endState) && !"DONE_WARNING".equals(endState))
+				attempts.getAndIncrement();
+			else
+				attempts.set(1);
 		}
 
 		setStatus(jaStatus.FINISHING_JA);
@@ -942,18 +964,17 @@ public class JobAgent implements Runnable {
 			if (mj != null)
 				mj.close();
 
+			endState = getWrapperJobStatus();	
 			if (code != 0) {
-				// Looks like something went wrong. Let's check the last reported status
-				final String lastStatus = getWrapperJobStatus();
-				if ("STARTED".equals(lastStatus) || "RUNNING".equals(lastStatus)) {
+				if ("STARTED".equals(endState) || "RUNNING".equals(endState)) {
 					putJobTrace("ERROR: The JobWrapper was killed before job could complete");
 					changeJobStatus(JobStatus.ERROR_E, null); // JobWrapper was killed before the job could be completed
 				}
-				else if ("SAVING".equals(lastStatus)) {
+				else if ("SAVING".equals(endState)) {
 					putJobTrace("ERROR: The JobWrapper was killed during saving");
 					changeJobStatus(JobStatus.ERROR_SV, null); // JobWrapper was killed during saving
 				}
-				else if (lastStatus.isBlank()) {
+				else if (endState.isBlank()) {
 					putJobTrace("ERROR: The JobWrapper was killed before job start");
 					changeJobStatus(JobStatus.ERROR_IB, null); // JobWrapper was killed before payload start
 				}
@@ -1695,7 +1716,7 @@ public class JobAgent implements Runnable {
 		}
 		catch (final IOException e) {
 			logger.log(Level.WARNING, "Attempt to read job status failed. Ignoring: " + e.toString());
-			return "";
+			return "Unread";
 		}
 	}
 
