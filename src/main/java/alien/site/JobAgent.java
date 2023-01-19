@@ -76,6 +76,8 @@ import lazyj.ExtProperties;
 import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
 import lia.util.process.ExternalProcesses;
+import sun.misc.Signal;
+
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -520,11 +522,11 @@ public class JobAgent implements Runnable {
 					logger.log(Level.WARNING, "Unable to check for AVX support", ex);
 				}
 
-				if (env.containsKey("ALIENV_ERRORS") && containerizer == null){
+				if (env.containsKey("ALIENV_ERRORS") && containerizer == null) {
 					logger.log(Level.SEVERE, "The environment on this node appears to be broken. Please do \"" + CVMFS.getAlienvPrint() + "\" for more debug info.");
 					throw new EOFException("Job matching aborted due to potentially misconfigured environment");
 				}
-				
+
 				setStatus(jaStatus.REQUESTING_JOB);
 
 				if (siteMap.containsKey("Disk"))
@@ -644,7 +646,7 @@ public class JobAgent implements Runnable {
 				putJobTrace("Error. Workdir for job could not be created");
 				return;
 			}
-			
+
 			jobWrapperLogDir = jobWorkdir + "/" + jobWrapperLogName;
 
 			logger.log(Level.INFO, "Started JA with: " + jdl);
@@ -668,7 +670,7 @@ public class JobAgent implements Runnable {
 					childPID = (int) p.pid();
 			}
 
-			//Start and monitor execution
+			// Start and monitor execution
 			monitorExecution(p, true);
 		}
 		catch (final Exception e) {
@@ -711,8 +713,8 @@ public class JobAgent implements Runnable {
 				putJobTrace("Support for containers detected. Will use: " + containerizer.getContainerizerName());
 				containerizer.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
 
-				//Only used on Cgroupsv2 hosts
-				if(containerizer.setMemLimit(jobMaxMemoryMB))
+				// Only used on Cgroupsv2 hosts
+				if (containerizer.setMemLimit(jobMaxMemoryMB))
 					putJobTrace("Warning: This host has support for cgroups v2. New features will be used.");
 
 				if (jdl.gets("DebugTag") != null)
@@ -848,6 +850,24 @@ public class JobAgent implements Runnable {
 				killGracefully(p);
 			}
 		};
+
+		sun.misc.SignalHandler sig = new sun.misc.SignalHandler() {
+			@Override
+			public void handle(Signal arg0) {
+				logger.log(Level.SEVERE, "JobAgent: " + arg0.toString() + " received. Killing payload!");
+				if (p.isAlive()) {
+					putJobTrace("JobAgent: " + arg0.toString() + " received. Killing payload!");
+					killForcibly(p);
+				}
+				else {
+					JobWrapper.cleanupProcesses(queueId, mj.getPid());
+					System.exit(130);
+				}
+			}
+		};
+		sun.misc.Signal.handle(new sun.misc.Signal("INT"), sig);
+		sun.misc.Signal.handle(new sun.misc.Signal("TERM"), sig);
+
 
 		final Timer t = new Timer();
 		t.schedule(killPayload, TimeUnit.MILLISECONDS.convert(ttl, TimeUnit.SECONDS)); // TODO: ttlForJob
