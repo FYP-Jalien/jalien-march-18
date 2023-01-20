@@ -1420,7 +1420,7 @@ public class JobAgent implements Runnable {
 			return "Job was killed";
 
 		//Also check for core directories, and abort if found to avoid filling up disk space
-		final Pattern coreDirPattern = Pattern.compile("core.*");
+		final Pattern coreDirPattern = Pattern.compile("^(?!.*\\.inp).*core.*$");
 		try {
 			List<File> coreDirs = Files.walk(new File(jobWorkdir).toPath())
 					.map(Path::toFile)
@@ -1434,7 +1434,7 @@ public class JobAgent implements Runnable {
 			logger.log(Level.WARNING, "Exception while checking for core directories: ", e1);
 
 			logger.log(Level.INFO, "Attempting core check using shell instead");
-			final String[] matchedDirs = SystemCommand.bash("find -name core.*").stdout.split("\n");
+			final String[] matchedDirs = SystemCommand.bash("find -name core* ! -name *.inp").stdout.split("\n");
 
 			if (matchedDirs.length > 0)
 				return "Core directory detected: " + matchedDirs[0] + ". Aborting!";
