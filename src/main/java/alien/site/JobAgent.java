@@ -842,15 +842,6 @@ public class JobAgent implements Runnable {
 				sendProcessResources(false);
 		}
 
-		final TimerTask killPayload = new TimerTask() {
-			@Override
-			public void run() {
-				logger.log(Level.SEVERE, "Timeout has occurred. Killing job!");
-				putJobTrace("Killing the job (it was running for longer than its TTL)");
-				killGracefully(p);
-			}
-		};
-
 		sun.misc.SignalHandler sig = new sun.misc.SignalHandler() {
 			@Override
 			public void handle(Signal arg0) {
@@ -868,6 +859,14 @@ public class JobAgent implements Runnable {
 		sun.misc.Signal.handle(new sun.misc.Signal("INT"), sig);
 		sun.misc.Signal.handle(new sun.misc.Signal("TERM"), sig);
 
+		final TimerTask killPayload = new TimerTask() {
+			@Override
+			public void run() {
+				logger.log(Level.SEVERE, "Timeout has occurred. Killing job!");
+				putJobTrace("Killing the job (it was running for longer than its TTL)");
+				killGracefully(p);
+			}
+		};
 
 		final Timer t = new Timer();
 		t.schedule(killPayload, TimeUnit.MILLISECONDS.convert(ttl, TimeUnit.SECONDS)); // TODO: ttlForJob
@@ -1432,7 +1431,13 @@ public class JobAgent implements Runnable {
 				return "Core directory detected: " + coreDirs.get(0).getName() + ". Aborting!";
 		}
 		catch (Exception e1) {
-			logger.log(Level.WARNING, "Exception while checking for core files: ", e1);
+			logger.log(Level.WARNING, "Exception while checking for core directories: ", e1);
+
+			logger.log(Level.INFO, "Attempting core check using shell instead");
+			final String[] matchedDirs = SystemCommand.bash("find -name core.*").stdout.split("\n");
+
+			if (matchedDirs.length > 0)
+				return "Core directory detected: " + matchedDirs[0] + ". Aborting!";
 		}
 
 		String error = null;
