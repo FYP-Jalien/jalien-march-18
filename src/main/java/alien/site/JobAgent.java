@@ -345,6 +345,7 @@ public class JobAgent implements Runnable {
 		setStatus(jaStatus.STARTING_JA);
 
 		logger = ConfigUtils.getLogger(JobAgent.class.getCanonicalName() + " " + jobNumber);
+
 		FileHandler handler = null;
 		try {
 			handler = new FileHandler("job-agent-" + jobNumber + ".log");
@@ -699,6 +700,7 @@ public class JobAgent implements Runnable {
 						cmdScanner.next();
 					else if (readArg.contains("alien.site.JobRunner") || readArg.contains("alien.site.JobAgent")) {
 						launchCmd.add("-Djobagent.vmid=" + queueId);
+						launchCmd.add("-Djava.util.logging.SimpleFormatter.format='JobID " + queueId + ": %1$tb %1$td, %1$tY %1$tH:%1$tM:%1$tS %2$s %n%4$s: %5$s%6$s%n'");
 						launchCmd.add("-cp");
 						launchCmd.add(jarPath + jarName);
 						launchCmd.add("alien.site.JobWrapper");
