@@ -152,6 +152,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 		lfns = commander.c_api.find(path, alPaths.get(1), query, flags, xmlCollectionPath, queueid, limit != Long.MAX_VALUE ? limit + offset : -1);
 
 		int count = 0;
+		long size = 0;
 
 		if (lfns != null) {
 			if (offset >= lfns.size())
@@ -169,6 +170,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 					break;
 
 				count++;
+				size += lfn.getSize();
 
 				commander.outNextResult();
 				commander.printOut("lfn", lfn.getCanonicalName());
@@ -215,8 +217,14 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 		if (xmlOutput != null)
 			commander.printOutln(xmlOutput.toString());
 
-		if (bC)
-			commander.printOutln("Found " + count + " maching entries");
+		if (bC) {
+			String output = "Found " + count + " maching entries";
+
+			if (bW)
+				output += ", of " + (bH ? Format.size(size) : String.valueOf(size));
+
+			commander.printOutln(output);
+		}
 	}
 
 	private static final DateFormat formatter = new SimpleDateFormat("MMM dd HH:mm");
