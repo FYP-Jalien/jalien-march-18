@@ -150,7 +150,7 @@ public class ParsedOutput {
 				if (file.isBlank())
 					System.err.println("Looks like we have an empty file. Ignoring: " + file);
 				else if (file.contains("*")){
-					final String[] parts = SystemCommand.bash("find " + file + " ! -type d").stdout.split("\n");
+					final String[] parts = SystemCommand.bash("find -name '" + file + "' ! -type d").stdout.split("\n");
 					if (parts.length > 0)
 					for (String f : parts) {
 						f = f.trim();
