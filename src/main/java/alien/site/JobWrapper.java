@@ -349,12 +349,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				return valUploadExitCode;
 			}
 
+			//Cleanup trailing processes before uploading
+			cleanupProcesses(queueId, pid);
+
 			if (!uploadOutputFiles(JobStatus.DONE)) {
 				logger.log(Level.SEVERE, "Failed to upload output files");
 				return -1;
 			}
-
-			cleanupProcesses(queueId, pid);
 
 			return 0;
 		}
