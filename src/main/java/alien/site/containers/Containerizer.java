@@ -3,7 +3,6 @@ package alien.site.containers;
 import java.io.File;
 import java.util.List;
 import java.util.Scanner;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -109,27 +108,7 @@ public abstract class Containerizer {
 	 * @return <code>true</code> if running a simple command (java -version) is possible with cgv2 constraints
 	 */
 	public boolean checkCgroupsv2() {
-		useCgroupsv2 = false;
-		try {
-			final ProcessBuilder mntCheck = new ProcessBuilder(new String[] { "/bin/bash", "-c", "mount -l | grep cgroup" });
-			final Process mntCheckPs = mntCheck.start();
-			mntCheckPs.waitFor(15, TimeUnit.SECONDS);
-
-			try (Scanner cmdScanner = new Scanner(mntCheckPs.getInputStream())) {
-				while (cmdScanner.hasNext()) {
-					if (cmdScanner.next().contains("cgroup2")) {
-						useCgroupsv2 = true;
-					}
-				}
-			}
-		}
-		catch (final Exception e) {
-			logger.log(Level.WARNING, "Failed to check for cgroupsv2 support: " + e.toString());
-			return false;
-		}
-
-		if (useCgroupsv2 == false)
-			return false;
+		useCgroupsv2 = true;
 
 		if (!isSupported())
 			useCgroupsv2 = false;
