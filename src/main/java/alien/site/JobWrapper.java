@@ -349,7 +349,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				return valUploadExitCode;
 			}
 
-			//Cleanup trailing processes before uploading
+			// Cleanup trailing processes before uploading
 			cleanupProcesses(queueId, pid);
 
 			if (!uploadOutputFiles(JobStatus.DONE)) {
@@ -495,8 +495,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		try {
 			sun.misc.Signal.handle(new sun.misc.Signal("INT"), sig -> {
-				logger.log(Level.SEVERE,"JobWrapper: SIGINT received. Shutting down NOW!"); //Handled by JA
-			}); 
+				logger.log(Level.SEVERE, "JobWrapper: SIGINT received. Shutting down NOW!"); // Handled by JA
+			});
 
 			sun.misc.Signal.handle(new sun.misc.Signal("TERM"), sig -> {
 				System.err.println("SIGTERM received. Killing payload and proceeding to upload.");
@@ -751,17 +751,28 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		// creates xml file with the InputData
 		final String list = jdl.gets("InputDataList");
 
-		if (list == null) {
-			logger.log(Level.WARNING, "XML List is NULL!");
+		if (list == null || list.isBlank()) {
+			logger.log(Level.WARNING, "InputDataList is NULL!");
 			return null;
 		}
-		logger.log(Level.INFO, "Going to create: " + list);
 
-		final String format = jdl.gets("InputDataListFormat");
-		if (!"xml-single".equals(format) && !"txt-list".equals(format)) {
+		String format = jdl.gets("InputDataListFormat");
+
+		if (format == null || format.isBlank()) {
+			if (list.toLowerCase().endsWith(".xml"))
+				format = "xml-single";
+			else if (list.toLowerCase().endsWith(".txt"))
+				format = "txt-list";
+			else if (list.toLowerCase().endsWith(".json"))
+				format = "json";
+		}
+
+		if (!"xml-single".equals(format) && !"txt-list".equals(format) && !"json".equals(format)) {
 			logger.log(Level.WARNING, "Data list format not understood: " + format);
 			return null;
 		}
+
+		logger.log(Level.INFO, "Going to create: " + list + ", format " + format);
 
 		final List<String> datalist = jdl.getInputData(true);
 
@@ -775,21 +786,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		final XmlCollection c = new XmlCollection();
 		c.setName("jobinputdata");
+		c.setCommand("JobWrapper.createInputDataList");
+		c.setOwner(String.valueOf(pid));
 
-		// TODO: Change
-		for (final String s : datalist) {
-			final LFN l = c_api.getLFN(s);
-			if (l == null)
-				continue;
-			c.add(l);
-		}
+		c.addAll(c_api.getLFNs(datalist, true, false));
 
-		return c.toString();
-
-		// logger.log(Level.WARNING, "Writing XML to:" + currentDir.getAbsolutePath() + "/" + list);
-		// Files.write(Paths.get(currentDir.getAbsolutePath() + "/" + list), content.getBytes());
-
-		// logger.log(Level.INFO, "XML creation has completed");;
+		return "json".equals(format) ? c.toJSON() : c.toString();
 	}
 
 	private HashMap<String, String> getJobPackagesEnvironment() {

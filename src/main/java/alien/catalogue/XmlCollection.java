@@ -6,11 +6,14 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
@@ -392,5 +395,21 @@ public class XmlCollection extends LinkedHashSet<LFN> {
 		sb.append("</alien>");
 
 		return sb.toString();
+	}
+
+	/**
+	 * @return JSON serialized collection content
+	 */
+	public String toJSON() {
+		final Map<String, Object> properties = new LinkedHashMap<>();
+
+		properties.put("name", collectionName != null && collectionName.length() > 0 ? collectionName : "tempCollection");
+		properties.put("command", Format.escHtml(command != null ? command : "alien.catalogue.XmlCollection"));
+		properties.put("creator", owner != null ? owner : "JAliEn-Central");
+		properties.put("timestamp", Long.valueOf(System.currentTimeMillis()));
+
+		properties.put("files", this.stream().map(l -> l.toMap()).collect(Collectors.toList()));
+
+		return Format.toJSON(properties).toString();
 	}
 }

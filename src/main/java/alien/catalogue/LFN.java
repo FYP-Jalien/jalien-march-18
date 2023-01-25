@@ -5,8 +5,10 @@ import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.Date;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.UUID;
@@ -311,6 +313,49 @@ public class LFN implements Comparable<LFN>, CatalogEntity {
 		return "LFN entryId\t: " + entryId + "\n" + "owner\t\t: " + owner + ":" + gowner + "\n" + "ctime\t\t: " + ctime + " (expires " + expiretime + ")\n" + "replicated\t: " + replicated + "\n"
 				+ "aclId\t\t: " + aclId + "\n" + "lfn\t\t: " + lfn + "\n" + "dir\t\t: " + dir + "\n" + "size\t\t: " + size + "\n" + "type\t\t: " + type + "\n" + "perm\t\t: " + perm + "\n"
 				+ "guid\t\t: " + guid + "\n" + "md5\t\t: " + md5 + "\n" + "guidtime\t: " + guidtime + "\n" + "broken\t\t: " + broken + "\n" + "jobid\t\t: " + jobid;
+	}
+
+	/**
+	 * @return a map of properties, to be used in JSON serialization
+	 */
+	public Map<String, Object> toMap() {
+		final Map<String, Object> ret = new LinkedHashMap<>();
+
+		ret.put("lfn", getCanonicalName());
+		ret.put("size", Long.valueOf(size));
+		ret.put("type", String.valueOf(type));
+		ret.put("perm", perm);
+		ret.put("ctime", Long.valueOf(ctime.getTime()));
+		ret.put("owner", owner);
+		ret.put("gowner", gowner);
+
+		if (guid != null)
+			ret.put("guid", guid);
+
+		if (md5 != null && !md5.isBlank())
+			ret.put("md5", md5);
+
+		ret.put("turl", "alien://" + getCanonicalName());
+
+		if (jobid > 0)
+			ret.put("jobid", Long.valueOf(jobid));
+
+		if (expiretime != null)
+			ret.put("expires", Long.valueOf(expiretime.getTime()));
+
+		ret.put("entryId", Long.valueOf(entryId));
+
+		// Other internal fields that are not expected to be useful to clients
+		// ret.put("replicated", Boolean.valueOf(replicated));
+		// ret.put("aclId", Long.valueOf(aclId));
+		// ret.put("dir", Long.valueOf(dir));
+
+		// if (guidtime != null)
+		// ret.put("guidtime", guidtime);
+
+		// ret.put("broken", Boolean.valueOf(broken));
+
+		return ret;
 	}
 
 	/**
