@@ -551,20 +551,13 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 	static final HashMap<Integer, GUIDCleanup> pfnDeleteQueue = new HashMap<>();
 
 	private static final Object globalLock = new Object();
-	
+
 	private static void offer(final HashMap<Integer, GUIDCleanup> queue, final Host h, final Integer tableName, final Integer guidId) {
-		GUIDCleanup g;
-
 		synchronized (queue) {
-			g = queue.get(tableName);
+			queue.computeIfAbsent(tableName, (n) -> new GUIDCleanup(h, n)).guidIDs.offer(guidId);
 
-			if (g == null) {
-				g = new GUIDCleanup(h, tableName);
-				queue.put(tableName, g);
-			}
+			queue.notifyAll();
 		}
-
-		g.guidIDs.offer(guidId);
 
 		synchronized (globalLock) {
 			if (refCleanupThread == null) {
@@ -576,8 +569,6 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 				pfnCleanupThread = new CleanupThread(pfnDeleteQueue, "_PFN");
 				pfnCleanupThread.start();
 			}
-
-			queue.notifyAll();
 		}
 	}
 
