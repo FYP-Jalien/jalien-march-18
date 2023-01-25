@@ -16,6 +16,8 @@ import java.net.DatagramSocket;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
 import java.net.SocketAddress;
+import java.nio.file.Files;
+import java.nio.file.attribute.PosixFilePermissions;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
@@ -137,9 +139,14 @@ public class JobTraceCollector {
 			if (!f.exists()) {
 				final File fDir = f.getParentFile();
 
-				if (!fDir.exists() && !fDir.mkdirs()) {
-					System.err.println("Cannot create " + fDir.getAbsolutePath());
-					return;
+				if (!fDir.exists()) {
+					try {
+						Files.createDirectory(fDir.toPath(), PosixFilePermissions.asFileAttribute(PosixFilePermissions.fromString("rwxr-xr-x")));
+					}
+					catch (IOException ioe) {
+						System.err.println("Cannot create " + fDir.getAbsolutePath() + ": " + ioe.getMessage());
+						return;
+					}
 				}
 			}
 
@@ -161,6 +168,8 @@ public class JobTraceCollector {
 			catch (final IOException ioe) {
 				System.err.println("Cannot write to " + f.getAbsolutePath() + " : " + ioe.getMessage());
 			}
+
+			f.setReadable(true, false);
 		}
 	}
 

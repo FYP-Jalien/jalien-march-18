@@ -349,12 +349,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				return valUploadExitCode;
 			}
 
+			//Cleanup trailing processes before uploading
+			cleanupProcesses(queueId, pid);
+
 			if (!uploadOutputFiles(JobStatus.DONE)) {
 				logger.log(Level.SEVERE, "Failed to upload output files");
 				return -1;
 			}
-
-			cleanupProcesses(queueId, pid);
 
 			return 0;
 		}
@@ -493,10 +494,15 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		try {
+			sun.misc.Signal.handle(new sun.misc.Signal("INT"), sig -> {
+				logger.log(Level.SEVERE,"JobWrapper: SIGINT received. Shutting down NOW!"); //Handled by JA
+			}); 
+
 			sun.misc.Signal.handle(new sun.misc.Signal("TERM"), sig -> {
+				System.err.println("SIGTERM received. Killing payload and proceeding to upload.");
 				if (payload.isAlive()) {
-					logger.log(Level.SEVERE, "SIGTERM received. Killing payload");
-					putJobTrace("JobWrapper: SIGTERM received. Killing payload");
+					logger.log(Level.SEVERE, "SIGTERM received. Killing payload and proceeding to upload.");
+					putJobTrace("JobWrapper: SIGTERM received. Killing payload and proceeding to upload.");
 					payload.destroyForcibly();
 				}
 			});
@@ -1072,13 +1078,14 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		try {
+			// Write status to file for the JobAgent to see
+			Files.writeString(Paths.get(tmpDir + "/" + jobstatusFile), newStatus.name());
+
 			// Set the updated status
 			if (!TaskQueueApiUtils.setJobStatus(queueId, resubmission, newStatus, extrafields)) {
 				jobKilled = true;
 				return false;
 			}
-			// Also write status to file for the JobAgent to see
-			Files.writeString(Paths.get(tmpDir + "/" + jobstatusFile), newStatus.name());
 		}
 		catch (final Exception e) {
 			logger.log(Level.WARNING, "An error occurred when attempting to change current job status: " + e);

@@ -76,6 +76,8 @@ import lazyj.ExtProperties;
 import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
 import lia.util.process.ExternalProcesses;
+import sun.misc.Signal;
+
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
@@ -124,6 +126,7 @@ public class JobAgent implements Runnable {
 	private long prevTime = 0;
 	private int cpuCores = 1;
 	private long ttl;
+	private String endState = "";
 
 	private static AtomicInteger totalJobs = new AtomicInteger(0);
 	private final int jobNumber;
@@ -293,8 +296,13 @@ public class JobAgent implements Runnable {
 	 */
 	protected static final AtomicInteger retries = new AtomicInteger(0);
 
+	/**
+	 * Number of attempts since last successful job
+	 */
+	protected static final AtomicInteger attempts = new AtomicInteger(1);
+
 	static NUMAExplorer numaExplorer;
-	//static final NUMAExplorer numaExplorer = new NUMAExplorer(Runtime.getRuntime().availableProcessors());
+	// static final NUMAExplorer numaExplorer = new NUMAExplorer(Runtime.getRuntime().availableProcessors());
 	static boolean wholeNode;
 	static byte[] initialMask;
 
@@ -337,6 +345,7 @@ public class JobAgent implements Runnable {
 		setStatus(jaStatus.STARTING_JA);
 
 		logger = ConfigUtils.getLogger(JobAgent.class.getCanonicalName() + " " + jobNumber);
+
 		FileHandler handler = null;
 		try {
 			handler = new FileHandler("job-agent-" + jobNumber + ".log");
@@ -437,7 +446,7 @@ public class JobAgent implements Runnable {
 			logger.log(Level.WARNING, "Problem with the monitoring objects ApMon Exception: " + e.toString());
 		}
 
-		wholeNode = ((Boolean)siteMap.getOrDefault("WholeNode", Boolean.valueOf(false))).booleanValue();
+		wholeNode = ((Boolean) siteMap.getOrDefault("WholeNode", Boolean.valueOf(false))).booleanValue();
 		initialMask = getInitialMask();
 		synchronized (cpuSync) {
 			if (numaExplorer == null && cpuIsolation == true)
@@ -459,9 +468,9 @@ public class JobAgent implements Runnable {
 
 	}
 
-	//#############################################################
-	//################## MAIN EXECUTION FLOW ######################
-	//#############################################################
+	// #############################################################
+	// ################## MAIN EXECUTION FLOW ######################
+	// #############################################################
 	/**
 	 * @param args
 	 * @throws IOException
@@ -478,6 +487,18 @@ public class JobAgent implements Runnable {
 	@Override
 	public void run() {
 		logger.log(Level.INFO, "Starting JobAgent " + jobNumber + " in " + hostName);
+
+		// Wait before matching if previous jobs have been failing
+		if (attempts.getAcquire() > 1) {
+			try {
+				final int timeToWait = (int) Math.pow(5, attempts.getAcquire());
+				logger.log(Level.INFO, "A previous job failed. Will wait " + timeToWait + "s before continuing...");
+				Thread.sleep(timeToWait * 1000);
+			}
+			catch (InterruptedException e1) {
+				// ignore
+			}
+		}
 
 		logger.log(Level.INFO, siteMap.toString());
 		try {
@@ -502,11 +523,11 @@ public class JobAgent implements Runnable {
 					logger.log(Level.WARNING, "Unable to check for AVX support", ex);
 				}
 
-				if (env.containsKey("ALIENV_ERRORS") && containerizer == null){
+				if (env.containsKey("ALIENV_ERRORS") && containerizer == null) {
 					logger.log(Level.SEVERE, "The environment on this node appears to be broken. Please do \"" + CVMFS.getAlienvPrint() + "\" for more debug info.");
 					throw new EOFException("Job matching aborted due to potentially misconfigured environment");
 				}
-				
+
 				setStatus(jaStatus.REQUESTING_JOB);
 
 				if (siteMap.containsKey("Disk"))
@@ -597,12 +618,16 @@ public class JobAgent implements Runnable {
 
 			if (RUNNING_CPU.equals(MAX_CPU))
 				retries.getAndIncrement();
-			// synchronized (requestSync) {
-			// requestSync.notify();
-			// }
-		} finally {
+
+		}
+		finally {
 			if (cpuIsolation == true)
 				numaExplorer.refillAvailable(jobNumber);
+
+			if (!"DONE".equals(endState) && !"DONE_WARNING".equals(endState))
+				attempts.getAndIncrement();
+			else
+				attempts.set(1);
 		}
 
 		setStatus(jaStatus.FINISHING_JA);
@@ -622,7 +647,7 @@ public class JobAgent implements Runnable {
 				putJobTrace("Error. Workdir for job could not be created");
 				return;
 			}
-			
+
 			jobWrapperLogDir = jobWorkdir + "/" + jobWrapperLogName;
 
 			logger.log(Level.INFO, "Started JA with: " + jdl);
@@ -646,7 +671,7 @@ public class JobAgent implements Runnable {
 					childPID = (int) p.pid();
 			}
 
-			//Start and monitor execution
+			// Start and monitor execution
 			monitorExecution(p, true);
 		}
 		catch (final Exception e) {
@@ -675,6 +700,7 @@ public class JobAgent implements Runnable {
 						cmdScanner.next();
 					else if (readArg.contains("alien.site.JobRunner") || readArg.contains("alien.site.JobAgent")) {
 						launchCmd.add("-Djobagent.vmid=" + queueId);
+						launchCmd.add("-Djava.util.logging.SimpleFormatter.format='JobID " + queueId + ": %1$tb %1$td, %1$tY %1$tH:%1$tM:%1$tS %2$s %n%4$s: %5$s%6$s%n'");
 						launchCmd.add("-cp");
 						launchCmd.add(jarPath + jarName);
 						launchCmd.add("alien.site.JobWrapper");
@@ -689,8 +715,8 @@ public class JobAgent implements Runnable {
 				putJobTrace("Support for containers detected. Will use: " + containerizer.getContainerizerName());
 				containerizer.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
 
-				//Only used on Cgroupsv2 hosts
-				if(containerizer.setMemLimit(jobMaxMemoryMB))
+				// Only used on Cgroupsv2 hosts
+				if (containerizer.setMemLimit(jobMaxMemoryMB))
 					putJobTrace("Warning: This host has support for cgroups v2. New features will be used.");
 
 				if (jdl.gets("DebugTag") != null)
@@ -710,7 +736,18 @@ public class JobAgent implements Runnable {
 			return launchCmd;
 		}
 		catch (final IOException e) {
-			logger.log(Level.SEVERE, "Could not generate JobWrapper launch command: " + e.toString());
+			logger.log(Level.SEVERE, ": ", e);
+			putJobTrace("Could not generate JobWrapper launch command " + e.toString());
+
+			try {
+				File[] listOfFiles = new File("/proc/" + MonitorFactory.getSelfProcessID() + "/fd").listFiles();
+				putJobTrace("Length of /proc/" + MonitorFactory.getSelfProcessID() + "/fd is: " + listOfFiles.length);
+				logger.log(Level.INFO, "Length of /proc/" + MonitorFactory.getSelfProcessID() + "/fd is: " + listOfFiles.length);
+			}
+			catch (final Exception e2) {
+				putJobTrace("Could not run debug for launchCommand: " + e2.toString());
+				logger.log(Level.SEVERE, "Could not run debug for launchCommand: ", e2);
+			}
 			return null;
 		}
 	}
@@ -806,6 +843,23 @@ public class JobAgent implements Runnable {
 			if (fs == null)
 				sendProcessResources(false);
 		}
+
+		sun.misc.SignalHandler sig = new sun.misc.SignalHandler() {
+			@Override
+			public void handle(Signal arg0) {
+				logger.log(Level.SEVERE, "JobAgent: " + arg0.toString() + " received. Killing payload!");
+				if (p.isAlive()) {
+					putJobTrace("JobAgent: " + arg0.toString() + " received. Killing payload!");
+					killForcibly(p);
+				}
+				else {
+					JobWrapper.cleanupProcesses(queueId, mj.getPid());
+					System.exit(130);
+				}
+			}
+		};
+		sun.misc.Signal.handle(new sun.misc.Signal("INT"), sig);
+		sun.misc.Signal.handle(new sun.misc.Signal("TERM"), sig);
 
 		final TimerTask killPayload = new TimerTask() {
 			@Override
@@ -931,18 +985,17 @@ public class JobAgent implements Runnable {
 			if (mj != null)
 				mj.close();
 
+			endState = getWrapperJobStatus();	
 			if (code != 0) {
-				// Looks like something went wrong. Let's check the last reported status
-				final String lastStatus = getWrapperJobStatus();
-				if ("STARTED".equals(lastStatus) || "RUNNING".equals(lastStatus)) {
+				if ("STARTED".equals(endState) || "RUNNING".equals(endState)) {
 					putJobTrace("ERROR: The JobWrapper was killed before job could complete");
 					changeJobStatus(JobStatus.ERROR_E, null); // JobWrapper was killed before the job could be completed
 				}
-				else if ("SAVING".equals(lastStatus)) {
+				else if ("SAVING".equals(endState)) {
 					putJobTrace("ERROR: The JobWrapper was killed during saving");
 					changeJobStatus(JobStatus.ERROR_SV, null); // JobWrapper was killed during saving
 				}
-				else if (lastStatus.isBlank()) {
+				else if (endState.isBlank()) {
 					putJobTrace("ERROR: The JobWrapper was killed before job start");
 					changeJobStatus(JobStatus.ERROR_IB, null); // JobWrapper was killed before payload start
 				}
@@ -1369,7 +1422,7 @@ public class JobAgent implements Runnable {
 			return "Job was killed";
 
 		//Also check for core directories, and abort if found to avoid filling up disk space
-		final Pattern coreDirPattern = Pattern.compile("core.*");
+		final Pattern coreDirPattern = Pattern.compile("^(?!.*\\.inp).*core.*$");
 		try {
 			List<File> coreDirs = Files.walk(new File(jobWorkdir).toPath())
 					.map(Path::toFile)
@@ -1380,7 +1433,17 @@ public class JobAgent implements Runnable {
 				return "Core directory detected: " + coreDirs.get(0).getName() + ". Aborting!";
 		}
 		catch (Exception e1) {
-			logger.log(Level.WARNING, "Exception while checking for core files: ", e1);
+			logger.log(Level.WARNING, "Exception while checking for core directories: ", e1);
+
+			logger.log(Level.INFO, "Attempting core check using shell instead");
+			try {
+				final String[] matchedDirs = SystemCommand.bash("find -name 'core*' ! -name '*.inp'").stdout.split("\n");
+				if (matchedDirs.length > 0)
+					return "Core directory detected: " + matchedDirs[0] + ". Aborting!";
+			}
+			catch (Exception e2) {
+				logger.log(Level.WARNING, "Exception while checking for core directories using shell: ", e2);
+			}
 		}
 
 		String error = null;
@@ -1684,7 +1747,7 @@ public class JobAgent implements Runnable {
 		}
 		catch (final IOException e) {
 			logger.log(Level.WARNING, "Attempt to read job status failed. Ignoring: " + e.toString());
-			return "";
+			return "Unread";
 		}
 	}
 
