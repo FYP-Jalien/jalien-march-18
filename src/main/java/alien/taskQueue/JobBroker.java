@@ -17,7 +17,6 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import lazyj.cache.ExpirationCache;
 import org.nfunk.jep.JEP;
 
 import alien.api.Dispatcher;
@@ -716,8 +715,8 @@ public class JobBroker {
 							// values defined will be matched to the node. Only the jobs that specifically does not match to
 							// the constraint value will be rejected
 							if (constraintType.equals("equality")) {
-								// eg:- SELECT * FROM JOB_AGENT WHERE... AND ((? = OS_NAME) OR (OS_NAME is null))
-								// SELECT * FROM JOB_AGENT WHERE... (('centos' = OS_NAME) OR (OS_NAME is null))
+								// eg:- SELECT * FROM JOB_AGENT WHERE... AND ((? = containsAVX) OR (containsAVX is null))
+								// SELECT * FROM JOB_AGENT WHERE... ((1 = containsAVX) OR (containsAVX is null))
 								where += " and (( ? = " + constraintName + ") or (" + constraintName + " is null))";
 							} else if (constraintType.equals("regex")) {
 								// SELECT * FROM JOB_AGENT WHERE... AND ((? LIKE CPU_FLAGS) OR (CPU_FLAGS is null))
@@ -734,7 +733,12 @@ public class JobBroker {
 						}
 					} else {
 						logger.log(Level.FINE, "Site map does not contain a value for : " + constraintName +
-								". Skipping the constraint");
+								". Setting the constraint value to null");
+						// Avoid accepting jobs that require the constraint value to be not present
+						// eg:- SELECT * FROM JOB_AGENT WHERE... AND (containsAVX is null)
+						// SELECT * FROM JOB_AGENT WHERE...(containsAVX is null)
+						// Jobs that require containsAVX to be present will not be matched to this node
+						where += " and (" + constraintName + " is null)";
 					}
 				}
 			}
