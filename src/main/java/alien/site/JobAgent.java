@@ -1461,6 +1461,9 @@ public class JobAgent implements Runnable {
 				// return "Not available"; TODO: Adjust and put back again
 			}
 
+			if (!mj.getErrorLogs().isEmpty())
+				putJobLog("proc", mj.getErrorLogs());
+
 			// getting cpu, memory and runtime info
 			if (diskinfo != null)
 				RES_WORKDIR_SIZE = diskinfo.get(ApMonMonitoringConstants.LJOB_WORKDIR_SIZE);
