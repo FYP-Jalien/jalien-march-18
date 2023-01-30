@@ -686,71 +686,69 @@ public class JobAgent implements Runnable {
 	 * @throws InterruptedException
 	 */
 	public List<String> generateLaunchCommand() throws InterruptedException {
-		try {
-			// Main cmd for starting the JobWrapper
-			List<String> launchCmd = new ArrayList<>();
+        try {
+            // Main cmd for starting the JobWrapper
+            List<String> launchCmd = new ArrayList<>();
+            
+			final String[] cmdCheck = env.getOrDefault("JALIEN_JOBAGENT_CMD",
+					SystemCommand.bash("ps -p " + String.valueOf(MonitorFactory.getSelfProcessID()) + " -o command=").stdout).split("\\s+");
 
-			final Process cmdChecker = Runtime.getRuntime().exec(new String[] { "ps", "-p", String.valueOf(MonitorFactory.getSelfProcessID()), "-o", "command=" });
-			cmdChecker.waitFor();
-			try (Scanner cmdScanner = new Scanner(cmdChecker.getInputStream())) {
-				String readArg;
-				while (cmdScanner.hasNext()) {
-					readArg = (cmdScanner.next());
-					if (readArg.contains("-cp"))
-						cmdScanner.next();
-					else if (readArg.contains("alien.site.JobRunner") || readArg.contains("alien.site.JobAgent")) {
-						launchCmd.add("-Djobagent.vmid=" + queueId);
-						launchCmd.add("-Djava.util.logging.SimpleFormatter.format='JobID " + queueId + ": %1$tb %1$td, %1$tY %1$tH:%1$tM:%1$tS %2$s %n%4$s: %5$s%6$s%n'");
-						launchCmd.add("-cp");
-						launchCmd.add(jarPath + jarName);
-						launchCmd.add("alien.site.JobWrapper");
-					}
-					else if (!readArg.contains("JobRunner") && !readArg.contains("JobAgent")) // Just to be completely sure...
-						launchCmd.add(readArg);
-				}
-			}
+            for (int i = 0; i < cmdCheck.length; i++) {
+                logger.log(Level.INFO, cmdCheck[i]);
+                if (cmdCheck[i].contains("-cp"))
+                    i++;
+                else if (cmdCheck[i].contains("alien.site.JobRunner") || cmdCheck[i].contains("alien.site.JobAgent")) {
+                    launchCmd.add("-Djobagent.vmid=" + queueId);
+                    launchCmd.add("-Djava.util.logging.SimpleFormatter.format='JobID " + queueId + ": %1$tb %1$td, %1$tY %1$tH:%1$tM:%1$tS %2$s %n%4$s: %5$s%6$s%n'");
+                    launchCmd.add("-cp");
+                    launchCmd.add(jarPath + jarName);
+                    launchCmd.add("alien.site.JobWrapper");
+                }
+                else if (!cmdCheck[i].contains("JobRunner") && !cmdCheck[i].contains("JobAgent")) // Just to be completely sure...
+                    launchCmd.add(cmdCheck[i]);
+            }
+			
+            // If there is container support present on site, add to launchCmd
+            if (containerizer != null) {
+                putJobTrace("Support for containers detected. Will use: " + containerizer.getContainerizerName());
+                containerizer.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
 
-			// If there is container support present on site, add to launchCmd
-			if (containerizer != null) {
-				putJobTrace("Support for containers detected. Will use: " + containerizer.getContainerizerName());
-				containerizer.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
+                // Only used on Cgroupsv2 hosts
+                if (containerizer.setMemLimit(jobMaxMemoryMB))
+                    putJobTrace("Warning: This host has support for cgroups v2. New features will be used.");
 
-				// Only used on Cgroupsv2 hosts
-				if (containerizer.setMemLimit(jobMaxMemoryMB))
-					putJobTrace("Warning: This host has support for cgroups v2. New features will be used.");
+                if (jdl.gets("DebugTag") != null)
+                    containerizer.enableDebug(jdl.gets("DebugTag"));
 
-				if (jdl.gets("DebugTag") != null)
-					containerizer.enableDebug(jdl.gets("DebugTag"));
+                launchCmd = containerizer.containerize(String.join(" ", launchCmd));
+            }
 
-				launchCmd = containerizer.containerize(String.join(" ", launchCmd));
-			}
+            // Run jobs in isolated environment
+            if (cpuIsolation == true) {
+                String isolCmd = addIsolation();
+                logger.log(Level.SEVERE, "IsolCmd command" + isolCmd);
+                if (isolCmd != null && isolCmd.compareTo("") != 0)
+                    launchCmd.addAll(0, Arrays.asList("taskset", "-c", isolCmd));
+            }
 
-			// Run jobs in isolated environment
-			if (cpuIsolation == true) {
-				String isolCmd = addIsolation();
-				logger.log(Level.SEVERE, "IsolCmd command" + isolCmd);
-				if (isolCmd != null && isolCmd.compareTo("") != 0)
-					launchCmd.addAll(0, Arrays.asList("taskset", "-c", isolCmd));
-			}
+            return launchCmd;
+        }
+        catch (final Exception e) {
+            logger.log(Level.SEVERE, ": ", e);
+            putJobTrace("Could not generate JobWrapper launch command " + e.toString());
 
-			return launchCmd;
-		}
-		catch (final IOException e) {
-			logger.log(Level.SEVERE, ": ", e);
-			putJobTrace("Could not generate JobWrapper launch command " + e.toString());
-
-			try {
-				File[] listOfFiles = new File("/proc/" + MonitorFactory.getSelfProcessID() + "/fd").listFiles();
-				putJobTrace("Length of /proc/" + MonitorFactory.getSelfProcessID() + "/fd is: " + listOfFiles.length);
-				logger.log(Level.INFO, "Length of /proc/" + MonitorFactory.getSelfProcessID() + "/fd is: " + listOfFiles.length);
-			}
-			catch (final Exception e2) {
-				putJobTrace("Could not run debug for launchCommand: " + e2.toString());
-				logger.log(Level.SEVERE, "Could not run debug for launchCommand: ", e2);
-			}
-			return null;
-		}
-	}
+            try {
+                File[] listOfFiles = new File("/proc/" + MonitorFactory.getSelfProcessID() + "/fd").listFiles();
+                putJobTrace("Length of /proc/" + MonitorFactory.getSelfProcessID() + "/fd is: " + listOfFiles.length);
+                logger.log(Level.INFO, "Length of /proc/" + MonitorFactory.getSelfProcessID() + "/fd is: " + listOfFiles.length);
+            }
+            catch (final Exception e2) {
+                putJobTrace("Could not run debug for launchCommand: " + e2.toString());
+                logger.log(Level.SEVERE, "Could not run debug for launchCommand: ", e2);
+            }
+            return null;
+        }
+    }
 
 	private Process launchJobWrapper(final List<String> launchCommand) {
 		logger.log(Level.INFO, "Launching jobwrapper using the command: " + launchCommand.toString());
