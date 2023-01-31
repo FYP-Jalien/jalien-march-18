@@ -29,7 +29,7 @@ public class ApptainerCVMFS extends Containerizer {
 
 		apptainerCmd.add("-B");
 		if(workdir != null) {
-			apptainerCmd.add(getCustomBinds() + gpuDirs + "/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + "/tmp:/tmp");
+			apptainerCmd.add(getCustomBinds() + gpuDirs + "/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + workdir + "/tmp:/tmp");
 			apptainerCmd.add("--pwd");
 			apptainerCmd.add(CONTAINER_JOBDIR);
 		}
