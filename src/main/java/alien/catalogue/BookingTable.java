@@ -169,7 +169,7 @@ public class BookingTable {
 			else {
 				// make sure a previously queued deletion request for this file is wiped before giving out a new token
 				db.query("DELETE FROM orphan_pfns WHERE guid=string2binary(?) AND se=?;", false, requestedGUID.guid.toString(), Integer.valueOf(se.seNumber));
-			 	db.query("DELETE FROM orphan_pfns_" + se.seNumber + " WHERE guid=string2binary(?);", true, requestedGUID.guid.toString());
+				db.query("DELETE FROM orphan_pfns_" + se.seNumber + " WHERE guid=string2binary(?);", true, requestedGUID.guid.toString());
 
 				final String reason = AuthorizationFactory.fillAccess(user, pfn, AccessType.WRITE);
 
@@ -429,13 +429,8 @@ public class BookingTable {
 			if (!db.query("SELECT *, binary2string(guid) as guid_as_string FROM LFN_BOOKED WHERE pfn=?;", false, pfn))
 				throw new IOException("Could not get the booked details for this pfn, query execution failed");
 
-			final int count = db.count();
-
-			if (count == 0)
+			if (!db.moveNext())
 				return null;
-
-			if (count > 1)
-				throw new IOException("More than one entry with this pfn: '" + pfn + "'");
 
 			final SE se = SEUtils.getSE(db.gets("se"));
 
@@ -455,6 +450,9 @@ public class BookingTable {
 				guid.type = 0;
 				guid.aclId = -1;
 			}
+
+			if (db.moveNext())
+				throw new IOException("More than one pfn row with this value: " + pfn);
 
 			final PFN retpfn = new PFN(guid, se);
 
@@ -501,7 +499,7 @@ public class BookingTable {
 
 						if (l != null) {
 							l.setExpireTime(new Date(System.currentTimeMillis() + 1000L * 60 * 60 * 24 * 14));
-							ret.add(l);							
+							ret.add(l);
 						}
 					}
 				}
@@ -519,7 +517,7 @@ public class BookingTable {
 	 * Books the members of an archive for writing
 	 * 
 	 * @param archive
-	 * @param archive_lfn 
+	 * @param archive_lfn
 	 * @param outputDir
 	 * @param user
 	 * @return true for no IOExceptions
@@ -544,7 +542,7 @@ public class BookingTable {
 					TaskQueueUtils.putJobLog(archive.getQueueId().longValue(), "error", "File " + member + ": unable to calculate MD5. Skip.", null);
 					continue;
 				}
-				
+
 				// GUID
 				final UUID uuid = GUIDUtils.generateTimeUUID();
 				GUID member_g = GUIDUtils.getGUID(uuid, true);
@@ -552,7 +550,6 @@ public class BookingTable {
 				member_g.md5 = md5s.get(member);
 				member_g.size = sizes.get(member).longValue();
 				member_g.type = 'f';
-
 
 				// PFN
 				String member_spfn = base_pfn + member;
