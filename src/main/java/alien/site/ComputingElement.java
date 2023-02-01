@@ -457,7 +457,9 @@ public final class ComputingElement extends Thread {
 
 		before += "source <( echo $ALIENV ); " + "\n";
 
-		final String content_str = before + getStartup() + "\n" + startup_customization(2);
+		before += "export JALIEN_JOBAGENT_CMD='" + getStartup() + "'\n";
+
+		final String content_str = before + "$JALIEN_JOBAGENT_CMD" + "\n" + startup_customization(2);
 
 		final String agent_startup_path = host_tempdir_resolved + "/agent.startup." + ProcessHandle.current().pid();
 		final File agent_startup_file = new File(agent_startup_path);
