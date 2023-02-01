@@ -1439,9 +1439,9 @@ public class JobAgent implements Runnable {
 
 			logger.log(Level.INFO, "Attempting core check using shell instead");
 			try {
-				final String[] matchedDirs = SystemCommand.bash("find -name 'core*' ! -name '*.inp'").stdout.split("\n");
-				if (matchedDirs.length > 0 && !matchedDirs[0].isBlank())
-					return "Core directory detected: " + matchedDirs[0] + ". Aborting!";
+				String output = ExternalProcesses.getCmdOutput(Arrays.asList("find", jobWorkdir, "-name", "core*", "!", "-name", "*.inp"), true, 30L, TimeUnit.SECONDS);
+				if (output != null && !output.isBlank() && output.contains("core"))
+					return "Core directory detected: " + output + ". Aborting!";
 			}
 			catch (Exception e2) {
 				logger.log(Level.WARNING, "Exception while checking for core directories using shell: ", e2);
