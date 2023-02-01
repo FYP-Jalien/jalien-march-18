@@ -8,6 +8,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
+import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStream;
 import java.io.PrintWriter;
@@ -137,6 +138,7 @@ public class JobAgent implements Runnable {
 	private String jarPath;
 	private String jarName;
 	private int childPID;
+	private int returnedPID;
 	private long lastHeartbeat = 0;
 	private long jobStartupTime;
 	private final Containerizer containerizer = ContainerizerFactory.getContainerizer();
@@ -795,7 +797,9 @@ public class JobAgent implements Runnable {
 
 			// Wait for JobWrapper to start
 			try (InputStream stdout = p.getInputStream()) {
-				stdout.read();
+				ObjectInputStream stdoutObj = new ObjectInputStream(stdout);
+				returnedPID = (int) stdoutObj.readObject();
+				logger.log(Level.INFO, "We received a PID from the wrapper: " + returnedPID);
 			}
 		}
 		catch (final Exception ioe) {
