@@ -453,7 +453,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 						cmd.add(st.nextToken());
 				}
 
-		cmd.add("; echo payload-" + queueId);
+		cmd.add(";");
+		cmd.add("echo");
+		cmd.add("payload-" + queueId);
 
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
 
