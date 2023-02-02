@@ -510,10 +510,10 @@ public final class ComputingElement extends Thread {
 	}
 
 	private static String getStartup() {
-		String javaDir = "";
-
-		final String useJdk64 = ConfigUtils.getConfiguration("version").gets("jdk64");
-		if (useJdk64 == null || !useJdk64.toLowerCase().equals("true"));
+		final String javaDir;
+		if (ConfigUtils.getConfiguration("version").getb("jdk64", true))
+			javaDir = "";
+		else
 			javaDir = CVMFS.getJava32Dir() + "/";
 
 		final String javaCmd = "java -client -Xms16M -Xmx64M -Djdk.lang.Process.launchMechanism=vfork -cp";
