@@ -37,6 +37,7 @@ import alien.user.JAKeyStore;
 import apmon.ApMon;
 import apmon.ApMonException;
 import lazyj.ExtProperties;
+import lazyj.Utils;
 
 /**
  * @author mmmartin
@@ -119,7 +120,7 @@ public final class ComputingElement extends Thread {
 		logger.info("Looping");
 		while (true) {
 
-			if(JAKeyStore.expireSoon(commander.getUser().getUserCert()[0].getNotAfter().getTime())){
+			if (JAKeyStore.expireSoon(commander.getUser().getUserCert()[0].getNotAfter().getTime())) {
 				logger.log(Level.WARNING, "Certificate is about to expire");
 				System.exit(0);
 			}
@@ -179,7 +180,7 @@ public final class ComputingElement extends Thread {
 		final GetNumberFreeSlots jobSlots = commander.q_api.getNumberFreeSlots((String) config.get("host_host"), port, siteMap.get("CE").toString(),
 				ConfigUtils.getConfig().gets("version", "J-1.0").trim());
 
-		if(jobSlots == null){
+		if (jobSlots == null) {
 			logger.info("Cannot get values from getNumberFreeSlots");
 			return 0;
 		}
@@ -268,7 +269,7 @@ public final class ComputingElement extends Thread {
 
 		// We ask the broker how many jobs we could run
 		final GetNumberWaitingJobs jobMatch = commander.q_api.getNumberWaitingForSite(siteMap);
-		if(jobMatch == null){
+		if (jobMatch == null) {
 			logger.warning("Could not get number of waiting jobs!");
 			return;
 		}
@@ -342,11 +343,12 @@ public final class ComputingElement extends Thread {
 		if ((new File(custom_file)).exists()) {
 			s += "\n#\n# customization " + i + " start\n#\n\n";
 
-			try {
-				s += Functions.getFileContent(custom_file);
-			}
-			catch (final Exception e) {
-				logger.log(Level.INFO, "Error reading " + custom_file, e);
+			final String content = Utils.readFile(custom_file);
+
+			if (content != null)
+				s += content;
+			else {
+				logger.log(Level.INFO, "Error reading " + custom_file);
 				return "";
 			}
 
@@ -527,7 +529,6 @@ public final class ComputingElement extends Thread {
 		return javaDir + javaCmd + " " + jarDir + jarAndClass;
 	}
 
-
 	/**
 	 * Class to periodically update the JA token in a shared folder, for long waiting JAs in the queue to find a fresh one at startup
 	 */
@@ -624,7 +625,7 @@ public final class ComputingElement extends Thread {
 
 		siteMap = (new SiteMap()).getSiteParameters(smenv);
 
-		//CE storage space does not matter for WNs
+		// CE storage space does not matter for WNs
 		siteMap.remove("Disk");
 
 		if (config.containsKey("ce_matcharg") && getValuesFromLDAPField(config.get("ce_matcharg")).containsKey("cpucores")) {

@@ -92,24 +92,6 @@ public class Functions {
 	}
 
 	/**
-	 * @param fFileName
-	 * @return file content
-	 * @throws Exception
-	 */
-	public static String getFileContent(final String fFileName) throws Exception {
-
-		final StringBuilder text = new StringBuilder();
-		final String NL = System.getProperty("line.separator");
-
-		try (Scanner scanner = new Scanner(new FileInputStream(fFileName))) {
-			while (scanner.hasNextLine())
-				text.append(scanner.nextLine() + NL);
-		}
-
-		return text.toString();
-	}
-
-	/**
 	 * Write String[] as a file, with String[0] as file name and String[1] as file content
 	 *
 	 * @param file

@@ -22,6 +22,7 @@ import alien.test.TestBrain;
 import alien.test.TestConfig;
 import alien.test.utils.TestCommand;
 import alien.test.utils.TestException;
+import lazyj.Utils;
 
 /**
  * @author ron
@@ -111,7 +112,7 @@ public class CreateLDAP {
 	 */
 	public static void stopLDAP() throws Exception {
 
-		ldap_pid = Functions.getFileContent(ldap_pid_file);
+		ldap_pid = Utils.readFile(ldap_pid_file);
 
 		TestCommand slapd = new TestCommand(new String[] { TestBrain.cKill, "-9", ldap_pid });
 		// slapd.verbose();

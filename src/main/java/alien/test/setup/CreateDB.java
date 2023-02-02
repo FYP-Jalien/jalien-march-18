@@ -11,6 +11,7 @@ import alien.test.TestConfig;
 import alien.test.utils.TestCommand;
 import alien.test.utils.TestException;
 import alien.user.UserFactory;
+import lazyj.Utils;
 
 /**
  * @author ron
@@ -73,7 +74,7 @@ public class CreateDB {
 	 */
 	public static void stopDatabase() throws Exception {
 
-		String sql_pid = Functions.getFileContent(sql_pid_file);
+		String sql_pid = Utils.readFile(sql_pid_file);
 
 		TestCommand db = new TestCommand(new String[] { TestBrain.cKill, "-9", sql_pid });
 		// db.verbose();
@@ -86,7 +87,7 @@ public class CreateDB {
 
 		Functions.writeOutFile(my_cnf, my_cnf_content);
 
-		final TestCommand db = new TestCommand(new String[] { "mysqld", "--defaults-file=" + my_cnf, "--initialize-insecure", "--datadir=" + TestConfig.sql_home + "/data"});
+		final TestCommand db = new TestCommand(new String[] { "mysqld", "--defaults-file=" + my_cnf, "--initialize-insecure", "--datadir=" + TestConfig.sql_home + "/data" });
 		// db.verbose();
 		if (!db.exec()) {
 			throw new TestException("Could not initialize MySQL, STDOUT: " + db.getStdOut() + "\n STDERR: " + db.getStdErr());
@@ -191,7 +192,8 @@ public class CreateDB {
 		return "";
 	}
 
-	private final static String[] mysql_passwd = { "update mysql.user set authentication_string=PASSWORD('" + TestConfig.sql_pass + "') where User='root';", "delete from mysql.user where user !='root';",
+	private final static String[] mysql_passwd = { "update mysql.user set authentication_string=PASSWORD('" + TestConfig.sql_pass + "') where User='root';",
+			"delete from mysql.user where user !='root';",
 			"GRANT ALL PRIVILEGES ON *.* TO root IDENTIFIED BY '" + TestConfig.sql_pass + "' WITH GRANT OPTION;",
 			"GRANT ALL PRIVILEGES ON *.* TO root@localhost IDENTIFIED BY '" + TestConfig.sql_pass + "' WITH GRANT OPTION;", "flush privileges;",
 
@@ -199,17 +201,19 @@ public class CreateDB {
 
 			"CREATE DATABASE IF NOT EXISTS `ADMIN` DEFAULT CHARACTER SET latin1;",
 
-			// "USE  mysql;", "DROP TABLE IF EXISTS `proc`;",
-			// "CREATE TABLE `proc` (" + "  `db` char(64) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT ''," + "  `name` char(64) NOT NULL DEFAULT '',"
-			// 		+ "  `type` enum('FUNCTION','PROCEDURE') NOT NULL," + "  `specific_name` char(64) NOT NULL DEFAULT ''," + "  `language` enum('SQL') NOT NULL DEFAULT 'SQL',"
-			// 		+ "  `sql_data_access` enum('CONTAINS_SQL','NO_SQL','READS_SQL_DATA','MODIFIES_SQL_DATA') NOT NULL DEFAULT 'CONTAINS_SQL',"
-			// 		+ "  `is_deterministic` enum('YES','NO') NOT NULL DEFAULT 'NO'," + "  `security_type` enum('INVOKER','DEFINER') NOT NULL DEFAULT 'DEFINER'," + "  `param_list` blob NOT NULL,"
-			// 		+ "  `returns` longblob NOT NULL," + "  `body` longblob NOT NULL," + "  `definer` char(77) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT '',"
-			// 		+ "  `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP," + "  `modified` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',"
-			// 		+ "  `sql_mode` set('REAL_AS_FLOAT','PIPES_AS_CONCAT','ANSI_QUOTES','IGNORE_SPACE','NOT_USED','ONLY_FULL_GROUP_BY','NO_UNSIGNED_SUBTRACTION','NO_DIR_IN_CREATE','POSTGRESQL','ORACLE','MSSQL','DB2','MAXDB','NO_KEY_OPTIONS','NO_TABLE_OPTIONS','NO_FIELD_OPTIONS','MYSQL323','MYSQL40','ANSI','NO_AUTO_VALUE_ON_ZERO','NO_BACKSLASH_ESCAPES','STRICT_TRANS_TABLES','STRICT_ALL_TABLES','NO_ZERO_IN_DATE','NO_ZERO_DATE','INVALID_DATES','ERROR_FOR_DIVISION_BY_ZERO','TRADITIONAL','NO_AUTO_CREATE_USER','HIGH_NOT_PRECEDENCE','NO_ENGINE_SUBSTITUTION','PAD_CHAR_TO_FULL_LENGTH') NOT NULL DEFAULT '',"
-			// 		+ "  `comment` char(64) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT ''," + "  `character_set_client` char(32) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL,"
-			// 		+ "  `collation_connection` char(32) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL," + "  `db_collation` char(32) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL,"
-			// 		+ "  `body_utf8` longblob," + "  PRIMARY KEY (`db`,`name`,`type`)" + ") ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Stored Procedures';",
+			// "USE mysql;", "DROP TABLE IF EXISTS `proc`;",
+			// "CREATE TABLE `proc` (" + " `db` char(64) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT ''," + " `name` char(64) NOT NULL DEFAULT '',"
+			// + " `type` enum('FUNCTION','PROCEDURE') NOT NULL," + " `specific_name` char(64) NOT NULL DEFAULT ''," + " `language` enum('SQL') NOT NULL DEFAULT 'SQL',"
+			// + " `sql_data_access` enum('CONTAINS_SQL','NO_SQL','READS_SQL_DATA','MODIFIES_SQL_DATA') NOT NULL DEFAULT 'CONTAINS_SQL',"
+			// + " `is_deterministic` enum('YES','NO') NOT NULL DEFAULT 'NO'," + " `security_type` enum('INVOKER','DEFINER') NOT NULL DEFAULT 'DEFINER'," + " `param_list` blob NOT NULL,"
+			// + " `returns` longblob NOT NULL," + " `body` longblob NOT NULL," + " `definer` char(77) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT '',"
+			// + " `created` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP," + " `modified` timestamp NOT NULL DEFAULT '0000-00-00 00:00:00',"
+			// + " `sql_mode`
+			// set('REAL_AS_FLOAT','PIPES_AS_CONCAT','ANSI_QUOTES','IGNORE_SPACE','NOT_USED','ONLY_FULL_GROUP_BY','NO_UNSIGNED_SUBTRACTION','NO_DIR_IN_CREATE','POSTGRESQL','ORACLE','MSSQL','DB2','MAXDB','NO_KEY_OPTIONS','NO_TABLE_OPTIONS','NO_FIELD_OPTIONS','MYSQL323','MYSQL40','ANSI','NO_AUTO_VALUE_ON_ZERO','NO_BACKSLASH_ESCAPES','STRICT_TRANS_TABLES','STRICT_ALL_TABLES','NO_ZERO_IN_DATE','NO_ZERO_DATE','INVALID_DATES','ERROR_FOR_DIVISION_BY_ZERO','TRADITIONAL','NO_AUTO_CREATE_USER','HIGH_NOT_PRECEDENCE','NO_ENGINE_SUBSTITUTION','PAD_CHAR_TO_FULL_LENGTH')
+			// NOT NULL DEFAULT '',"
+			// + " `comment` char(64) CHARACTER SET utf8 COLLATE utf8_bin NOT NULL DEFAULT ''," + " `character_set_client` char(32) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL,"
+			// + " `collation_connection` char(32) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL," + " `db_collation` char(32) CHARACTER SET utf8 COLLATE utf8_bin DEFAULT NULL,"
+			// + " `body_utf8` longblob," + " PRIMARY KEY (`db`,`name`,`type`)" + ") ENGINE=MyISAM DEFAULT CHARSET=utf8 COMMENT='Stored Procedures';",
 
 			"LOCK TABLES `proc` WRITE;",
 			"INSERT INTO `proc` VALUES ('" + TestConfig.systemDB
@@ -246,53 +250,52 @@ public class CreateDB {
 	private final static String my_cnf = TestConfig.sql_home + "/my.cnf";
 
 	private final static String my_cnf_content = "[mysqld]\n" +
-                                               "user="    + UserFactory.getUserName() + "\n" +
-                                               "datadir=" + TestConfig.sql_home + "/data" + "\n" +
-                                               "port="    + TestConfig.sql_port + "\n" +
-                                               "socket="  + sql_socket + "\n" +
-                                               "\n" +
+			"user=" + UserFactory.getUserName() + "\n" +
+			"datadir=" + TestConfig.sql_home + "/data" + "\n" +
+			"port=" + TestConfig.sql_port + "\n" +
+			"socket=" + sql_socket + "\n" +
+			"\n" +
 
-                                               "[mysqld_safe]\n" +
-                                               "log-error="      + sql_log + "\n" +
-                                               "pid-file="       + sql_pid_file + "\n" +
-                                               "\n" +
+			"[mysqld_safe]\n" +
+			"log-error=" + sql_log + "\n" +
+			"pid-file=" + sql_pid_file + "\n" +
+			"\n" +
 
-                                               "[client]\n" +
-                                               "port="   + TestConfig.sql_port + "\n" +
-                                               "user="   + UserFactory.getUserName() + "\n" +
-                                               "socket=" + sql_socket + "\n" +
-                                               "\n" +
+			"[client]\n" +
+			"port=" + TestConfig.sql_port + "\n" +
+			"user=" + UserFactory.getUserName() + "\n" +
+			"socket=" + sql_socket + "\n" +
+			"\n" +
 
-                                               "[mysqladmin]\n" +
-                                               "user=root\n" +
-                                               "port="       + TestConfig.sql_port + "\n" +
-                                               "socket="     + sql_socket + "\n" +
-                                               "\n" +
+			"[mysqladmin]\n" +
+			"user=root\n" +
+			"port=" + TestConfig.sql_port + "\n" +
+			"socket=" + sql_socket + "\n" +
+			"\n" +
 
-                                               "[mysql]\n" +
-                                               "port="     + TestConfig.sql_port + "\n" +
-                                               "socket="   + sql_socket + "\n" +
-                                               "\n" +
+			"[mysql]\n" +
+			"port=" + TestConfig.sql_port + "\n" +
+			"socket=" + sql_socket + "\n" +
+			"\n" +
 
-                                               "[mysql_install_db]\n" +
-                                               "user="    + UserFactory.getUserName() + "\n" +
-                                               "port="    + TestConfig.sql_port + "\n" +
-                                               "datadir=" + TestConfig.sql_home + "/data" + "\n" +
-                                               "socket="  + sql_socket + "\n" +
-                                               "\n" + "\n";
+			"[mysql_install_db]\n" +
+			"user=" + UserFactory.getUserName() + "\n" +
+			"port=" + TestConfig.sql_port + "\n" +
+			"datadir=" + TestConfig.sql_home + "/data" + "\n" +
+			"socket=" + sql_socket + "\n" +
+			"\n" + "\n";
 
 	private static void createCatalogueDB(String catDB) throws Exception {
 
 		fillDatabase(new String[] { "CREATE DATABASE IF NOT EXISTS `" + catDB + "` DEFAULT CHARACTER SET latin1;", "USE `" + catDB + "`;",
 
-        "DROP TABLE IF EXISTS `SEDistance`;",
-        "CREATE TABLE `SEDistance` (`sitename` varchar(32) NOT NULL DEFAULT '', "
-            + "`senumber` int(11) NOT NULL DEFAULT '0',"
-            + "`distance` float DEFAULT NULL,"
-            + "`updated` int(11) DEFAULT '0',"
-            + "PRIMARY KEY(`sitename`,`senumber`)"
-            + ") ENGINE = MyISAM DEFAULT CHARSET = latin1;",
-
+				"DROP TABLE IF EXISTS `SEDistance`;",
+				"CREATE TABLE `SEDistance` (`sitename` varchar(32) NOT NULL DEFAULT '', "
+						+ "`senumber` int(11) NOT NULL DEFAULT '0',"
+						+ "`distance` float DEFAULT NULL,"
+						+ "`updated` int(11) DEFAULT '0',"
+						+ "PRIMARY KEY(`sitename`,`senumber`)"
+						+ ") ENGINE = MyISAM DEFAULT CHARSET = latin1;",
 
 				"DROP TABLE IF EXISTS `ACL`;",
 				"CREATE TABLE `ACL` (" + "  `entryId` int(11) NOT NULL AUTO_INCREMENT," + "  `owner` char(10) COLLATE latin1_general_cs NOT NULL," + "  `aclId` int(11) NOT NULL,"
@@ -361,7 +364,7 @@ public class CreateDB {
 				"CREATE TABLE `INDEXTABLE` (" + "  `indexId` int(11) NOT NULL AUTO_INCREMENT," + "  `hostIndex` int(11) NOT NULL," + "  `tableName` int(11) NOT NULL,"
 						+ "  `lfn` varchar(255) COLLATE latin1_general_cs DEFAULT NULL," + "  PRIMARY KEY (`indexId`)," + "  UNIQUE KEY `lfn` (`lfn`)"
 						+ ") ENGINE=InnoDB AUTO_INCREMENT=2 DEFAULT CHARSET=latin1 COLLATE=latin1_general_cs;",
-				
+
 				"DROP TABLE IF EXISTS `INDEXTABLE_UPDATE`;",
 				"CREATE TABLE `INDEXTABLE_UPDATE` (" + " `entryId` ENUM(" + "`1`) NOT NULL PRIMARY KEY," + " `last_updated` TIMESTAMP);",
 
