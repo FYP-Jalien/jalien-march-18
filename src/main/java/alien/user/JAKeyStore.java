@@ -7,6 +7,7 @@ import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringReader;
@@ -31,7 +32,6 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.EnumSet;
 import java.util.HashSet;
-import java.util.Scanner;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.ThreadLocalRandom;
@@ -68,6 +68,7 @@ import alien.catalogue.CatalogueUtils;
 import alien.config.ConfigUtils;
 import lazyj.ExtProperties;
 import lazyj.Format;
+import lazyj.Utils;
 
 /**
  *
@@ -145,8 +146,8 @@ public class JAKeyStore {
 
 	private static void loadTrusts(final KeyStore keystore, final boolean isTrustStore) {
 		final String trustsDirSet = ConfigUtils.getConfig().gets("trusted.certificates.location",
-			System.getProperty("AliEnConfig", "") + System.getProperty("file.separator") + ".." + System.getProperty("file.separator") + "trusts");
-			
+				System.getProperty("AliEnConfig", "") + System.getProperty("file.separator") + ".." + System.getProperty("file.separator") + "trusts");
+
 		try {
 			final StringTokenizer st = new StringTokenizer(trustsDirSet, ":");
 
@@ -243,21 +244,9 @@ public class JAKeyStore {
 	}
 
 	private static boolean isEncrypted(final String path) {
-		boolean encrypted = false;
-		try (Scanner scanner = new Scanner(new File(path))) {
-			while (scanner.hasNext()) {
-				final String nextToken = scanner.next();
-				if (nextToken.contains("ENCRYPTED")) {
-					encrypted = true;
-					break;
-				}
-			}
-		}
-		catch (@SuppressWarnings("unused") final Exception e) {
-			encrypted = false;
-		}
+		final String content = Utils.readFile(path);
 
-		return encrypted;
+		return content != null && content.contains("ENCRYPTED");
 	}
 
 	/**
@@ -312,8 +301,11 @@ public class JAKeyStore {
 				passwd = System.console().readPassword("Enter the password for " + keypath + ": ");
 			}
 			catch (@SuppressWarnings("unused") final Exception e) {
-				try (Scanner scanner = new Scanner(System.in)) {
-					passwd = scanner.nextLine().toCharArray();
+				try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
+					passwd = br.readLine().toCharArray();
+				}
+				catch (final IOException ioe) {
+					logger.log(Level.WARNING, "Error asking for a password interactively", ioe);
 				}
 			}
 
