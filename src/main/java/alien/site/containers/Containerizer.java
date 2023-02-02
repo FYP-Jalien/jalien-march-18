@@ -3,6 +3,7 @@ package alien.site.containers;
 import java.io.File;
 import java.util.List;
 import java.util.Scanner;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
@@ -10,6 +11,9 @@ import java.util.regex.Pattern;
 import alien.config.ConfigUtils;
 import alien.site.JobAgent;
 import alien.site.packman.CVMFS;
+import lazyj.commands.SystemCommand;
+import lia.util.process.ExternalProcess.ExitStatus;
+import utils.ProcessWithTimeout;
 
 /**
  * @author mstoretv
@@ -17,14 +21,14 @@ import alien.site.packman.CVMFS;
 public abstract class Containerizer {
 
 	private static final String DEFAULT_JOB_CONTAINER_PATH = CVMFS.getContainerPath();
-	
+
 	/**
 	 * Sandbox location
 	 */
 	protected static final String CONTAINER_JOBDIR = "/workdir";
 
 	private static final Logger logger = ConfigUtils.getLogger(JobAgent.class.getCanonicalName());
-	
+
 	/**
 	 * Location of the container
 	 */
@@ -50,7 +54,6 @@ public abstract class Containerizer {
 	 * For resource constraints
 	 */
 	protected int memLimit = 0;
-	
 
 	/**
 	 * GPU
@@ -84,24 +87,25 @@ public abstract class Containerizer {
 	public boolean isSupported() {
 		final String javaTest = "java -version";
 
-		boolean supported = false;
 		try {
-			final ProcessBuilder pb = new ProcessBuilder(containerize(javaTest));
-			final Process probe = pb.start();
-			probe.waitFor();
+			final ProcessBuilder pBuilder = new ProcessBuilder(containerize(javaTest));
+			pBuilder.redirectErrorStream(true);
 
-			try (Scanner cmdScanner = new Scanner(probe.getErrorStream())) {
-				while (cmdScanner.hasNext()) {
-					if (cmdScanner.next().contains("Runtime")) {
-						supported = true;
-					}
-				}
-			}
+			Process p = pBuilder.start();
+			ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
+			pTimeout.waitFor(1, TimeUnit.MINUTES);
+
+			final ExitStatus exitStatus = pTimeout.getExitStatus();
+
+			if (exitStatus.getExtProcExitStatus() != 0 || !exitStatus.getStdOut().contains("Runtime"))
+				return false;
 		}
 		catch (final Exception e) {
 			logger.log(Level.WARNING, "Failed to start container: " + e.toString());
+			return false;
 		}
-		return supported;
+
+		return true;
 	}
 
 	/**
@@ -153,7 +157,7 @@ public abstract class Containerizer {
 	 * @return parameter
 	 */
 	public abstract List<String> containerize(String cmd);
-	
+
 	/**
 	 * Decorating arguments to run the given command under a container. Returns a
 	 * string for use within scripts
@@ -163,8 +167,8 @@ public abstract class Containerizer {
 	 */
 	public String containerizeAsString(String cmd) {
 		String contCmd = String.join(" ", containerize(cmd));
-		contCmd = contCmd.replaceAll(" \\$", " \\\\\\$"); //Prevent startup path from being expanded prematurely
-		contCmd = contCmd.replaceAll("-c ", "-c \"") + "\""; //Wrap the command to be executed as a string 
+		contCmd = contCmd.replaceAll(" \\$", " \\\\\\$"); // Prevent startup path from being expanded prematurely
+		contCmd = contCmd.replaceAll("-c ", "-c \"") + "\""; // Wrap the command to be executed as a string
 		return contCmd;
 	}
 
