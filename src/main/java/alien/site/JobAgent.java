@@ -1435,8 +1435,10 @@ public class JobAgent implements Runnable {
 
 			logger.log(Level.INFO, "Attempting core check using shell instead");
 			try {
-				String output = ExternalProcesses.getCmdOutput(Arrays.asList("find", jobWorkdir, "-name", "core*", "!", "-name", "*.inp"), true, 30L, TimeUnit.SECONDS);
-				if (output != null && !output.isBlank() && output.contains("core"))
+				CommandOutput output = SystemCommand.executeCommand(Arrays.asList("find", jobWorkdir, "-name", "core*", "!", "-name", "*.inp"));
+				BufferedReader br = output.reader();
+				String readArg = br.readLine();
+				if (readArg != null && !readArg.isBlank() && readArg.contains("core"))
 					return "Core directory detected: " + output + ". Aborting!";
 			}
 			catch (Exception e2) {
