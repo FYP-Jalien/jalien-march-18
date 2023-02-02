@@ -688,69 +688,69 @@ public class JobAgent implements Runnable {
 	 * @throws InterruptedException
 	 */
 	public List<String> generateLaunchCommand() throws InterruptedException {
-        try {
-            // Main cmd for starting the JobWrapper
-            List<String> launchCmd = new ArrayList<>();
-            
+		try {
+			// Main cmd for starting the JobWrapper
+			List<String> launchCmd = new ArrayList<>();
+
 			final String[] cmdCheck = env.getOrDefault("JALIEN_JOBAGENT_CMD",
 					SystemCommand.bash("ps -p " + String.valueOf(MonitorFactory.getSelfProcessID()) + " -o command=").stdout).split("\\s+");
 
-            for (int i = 0; i < cmdCheck.length; i++) {
-                logger.log(Level.INFO, cmdCheck[i]);
-                if (cmdCheck[i].contains("-cp"))
-                    i++;
-                else if (cmdCheck[i].contains("alien.site.JobRunner") || cmdCheck[i].contains("alien.site.JobAgent")) {
-                    launchCmd.add("-Djobagent.vmid=" + queueId);
-                    launchCmd.add("-Djava.util.logging.SimpleFormatter.format='JobID " + queueId + ": %1$tb %1$td, %1$tY %1$tH:%1$tM:%1$tS %2$s %n%4$s: %5$s%6$s%n'");
-                    launchCmd.add("-cp");
-                    launchCmd.add(jarPath + jarName);
-                    launchCmd.add("alien.site.JobWrapper");
-                }
-                else if (!cmdCheck[i].contains("JobRunner") && !cmdCheck[i].contains("JobAgent")) // Just to be completely sure...
-                    launchCmd.add(cmdCheck[i]);
-            }
-			
-            // If there is container support present on site, add to launchCmd
-            if (containerizer != null) {
-                putJobTrace("Support for containers detected. Will use: " + containerizer.getContainerizerName());
-                containerizer.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
+			for (int i = 0; i < cmdCheck.length; i++) {
+				logger.log(Level.INFO, cmdCheck[i]);
+				if (cmdCheck[i].contains("-cp"))
+					i++;
+				else if (cmdCheck[i].contains("alien.site.JobRunner") || cmdCheck[i].contains("alien.site.JobAgent")) {
+					launchCmd.add("-Djobagent.vmid=" + queueId);
+					launchCmd.add("-Djava.util.logging.SimpleFormatter.format='JobID " + queueId + ": %1$tb %1$td, %1$tY %1$tH:%1$tM:%1$tS %2$s %n%4$s: %5$s%6$s%n'");
+					launchCmd.add("-cp");
+					launchCmd.add(jarPath + jarName);
+					launchCmd.add("alien.site.JobWrapper");
+				}
+				else if (!cmdCheck[i].contains("JobRunner") && !cmdCheck[i].contains("JobAgent")) // Just to be completely sure...
+					launchCmd.add(cmdCheck[i]);
+			}
 
-                // Only used on Cgroupsv2 hosts
-                if (containerizer.setMemLimit(jobMaxMemoryMB))
-                    putJobTrace("Warning: This host has support for cgroups v2. New features will be used.");
+			// If there is container support present on site, add to launchCmd
+			if (containerizer != null) {
+				putJobTrace("Support for containers detected. Will use: " + containerizer.getContainerizerName());
+				containerizer.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
 
-                if (jdl.gets("DebugTag") != null)
-                    containerizer.enableDebug(jdl.gets("DebugTag"));
+				// Only used on Cgroupsv2 hosts
+				if (containerizer.setMemLimit(jobMaxMemoryMB))
+					putJobTrace("Warning: This host has support for cgroups v2. New features will be used.");
 
-                launchCmd = containerizer.containerize(String.join(" ", launchCmd));
-            }
+				if (jdl.gets("DebugTag") != null)
+					containerizer.enableDebug(jdl.gets("DebugTag"));
 
-            // Run jobs in isolated environment
-            if (cpuIsolation == true) {
-                String isolCmd = addIsolation();
-                logger.log(Level.SEVERE, "IsolCmd command" + isolCmd);
-                if (isolCmd != null && isolCmd.compareTo("") != 0)
-                    launchCmd.addAll(0, Arrays.asList("taskset", "-c", isolCmd));
-            }
+				launchCmd = containerizer.containerize(String.join(" ", launchCmd));
+			}
 
-            return launchCmd;
-        }
-        catch (final Exception e) {
-            logger.log(Level.SEVERE, ": ", e);
-            putJobTrace("Could not generate JobWrapper launch command " + e.toString());
+			// Run jobs in isolated environment
+			if (cpuIsolation == true) {
+				String isolCmd = addIsolation();
+				logger.log(Level.SEVERE, "IsolCmd command" + isolCmd);
+				if (isolCmd != null && isolCmd.compareTo("") != 0)
+					launchCmd.addAll(0, Arrays.asList("taskset", "-c", isolCmd));
+			}
 
-            try {
-                File[] listOfFiles = new File("/proc/" + MonitorFactory.getSelfProcessID() + "/fd").listFiles();
-                putJobTrace("Length of /proc/" + MonitorFactory.getSelfProcessID() + "/fd is: " + listOfFiles.length);
-                logger.log(Level.INFO, "Length of /proc/" + MonitorFactory.getSelfProcessID() + "/fd is: " + listOfFiles.length);
-            }
-            catch (final Exception e2) {
-                putJobTrace("Could not run debug for launchCommand: " + e2.toString());
-                logger.log(Level.SEVERE, "Could not run debug for launchCommand: ", e2);
-            }
-            return null;
-        }
-    }
+			return launchCmd;
+		}
+		catch (final Exception e) {
+			logger.log(Level.SEVERE, ": ", e);
+			putJobTrace("Could not generate JobWrapper launch command " + e.toString());
+
+			try {
+				File[] listOfFiles = new File("/proc/" + MonitorFactory.getSelfProcessID() + "/fd").listFiles();
+				putJobTrace("Length of /proc/" + MonitorFactory.getSelfProcessID() + "/fd is: " + listOfFiles.length);
+				logger.log(Level.INFO, "Length of /proc/" + MonitorFactory.getSelfProcessID() + "/fd is: " + listOfFiles.length);
+			}
+			catch (final Exception e2) {
+				putJobTrace("Could not run debug for launchCommand: " + e2.toString());
+				logger.log(Level.SEVERE, "Could not run debug for launchCommand: ", e2);
+			}
+			return null;
+		}
+	}
 
 	private Process launchJobWrapper(final List<String> launchCommand) {
 		logger.log(Level.INFO, "Launching jobwrapper using the command: " + launchCommand.toString());
@@ -817,7 +817,7 @@ public class JobAgent implements Runnable {
 		return p;
 	}
 
-	private int monitorExecution(Process p, boolean monitorJob){
+	private int monitorExecution(Process p, boolean monitorJob) {
 		boolean payloadMonitoring = false;
 
 		if (p == null || !p.isAlive())
@@ -836,7 +836,7 @@ public class JobAgent implements Runnable {
 			String monitoring = jdl.gets("Monitoring");
 			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
 				payloadMonitoring = true;
-				mj.setWrapperPid(getWrapperPid(0));
+				mj.setWrapperPid(getWrapperPid());
 				// mjPayload = apmon.addJobToMonitor(getWrapperPid(), jobWorkdir, ce + "_JobWrapper", matchedJob.get("queueId").toString());
 				mj.setPayloadMonitoring();
 			}
@@ -987,7 +987,7 @@ public class JobAgent implements Runnable {
 			if (mj != null)
 				mj.close();
 
-			endState = getWrapperJobStatus();	
+			endState = getWrapperJobStatus();
 			if (code != 0) {
 				if ("STARTED".equals(endState) || "RUNNING".equals(endState)) {
 					putJobTrace("ERROR: The JobWrapper was killed before job could complete");
@@ -1057,38 +1057,33 @@ public class JobAgent implements Runnable {
 	/**
 	 * @return mask with already pinned cores by other running workloads
 	 */
-	byte[] getFreeCPUs(int catchExceptionRetries) {
-		BigInteger newVal;
+	byte[] getFreeCPUs() {
 		BigInteger mask = BigInteger.ZERO;
-		logger.log(Level.INFO, "DBG: Getting FreeCPUs with counter " + catchExceptionRetries);
 
 		try {
 			String cmd = "pgrep -v -U root -u root | xargs -L1 taskset -a -p 2>/dev/null | cut -d' ' -f6 | sort -u";
 
-			final Process affinityCmd = Runtime.getRuntime().exec(new String[] { "/bin/bash", "-c", cmd });
-			affinityCmd.waitFor();
-			try (Scanner cmdScanner = new Scanner(affinityCmd.getInputStream())) {
+			CommandOutput output = SystemCommand.bash(cmd);
+
+			try (BufferedReader br = output.reader()) {
 				String readArg;
-				while (cmdScanner.hasNext()) {
-					readArg = (cmdScanner.next());
+				while ((readArg = br.readLine()) != null) {
+					try {
+						BigInteger newVal = new BigInteger(readArg.trim(), 16);
+						if (BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE).equals(newVal))
+							continue;
 
-					newVal = new BigInteger(readArg.trim(), 16);
-
-					if (BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE).equals(newVal))
-						continue;
-
-					mask = mask.or(newVal);
-
+						mask = mask.or(newVal);
+					}
+					catch (NumberFormatException nfe) {
+						logger.log(Level.WARNING, "Exception parsing a line of output from pgrep: " + readArg, nfe);
+					}
 				}
 				return valueToArray(mask, RES_NOCPUS.intValue());
 			}
 		}
-		catch (IOException | IllegalArgumentException | InterruptedException e) {
-			if (catchExceptionRetries < 5) {
-				logger.log(Level.WARNING, "Retrying getFreeCPUs(). Counter = " + catchExceptionRetries);
-				getFreeCPUs(catchExceptionRetries + 1);
-			} else
-				logger.log(Level.WARNING, "Exception when getting free CPUs. Already tried 5 times without success. ", e);
+		catch (IOException | IllegalArgumentException e) {
+			logger.log(Level.WARNING, "Exception when getting free CPUs", e);
 		}
 
 		return new byte[RES_NOCPUS.intValue()];
@@ -1123,7 +1118,8 @@ public class JobAgent implements Runnable {
 			if (catchExceptionRetries < 5) {
 				logger.log(Level.WARNING, "Retrying getHostMask(). Counter = " + catchExceptionRetries);
 				getHostMask(catchExceptionRetries + 1);
-			} else
+			}
+			else
 				logger.log(Level.WARNING, "Exception when getting host mask. Already tried 5 times without success. ", e);
 		}
 
@@ -1136,7 +1132,7 @@ public class JobAgent implements Runnable {
 	public byte[] getInitialMask() {
 		byte[] mask;
 		byte[] hostMask;
-		mask = getFreeCPUs(0);
+		mask = getFreeCPUs();
 		hostMask = getHostMask(0);
 		// In case we could not parse the mask of other processes we get it empty
 		if (mask == null || hostMask == null)
@@ -1167,9 +1163,9 @@ public class JobAgent implements Runnable {
 		return isolatedCPUs;
 	}
 
-	//####################################################################
-	//################## MONITORING HELPER FUNCTIONS #####################
-	//####################################################################
+	// ####################################################################
+	// ################## MONITORING HELPER FUNCTIONS #####################
+	// ####################################################################
 
 	/**
 	 * updates jobagent parameters that change between job requests
@@ -1423,7 +1419,7 @@ public class JobAgent implements Runnable {
 		if (jobKilled)
 			return "Job was killed";
 
-		//Also check for core directories, and abort if found to avoid filling up disk space
+		// Also check for core directories, and abort if found to avoid filling up disk space
 		final Pattern coreDirPattern = Pattern.compile("^(?!.*\\.inp).*core.*$");
 		try {
 			List<File> coreDirs = Files.walk(new File(jobWorkdir).toPath())
@@ -1518,13 +1514,13 @@ public class JobAgent implements Runnable {
 				prevCpuTime = RES_CPUTIME;
 				prevTime = time;
 			}
-/*
-			if (cpuIsolation == false && mj.isOverConsuming()) {
-				cpuIsolation = true;
-				logger.log(Level.SEVERE, "CPU resources overconsumption detected in job " + queueId + ". Going to constrain job to allocated cores.");
-				constrainJobCPU();
-			}
-*/
+			/*
+			 * if (cpuIsolation == false && mj.isOverConsuming()) {
+			 * cpuIsolation = true;
+			 * logger.log(Level.SEVERE, "CPU resources overconsumption detected in job " + queueId + ". Going to constrain job to allocated cores.");
+			 * constrainJobCPU();
+			 * }
+			 */
 
 		}
 		catch (final IOException e) {
@@ -1567,17 +1563,18 @@ public class JobAgent implements Runnable {
 		}
 	}
 
+	// ##########################################################################
+	// ######################### OTHER HELPER FUNCTIONS #########################
+	// ##########################################################################
 
-	//##########################################################################
-	//######################### OTHER HELPER FUNCTIONS #########################
-	//##########################################################################
-
-	/*private void constrainJobCPU() {
-		//get CPU cores to constrain the job
-		String isolCmd = addIsolation();
-		logger.log(Level.SEVERE, "IsolCmd command" + isolCmd);
-		NUMAExplorer.applyTaskset(isolCmd, childPID);
-	}*/
+	/*
+	 * private void constrainJobCPU() {
+	 * //get CPU cores to constrain the job
+	 * String isolCmd = addIsolation();
+	 * logger.log(Level.SEVERE, "IsolCmd command" + isolCmd);
+	 * NUMAExplorer.applyTaskset(isolCmd, childPID);
+	 * }
+	 */
 
 	private long ttlForJob() {
 		final Integer iTTL = jdl.getInteger("TTL");
@@ -1767,26 +1764,29 @@ public class JobAgent implements Runnable {
 	 *
 	 * @return JobWrapper PID
 	 */
-	private int getWrapperPid(int catchExceptionRetries) {
-		logger.log(Level.INFO, "DBG: Getting Wrapper PID with counter " + catchExceptionRetries);
+	private int getWrapperPid() {
 		final ArrayList<Integer> wrapperProcs = new ArrayList<>();
 
-		try {
-			final Process getWrapperProcs = Runtime.getRuntime().exec(new String[] { "pgrep", "-f", String.valueOf(queueId) });
-			getWrapperProcs.waitFor();
-			try (Scanner cmdScanner = new Scanner(getWrapperProcs.getInputStream())) {
-				while (cmdScanner.hasNext()) {
-					wrapperProcs.add(Integer.valueOf(cmdScanner.next()));
+		final CommandOutput output = SystemCommand.executeCommand(List.of("pgrep", "-f", String.valueOf(queueId)), false);
+
+		if (output.exitCode != 0) {
+			// pgrep failed
+		}
+
+		try (BufferedReader br = output.reader()) {
+			String line;
+
+			while ((line = br.readLine()) != null) {
+				try {
+					wrapperProcs.add(Integer.valueOf(line.trim()));
+				}
+				catch (@SuppressWarnings("unused") NumberFormatException nfe) {
+					logger.log(Level.WARNING, "Unexpected string in the output of `pgrep` : " + line);
 				}
 			}
 		}
-		catch (final Exception e) {
-			if (catchExceptionRetries < 5) {
-				logger.log(Level.WARNING, "Retrying getWrapperPid(). Counter is " + catchExceptionRetries);
-				getWrapperPid(catchExceptionRetries + 1);
-			} else
-				logger.log(Level.WARNING, "Could not get JobWrapper PID. Already tried 5 times without success. ", e);
-			return 0;
+		catch (@SuppressWarnings("unused") final IOException ioe) {
+			// not happening, it's a BR on a memory String
 		}
 
 		if (wrapperProcs.size() < 1)
@@ -1812,7 +1812,7 @@ public class JobAgent implements Runnable {
 	 */
 	private void killGracefully(final Process p) {
 		try {
-			final int jobWrapperPid = getWrapperPid(0);
+			final int jobWrapperPid = getWrapperPid();
 			if (jobWrapperPid != 0)
 				Runtime.getRuntime().exec(new String[] { "kill", String.valueOf(jobWrapperPid) });
 			else
@@ -1850,7 +1850,7 @@ public class JobAgent implements Runnable {
 	 * @param p process for JobWrapper
 	 */
 	private void killForcibly(final Process p) {
-		final int jobWrapperPid = getWrapperPid(0);
+		final int jobWrapperPid = getWrapperPid();
 		try {
 			if (jobWrapperPid != 0) {
 				JobWrapper.cleanupProcesses(queueId, jobWrapperPid);
@@ -1927,9 +1927,9 @@ public class JobAgent implements Runnable {
 		};
 	}
 
-	//#################################################################
-	//############################ SCRIPTS ############################
-	//#################################################################
+	// #################################################################
+	// ############################ SCRIPTS ############################
+	// #################################################################
 
 	/**
 	 * Site Sonar controller function
@@ -2100,8 +2100,8 @@ public class JobAgent implements Runnable {
 
 			if (f.exists() && f.canExecute()) {
 				final ProcessBuilder pBuilder = new ProcessBuilder("sh", scriptPath);
-		//		pBuilder.redirectError(Redirect.INHERIT);
-		//		pBuilder.redirectOutput(Redirect.INHERIT);
+				// pBuilder.redirectError(Redirect.INHERIT);
+				// pBuilder.redirectOutput(Redirect.INHERIT);
 				logger.log(Level.INFO, ("Running " + probeName + ".sh..."));
 				long startTime = System.currentTimeMillis();
 				final Process process = pBuilder.start();
