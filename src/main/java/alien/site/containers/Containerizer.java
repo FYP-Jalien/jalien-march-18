@@ -2,7 +2,6 @@ package alien.site.containers;
 
 import java.io.File;
 import java.util.List;
-import java.util.Scanner;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -11,7 +10,6 @@ import java.util.regex.Pattern;
 import alien.config.ConfigUtils;
 import alien.site.JobAgent;
 import alien.site.packman.CVMFS;
-import lazyj.commands.SystemCommand;
 import lia.util.process.ExternalProcess.ExitStatus;
 import utils.ProcessWithTimeout;
 
@@ -56,6 +54,11 @@ public abstract class Containerizer {
 	protected int memLimit = 0;
 
 	/**
+	 * Set to true if mounting GPU libraries breaks container
+	 */
+	protected boolean gpuBroken = false;
+
+	/**
 	 * GPU
 	 */
 	private static final String cudaDevices = System.getenv().containsKey("CUDA_VISIBLE_DEVICES") ? " && echo export CUDA_VISIBLE_DEVICES=" + System.getenv().get("CUDA_VISIBLE_DEVICES") : "";
@@ -82,10 +85,13 @@ public abstract class Containerizer {
 	}
 
 	/**
+	 * Checks if running a simple command (java -version) is possible under the given container implementation.
+	 * Also contains a sanity check (ps --version) to see if bind-mounted GPU libraries are incompatible with container
+	 * 
 	 * @return <code>true</code> if running a simple command (java -version) is possible under the given container implementation
 	 */
 	public boolean isSupported() {
-		final String javaTest = "java -version";
+		final String javaTest = "java -version && ps --version";
 
 		try {
 			final ProcessBuilder pBuilder = new ProcessBuilder(containerize(javaTest));
@@ -97,8 +103,12 @@ public abstract class Containerizer {
 
 			final ExitStatus exitStatus = pTimeout.getExitStatus();
 
-			if (exitStatus.getExtProcExitStatus() != 0 || !exitStatus.getStdOut().contains("Runtime"))
-				return false;
+			if (exitStatus.getExtProcExitStatus() != 0) {
+				if (!exitStatus.getStdOut().contains("ps from"))
+					gpuBroken = true;
+				if (!exitStatus.getStdOut().contains("Runtime"))
+					return false;
+			}
 		}
 		catch (final Exception e) {
 			logger.log(Level.WARNING, "Failed to start container: " + e.toString());

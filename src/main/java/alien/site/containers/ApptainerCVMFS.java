@@ -17,15 +17,19 @@ public class ApptainerCVMFS extends Containerizer {
 		apptainerCmd.add("exec");
 		apptainerCmd.add("-C");
 
-		final String gpuString = getGPUString();
-		String gpuDirs = getGPUdirs();
+		String gpuDirs = "";
+		if (!gpuBroken) {
+			final String gpuString = getGPUString();
+			if (gpuString.contains("nvidia"))
+				apptainerCmd.add("--nv");
+			else if (gpuString.contains("kfd"))
+				apptainerCmd.add("--rocm");
+			else
+				gpuBroken = true;
 
-		if (gpuString.contains("nvidia"))
-			apptainerCmd.add("--nv");
-		else if (gpuString.contains("kfd"))
-			apptainerCmd.add("--rocm");
-		else
-			gpuDirs = "";
+			if (!gpuBroken)
+				gpuDirs = getGPUdirs();
+		}
 
 		apptainerCmd.add("-B");
 		if(workdir != null) {
