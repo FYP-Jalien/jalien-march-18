@@ -110,7 +110,7 @@ public class Quota implements Serializable, Comparable<Quota> {
 	/**
 	 * Fields allowed to modify via jquota set command
 	 */
-	private final static Set<String> allowed_to_update = Set.of("maxUnfinishedJobs", "maxTotalCpuCost", "maxTotalRunningTime");
+	private final static Set<String> allowed_to_update = Set.of("maxUnfinishedJobs", "maxTotalCpuCost", "maxTotalRunningTime", "priority");
 
 	/**
 	 * @param db
