@@ -6,7 +6,6 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.lang.ProcessBuilder.Redirect;
 import java.nio.file.Files;
 import java.nio.file.Paths;
@@ -220,11 +219,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			logger.log(Level.INFO, "We received the following CE " + ce);
 
 			masterjobID = jdl.getLong("MasterjobID");
-
-			// Send over the pid as seen by wrapper (in case of containers)
-			ObjectOutputStream stdoutObj = new ObjectOutputStream(System.out);
-			stdoutObj.writeObject(pid);
-			stdoutObj.flush();
 		} 
 		catch (final IOException | ClassNotFoundException e) {
 			logger.log(Level.SEVERE, "Error: Could not receive data from JobAgent" + e);
