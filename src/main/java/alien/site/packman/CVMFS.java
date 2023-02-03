@@ -3,6 +3,10 @@
  */
 package alien.site.packman;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
@@ -130,7 +134,21 @@ public class CVMFS extends PackMan {
 	}
 
 	private static String getAliEnPrintenv(final String args) {
-		final String keyModifier = SystemCommand.bash("lsb_release -s -d").stdout;
+		String keyModifier = "";
+		File f = new File("/etc/os-release");
+		if (f.exists() && f.canRead()) {
+			String s;
+			try (BufferedReader br = new BufferedReader(new FileReader(f))) {
+				while ((s = br.readLine()) != null) {
+					if (s.startsWith("PRETTY_NAME")) {
+						keyModifier = s.split("=")[1].replace("\"", "");
+						break;
+					}
+				}
+			} catch (IOException | IllegalArgumentException e) {
+				logger.log(Level.WARNING, "The file /etc/os-release could not be accessed.\n" + e);
+			}
+		}
 
 		try {
 			logger.log(Level.INFO, "Executing GetAliEnv");

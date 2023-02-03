@@ -36,7 +36,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Properties;
-import java.util.Scanner;
 import java.util.StringTokenizer;
 import java.util.Timer;
 import java.util.TimerTask;
@@ -1063,7 +1062,7 @@ public class JobAgent implements Runnable {
 		try {
 			String cmd = "pgrep -v -U root -u root | xargs -L1 taskset -a -p 2>/dev/null | cut -d' ' -f6 | sort -u";
 
-			CommandOutput output = SystemCommand.bash(cmd);
+			CommandOutput output = SystemCommand.bash(cmd, true);
 
 			try (BufferedReader br = output.reader()) {
 				String readArg;
@@ -1105,24 +1104,26 @@ public class JobAgent implements Runnable {
 	/**
 	 * @return mask our workload has already been pinned to
 	 */
-	byte[] getHostMask(int catchExceptionRetries) {
-		logger.log(Level.INFO, "DBG: Getting Host mask with counter " + catchExceptionRetries);
+	byte[] getHostMask() {
 
 		String cmd = "taskset -p $$ | cut -d' ' -f6";
 
-		try {
-			final String out = ExternalProcesses.getCmdOutput(Arrays.asList("/bin/bash", "-c", cmd), true, 30L, TimeUnit.SECONDS);
-			return valueToArray((new BigInteger(out.trim(), 16)).not().and(BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE)), RES_NOCPUS.intValue());
-		}
-		catch (IOException | IllegalArgumentException | InterruptedException e) {
-			if (catchExceptionRetries < 5) {
-				logger.log(Level.WARNING, "Retrying getHostMask(). Counter = " + catchExceptionRetries);
-				getHostMask(catchExceptionRetries + 1);
-			}
-			else
-				logger.log(Level.WARNING, "Exception when getting host mask. Already tried 5 times without success. ", e);
-		}
+		CommandOutput output = SystemCommand.bash(cmd,true);
 
+		try (BufferedReader br = output.reader()) {
+			String readArg;
+			if ((readArg = br.readLine()) != null) {
+				try {
+					return valueToArray((new BigInteger(readArg.trim(), 16)).not().and(BigInteger.ONE.shiftLeft(RES_NOCPUS.intValue()).subtract(BigInteger.ONE)), RES_NOCPUS.intValue());
+				}
+				catch (NumberFormatException nfe) {
+					logger.log(Level.WARNING, "Exception parsing a line of output from taskset: " + readArg, nfe);
+				}
+			}
+		}
+		catch (IOException | IllegalArgumentException e) {
+			logger.log(Level.WARNING, "Exception when getting hostMask", e);
+		}
 		return new byte[RES_NOCPUS.intValue()];
 	}
 
@@ -1133,7 +1134,7 @@ public class JobAgent implements Runnable {
 		byte[] mask;
 		byte[] hostMask;
 		mask = getFreeCPUs();
-		hostMask = getHostMask(0);
+		hostMask = getHostMask();
 		// In case we could not parse the mask of other processes we get it empty
 		if (mask == null || hostMask == null)
 			return (new byte[RES_NOCPUS.intValue()]);
@@ -1199,7 +1200,7 @@ public class JobAgent implements Runnable {
 	 */
 	public void checkAndApplyIsolation(int jobRunnerPid) {
 		synchronized (cpuSync) {
-			byte[] hostMask = getHostMask(0);
+			byte[] hostMask = getHostMask();
 			boolean alreadyIsol = false;
 			for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
 				if (hostMask[i] != 0) {
@@ -1434,9 +1435,12 @@ public class JobAgent implements Runnable {
 			logger.log(Level.WARNING, "Exception while checking for core directories: ", e1);
 
 			logger.log(Level.INFO, "Attempting core check using shell instead");
-			try {
-				CommandOutput output = SystemCommand.executeCommand(Arrays.asList("find", jobWorkdir, "-name", "core*", "!", "-name", "*.inp"));
-				BufferedReader br = output.reader();
+
+			String cmd = "find -name 'core*' ! -name '*.inp'";
+
+			CommandOutput output = SystemCommand.bash(cmd,true);
+
+			try (BufferedReader br = output.reader()) {
 				String readArg = br.readLine();
 				if (readArg != null && !readArg.isBlank() && readArg.contains("core"))
 					return "Core directory detected: " + output + ". Aborting!";
