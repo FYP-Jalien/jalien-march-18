@@ -1,17 +1,19 @@
 package alien.site.containers;
 
+import java.io.BufferedReader;
 import java.io.File;
+import java.util.Arrays;
 import java.util.List;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 import alien.config.ConfigUtils;
 import alien.site.JobAgent;
 import alien.site.packman.CVMFS;
-import lia.util.process.ExternalProcess.ExitStatus;
-import utils.ProcessWithTimeout;
+import lazyj.commands.CommandOutput;
+import lazyj.commands.SystemCommand;
 
 /**
  * @author mstoretv
@@ -92,22 +94,19 @@ public abstract class Containerizer {
 	 */
 	public boolean isSupported() {
 		final String javaTest = "java -version && ps --version";
-
 		try {
-			final ProcessBuilder pBuilder = new ProcessBuilder(containerize(javaTest));
-			pBuilder.redirectErrorStream(true);
-
-			Process p = pBuilder.start();
-			ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
-			pTimeout.waitFor(1, TimeUnit.MINUTES);
-
-			final ExitStatus exitStatus = pTimeout.getExitStatus();
-
-			if (exitStatus.getExtProcExitStatus() != 0) {
-				if (!exitStatus.getStdOut().contains("ps from"))
-					gpuBroken = true;
-				if (!exitStatus.getStdOut().contains("Runtime"))
-					return false;
+			CommandOutput output = SystemCommand.executeCommand(containerize(javaTest), true);
+			try (BufferedReader br = output.reader()) {
+				final String outputString = br.lines().collect(Collectors.joining());
+				if (outputString != null && !outputString.isBlank()) {
+					if (!outputString.contains("ps from"))
+						gpuBroken = true;
+					if (!outputString.contains("Runtime"))
+						return false;
+				}
+			}
+			catch (Exception e2) {
+				logger.log(Level.WARNING, "Could not get output from container check: ", e2);
 			}
 		}
 		catch (final Exception e) {
@@ -122,13 +121,34 @@ public abstract class Containerizer {
 	 * @return <code>true</code> if running a simple command (java -version) is possible with cgv2 constraints
 	 */
 	public boolean checkCgroupsv2() {
-		useCgroupsv2 = true;
+		useCgroupsv2 = false;
+		try {
+			CommandOutput output = SystemCommand.executeCommand(Arrays.asList("/bin/bash", "-c", "mount -l | grep cgroup"));
+			try (BufferedReader br = output.reader()) {
+				final String outputString = br.lines().collect(Collectors.joining());
+				if (outputString != null && !outputString.isBlank()) {
+					if (outputString.contains("cgroup2"))
+						useCgroupsv2 = true;
+				}
+			}
+			catch (Exception e2) {
+				logger.log(Level.WARNING, "Could not get output from cgroupsv2 check: ", e2);
+			}
+		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "Failed to check for cgroupsv2 support: " + e.toString());
+			return false;
+		}
+
+		if (useCgroupsv2 == false)
+			return false;
 
 		if (!isSupported())
 			useCgroupsv2 = false;
 
 		return useCgroupsv2;
 	}
+
 
 	/**
 	 * @return String representing supported GPUs by the system. Will contain either 'nvidia[0-9]' (Nvidia), 'kfd' (AMD), or none.
