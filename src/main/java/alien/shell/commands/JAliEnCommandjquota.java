@@ -114,46 +114,66 @@ public class JAliEnCommandjquota extends JAliEnBaseCommand {
 
 		this.users_to_set = new LinkedHashSet<>();
 
-		AliEnPrincipal user_to_set = commander.getUser();
+		if (this.command.equals("set")) {
+			if (alArguments.size() == 4) {
+				final AliEnPrincipal user_to_set = UserFactory.getByUsername(alArguments.get(1));
 
-		if (this.command.equals("set") && alArguments.size() == 4) {
-			user_to_set = UserFactory.getByUsername(alArguments.get(1));
+				if (user_to_set == null) {
+					commander.setReturnCode(ErrNo.ENOKEY, "User " + alArguments.get(1) + " not found");
+					setArgumentsOk(false);
+					return;
+				}
 
-			if (user_to_set == null) {
-				commander.setReturnCode(ErrNo.ENOKEY, "User " + alArguments.get(1) + " not found");
-				return;
+				final String param = alArguments.get(2);
+
+				if (!Quota.canUpdateField(param)) {
+					commander.setReturnCode(ErrNo.ENOSYS, "Parameter `" + param + "` cannot be updated, only one these fields can be set: " + Quota.allowed_to_update);
+					setArgumentsOk(false);
+					return;
+				}
+
+				this.param_to_set = param;
+				try {
+					this.value_to_set = Long.valueOf(alArguments.get(3));
+				}
+				catch (@SuppressWarnings("unused") final Exception e) {
+					commander.setReturnCode(ErrNo.EINVAL, "Invalid new value for " + param + " : " + alArguments.get(3));
+					setArgumentsOk(false);
+					return;
+				}
+
+				users_to_set.add(user_to_set);
+			}
+			else {
+				setArgumentsOk(false);
 			}
 
-			final String param = alArguments.get(2);
-
-			if (!Quota.canUpdateField(param)) {
-				commander.setReturnCode(ErrNo.ENOSYS, "Parameter `" + param + "` cannot be updated, only one these fields can be set: " + Quota.allowed_to_update);
-				return;
-			}
-
-			this.param_to_set = param;
-			try {
-				this.value_to_set = Long.valueOf(alArguments.get(3));
-			}
-			catch (@SuppressWarnings("unused") final Exception e) {
-				commander.setReturnCode(ErrNo.EINVAL, "Invalid new value for " + param + " : " + alArguments.get(3));
-				return;
-			}
-
-			users_to_set.add(user_to_set);
+			return;
 		}
 
-		if (this.command.equals("list") && alArguments.size() > 1) {
+		if (this.command.equals("list"))
+
+		{
 			for (int i = 1; i < alArguments.size(); i++) {
-				user_to_set = UserFactory.getByUsername(alArguments.get(i));
+				AliEnPrincipal user_to_set = UserFactory.getByUsername(alArguments.get(i));
 
 				if (user_to_set == null) {
 					commander.setReturnCode(ErrNo.ENOKEY, "No such account name: " + alArguments.get(i));
+					setArgumentsOk(false);
 					break;
 				}
 
 				users_to_set.add(user_to_set);
 			}
+
+			if (users_to_set.size() == 0)
+				users_to_set.add(commander.getUser());
+
+			return;
 		}
+
+		commander.setReturnCode(ErrNo.EINVAL, "Unrecognized command " + this.command);
+
+		setArgumentsOk(false);
 	}
 }
