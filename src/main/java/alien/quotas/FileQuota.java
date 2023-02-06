@@ -1,6 +1,7 @@
 package alien.quotas;
 
 import java.io.Serializable;
+import java.util.Collections;
 import java.util.Set;
 
 import lazyj.DBFunctions;
@@ -60,7 +61,7 @@ public final class FileQuota implements Serializable, Comparable<FileQuota> {
 	/**
 	 * Fields allowed to modify via fquota set command
 	 */
-	private final static Set<String> allowed_to_update = Set.of("maxNbFiles", "maxTotalSize");
+	public final static Set<String> allowed_to_update = Collections.unmodifiableSet(Set.of("maxNbFiles", "maxTotalSize"));
 
 	/**
 	 * @param db

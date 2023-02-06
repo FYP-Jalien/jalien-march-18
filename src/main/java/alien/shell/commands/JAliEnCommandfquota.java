@@ -26,6 +26,8 @@ public class JAliEnCommandfquota extends JAliEnBaseCommand {
 	@Override
 	public void run() {
 		if (command.equals("list")) {
+			boolean first = true;
+
 			for (final String username : usersToList) {
 				final FileQuota q = TaskQueueApiUtils.getFileQuota(UserFactory.getByUsername(username));
 
@@ -40,6 +42,11 @@ public class JAliEnCommandfquota extends JAliEnBaseCommand {
 				commander.printOut("nbFiles", String.valueOf(q.nbFiles));
 				commander.printOut("maxNbFiles", String.valueOf(q.maxNbFiles));
 				commander.printOut("maxNbFiles", String.valueOf(q.maxNbFiles));
+
+				if (first)
+					first = false;
+				else
+					commander.printOutln();
 
 				commander.printOutln(q.toString());
 
@@ -107,7 +114,7 @@ public class JAliEnCommandfquota extends JAliEnBaseCommand {
 				final String param = alArguments.get(2);
 
 				if (!FileQuota.canUpdateField(param)) {
-					commander.setReturnCode(ErrNo.EINVAL, "Not a field you can set: " + param);
+					commander.setReturnCode(ErrNo.ENOSYS, "Not a field you can set: " + param + ", only these ones can be modified: " + FileQuota.allowed_to_update);
 					setArgumentsOk(false);
 					return;
 				}
@@ -118,7 +125,9 @@ public class JAliEnCommandfquota extends JAliEnBaseCommand {
 					this.value_to_set = Long.valueOf(alArguments.get(3));
 				}
 				catch (@SuppressWarnings("unused") final Exception e) {
-					commander.setReturnCode(ErrNo.EINVAL, "Illegal value for " + param_to_set + " : " + alArguments.get(4));
+					commander.setReturnCode(ErrNo.EINVAL, "Illegal value for " + param_to_set + " : " + alArguments.get(3));
+					setArgumentsOk(false);
+					return;
 				}
 			}
 			else {
