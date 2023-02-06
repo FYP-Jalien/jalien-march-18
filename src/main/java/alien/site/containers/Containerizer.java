@@ -104,6 +104,8 @@ public abstract class Containerizer {
 					if (!outputString.contains("Runtime"))
 						return false;
 				}
+				else
+					return false;
 			}
 			catch (Exception e2) {
 				logger.log(Level.WARNING, "Could not get output from container check: ", e2);
