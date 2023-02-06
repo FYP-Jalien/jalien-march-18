@@ -488,7 +488,7 @@ public final class ComputingElement extends Thread {
 			logger.info("Agent Startup file not found: " + e.toString());
 		}
 		catch (final UnsupportedEncodingException e) {
-			logger.info("Encoding error while writing Agent Sturtup file: " + e.toString());
+			logger.info("Encoding error while writing Agent Startup file: " + e.toString());
 		}
 
 		return agent_startup_path;
@@ -518,7 +518,7 @@ public final class ComputingElement extends Thread {
 		else
 			javaDir = CVMFS.getJava32Dir() + "/";
 
-		final String javaCmd = "java -client -Xms16M -Xmx64M -Djdk.lang.Process.launchMechanism=vfork -cp";
+		final String javaCmd = "java -client -Xms16M -Xmx128M -Djdk.lang.Process.launchMechanism=vfork -cp";
 		final String jarDir = "$(dirname $(which jalien))/../lib";
 		final String jarAndClass = "/alien-users.jar alien.site.JobRunner";
 
