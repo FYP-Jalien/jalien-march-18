@@ -646,7 +646,7 @@ public class JobAgent implements Runnable {
 				putJobTrace("Error. Workdir for job could not be created");
 				return;
 			}
-
+			
 			jobWrapperLogDir = jobWorkdir + "/" + jobWrapperLogName;
 
 			logger.log(Level.INFO, "Started JA with: " + jdl);
@@ -676,7 +676,11 @@ public class JobAgent implements Runnable {
 		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Unable to handle job", e);
 			putJobTrace("ERROR: Unable to handle job: " + e.toString() + " " + Arrays.toString(e.getStackTrace()));
-			changeJobStatus(JobStatus.ERROR_E, null);
+
+			// Cause of error was an unhandled exception on our end. Let's resubmit
+			logger.log(Level.INFO, "Putting job back to waiting " + queueId);
+			putJobTrace("Putting job back to waiting " + queueId);
+			changeJobStatus(JobStatus.WAITING, null);
 		}
 	}
 
