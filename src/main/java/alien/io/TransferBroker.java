@@ -201,7 +201,7 @@ public class TransferBroker {
 				dbCached.query(
 						"select /*! SQL_BUFFER_RESULT */ /*! SQL_SMALL_RESULT */  transferId, lfn, destination, remove_replica from TRANSFERS_DIRECT inner join (select sename, sum(max_transfers) mt, coalesce(max(active_cnt),0) at from PROTOCOLS left outer join (select se_name, count(1) as active_cnt from active_transfers group by se_name) a on (se_name=sename) group by sename having at<mt) b ON destination=sename where status='WAITING' order by at/mt asc, transferId-1000*attempts asc limit 500;");
 				dbCached.setTransactionIsolation(-1);
-				
+
 				if (!dbCached.moveNext()) {
 					logger.log(Level.FINE, "There is no waiting transfer in the queue");
 
@@ -764,9 +764,9 @@ public class TransferBroker {
 
 			db.setQueryTimeout(600);
 
-			String formattedReason = reason;
+			String formattedReason = ConfigUtils.getLocalHostname() + " : " + reason;
 
-			if (formattedReason != null && formattedReason.length() > 4000)
+			if (formattedReason.length() > 4000)
 				formattedReason = formattedReason.substring(0, 4000);
 
 			int finalExitCode = exitCode;
