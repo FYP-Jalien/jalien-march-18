@@ -34,6 +34,7 @@ public class OutputEntry implements Serializable {
 	private final ArrayList<String> ses;
 	private final ArrayList<String> exses;
 	private final HashMap<String, Integer> qos;
+	private String asyncReplication = "";
 
 	/**
 	 *
@@ -84,7 +85,16 @@ public class OutputEntry implements Serializable {
 		if (this.options.length() > 0) {
 			final String[] opts = this.options.split(",");
 
-			for (final String o : opts)
+			for (final String o : opts) {
+				if (o.startsWith("*")) {
+					if (asyncReplication.length() > 0)
+						asyncReplication += ",";
+
+					asyncReplication += o.substring(1);
+
+					continue;
+				}
+				
 				if (o.contains("=")) {
 					// e.g. disk=2
 					final String[] qosparts = o.split("=");
@@ -96,6 +106,7 @@ public class OutputEntry implements Serializable {
 				else
 					// prioritized se
 					ses.add(o);
+			}
 		}
 	}
 
@@ -132,6 +143,13 @@ public class OutputEntry implements Serializable {
 	 */
 	public HashMap<String, Integer> getQoS() {
 		return qos;
+	}
+	
+	/**
+	 * @return the async replication targets, if any
+	 */
+	public String getAsyncTargets() {
+		return asyncReplication;
 	}
 
 	/**

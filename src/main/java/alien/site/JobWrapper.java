@@ -219,7 +219,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			logger.log(Level.INFO, "We received the following CE " + ce);
 
 			masterjobID = jdl.getLong("MasterjobID");
-		} 
+		}
 		catch (final IOException | ClassNotFoundException e) {
 			logger.log(Level.SEVERE, "Error: Could not receive data from JobAgent" + e);
 			throw e;
@@ -879,6 +879,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 						cpOptions.add(entry.getOptions());
 					else
 						cpOptions.add("disk:2");
+
+					if (entry.getAsyncTargets() != null && entry.getAsyncTargets().length() > 0) {
+						cpOptions.add("-q");
+						cpOptions.add(entry.getAsyncTargets());
+					}
 
 					cpOptions.add("-j");
 					cpOptions.add(String.valueOf(queueId));
