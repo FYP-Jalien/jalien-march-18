@@ -109,6 +109,9 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 
 	private String protocolUploadErrors = "";
 
+	private final Map<String, Integer> asyncQoS = new HashMap<>();
+	private final List<String> asyncSEs = new ArrayList<>();
+
 	// public long timingChallenge = 0;
 
 	// public boolean isATimeChallenge = false;
@@ -1023,27 +1026,40 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 			if (report)
 				commander.printOutln("File successfully uploaded to " + desiredCount + " SEs");
 
+			if (asyncSEs.size() > 0 || asyncQoS.size() > 0) {
+				final Map<String, Long> scheduledTransfers = commander.c_api.mirrorLFN(lfnToCommit, asyncSEs, null, asyncQoS, false, Integer.valueOf(10), null);
+
+				if (scheduledTransfers != null && scheduledTransfers.size() > 0) {
+					commander.printOutln("Scheduled the following async transfers: " + scheduledTransfers);
+				}
+			}
+
 			return true;
 		}
 		else if (envelopes.size() > 0) {
 			if (bM && failedUploads.size() > 0) {
 				// scheduling a background mirror to the missing replicas
-				final List<String> sesToRecover = new ArrayList<>();
-				final Map<String, Integer> qosToRecover = new HashMap<>();
+				final List<String> sesToRecover = new ArrayList<>(asyncSEs);
+				final Map<String, Integer> qosToRecover = new HashMap<>(asyncQoS);
 
 				for (final Map.Entry<String, AtomicInteger> entry : failedUploads.entrySet()) {
 					final String key = entry.getKey();
 
-					if (key.contains("::"))
-						sesToRecover.add(key);
-					else
-						qosToRecover.put(key, Integer.valueOf(entry.getValue().intValue()));
+					if (key.contains("::")) {
+						if (!sesToRecover.contains(key))
+							sesToRecover.add(key);
+					}
+					else {
+						final Integer oldValue = qosToRecover.get(key);
+
+						qosToRecover.put(key, Integer.valueOf(entry.getValue().intValue() + (oldValue != null ? oldValue.intValue() : 0)));
+					}
 				}
 
 				final Map<String, Long> scheduledTransfers = commander.c_api.mirrorLFN(lfnToCommit, sesToRecover, null, qosToRecover, false, Integer.valueOf(10), null);
 
 				if (scheduledTransfers != null && scheduledTransfers.size() > 0) {
-					commander.printOutln("Scheduled the following transfers to make up for the failed uploads: " + scheduledTransfers);
+					commander.printOutln("Scheduled the following transfers to make up for the failed uploads or async requests: " + scheduledTransfers);
 
 					// TODO: decide whether or not to return here, avoiding to send the jobs to DONE_WARN if the file can be recovered
 				}
@@ -1235,6 +1251,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 		commander.printOutln(helpOption("-d", "delete local file after a successful upload (i.e. move local to Grid)"));
 		commander.printOutln(helpOption("-j <job ID>", "the job ID that has created the file"));
 		commander.printOutln(helpOption("-m", "queue mirror operations to the missing SEs, in case of partial success. Forces '-w'"));
+		commander.printOutln(helpOption("-q <SEs|QoS:count>", "Queue async transfers to the specified targets"));
 		commander.printOutln();
 	}
 
@@ -1287,6 +1304,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 			parser.accepts("silent");
 			parser.accepts("nc");
 			parser.accepts("m");
+			parser.accepts("q").withRequiredArg();
 
 			final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
 
@@ -1326,6 +1344,28 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 				else {
 					commander.printErrln("no commit flag can only be set for job outputs");
 					return;
+				}
+			}
+
+			if (options.has("q") && options.hasArgument("q")) {
+				final StringTokenizer st = new StringTokenizer((String) options.valueOf("q"), ",");
+
+				while (st.hasMoreTokens()) {
+					final String tok = st.nextToken().replace('=', ':');
+
+					if (tok.contains("::"))
+						asyncSEs.add(tok.toUpperCase());
+					else {
+						final int idx = tok.lastIndexOf(':');
+
+						if (idx > 0)
+							try {
+								asyncQoS.put(tok.substring(0, idx), Integer.valueOf(tok.substring(idx + 1)));
+							}
+							catch (NumberFormatException nfe) {
+								throw new JAliEnCommandException("Could not parse the QoS string " + tok, nfe);
+							}
+					}
 				}
 			}
 
