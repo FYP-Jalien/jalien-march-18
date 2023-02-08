@@ -459,7 +459,7 @@ public final class ComputingElement extends Thread {
 
 		before += "source <( echo $ALIENV ); " + "\n";
 
-		before += "export JALIEN_JOBAGENT_CMD='" + getStartup() + "'\n";
+		before += "export JALIEN_JOBAGENT_CMD=\"" + getStartup() + "\"\n";
 
 		final String content_str = before + "$JALIEN_JOBAGENT_CMD" + "\n" + startup_customization(2);
 
