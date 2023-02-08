@@ -1027,10 +1027,15 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 				commander.printOutln("File successfully uploaded to " + desiredCount + " SEs");
 
 			if (asyncSEs.size() > 0 || asyncQoS.size() > 0) {
-				final Map<String, Long> scheduledTransfers = commander.c_api.mirrorLFN(lfnToCommit, asyncSEs, null, asyncQoS, false, Integer.valueOf(10), null);
+				if (noCommit) {
+					commander.printOutln("Cannot schedule async transfers for uncommitted files, skipping over this step");
+				}
+				else {
+					final Map<String, Long> scheduledTransfers = commander.c_api.mirrorLFN(lfnToCommit, asyncSEs, null, asyncQoS, false, Integer.valueOf(10), null);
 
-				if (scheduledTransfers != null && scheduledTransfers.size() > 0) {
-					commander.printOutln("Scheduled the following async transfers: " + scheduledTransfers);
+					if (scheduledTransfers != null && scheduledTransfers.size() > 0) {
+						commander.printOutln("Scheduled the following async transfers: " + scheduledTransfers);
+					}
 				}
 			}
 
