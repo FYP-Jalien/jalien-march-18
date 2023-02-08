@@ -31,9 +31,6 @@ public class OutputEntry implements Serializable {
 	private final Long queueId;
 	private final boolean isArchive;
 	private boolean isRootArchive;
-	private final ArrayList<String> ses;
-	private final ArrayList<String> exses;
-	private final HashMap<String, Integer> qos;
 	private String asyncReplication = "";
 
 	/**
@@ -46,9 +43,6 @@ public class OutputEntry implements Serializable {
 		this.queueId = null;
 		this.isArchive = false;
 		this.isRootArchive = false;
-		this.ses = new ArrayList<>();
-		this.exses = new ArrayList<>();
-		this.qos = new HashMap<>();
 		this.md5members = new HashMap<>();
 		this.sizemembers = new HashMap<>();
 	}
@@ -58,19 +52,15 @@ public class OutputEntry implements Serializable {
 	 * @param filesIncluded
 	 * @param options
 	 * @param jobid
-	 * @param isArchive 
+	 * @param isArchive
 	 */
 	public OutputEntry(final String name, final ArrayList<String> filesIncluded, final String options, final Long jobid, final boolean isArchive) {
 		this.name = name;
 		this.filesIncluded = filesIncluded;
-		this.options = options;
 
 		this.queueId = jobid;
 		this.isArchive = isArchive;
 		this.isRootArchive = false;
-		this.ses = new ArrayList<>();
-		this.exses = new ArrayList<>();
-		this.qos = new HashMap<>();
 		this.md5members = new HashMap<>();
 		this.sizemembers = new HashMap<>();
 
@@ -81,9 +71,11 @@ public class OutputEntry implements Serializable {
 					break;
 				}
 
+		String syncOptions = "";
+
 		// parse options
-		if (this.options.length() > 0) {
-			final String[] opts = this.options.split(",");
+		if (options.length() > 0) {
+			final String[] opts = options.split(",");
 
 			for (final String o : opts) {
 				if (o.startsWith("*")) {
@@ -91,23 +83,17 @@ public class OutputEntry implements Serializable {
 						asyncReplication += ",";
 
 					asyncReplication += o.substring(1);
+				}
+				else {
+					if (syncOptions.length() > 0)
+						syncOptions += ",";
 
-					continue;
+					syncOptions += o;
 				}
-				
-				if (o.contains("=")) {
-					// e.g. disk=2
-					final String[] qosparts = o.split("=");
-					qos.put(qosparts[0], Integer.valueOf(qosparts[1]));
-				}
-				else if (o.contains("!"))
-					// de-prioritized se
-					exses.add(o.substring(1));
-				else
-					// prioritized se
-					ses.add(o);
 			}
 		}
+
+		this.options = syncOptions;
 	}
 
 	/**
@@ -124,27 +110,6 @@ public class OutputEntry implements Serializable {
 		return this.queueId;
 	}
 
-	/**
-	 * @return preferred SEs
-	 */
-	public ArrayList<String> getSEsPrioritized() {
-		return ses;
-	}
-
-	/**
-	 * @return Excluded SEs
-	 */
-	public ArrayList<String> getSEsDeprioritized() {
-		return exses;
-	}
-
-	/**
-	 * @return QoS tag to replica count mapping
-	 */
-	public HashMap<String, Integer> getQoS() {
-		return qos;
-	}
-	
 	/**
 	 * @return the async replication targets, if any
 	 */
@@ -214,7 +179,7 @@ public class OutputEntry implements Serializable {
 				if (!f.exists() || !f.isFile() || !f.canRead() || f.length() <= 0) {
 					// filesIncluded.remove(file);
 					System.err.println("File " + file + " doesn't exist or cannot be read!. Is directory then?: " + f.isDirectory() + ". File after all?: " + f.isFile());
-					//throw new NullPointerException("File " + file + " for archive " + this.name + " doesn't exist or cannot be read!");
+					// throw new NullPointerException("File " + file + " for archive " + this.name + " doesn't exist or cannot be read!");
 					continue;
 				}
 				hasPhysicalFiles = true;
