@@ -96,26 +96,21 @@ public abstract class Containerizer {
 		final String javaTest = "java -version && ps --version";
 		try {
 			CommandOutput output = SystemCommand.executeCommand(containerize(javaTest), true);
-			try (BufferedReader br = output.reader()) {
-				final String outputString = br.lines().collect(Collectors.joining());
-				if (outputString != null && !outputString.isBlank()) {
-					if (!outputString.contains("ps from"))
-						gpuBroken = true;
-					if (!outputString.contains("Runtime"))
-						return false;
-				}
-				else
+			BufferedReader br = output.reader();
+			final String outputString = br.lines().collect(Collectors.joining());
+			if (outputString != null && !outputString.isBlank()) {
+				if (!outputString.contains("ps from"))
+					gpuBroken = true;
+				if (!outputString.contains("Runtime"))
 					return false;
 			}
-			catch (Exception e2) {
-				logger.log(Level.WARNING, "Could not get output from container check: ", e2);
-			}
+			else
+				return false;
 		}
 		catch (final Exception e) {
 			logger.log(Level.WARNING, "Failed to start container: " + e.toString());
 			return false;
 		}
-
 		return true;
 	}
 
