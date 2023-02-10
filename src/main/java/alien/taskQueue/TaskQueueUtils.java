@@ -864,43 +864,54 @@ public class TaskQueueUtils {
 				execHost = extrafields.getOrDefault("exechost", execHost).toString();
 			}
 
-			// lazy initialization of the ML service collecting job transitions
-			synchronized (fieldMap) {
-				if (centralMLService == null) {
-					final Vector<String> targets = new Vector<>();
-					try {
-						targets.add(ConfigUtils.getConfig().gets("CS_ApMon", "aliendb4.cern.ch"));
-						centralMLService = new ApMon(targets);
-					}
-					catch (final Exception e) {
-						logger.log(Level.WARNING, "Could not initialize apmon (" + targets + ")", e);
-					}
-				}
-			}
-
-			// send status change to ML
-			if (centralMLService != null) {
-				final Vector<String> parameters = new Vector<>();
-				final Vector<Object> values = new Vector<>();
-
-				parameters.add("jobID");
-				values.add(Double.valueOf(job));
-
-				parameters.add("statusID");
-				values.add(Integer.valueOf(newStatus.getAliEnLevel()));
-
-				try {
-					centralMLService.sendParameters("TaskQueue_Jobs_ALICE", execHost, parameters.size(), parameters, values);
-				}
-				catch (final Exception e) {
-					logger.log(Level.WARNING, "Failed to send job status update to central ML", e);
-				}
-			}
+			sendJobStatusToML(job, newStatus, execHost);
 
 			if (parentPID > 0 && parentPID != job && JobStatus.finalStates().contains(newStatus))
 				checkMasterjobStatus(parentPID);
 
 			return updated;
+		}
+	}
+
+	/**
+	 * Tell the central ML instance about the status update for this job ID
+	 * 
+	 * @param job
+	 * @param newStatus
+	 * @param execHost
+	 */
+	public static void sendJobStatusToML(final long job, final JobStatus newStatus, final String execHost) {
+		// lazy initialization of the ML service collecting job transitions
+		synchronized (fieldMap) {
+			if (centralMLService == null) {
+				final Vector<String> targets = new Vector<>(1);
+				try {
+					targets.add(ConfigUtils.getConfig().gets("CS_ApMon", "aliendb4.cern.ch"));
+					centralMLService = new ApMon(targets);
+				}
+				catch (final Exception e) {
+					logger.log(Level.WARNING, "Could not initialize apmon (" + targets + ")", e);
+				}
+			}
+		}
+
+		// send status change to ML
+		if (centralMLService != null) {
+			final Vector<String> parameters = new Vector<>(2);
+			final Vector<Object> values = new Vector<>(2);
+
+			parameters.add("jobID");
+			values.add(Double.valueOf(job));
+
+			parameters.add("statusID");
+			values.add(Integer.valueOf(newStatus.getAliEnLevel()));
+
+			try {
+				centralMLService.sendParameters("TaskQueue_Jobs_ALICE", execHost, parameters.size(), parameters, values);
+			}
+			catch (final Exception e) {
+				logger.log(Level.WARNING, "Failed to send job status update to central ML", e);
+			}
 		}
 	}
 
@@ -2746,6 +2757,7 @@ public class TaskQueueUtils {
 
 	/**
 	 * Cache Site Sonar constraints
+	 * @return the cached sitesonar constraints
 	 */
 	public static synchronized HashMap<String, String> getConstraintCache() {
 		long currentTimestamp = System.currentTimeMillis();
@@ -3778,11 +3790,11 @@ public class TaskQueueUtils {
 		// Parse Site Sonar constraints
 
 		// Initialize or refresh constraint cache
-		HashMap<String, String> constraintCache = TaskQueueUtils.getConstraintCache();
+		final HashMap<String, String> constraints = getConstraintCache();
 
-		if (constraintCache != null && constraintCache.size() > 0) {
+		if (constraints != null && constraints.size() > 0) {
 			// Constraint name is the constraint key
-			for (String key : constraintCache.keySet()) {
+			for (String key : constraints.keySet()) {
 				// eg - key : CGROUPSv2_AVAILABLE
 				// eg - value : taken from JDL (true)
 				Object constraintValue = jdl.get(key); // check if JDL has a pattern matching the constraint key
