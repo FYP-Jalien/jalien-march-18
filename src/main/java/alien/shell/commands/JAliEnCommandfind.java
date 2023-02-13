@@ -81,6 +81,8 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 
 	private long offset = 0;
 
+	private String readSiteSorting = null;
+
 	/**
 	 * returns the LFNs that were the result of the find
 	 *
@@ -149,8 +151,8 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			return;
 		}
 
-		lfns = commander.c_api.find(path, alPaths.get(1), query, flags, xmlCollectionPath, queueid, limit != Long.MAX_VALUE ? limit + offset : -1);
-
+		lfns = commander.c_api.find(path, alPaths.get(1), query, flags, xmlCollectionPath, queueid, limit != Long.MAX_VALUE ? limit + offset : -1, readSiteSorting);
+		
 		int count = 0;
 		long size = 0;
 
@@ -256,6 +258,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 		commander.printOutln(helpOption("-r", "pattern is a regular expression"));
 		commander.printOutln(helpOption("-f", "return all LFN data as JSON fields (API flag only)"));
 		commander.printOutln(helpOption("-y", "(FOR THE OCDB) return only the biggest version of each file"));
+		commander.printOutln(helpOption("-S <site name>", "Sort the returned list by the distance to the given site"));
 		commander.printOutln();
 	}
 
@@ -300,6 +303,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			parser.accepts("o").withRequiredArg().ofType(Long.class);
 			parser.accepts("z"); // ignored option, just to maintain compatibility with AliEn
 			parser.accepts("f"); // full LFN details, API only
+			parser.accepts("S").withRequiredArg();
 
 			final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
 
@@ -344,6 +348,11 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 					commander.printErrln("Offset value cannot be negative, ignoring indicated value (" + offset + ")");
 					offset = 0;
 				}
+			}
+
+			if (options.has("S")) {
+				readSiteSorting = options.valueOf("S").toString();
+				bS = true;
 			}
 
 			if (alPaths.size() == 0) {
@@ -403,6 +412,8 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			sb.append(" -r");
 		if (bC)
 			sb.append(" -c");
+		if (readSiteSorting != null)
+			sb.append("-S " + readSiteSorting);
 
 		sb.append("}");
 

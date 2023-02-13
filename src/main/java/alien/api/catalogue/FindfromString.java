@@ -3,12 +3,18 @@ package alien.api.catalogue;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.HashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import alien.api.Cacheable;
 import alien.api.Request;
 import alien.catalogue.LFN;
 import alien.catalogue.LFNUtils;
+import alien.catalogue.PFN;
+import alien.se.SEUtils;
 import alien.user.AliEnPrincipal;
 
 /**
@@ -30,6 +36,7 @@ public class FindfromString extends Request implements Cacheable {
 	private final String xmlCollectionName;
 	private Long queueid = Long.valueOf(0);
 	private long queryLimit = 1000000;
+	private String readSiteSorting = null;
 
 	/**
 	 * @param user
@@ -79,6 +86,33 @@ public class FindfromString extends Request implements Cacheable {
 	 * @param user
 	 * @param path
 	 * @param pattern
+	 * @param query
+	 * @param flags
+	 * @param xmlCollectionName
+	 * @param queueid
+	 * @param queryLimit number of entries to limit the search to. If strictly positive, a larger set than this would throw an exception
+	 * @param readSiteSorting
+	 */
+	public FindfromString(final AliEnPrincipal user, final String path, final String pattern, final String query, final int flags, final String xmlCollectionName, final Long queueid,
+			final long queryLimit, final String readSiteSorting) {
+		setRequestUser(user);
+		this.path = path;
+		this.pattern = pattern;
+		this.query = query;
+		this.flags = flags;
+		this.xmlCollectionName = xmlCollectionName;
+		this.queueid = queueid;
+
+		if (queryLimit > 0)
+			this.queryLimit = queryLimit;
+
+		this.readSiteSorting = readSiteSorting;
+	}
+
+	/**
+	 * @param user
+	 * @param path
+	 * @param pattern
 	 * @param flags
 	 * @param xmlCollectionName
 	 */
@@ -93,7 +127,30 @@ public class FindfromString extends Request implements Cacheable {
 
 	@Override
 	public void run() {
-		lfns = LFNUtils.find(path, pattern, query, flags, getEffectiveRequester(), xmlCollectionName, queueid, queryLimit);
+		lfns = LFNUtils.find(path, pattern, query, flags, getEffectiveRequester(), xmlCollectionName, queueid, readSiteSorting != null ? 1000000 : queryLimit);
+
+		if (readSiteSorting != null && lfns != null && lfns.size() > 0) {
+			final Map<PFN, LFN> resolvedLFNs = new HashMap<>();
+
+			for (final LFN l : lfns) {
+				final Set<PFN> pfns = l.whereisReal();
+
+				if (pfns != null)
+					for (final PFN p : pfns)
+						resolvedLFNs.put(p, l);
+			}
+
+			final List<PFN> pfns = SEUtils.sortBySite(resolvedLFNs.keySet(), readSiteSorting, false, false);
+
+			lfns = new LinkedHashSet<>(lfns.size());
+
+			for (final PFN p : pfns) {
+				lfns.add(resolvedLFNs.get(p));
+
+				if (queryLimit > 0 && lfns.size() >= queryLimit)
+					return;
+			}
+		}
 	}
 
 	/**
@@ -128,7 +185,7 @@ public class FindfromString extends Request implements Cacheable {
 
 	@Override
 	public String getKey() {
-		return path + "|" + pattern + "|" + query + "|" + flags + "|" + queueid + "|" + queryLimit;
+		return path + "|" + pattern + "|" + query + "|" + flags + "|" + queueid + "|" + queryLimit + "|" + readSiteSorting;
 	}
 
 	@Override

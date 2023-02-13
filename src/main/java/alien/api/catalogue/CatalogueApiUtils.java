@@ -529,6 +529,33 @@ public class CatalogueApiUtils {
 	}
 
 	/**
+	 * Find an LFN based on pattern and save to XmlCollection
+	 *
+	 * @param path
+	 * @param pattern
+	 * @param query
+	 * @param flags
+	 * @param xmlCollectionName
+	 * @param queueid
+	 * @param queryLimit how many LFNs to return at maximum. The server will throw and exception if the set is larger than this value.
+	 * @param readSiteSorting
+	 * @return result LFNs or <code>null</code> if no LFNs found
+	 */
+	public Collection<LFN> find(final String path, final String pattern, final String query, final int flags, final String xmlCollectionName, final Long queueid, final long queryLimit,
+			final String readSiteSorting) {
+		try {
+			return Dispatcher.execute(new FindfromString(commander.getUser(), path, pattern, query, flags, xmlCollectionName, queueid, queryLimit, readSiteSorting)).getLFNs();
+		}
+		catch (final ServerException e) {
+			logger.log(Level.WARNING, "Unable to execute find: path (" + path + "), pattern (" + pattern + "), flags (" + flags + ")");
+			e.getCause().printStackTrace();
+			commander.setReturnCode(ErrNo.EREMOTEIO, e.getMessage());
+		}
+
+		return null;
+	}
+
+	/**
 	 * Get an SE by its name
 	 *
 	 * @param se
@@ -594,7 +621,7 @@ public class CatalogueApiUtils {
 	 */
 	public List<CE> getCEs(final List<String> ceNames) {
 		try {
-			List<CE> ces = Dispatcher.execute(new ListCEs(commander.getUser(), ceNames)).getCEs();
+			final List<CE> ces = Dispatcher.execute(new ListCEs(commander.getUser(), ceNames)).getCEs();
 			return ces;
 		}
 		catch (final ServerException e) {
