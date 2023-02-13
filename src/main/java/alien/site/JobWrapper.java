@@ -453,7 +453,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
 
-		final ProcessBuilder pBuilder = new ProcessBuilder(cmd);
+		final ProcessBuilder pBuilder = new ProcessBuilder(new String[] {"bash", "-c",  String.join(" ", cmd)});
 
 		final Map<String, String> processEnv = pBuilder.environment();
 		final HashMap<String, String> jBoxEnv = ConfigUtils.exportJBoxVariables();
