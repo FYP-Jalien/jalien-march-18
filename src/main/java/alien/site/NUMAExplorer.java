@@ -277,11 +277,42 @@ public class NUMAExplorer {
 
 			if (rearrangementCount > 0)
 				rearrangementNeeded = false;
+
 		}
 		logger.log(Level.INFO, "Current CPU-job mapping: " + getMaskString(usedCPUs));
 		JAToMask.put(Integer.valueOf(jobNumber), finalMask);
 		coresPerJob.put(Integer.valueOf(jobNumber), reqCPU);
-		return arrayToTaskset(finalMask);
+		byte[] extendedFinalMask = extendFinalMask(finalMask, jobNumber);
+		logger.log(Level.INFO, "Pinning job " + jobNumber + " to mask mask " + getMaskString(extendedFinalMask));
+
+		return arrayToTaskset(extendedFinalMask);
+	}
+
+	/**
+	 * Split the unused cores within the running payloads
+	 *
+	 * @param finalMask
+	 * @param jobNumber
+	 * @return
+	 */
+	private byte[] extendFinalMask(byte[] finalMask, int jobNumber) {
+		byte[] extendedFinalMask = finalMask.clone();
+
+		HashMap<Integer,byte[]> masksToPin = new HashMap<>();
+		for (Integer job : coresPerJob.keySet()) {
+			byte[] newMask = new byte[numCPUs];
+			for (int i = 0; i < usedCPUs.length; i++) {
+				if ((usedCPUs[i] == job.intValue() || usedCPUs[i] == 0) && (jobToNuma.get(job) == Integer.valueOf(-1) || divisionedNUMA.get(coresPerNode.get(Integer.valueOf(i))) == divisionedNUMA.get(jobToNuma.get(job))))
+					newMask[i] = 1;
+			}
+
+			if (job == Integer.valueOf(jobNumber))
+				extendedFinalMask = newMask;
+
+			masksToPin.put(job, newMask);
+		}
+		isolateJobs(masksToPin);
+		return extendedFinalMask;
 	}
 
 	private int getNumaNode(Long reqCPU, long queueId, Integer previousNuma, HashMap<Integer, Integer> available) {
@@ -322,6 +353,15 @@ public class NUMAExplorer {
 				masksToPin.put(Integer.valueOf(auxUsedCPUs[i]), initMask);
 			}
 		}
+		isolateJobs(masksToPin);
+	}
+
+	/**
+	 * Constrain the jobs to the given CPU masks
+	 *
+	 * @param masksToPin
+	 */
+	private void isolateJobs(HashMap<Integer,byte[]> masksToPin) {
 		for (Integer jobId : masksToPin.keySet()) {
 			if (!Arrays.equals(JAToMask.get(jobId), masksToPin.get(jobId))) {
 				if (activeJAInstances.get(jobId) != null) {
