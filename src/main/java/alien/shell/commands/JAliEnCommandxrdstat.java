@@ -382,6 +382,9 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 					commander.printOut("dowloadedInMillis", String.valueOf(timing));
 					commander.printOut("downloadSize", String.valueOf(referenceGUID.size));
 				}
+
+				if (verbose && printCommand)
+					commander.printOutln(xrootd.getFormattedLastCommand());
 			}
 			else {
 				// just namespace check, no actual IO
