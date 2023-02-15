@@ -301,32 +301,42 @@ public class Monitor implements Runnable {
 		if (!MonitorFactory.canRun())
 			return;
 
-		final List<Object> values = new ArrayList<>();
+		try {
+			final List<Object> values = new ArrayList<>();
 
-		for (final SchJobInt module : modules) {
-			final Object o;
+			for (final SchJobInt module : modules) {
+				final Object o;
 
-			try {
-				o = module.doProcess();
+				try {
+					o = module.doProcess();
+				}
+				catch (final Throwable t) {
+					logger.log(Level.WARNING, "Exception running module " + module + " for component " + component, t);
+
+					continue;
+				}
+
+				if (o == null)
+					continue;
+
+				if (o instanceof Collection<?>)
+					values.addAll((Collection<?>) o);
+				else
+					values.add(o);
 			}
-			catch (final Throwable t) {
-				logger.log(Level.WARNING, "Exception running module " + module + " for component " + component, t);
 
-				continue;
-			}
-
-			if (o == null)
-				continue;
-
-			if (o instanceof Collection<?>)
-				values.addAll((Collection<?>) o);
-			else
-				values.add(o);
+			sendResults(values);
+		}
+		catch (final Throwable t) {
+			logger.log(Level.WARNING, "Exception collecting data from modules of " + component, t);
 		}
 
-		sendResults(values);
-
-		callMonitoringObjects(false);
+		try {
+			callMonitoringObjects(false);
+		}
+		catch (final Throwable t) {
+			logger.log(Level.WARNING, "Exception calling monitoring objects of " + component, t);
+		}
 	}
 
 	void callMonitoringObjects(final boolean lastCall) {
@@ -337,14 +347,37 @@ public class Monitor implements Runnable {
 			final Iterator<Map.Entry<String, MonitoringObject>> it = monitoringObjects.entrySet().iterator();
 
 			while (it.hasNext()) {
-				final MonitoringObject mo = it.next().getValue();
+				final Map.Entry<String, MonitoringObject> entry = it.next();
+
+				final MonitoringObject mo = entry.getValue();
+
+				if (mo == null) {
+					logger.log(Level.WARNING, "Null value for " + entry.getKey());
+					continue;
+				}
 
 				if (!lastCall || mo instanceof DerivedDataProducer) {
-					mo.fillValues(paramNames, paramValues);
+					try {
+						final Vector<String> tempNames = new Vector<>();
+						final Vector<Object> tempValues = new Vector<>();
 
-					if ((mo instanceof TransientMonitor) && ((TransientMonitor) mo).shouldStop()) {
-						System.err.println("Will stop " + mo);
-						it.remove();
+						mo.fillValues(tempNames, tempValues);
+
+						if ((mo instanceof TransientMonitor) && ((TransientMonitor) mo).shouldStop()) {
+							logger.log(Level.FINE, "Will stop " + mo);
+							it.remove();
+						}
+
+						if (tempNames.size() > 0 || tempValues.size() > 0)
+							if (tempNames.size() == tempValues.size()) {
+								paramNames.addAll(tempNames);
+								paramValues.addAll(tempValues);
+							}
+							else
+								logger.log(Level.WARNING, "A module has produced unequal names and values: " + entry.getKey() + " / " + mo.getClass().getCanonicalName());
+					}
+					catch (final Throwable t) {
+						logger.log(Level.WARNING, "Exception filling the values for " + entry.getKey() + " / " + mo.getClass().getCanonicalName(), t);
 					}
 				}
 			}
