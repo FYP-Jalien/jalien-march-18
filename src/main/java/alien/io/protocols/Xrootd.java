@@ -1221,7 +1221,7 @@ public class Xrootd extends Protocol {
 		command.add("prepare");
 		command.add("-s");
 
-		if (path.startsWith("//"))
+		if (path.startsWith("/"))
 			path = path.substring(1);
 
 		if (envelope != null)
@@ -1749,8 +1749,11 @@ public class Xrootd extends Protocol {
 
 		String path = url.getPath();
 
-		if (path.startsWith("//"))
+		if (path.startsWith("/"))
 			path = path.substring(1);
+
+		if (path.length() == 0)
+			path = "/";
 
 		final SpaceInfo ret = new SpaceInfo();
 
@@ -1877,8 +1880,11 @@ public class Xrootd extends Protocol {
 
 		String path = url.getPath();
 
-		if (path.startsWith("//"))
+		if (path.startsWith("/"))
 			path = path.substring(1);
+
+		if (path.length() == 0)
+			path = "/";
 
 		final SpaceInfo ret = new SpaceInfo();
 
