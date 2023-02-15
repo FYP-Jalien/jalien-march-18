@@ -282,6 +282,7 @@ public class NUMAExplorer {
 		logger.log(Level.INFO, "Current CPU-job mapping: " + getMaskString(usedCPUs));
 		JAToMask.put(Integer.valueOf(jobNumber), finalMask);
 		coresPerJob.put(Integer.valueOf(jobNumber), reqCPU);
+		addPinningTraceLog(finalMask, Integer.valueOf(jobNumber));
 		byte[] extendedFinalMask = extendFinalMask(finalMask, jobNumber);
 		logger.log(Level.INFO, "Pinning job " + jobNumber + " to mask mask " + getMaskString(extendedFinalMask));
 
@@ -311,7 +312,7 @@ public class NUMAExplorer {
 
 			masksToPin.put(job, newMask);
 		}
-		isolateJobs(masksToPin);
+		isolateJobs(masksToPin, true);
 		return extendedFinalMask;
 	}
 
@@ -353,7 +354,7 @@ public class NUMAExplorer {
 				masksToPin.put(Integer.valueOf(auxUsedCPUs[i]), initMask);
 			}
 		}
-		isolateJobs(masksToPin);
+		isolateJobs(masksToPin, false);
 	}
 
 	/**
@@ -361,21 +362,27 @@ public class NUMAExplorer {
 	 *
 	 * @param masksToPin
 	 */
-	private void isolateJobs(HashMap<Integer,byte[]> masksToPin) {
+	private void isolateJobs(HashMap<Integer,byte[]> masksToPin, boolean maskExtension) {
 		for (Integer jobId : masksToPin.keySet()) {
 			if (!Arrays.equals(JAToMask.get(jobId), masksToPin.get(jobId))) {
 				if (activeJAInstances.get(jobId) != null) {
 					int pid = activeJAInstances.get(jobId).getChildPID();
 					logger.log(Level.INFO, "Going to apply CPU constraintment to PID " + pid);
 					applyTaskset(arrayToTaskset(masksToPin.get(jobId)), pid);
-					long queueId = activeJAInstances.get(jobId).getQueueId();
-					int resubmission = activeJAInstances.get(jobId).getResubmission();
-					commander.q_api.putJobLog(queueId, resubmission, "proc", "New pinning configuration: CPUs " + arrayToTaskset(masksToPin.get(jobId)));
+					if (!maskExtension) {
+						addPinningTraceLog(masksToPin.get(jobId), jobId);
+					}
 					JAToMask.put(jobId, masksToPin.get(jobId).clone());
 					logger.log(Level.INFO, "Modifying pinning configuration of job ID " + jobId + ". New mask " + getMaskString(JAToMask.get(jobId)));
 				}
 			}
 		}
+	}
+
+	private void addPinningTraceLog(byte[] newMask, Integer jobId) {
+		long queueId = activeJAInstances.get(jobId).getQueueId();
+		int resubmission = activeJAInstances.get(jobId).getResubmission();
+		commander.q_api.putJobLog(queueId, resubmission, "proc", "Pinning job to CPUs " + arrayToTaskset(newMask));
 	}
 
 	/**
