@@ -1159,7 +1159,6 @@ public class JobAgent implements Runnable {
 		synchronized (cpuSync) {
 			numaExplorer.activeJAInstances.put(Integer.valueOf(jobNumber), this);
 			isolatedCPUs = numaExplorer.pickCPUs(reqCPU, jobNumber);
-			putJobLog("proc", "Job will be pinned to CPUs " + isolatedCPUs);
 		}
 
 		return isolatedCPUs;
