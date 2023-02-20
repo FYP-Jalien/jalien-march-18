@@ -25,6 +25,10 @@ public class ContainerizerFactory {
 		 */
 		SingularityCVMFS,
 		/**
+		 * Entry for Apptainer (local)
+		 */
+		Apptainer,
+		/**
 		 * Entry for Singularity (local)
 		 */
 		Singularity,
@@ -42,15 +46,19 @@ public class ContainerizerFactory {
 	 * @return the first supported container from the (Singularity, Docker) list, or <code>null</code> if none is supported at runtime
 	 */
 	public static Containerizer getContainerizer() {
-		for (final Containerizers c : Containerizers.values()) {
-			try {
+		try {
+			if (System.getenv().containsKey("FORCE_CONTAINERIZER"))
+				return (Containerizer) getClassFromName(System.getenv().get("FORCE_CONTAINERIZER")).getConstructor().newInstance();
+
+			for (final Containerizers c : Containerizers.values()) {
 				final Containerizer containerizerCandidate = (Containerizer) getClassFromName(c.name()).getConstructor().newInstance();
 				if (containerizerCandidate.isSupported())
 					return containerizerCandidate;
 			}
-			catch (final Exception e) {
-				logger.log(Level.WARNING, "Invalid containerizer: " + e);
-			}
+
+		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "Invalid containerizer: " + e);
 		}
 		return null;
 	}
