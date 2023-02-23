@@ -490,7 +490,7 @@ public class JobAgent implements Runnable {
 		// Wait before matching if previous jobs have been failing
 		if (attempts.getAcquire() > 1) {
 			try {
-				final int timeToWait = (int) Math.pow(2, attempts.getAcquire());
+				final int timeToWait = attempts.getAcquire();
 				logger.log(Level.INFO, "A previous job failed. Will wait " + timeToWait + "s before continuing...");
 				Thread.sleep(timeToWait * 1000);
 			}
@@ -623,7 +623,7 @@ public class JobAgent implements Runnable {
 			if (cpuIsolation == true)
 				numaExplorer.refillAvailable(jobNumber);
 
-			if (!"DONE".equals(endState) && !"DONE_WARNING".equals(endState))
+			if ("ERROR_IB".equals(endState) || "ERROR_E".equals(endState))
 				attempts.getAndIncrement();
 			else
 				attempts.set(1);
