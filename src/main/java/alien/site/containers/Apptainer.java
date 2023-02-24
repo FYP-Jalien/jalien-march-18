@@ -11,7 +11,7 @@ public class Apptainer extends Containerizer {
 	@Override
 	public List<String> containerize(final String cmd) {
 		final List<String> apptainerCmd = new ArrayList<>();
-		apptainerCmd.add(getBinPath());
+		apptainerCmd.add(System.getenv().getOrDefault("FORCE_BINPATH", getBinPath()));
 		apptainerCmd.add("exec");
 		apptainerCmd.add("-C");
 
