@@ -489,10 +489,16 @@ public class JobAgent implements Runnable {
 
 		// Wait before matching if previous jobs have been failing
 		if (attempts.getAcquire() > 1) {
+			final int timeToWait = attempts.getAcquire();
 			try {
-				final int timeToWait = attempts.getAcquire();
-				logger.log(Level.INFO, "A previous job failed. Will wait " + timeToWait + "s before continuing...");
-				Thread.sleep(timeToWait * 1000);
+				if ((int) siteMap.get("TTL") - timeToWait > 0) {
+					logger.log(Level.INFO, "A previous job failed. Will wait " + timeToWait + "s before continuing...");
+					Thread.sleep(timeToWait * 1000);
+				}
+				else {
+					logger.log(Level.INFO, "Too many jobs have failed, and the timeout delay now exceeds TTL. Aborting...");
+					System.exit(0);
+				}
 			}
 			catch (InterruptedException e1) {
 				// ignore
