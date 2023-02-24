@@ -2,11 +2,13 @@ package alien.site;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
+import java.io.FileOutputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.lang.ProcessBuilder.Redirect;
+import java.nio.channels.FileChannel;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
@@ -1225,8 +1227,26 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (exitStatus == JobStatus.ERROR_E) {
 			if (jdl.gets("OutputErrorE") == null) {
 				putJobTrace("No output given for ERROR_E in JDL. Defaulting to std*");
-				jdl.set("OutputErrorE", "log_archive.zip:std*@disk=1"); // set a default if nothing is provided
+				jdl.set("OutputErrorE", "log_archive.zip:std*@disk=1"); // set a default if nothing is provided...
+
+				// ...but protect against uploading large std* logfiles as a default
+				for (final String entry : Arrays.asList("stdout", "stderr")) {
+					final File logFile = new File(currentDir.getAbsolutePath() + "/" + entry);
+					if (logFile.exists()) {
+						try {
+							if (Files.size(logFile.toPath()) > 1073741824L) {
+								FileChannel out = new FileOutputStream(logFile, true).getChannel();
+								out.truncate(1073741824L);
+								out.close();
+							}
+						}
+						catch (Exception e) {
+							// ignore
+						}
+					}
+				}
 			}
+
 			tags.add("OutputErrorE");
 		}
 		else {
@@ -1237,7 +1257,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (jdl.gets("Output") != null)
 				tags.add("Output");
 		}
-
 		return tags;
 	}
 
