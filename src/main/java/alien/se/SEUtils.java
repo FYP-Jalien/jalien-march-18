@@ -746,6 +746,22 @@ public final class SEUtils {
 	 * @return the distance (0 = local, 1 = far away, with negative values being strongly preferred and >1 values highly demoted)
 	 */
 	public static Double getDistance(final String sSite, final Object toSE, final boolean write) {
+		return getDistance(sSite, toSE, write, false);
+	}
+
+	/**
+	 * Get the distance between a site and a target SE
+	 *
+	 * @param sSite
+	 *            reference site
+	 * @param toSE
+	 *            target se, can be either a {@link SE} object, a name (as String) or a SE number (Integer), anything else will throw an exception
+	 * @param write
+	 *            <code>true</code> for writing, <code>false</code> for reading
+	 * @param flexibleMatching <code>true</code> if the site name should be loosely matched, i.e. the given string is either a prefix or a suffix of a site
+	 * @return the distance (0 = local, 1 = far away, with negative values being strongly preferred and >1 values highly demoted)
+	 */
+	public static Double getDistance(final String sSite, final Object toSE, final boolean write, final boolean flexibleMatching) {
 		if (toSE == null)
 			return null;
 
@@ -768,7 +784,16 @@ public final class SEUtils {
 		if (seDistance == null)
 			return null;
 
-		final Map<Integer, Double> ranks = seDistance.get(sSite.trim().toUpperCase());
+		final String lowerSiteName = sSite.trim().toUpperCase();
+
+		Map<Integer, Double> ranks = seDistance.get(lowerSiteName);
+
+		if (ranks == null && flexibleMatching)
+			for (Map.Entry<String, Map<Integer, Double>> entry : seDistance.entrySet())
+				if (entry.getKey().startsWith(lowerSiteName) || entry.getKey().endsWith(lowerSiteName)) {
+					ranks = entry.getValue();
+					break;
+				}
 
 		if (ranks == null)
 			return null;
@@ -1022,7 +1047,8 @@ public final class SEUtils {
 					db.setReadOnly(false);
 					db.setQueryTimeout(60);
 
-					if (!db.query("UPDATE SE SET seUsedSpace=greatest(coalesce(seUsedSpace,0)" + (deltaBytes >= 0 ? "+" : "") + "?, 0), seNumFiles=greatest(coalesce(seNumFiles,0)" + (deltaFiles >= 0 ? "+" : "")
+					if (!db.query("UPDATE SE SET seUsedSpace=greatest(coalesce(seUsedSpace,0)" + (deltaBytes >= 0 ? "+" : "") + "?, 0), seNumFiles=greatest(coalesce(seNumFiles,0)"
+							+ (deltaFiles >= 0 ? "+" : "")
 							+ "?, 0) WHERE seNumber=?;", false, Long.valueOf(deltaBytes), Long.valueOf(deltaFiles), seNumber)) {
 						aiFiles.addAndGet(deltaFiles);
 						aiBytes.addAndGet(deltaBytes);
@@ -1083,7 +1109,7 @@ public final class SEUtils {
 			final SE se = SEUtils.getSE(seName);
 
 			try (PrintWriter pw = new PrintWriter(new FileWriter(seName + ".file_list"))) {
-				pw.println("#PFN,size,MD5,ctime");
+				pw.println("#PFN,size,MD5,ctime,guid");
 
 				for (final GUIDIndex idx : CatalogueUtils.getAllGUIDIndexes()) {
 					final Host h = CatalogueUtils.getHost(idx.hostIndex);
@@ -1103,7 +1129,7 @@ public final class SEUtils {
 
 								try {
 									final UUID u = UUID.fromString(gdb.gets(4));
-									pw.print(GUIDUtils.epochTime(u));
+									pw.print(GUIDUtils.epochTime(u) + "," + gdb.gets(4));
 								}
 								catch (@SuppressWarnings("unused") final Throwable t) {
 									// ignore any errors
