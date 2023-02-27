@@ -12,6 +12,7 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.StringReader;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.PosixFilePermission;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -68,7 +69,6 @@ import alien.catalogue.CatalogueUtils;
 import alien.config.ConfigUtils;
 import lazyj.ExtProperties;
 import lazyj.Format;
-import lazyj.Utils;
 
 /**
  *
@@ -244,9 +244,20 @@ public class JAKeyStore {
 	}
 
 	private static boolean isEncrypted(final String path) {
-		final String content = Utils.readFile(path);
+		final Path p = Paths.get(path);
 
-		return content != null && content.contains("ENCRYPTED");
+		if (Files.exists(p) && Files.isRegularFile(p) && Files.isReadable(p)) {
+			try {
+				final String content = Files.readString(p);
+
+				return content != null && content.contains("ENCRYPTED");
+			}
+			catch (final IOException ioe) {
+				logger.log(Level.WARNING, "Could not read the content of " + p, ioe);
+			}
+		}
+
+		return false;
 	}
 
 	/**
@@ -286,7 +297,7 @@ public class JAKeyStore {
 
 	/**
 	 * @param keypath
-	 *            to the private key in order to test if the password is vaid
+	 *            to the private key in order to test if the password is valid
 	 * @return char[] containing the correct password or empty string if the key is not encrypted
 	 */
 	public static char[] requestPassword(final String keypath) {
@@ -520,10 +531,6 @@ public class JAKeyStore {
 	 * @throws PKCSException
 	 */
 	public static PrivateKey loadPrivX509(final String keyFileLocation, final char[] password) throws IOException, PEMException, OperatorCreationException, PKCSException {
-
-		if (logger.isLoggable(Level.FINEST))
-			logger.log(Level.FINEST, "Loading private key: " + keyFileLocation);
-
 		Reader source = null;
 		try {
 			source = new FileReader(keyFileLocation);
