@@ -1233,11 +1233,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				for (final String entry : Arrays.asList("stdout", "stderr")) {
 					final File logFile = new File(currentDir.getAbsolutePath() + "/" + entry);
 					if (logFile.exists()) {
-						try {
+						try (final FileChannel out = new FileOutputStream(logFile, true).getChannel()) {
 							if (Files.size(logFile.toPath()) > 1073741824L) {
-								FileChannel out = new FileOutputStream(logFile, true).getChannel();
 								out.truncate(1073741824L);
-								out.close();
 							}
 						}
 						catch (Exception e) {
