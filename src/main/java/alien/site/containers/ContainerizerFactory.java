@@ -21,10 +21,6 @@ public class ContainerizerFactory {
 		 */
 		ApptainerCVMFS,
 		/**
-		 * Entry for Singularity (CVMFS)
-		 */
-		SingularityCVMFS,
-		/**
 		 * Entry for Apptainer (local)
 		 */
 		Apptainer,
