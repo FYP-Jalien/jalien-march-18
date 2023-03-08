@@ -4,6 +4,7 @@ import java.io.File;
 import java.net.BindException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
+import java.security.KeyStore;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -25,6 +26,7 @@ import org.apache.tomcat.util.descriptor.web.SecurityCollection;
 import org.apache.tomcat.util.descriptor.web.SecurityConstraint;
 import org.apache.tomcat.util.net.SSLHostConfig;
 import org.apache.tomcat.util.net.SSLHostConfigCertificate;
+import org.apache.tomcat.util.net.SSLHostConfigCertificate.Type;
 
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
@@ -160,19 +162,9 @@ public class TomcatServer {
 	private static Connector createSslConnector(final int tomcatPort, final String bindAddress) {
 		final String keystorePass = new String(JAKeyStore.pass);
 
-		final String dirName = System.getProperty("java.io.tmpdir") + File.separator;
-		final String keystoreName = dirName + "keystore.jks_" + UserFactory.getUserID();
-		final String truststoreName = dirName + "truststore.jks_" + UserFactory.getUserID();
+		final KeyStore serverIdentity = ConfigUtils.isCentralService() ? JAKeyStore.getKeyStore() : JAKeyStore.tokenCert;
 
-		if (ConfigUtils.isCentralService()) {
-			JAKeyStore.saveKeyStore(JAKeyStore.getKeyStore(), keystoreName, JAKeyStore.pass);
-			expirationTime = JAKeyStore.getExpirationTime(JAKeyStore.getKeyStore());
-		}
-		else {
-			JAKeyStore.saveKeyStore(JAKeyStore.tokenCert, keystoreName, JAKeyStore.pass);
-			expirationTime = JAKeyStore.getExpirationTime(JAKeyStore.tokenCert);
-		}
-		JAKeyStore.saveKeyStore(JAKeyStore.trustStore, truststoreName, JAKeyStore.pass);
+		expirationTime = JAKeyStore.getExpirationTime(JAKeyStore.getKeyStore());
 
 		final Connector connector = new Connector("org.apache.coyote.http11.Http11Nio2Protocol");
 
@@ -192,20 +184,20 @@ public class TomcatServer {
 
 		final SSLHostConfig hostconfig = new SSLHostConfig();
 		hostconfig.setHostName("localhost");
-		hostconfig.setCertificateVerification("true");
-		hostconfig.setTruststoreFile(truststoreName);
+		hostconfig.setCertificateVerification("require");
+		hostconfig.setTrustStore(JAKeyStore.trustStore);
 		hostconfig.setTruststorePassword(keystorePass);
-		hostconfig.setTruststoreType("JKS");
 		hostconfig.setSslProtocol("TLS");
 		hostconfig.setProtocols("TLSv1.2");
 
-		final SSLHostConfigCertificate cert = hostconfig.getCertificates(true).iterator().next();
-		cert.setCertificateKeyAlias("User.cert");
-		cert.setCertificateKeystoreFile(keystoreName);
-		cert.setCertificateKeystorePassword(keystorePass);
-		cert.setCertificateKeystoreType("JKS");
+		final SSLHostConfigCertificate cert = new SSLHostConfigCertificate(hostconfig, Type.UNDEFINED);
+		cert.setCertificateKeystore(serverIdentity);
+		cert.setCertificateKeystorePassword(new String(JAKeyStore.pass));
+
+		hostconfig.addCertificate(cert);
 
 		connector.addSslHostConfig(hostconfig);
+
 		return connector;
 	}
 
