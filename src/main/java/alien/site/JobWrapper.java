@@ -449,7 +449,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 						cmd.add(st.nextToken());
 				}
 
-		cmd.add(";");
+		cmd.add("&&");
 		cmd.add("echo");
 		cmd.add("payload-" + queueId);
 
@@ -1225,9 +1225,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		final ArrayList<String> tags = new ArrayList<>();
 
 		if (exitStatus == JobStatus.ERROR_E || exitStatus == JobStatus.ERROR_V) {
-			String tag = exitStatus == JobStatus.ERROR_E ? "OutputErrorE" : "OutputErrorV";
+			final String tag = exitStatus == JobStatus.ERROR_E ? "OutputErrorE" : "OutputErrorV";
 
-			// set a default for ERROR_E/ERROR_V if nothing is provided..
+			// set a default for ERROR_E/ERROR_V if nothing is provided...
 			if (jdl.gets(tag) == null) {
 				putJobTrace("No output given for " + exitStatus + " in JDL. Defaulting to std*");
 				jdl.set(tag, "log_archive.zip:std*@disk=1");
