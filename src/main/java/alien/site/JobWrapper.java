@@ -1224,12 +1224,15 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	private ArrayList<String> getOutputTags(final JobStatus exitStatus) {
 		final ArrayList<String> tags = new ArrayList<>();
 
-		if (exitStatus == JobStatus.ERROR_E) {
-			if (jdl.gets("OutputErrorE") == null) {
-				putJobTrace("No output given for ERROR_E in JDL. Defaulting to std*");
-				jdl.set("OutputErrorE", "log_archive.zip:std*@disk=1"); // set a default if nothing is provided...
+		if (exitStatus == JobStatus.ERROR_E || exitStatus == JobStatus.ERROR_V) {
+			String tag = exitStatus == JobStatus.ERROR_E ? "OutputErrorE" : "OutputErrorV";
 
-				// ...but protect against uploading large std* logfiles as a default
+			// set a default for ERROR_E/ERROR_V if nothing is provided..
+			if (jdl.gets(tag) == null) {
+				putJobTrace("No output given for " + exitStatus + " in JDL. Defaulting to std*");
+				jdl.set(tag, "log_archive.zip:std*@disk=1");
+
+				// ...but protect against uploading large std* logfiles
 				for (final String entry : Arrays.asList("stdout", "stderr")) {
 					final File logFile = new File(currentDir.getAbsolutePath() + "/" + entry);
 					if (logFile.exists()) {
@@ -1244,8 +1247,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					}
 				}
 			}
-
-			tags.add("OutputErrorE");
+			tags.add(tag);
 		}
 		else {
 			if (jdl.gets("OutputArchive") != null)
