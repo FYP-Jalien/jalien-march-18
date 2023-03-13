@@ -1224,10 +1224,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	private ArrayList<String> getOutputTags(final JobStatus exitStatus) {
 		final ArrayList<String> tags = new ArrayList<>();
 
-		if (exitStatus == JobStatus.ERROR_E || exitStatus == JobStatus.ERROR_V) {
-			final String tag = exitStatus == JobStatus.ERROR_E ? "OutputErrorE" : "OutputErrorV";
+		if (exitStatus == JobStatus.ERROR_E) {
+			final String tag = "OutputErrorE";//exitStatus == JobStatus.ERROR_E ? "OutputErrorE" : "OutputErrorV"; TODO: Re-add after 1.7.0
 
-			// set a default for ERROR_E/ERROR_V if nothing is provided...
+			// set a default for ERROR_E if nothing is provided...
 			if (jdl.gets(tag) == null) {
 				putJobTrace("No output given for " + exitStatus + " in JDL. Defaulting to std*");
 				jdl.set(tag, "log_archive.zip:std*@disk=1");
