@@ -1224,39 +1224,39 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	private ArrayList<String> getOutputTags(final JobStatus exitStatus) {
 		final ArrayList<String> tags = new ArrayList<>();
 
-		if (exitStatus == JobStatus.ERROR_E) {
-			final String tag = "OutputErrorE";//exitStatus == JobStatus.ERROR_E ? "OutputErrorE" : "OutputErrorV"; TODO: Re-add after 1.7.0
+		if (exitStatus == JobStatus.ERROR_E || exitStatus == JobStatus.ERROR_V) {
 
-			// set a default for ERROR_E if nothing is provided...
-			if (jdl.gets(tag) == null) {
-				putJobTrace("No output given for " + exitStatus + " in JDL. Defaulting to std*");
-				jdl.set(tag, "log_archive.zip:std*@disk=1");
-
-				// ...but protect against uploading large std* logfiles
-				for (final String entry : Arrays.asList("stdout", "stderr")) {
-					final File logFile = new File(currentDir.getAbsolutePath() + "/" + entry);
-					if (logFile.exists()) {
-						try (final FileChannel out = new FileOutputStream(logFile, true).getChannel()) {
-							if (Files.size(logFile.toPath()) > 1073741824L) {
-								out.truncate(1073741824L);
-							}
+			// Protect against uploading large std* logfiles for error jobs
+			for (final String entry : Arrays.asList("stdout", "stderr")) {
+				final File logFile = new File(currentDir.getAbsolutePath() + "/" + entry);
+				if (logFile.exists()) {
+					try (final FileChannel out = new FileOutputStream(logFile, true).getChannel()) {
+						if (Files.size(logFile.toPath()) > 1073741824L) {
+							out.truncate(1073741824L);
 						}
-						catch (Exception e) {
-							// ignore
-						}
+					}
+					catch (Exception e) {
+						// ignore
 					}
 				}
 			}
-			tags.add(tag);
+			if (exitStatus == JobStatus.ERROR_E) {
+				if (jdl.gets("OutputErrorE") == null) {
+					putJobTrace("No output given for " + exitStatus + " in JDL. Defaulting to std*");
+					jdl.set("OutputErrorE", "log_archive.zip:std*@disk=1");
+				}
+				tags.add("OutputErrorE");
+				return tags;
+			}
 		}
-		else {
-			if (jdl.gets("OutputArchive") != null)
-				tags.add("OutputArchive");
-			if (jdl.gets("OutputFile") != null)
-				tags.add("OutputFile");
-			if (jdl.gets("Output") != null)
-				tags.add("Output");
-		}
+
+		if (jdl.gets("OutputArchive") != null)
+			tags.add("OutputArchive");
+		if (jdl.gets("OutputFile") != null)
+			tags.add("OutputFile");
+		if (jdl.gets("Output") != null)
+			tags.add("Output");
+
 		return tags;
 	}
 
