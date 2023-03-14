@@ -51,7 +51,6 @@ public class ContainerizerFactory {
 				if (containerizerCandidate.isSupported())
 					return containerizerCandidate;
 			}
-
 		}
 		catch (final Exception e) {
 			logger.log(Level.WARNING, "Invalid containerizer: " + e);

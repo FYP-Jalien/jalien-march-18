@@ -40,6 +40,11 @@ public abstract class Containerizer {
 	String workdir = null;
 
 	/**
+	 * Directories to bind-mount for GPU
+	 */
+	String gpuDirs = "";
+
+	/**
 	 * Debug cmd to run
 	 * 
 	 */
@@ -56,9 +61,9 @@ public abstract class Containerizer {
 	protected int memLimit = 0;
 
 	/**
-	 * Set to true if mounting GPU libraries breaks container
+	 * Set to false if mounting GPU libraries breaks container or no GPU strings found
 	 */
-	protected boolean gpuBroken = false;
+	static boolean useGpu = true;
 
 	/**
 	 * GPU
@@ -100,7 +105,7 @@ public abstract class Containerizer {
 			final String outputString = br.lines().collect(Collectors.joining());
 			if (outputString != null && !outputString.isBlank()) {
 				if (!outputString.contains("ps from"))
-					gpuBroken = true;
+					useGpu = false;
 				if (!outputString.contains("Runtime"))
 					return false;
 			}
@@ -115,7 +120,7 @@ public abstract class Containerizer {
 	}
 
 	/**
-	 * @return <code>true</code> if running a simple command (java -version) is possible with cgv2 constraints
+	 * @return <code>true</code> if mounted and running a simple command (java -version) is possible with cgv2 constraints
 	 */
 	public boolean checkCgroupsv2() {
 		useCgroupsv2 = false;
@@ -154,6 +159,9 @@ public abstract class Containerizer {
 		final Pattern p = Pattern.compile("^nvidia\\d+$");
 		String[] names = new File("/dev").list((dir, name) -> name.equals("kfd") || p.matcher(name).matches());
 
+		if (names.length == 0)
+			useGpu = false;
+
 		return String.join(",", names);
 	}
 
@@ -163,11 +171,12 @@ public abstract class Containerizer {
 	public static final String getGPUdirs() {
 		String toBind = "";
 
-		if (new File("/etc/alternatives").exists())
-			toBind += "/etc/alternatives:/etc/alternatives,";
-
-		if (new File("/opt").exists())
-			toBind += "/opt:/opt,";
+		if (useGpu) {
+			if (new File("/etc/alternatives").exists())
+				toBind += "/etc/alternatives:/etc/alternatives,";
+			if (new File("/opt").exists())
+				toBind += "/opt:/opt,";
+		}
 
 		return toBind;
 	}
@@ -236,7 +245,6 @@ public abstract class Containerizer {
 	}
 
 	/**
-	 * 
 	 * Applies options from debugtag to job container
 	 * 
 	 * @param debugTag

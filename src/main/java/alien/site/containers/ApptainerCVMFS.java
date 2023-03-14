@@ -9,6 +9,6 @@ public class ApptainerCVMFS extends Apptainer {
 
 	@Override
 	public String getBinPath(){
-		return CVMFS.getApptainerPath() + "/" + "apptainer";
+		return System.getenv().getOrDefault("FORCE_BINPATH", CVMFS.getApptainerPath() + "/" + "apptainer");
 	}
 }

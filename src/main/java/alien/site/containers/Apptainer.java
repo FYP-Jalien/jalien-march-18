@@ -11,27 +11,21 @@ public class Apptainer extends Containerizer {
 	@Override
 	public List<String> containerize(final String cmd) {
 		final List<String> apptainerCmd = new ArrayList<>();
-		apptainerCmd.add(System.getenv().getOrDefault("FORCE_BINPATH", getBinPath()));
+		apptainerCmd.add(getBinPath());
 		apptainerCmd.add("exec");
 		apptainerCmd.add("-C");
 
-		String gpuDirs = "";
-		if (!gpuBroken) {
+		if (useGpu) {
 			final String gpuString = getGPUString();
 			if (gpuString.contains("nvidia"))
 				apptainerCmd.add("--nv");
 			else if (gpuString.contains("kfd"))
 				apptainerCmd.add("--rocm");
-			else
-				gpuBroken = true;
-
-			if (!gpuBroken)
-				gpuDirs = getGPUdirs();
 		}
 
 		apptainerCmd.add("-B");
 		if(workdir != null) {
-			apptainerCmd.add(getCustomBinds() + gpuDirs + "/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + workdir + "/tmp:/tmp");
+			apptainerCmd.add(getCustomBinds() + getGPUdirs() + "/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + workdir + "/tmp:/tmp");
 			apptainerCmd.add("--pwd");
 			apptainerCmd.add(CONTAINER_JOBDIR);
 		}
@@ -56,7 +50,7 @@ public class Apptainer extends Containerizer {
 		return apptainerCmd;
 	}
 
-	public String getBinPath(){
-		return "apptainer";
+	public String getBinPath() {
+		return System.getenv().getOrDefault("FORCE_BINPATH", "apptainer");
 	}
 }
