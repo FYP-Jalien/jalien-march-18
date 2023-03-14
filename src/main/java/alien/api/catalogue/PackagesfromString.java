@@ -44,8 +44,10 @@ public class PackagesfromString extends Request {
 	public void run() {
 		final List<Package> all = PackageUtils.getPackages();
 
-		if (platform == null || platform.equals("all"))
+		if (platform == null || platform.equals("all")) {
 			this.packages = all;
+			return;
+		}
 
 		this.packages = new ArrayList<>(all.size());
 
