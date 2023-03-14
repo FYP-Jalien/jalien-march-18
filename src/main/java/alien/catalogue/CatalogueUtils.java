@@ -256,6 +256,9 @@ public final class CatalogueUtils {
 					if (indexTableUpdated()) {
 						if (logger.isLoggable(Level.FINER))
 							logger.log(Level.FINER, "Updating INDEXTABLE cache");
+						
+						if (monitor != null)
+							monitor.incrementCounter("indexCacheRefresh");
 
 						try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
 							if (db != null) {
@@ -305,10 +308,16 @@ public final class CatalogueUtils {
 		}
 	}
 
+	private static long indextableLastUpdated = 0;
+
+	private static long getIndexTableUpdate() {
+		return indextableLastUpdated;
+	}
+
 	/**
 	 * Get the timestamp when the indextable has last been modified
 	 */
-	private static long getIndexTableUpdate() {
+	private static long refreshIndexTableUpdate() {
 		try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
 			if (db == null)
 				return 0;
@@ -327,6 +336,27 @@ public final class CatalogueUtils {
 		}
 
 		return 0;
+	}
+
+	private static Thread indextableRefresher = new Thread("CatalogueUtils.refresher") {
+		@Override
+		public void run() {
+			while (true) {
+				indextableLastUpdated = refreshIndexTableUpdate();
+
+				try {
+					Thread.sleep(5000);
+				}
+				catch (@SuppressWarnings("unused") InterruptedException e) {
+					// exit
+				}
+			}
+		}
+	};
+
+	static {
+		indextableRefresher.setDaemon(true);
+		indextableRefresher.start();
 	}
 
 	/**
