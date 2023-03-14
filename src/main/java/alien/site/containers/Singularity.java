@@ -1,47 +1,12 @@
 package alien.site.containers;
 
-import java.util.ArrayList;
-import java.util.List;
-
 /**
  * @author mstoretv
  */
-public class Singularity extends Containerizer {
+public class Singularity extends Apptainer {
 
 	@Override
-	public List<String> containerize(final String cmd) {
-		final List<String> singularityCmd = new ArrayList<>();
-		singularityCmd.add("singularity");
-		singularityCmd.add("exec");
-		singularityCmd.add("-C");
-
-		final String gpuString = getGPUString();
-		String gpuDirs = getGPUdirs();
-
-		if (gpuString.contains("nvidia"))
-			singularityCmd.add("--nv");
-		else if (gpuString.contains("kfd"))
-			singularityCmd.add("--rocm");
-		else
-			gpuDirs = "";
-
-		singularityCmd.add("-B");
-		if(workdir != null) {
-			singularityCmd.add(getCustomBinds() + gpuDirs + "/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + "/tmp:/tmp");
-			singularityCmd.add("--pwd");
-			singularityCmd.add(CONTAINER_JOBDIR);
-		}
-		else
-			singularityCmd.add("/cvmfs:/cvmfs");
-
-		singularityCmd.add("--no-mount");
-		singularityCmd.add("tmp");
-
-		singularityCmd.add(containerImgPath);
-		singularityCmd.add("/bin/bash");
-		singularityCmd.add("-c");
-		singularityCmd.add(envSetup + cmd);
-
-		return singularityCmd;
+	public String getBinPath(){
+		return System.getenv().getOrDefault("FORCE_BINPATH", "singularity");
 	}
 }
