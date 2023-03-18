@@ -1779,7 +1779,7 @@ public class JobAgent implements Runnable {
 	private int getWrapperPid() {
 		final ArrayList<Integer> wrapperProcs = new ArrayList<>();
 
-		final CommandOutput output = SystemCommand.executeCommand(List.of("pgrep", "-f", String.valueOf(queueId)), false);
+		final CommandOutput output = SystemCommand.executeCommand(List.of("pgrep", "-f", "vmid=" + String.valueOf(queueId)), false);
 
 		if (output.exitCode != 0) {
 			// pgrep failed
