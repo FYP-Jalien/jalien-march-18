@@ -336,11 +336,14 @@ public class PackageUtils {
 				// download and register the file in the catalogue
 				archiveCheck = fetchAndRegister(tarballURL, platformArchive);
 
+				if (archiveCheck == null)
+					throw new IOException("Could not download the content of " + tarballURL + " and register it in the catalogue as " + platformArchive);
+
 				logger.log(Level.INFO, "Fetching " + tarballURL + " to " + platformArchive + " returned " + archiveCheck);
 			}
 		}
 
-		if (archiveCheck != null && archiveCheck.exists && archiveCheck.isFile()) {
+		if (archiveCheck.exists && archiveCheck.isFile()) {
 			// file exists, let's take it into account
 			try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
 				if (db != null) {
@@ -363,26 +366,24 @@ public class PackageUtils {
 				}
 			}
 		}
+		else
+			throw new IOException("The package was not correctly defined at this point");
 
-		if (existing != null) {
-			final String table = tagTables.iterator().next();
+		final String table = tagTables.iterator().next();
 
-			System.err.println(table);
-
-			try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
-				if (db != null) {
-					if (!db.query("REPLACE INTO " + table + " (file, dependencies) VALUES (?, ?);", false, packageWithVersionDir, dependencies)) {
-						logger.log(Level.WARNING, "Failed to insert the dependencies for " + packageWithVersionDir + ": " + db.getLastError());
-						throw new IOException("Failed to insert the dependencies for " + packageWithVersionDir + ": " + db.getLastError());
-					}
+		try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
+			if (db != null) {
+				if (!db.query("REPLACE INTO " + table + " (file, dependencies) VALUES (?, ?);", false, packageWithVersionDir, dependencies)) {
+					logger.log(Level.WARNING, "Failed to insert the dependencies for " + packageWithVersionDir + ": " + db.getLastError());
+					throw new IOException("Failed to insert the dependencies for " + packageWithVersionDir + ": " + db.getLastError());
 				}
-				else
-					throw new IOException("No catalogue db");
 			}
-
-			if (packages != null)
-				packages.put(existing.getFullName(), existing);
+			else
+				throw new IOException("No catalogue db");
 		}
+
+		if (packages != null)
+			packages.put(existing.getFullName(), existing);
 
 		return existing;
 	}
