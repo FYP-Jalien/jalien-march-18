@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -206,18 +207,73 @@ public final class GUIDUtils {
 	}
 
 	/**
-	 * Bulk operation to retrieve GUID objects from the catalogue
-	 *
-	 * @param guidList
-	 *            List of UUIDs to retrieve the GUIDs for
-	 * @return the set of GUIDs that could be looked up in the catalogue
+	 * @param guidList wish list
+	 * @return the PFNs corresponding to given UUIDs, only the ones that are found in the database
 	 */
-	public static Set<GUID> getGUIDs(final UUID... guidList) {
-		final Set<GUID> ret = new LinkedHashSet<>();
+	public static Map<UUID, Set<PFN>> getRealPFNs(final UUID... guidList) {
+		final Map<UUID, Set<PFN>> ret = new LinkedHashMap<>(guidList.length);
 
-		if (guidList == null || guidList.length == 0)
-			return ret;
+		final Map<UUID, Set<PFN>> firstStage = getPFNs(guidList);
 
+		final Map<UUID, UUID> archives = new HashMap<>();
+
+		for (final Map.Entry<UUID, Set<PFN>> entry : firstStage.entrySet()) {
+			final UUID uuid = entry.getKey();
+			final Set<PFN> pfns = entry.getValue();
+
+			UUID archiveUUID = null;
+
+			for (final PFN p : pfns) {
+				final String pfn = p.getPFN();
+
+				if (pfn.startsWith("guid://") || (pfn.startsWith("root://") && pfn.indexOf("?ZIP=") >= 0)) {
+					final StringTokenizer st = new StringTokenizer(pfn, "/?");
+
+					st.nextToken();
+
+					while (st.hasMoreTokens()) {
+						final String tok = st.nextToken();
+
+						if (tok.indexOf('-') > 0)
+							try {
+								archiveUUID = UUID.fromString(tok);
+								break;
+							}
+							catch (@SuppressWarnings("unused") final Exception e) {
+								// ignore
+							}
+					}
+				}
+
+				if (archiveUUID != null)
+					break;
+			}
+
+			if (archiveUUID != null)
+				archives.put(archiveUUID, uuid);
+			else
+				ret.put(uuid, pfns);
+		}
+
+		if (archives.size() > 0) {
+			System.err.println("Resolving: " + archives);
+
+			final Map<UUID, Set<PFN>> secondStage = getPFNs(archives.keySet().toArray(new UUID[0]));
+
+			System.err.println("Got back: " + secondStage);
+
+			for (final Map.Entry<UUID, Set<PFN>> entry : secondStage.entrySet()) {
+				final UUID original = archives.get(entry.getKey());
+
+				if (original != null)
+					ret.put(original, entry.getValue());
+			}
+		}
+
+		return ret;
+	}
+
+	private static Map<Host, Map<Integer, Set<UUID>>> uuidsToHosts(final UUID... guidList) {
 		final Map<Host, Map<Integer, Set<UUID>>> mapping = new LinkedHashMap<>();
 
 		for (final UUID guid : guidList) {
@@ -238,22 +294,91 @@ public final class GUIDUtils {
 
 			final Integer iTableName = Integer.valueOf(tableName);
 
-			Map<Integer, Set<UUID>> hostMap = mapping.get(h);
-
-			if (hostMap == null) {
-				hostMap = new LinkedHashMap<>();
-				mapping.put(h, hostMap);
-			}
-
-			Set<UUID> uuidList = hostMap.get(iTableName);
-
-			if (uuidList == null) {
-				uuidList = new LinkedHashSet<>();
-				hostMap.put(iTableName, uuidList);
-			}
-
-			uuidList.add(guid);
+			mapping.computeIfAbsent(h, (k) -> new LinkedHashMap<>()).computeIfAbsent(iTableName, (k) -> new LinkedHashSet<>()).add(guid);
 		}
+
+		return mapping;
+	}
+
+	/**
+	 * @param guidList wish list
+	 * @return the PFNs corresponding to given UUIDs, only the ones that are found in the database
+	 */
+	public static Map<UUID, Set<PFN>> getPFNs(final UUID... guidList) {
+		final Map<UUID, Set<PFN>> ret = new LinkedHashMap<>();
+
+		if (guidList == null || guidList.length == 0)
+			return ret;
+
+		final Map<Host, Map<Integer, Set<UUID>>> mapping = uuidsToHosts(guidList);
+
+		for (final Map.Entry<Host, Map<Integer, Set<UUID>>> entry : mapping.entrySet()) {
+			final Host h = entry.getKey();
+
+			final Map<Integer, Set<UUID>> hostMapping = entry.getValue();
+
+			try (DBFunctions db = h.getDB()) {
+				db.setReadOnly(true);
+				db.setQueryTimeout(600); // in normal conditions it cannot take 10 minutes to ask for up to 100 guids from a table
+
+				for (final Map.Entry<Integer, Set<UUID>> tableEntry : hostMapping.entrySet()) {
+					final Integer tableName = tableEntry.getKey();
+
+					if (monitor != null)
+						monitor.incrementCounter("GUID_db_lookup");
+
+					final StringBuilder sb = new StringBuilder();
+
+					final ArrayList<UUID> allGUIDs = new ArrayList<>(tableEntry.getValue());
+
+					for (int i = 0; i < allGUIDs.size(); i += IndexTableEntry.MAX_QUERY_LENGTH) {
+						sb.setLength(0);
+						final List<UUID> sublist = allGUIDs.subList(i, Math.min(i + IndexTableEntry.MAX_QUERY_LENGTH, allGUIDs.size()));
+
+						for (final UUID u : sublist) {
+							if (sb.length() > 0)
+								sb.append(',');
+
+							sb.append("string2binary('").append(u.toString()).append("')");
+						}
+
+						final String q = "SELECT distinct guidId, pfn, seNumber, binary2string(guid) as guid FROM G" + tableName + "L_PFN INNER JOIN G" + tableName + "L USING(guidId) WHERE guid IN ("
+								+ sb.toString() + ");";
+
+						if (!db.query(q))
+							throw new IllegalStateException("Failed executing query: " + q);
+
+						while (db.moveNext())
+							try {
+								final UUID uuid = UUID.fromString(db.gets("guid"));
+
+								ret.computeIfAbsent(uuid, (k) -> new LinkedHashSet<>()).add(new PFN(db, h.hostIndex, tableName.intValue()));
+							}
+							catch (final Exception e) {
+								logger.log(Level.WARNING, "Exception instantiating some guid from " + tableName, e);
+							}
+					}
+				}
+			}
+		}
+
+		return ret;
+	}
+
+	/**
+	 * Bulk operation to retrieve GUID objects from the catalogue
+	 *
+	 * @param guidList
+	 *            List of UUIDs to retrieve the GUIDs for
+	 * @return the set of GUIDs that could be looked up in the catalogue
+	 */
+	public static Set<GUID> getGUIDs(final UUID... guidList) {
+		final Set<GUID> ret = new LinkedHashSet<>();
+
+		if (guidList == null || guidList.length == 0)
+			return ret;
+
+		final Map<Host, Map<Integer, Set<UUID>>> mapping = uuidsToHosts(guidList);
 
 		for (final Map.Entry<Host, Map<Integer, Set<UUID>>> entry : mapping.entrySet()) {
 			final Host h = entry.getKey();

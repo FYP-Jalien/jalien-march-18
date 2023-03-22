@@ -132,8 +132,12 @@ public class FindfromString extends Request implements Cacheable {
 		if (readSiteSorting != null && lfns != null && lfns.size() > 0) {
 			final Map<PFN, LFN> resolvedLFNs = new HashMap<>();
 
-			for (final LFN l : lfns) {
-				final Set<PFN> pfns = l.whereisReal();
+			final Map<LFN, Set<PFN>> locations = LFNUtils.getRealPFNs(lfns);
+
+			for (final Map.Entry<LFN, Set<PFN>> entry : locations.entrySet()) {
+				final LFN l = entry.getKey();
+
+				final Set<PFN> pfns = entry.getValue();
 
 				if (pfns != null)
 					for (final PFN p : pfns)

@@ -21,6 +21,7 @@ import java.util.UUID;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
@@ -1680,5 +1681,47 @@ public class LFNUtils {
 
 			return "The table L" + tableName + "L has been created successfully";
 		}
+	}
+
+	/**
+	 * @param lfns
+	 * @return the resolved locations of the given LFNs (the ones that could be found)
+	 */
+	public static Map<LFN, Set<PFN>> getPFNs(final Collection<LFN> lfns) {
+		final List<UUID> uuids = lfns.stream().map((l) -> l.guid).collect(Collectors.toList());
+
+		final Map<UUID, Set<PFN>> pfns = GUIDUtils.getPFNs(uuids.toArray(new UUID[0]));
+
+		final Map<LFN, Set<PFN>> ret = new LinkedHashMap<>(pfns.size());
+
+		for (final LFN l : lfns) {
+			final Set<PFN> locations = pfns.get(l.guid);
+
+			if (locations != null)
+				ret.put(l, locations);
+		}
+
+		return ret;
+	}
+
+	/**
+	 * @param lfns
+	 * @return the resolved physical locations of the given LFNs (the ones that could be found)
+	 */
+	public static Map<LFN, Set<PFN>> getRealPFNs(final Collection<LFN> lfns) {
+		final List<UUID> uuids = lfns.stream().map((l) -> l.guid).collect(Collectors.toList());
+
+		final Map<UUID, Set<PFN>> pfns = GUIDUtils.getRealPFNs(uuids.toArray(new UUID[0]));
+
+		final Map<LFN, Set<PFN>> ret = new LinkedHashMap<>(pfns.size());
+
+		for (final LFN l : lfns) {
+			final Set<PFN> locations = pfns.get(l.guid);
+
+			if (locations != null)
+				ret.put(l, locations);
+		}
+
+		return ret;
 	}
 }
