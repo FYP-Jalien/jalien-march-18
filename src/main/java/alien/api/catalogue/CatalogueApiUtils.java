@@ -543,8 +543,27 @@ public class CatalogueApiUtils {
 	 */
 	public Collection<LFN> find(final String path, final String pattern, final String query, final int flags, final String xmlCollectionName, final Long queueid, final long queryLimit,
 			final String readSiteSorting) {
+		return find(path, pattern, query, flags, xmlCollectionName, queueid, queryLimit, readSiteSorting, null);
+	}
+
+	/**
+	 * Find an LFN based on pattern and save to XmlCollection
+	 *
+	 * @param path
+	 * @param pattern
+	 * @param query
+	 * @param flags
+	 * @param xmlCollectionName
+	 * @param queueid
+	 * @param queryLimit how many LFNs to return at maximum. The server will throw and exception if the set is larger than this value.
+	 * @param readSiteSorting
+	 * @param excludedPatterns patterns to remove from matching
+	 * @return result LFNs or <code>null</code> if no LFNs found
+	 */
+	public Collection<LFN> find(final String path, final String pattern, final String query, final int flags, final String xmlCollectionName, final Long queueid, final long queryLimit,
+			final String readSiteSorting, final Collection<String> excludedPatterns) {
 		try {
-			return Dispatcher.execute(new FindfromString(commander.getUser(), path, pattern, query, flags, xmlCollectionName, queueid, queryLimit, readSiteSorting)).getLFNs();
+			return Dispatcher.execute(new FindfromString(commander.getUser(), path, pattern, query, flags, xmlCollectionName, queueid, queryLimit, readSiteSorting, excludedPatterns)).getLFNs();
 		}
 		catch (final ServerException e) {
 			logger.log(Level.WARNING, "Unable to execute find: path (" + path + "), pattern (" + pattern + "), flags (" + flags + ")");

@@ -346,6 +346,23 @@ public class IndexTableEntry implements Serializable, Comparable<IndexTableEntry
 	 * @return the LFNs from this table that match
 	 */
 	public List<LFN> find(final String sPath, final String sPattern, final int flags, final Long queueid, final long limit) {
+		return find(sPath, sPattern, flags, queueid, limit, null);
+	}
+
+	/**
+	 * @param sPath
+	 *            base path where to start searching, must be an absolute path ending in /
+	 * @param sPattern
+	 *            pattern to search for, in SQL wildcard format
+	 * @param flags
+	 *            a combination of {@link LFNUtils}.FIND_* fields
+	 * @param queueid
+	 *            a job id to filter for its files
+	 * @param limit if strictly positive, restrict the number of returned entries to at most this number
+	 * @param excludePatterns patterns to filter out from the returned results
+	 * @return the LFNs from this table that match
+	 */
+	public List<LFN> find(final String sPath, final String sPattern, final int flags, final Long queueid, final long limit, final Collection<String> excludePatterns) {
 		try (DBFunctions db = getDB()) {
 			if (db == null)
 				return null;
@@ -355,17 +372,17 @@ public class IndexTableEntry implements Serializable, Comparable<IndexTableEntry
 
 			final List<LFN> ret = new ArrayList<>();
 
-			String sSearch = sPath;
+			String sSearchBase = sPath;
 
-			if (sSearch.startsWith("/"))
-				if (lfn.length() <= sSearch.length()) {
-					sSearch = sSearch.substring(lfn.length());
+			if (sSearchBase.startsWith("/"))
+				if (lfn.length() <= sSearchBase.length()) {
+					sSearchBase = sSearchBase.substring(lfn.length());
 
-					if (sSearch.startsWith("/"))
-						sSearch = sSearch.substring(1);
+					if (sSearchBase.startsWith("/"))
+						sSearchBase = sSearchBase.substring(1);
 				}
 				else
-					sSearch = "";
+					sSearchBase = "";
 
 			String q = "SELECT * FROM L" + tableName + "L ";
 
@@ -376,6 +393,8 @@ public class IndexTableEntry implements Serializable, Comparable<IndexTableEntry
 
 			if ((flags & LFNUtils.FIND_REGEXP) == 0) {
 				String sSearchAlternate = null;
+
+				String sSearch = sSearchBase;
 
 				if (sSearch.length() == 0 && sPattern.startsWith("/")) {
 					sSearch += sPattern.substring(1);
@@ -403,10 +422,48 @@ public class IndexTableEntry implements Serializable, Comparable<IndexTableEntry
 				else
 					q += "(lfn LIKE '" + Format.escSQL(sSearch) + "' OR lfn LIKE '" + Format.escSQL(sSearchAlternate) + "')";
 
+				if (excludePatterns != null && excludePatterns.size() > 0)
+					for (String excludePattern : excludePatterns) {
+						sSearchAlternate = null;
+
+						sSearch = sSearchBase;
+
+						if (sSearch.length() == 0 && excludePattern.startsWith("/")) {
+							sSearch += excludePattern.substring(1);
+						}
+						else {
+							if (!excludePattern.startsWith("%")) {
+								if (sSearch.endsWith("/") && excludePattern.startsWith("/"))
+									sSearchAlternate = sSearch + excludePattern.substring(1);
+
+								sSearch += "%";
+							}
+
+							sSearch += excludePattern;
+						}
+
+						if (!excludePattern.endsWith("%")) {
+							sSearch += "%";
+
+							if (sSearchAlternate != null)
+								sSearchAlternate += "%";
+						}
+
+						if (sSearchAlternate == null)
+							q += " AND lfn NOT LIKE '" + Format.escSQL(sSearch) + "'";
+						else
+							q += " AND lfn NOT LIKE '" + Format.escSQL(sSearch) + "' AND lfn NOT LIKE '" + Format.escSQL(sSearchAlternate) + "'";
+					}
+
 				q += " AND replicated=0";
 			}
-			else
-				q += "lfn RLIKE '^" + Format.escSQL(sSearch + sPattern) + "' AND replicated=0";
+			else {
+				q += "lfn RLIKE '^" + Format.escSQL(sSearchBase + sPattern) + "' AND replicated=0";
+
+				if (excludePatterns != null && excludePatterns.size() > 0)
+					for (String excludePattern : excludePatterns)
+						q += " AND lfn NOT RLIKE '^" + Format.escSQL(sSearchBase + excludePattern) + "'";
+			}
 
 			if ((flags & LFNUtils.FIND_INCLUDE_DIRS) == 0)
 				q += " AND type!='d'";

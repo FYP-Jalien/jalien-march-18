@@ -37,6 +37,7 @@ public class FindfromString extends Request implements Cacheable {
 	private Long queueid = Long.valueOf(0);
 	private long queryLimit = 1000000;
 	private String readSiteSorting = null;
+	private Collection<String> excludedPatterns;
 
 	/**
 	 * @param user
@@ -51,6 +52,7 @@ public class FindfromString extends Request implements Cacheable {
 		this.query = null;
 		this.flags = flags;
 		this.xmlCollectionName = "";
+		this.excludedPatterns = null;
 	}
 
 	@Override
@@ -80,6 +82,8 @@ public class FindfromString extends Request implements Cacheable {
 
 		if (queryLimit > 0)
 			this.queryLimit = queryLimit;
+
+		this.excludedPatterns = null;
 	}
 
 	/**
@@ -107,6 +111,38 @@ public class FindfromString extends Request implements Cacheable {
 			this.queryLimit = queryLimit;
 
 		this.readSiteSorting = readSiteSorting;
+
+		this.excludedPatterns = null;
+	}
+
+	/**
+	 * @param user
+	 * @param path
+	 * @param pattern
+	 * @param query
+	 * @param flags
+	 * @param xmlCollectionName
+	 * @param queueid
+	 * @param queryLimit number of entries to limit the search to. If strictly positive, a larger set than this would throw an exception
+	 * @param readSiteSorting
+	 * @param excludedPatterns patterns to remove from matching
+	 */
+	public FindfromString(final AliEnPrincipal user, final String path, final String pattern, final String query, final int flags, final String xmlCollectionName, final Long queueid,
+			final long queryLimit, final String readSiteSorting, final Collection<String> excludedPatterns) {
+		setRequestUser(user);
+		this.path = path;
+		this.pattern = pattern;
+		this.query = query;
+		this.flags = flags;
+		this.xmlCollectionName = xmlCollectionName;
+		this.queueid = queueid;
+
+		if (queryLimit > 0)
+			this.queryLimit = queryLimit;
+
+		this.readSiteSorting = readSiteSorting;
+
+		this.excludedPatterns = excludedPatterns;
 	}
 
 	/**
@@ -127,7 +163,7 @@ public class FindfromString extends Request implements Cacheable {
 
 	@Override
 	public void run() {
-		lfns = LFNUtils.find(path, pattern, query, flags, getEffectiveRequester(), xmlCollectionName, queueid, readSiteSorting != null ? 1000000 : queryLimit);
+		lfns = LFNUtils.find(path, pattern, query, flags, getEffectiveRequester(), xmlCollectionName, queueid, readSiteSorting != null ? 1000000 : queryLimit, excludedPatterns);
 
 		if (readSiteSorting != null && lfns != null && lfns.size() > 0) {
 			final Map<PFN, LFN> resolvedLFNs = new HashMap<>();
@@ -189,7 +225,7 @@ public class FindfromString extends Request implements Cacheable {
 
 	@Override
 	public String getKey() {
-		return path + "|" + pattern + "|" + query + "|" + flags + "|" + queueid + "|" + queryLimit + "|" + readSiteSorting;
+		return path + "|" + pattern + "|" + query + "|" + flags + "|" + queueid + "|" + queryLimit + "|" + readSiteSorting + "|" + excludedPatterns;
 	}
 
 	@Override

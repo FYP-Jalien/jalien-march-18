@@ -683,6 +683,25 @@ public class LFNUtils {
 	 */
 	public static Collection<LFN> find(final String path, final String pattern, final String query, final int flags, final AliEnPrincipal owner, final String xmlCollectionName, final Long queueid,
 			final long queryLimit) {
+		return find(path, pattern, query, flags, owner, xmlCollectionName, queueid, queryLimit, null);
+	}
+
+	/**
+	 * @param path
+	 * @param pattern
+	 * @param query
+	 * @param flags
+	 *            a combination of FIND_* flags
+	 * @param owner
+	 * @param xmlCollectionName
+	 * @param queueid
+	 *            a job id to filter for its files
+	 * @param queryLimit if strictly positive then restrict the number of returned entries to this many; if more would be produced, exit with an exception
+	 * @param excludedPatterns 
+	 * @return the list of LFNs that match
+	 */
+	public static Collection<LFN> find(final String path, final String pattern, final String query, final int flags, final AliEnPrincipal owner, final String xmlCollectionName, final Long queueid,
+			final long queryLimit, final Collection<String> excludedPatterns) {
 		final String processedPattern;
 
 		if ((flags & FIND_REGEXP) == 0)
@@ -705,7 +724,7 @@ public class LFNUtils {
 		final Collection<IndexTableEntry> matchingTables = CatalogueUtils.getAllMatchingTables(path);
 
 		for (final IndexTableEntry ite : matchingTables) {
-			final List<LFN> findResults = ite.find(path, processedPattern, flags, queueid, queryLimit > 0 ? queryLimit - ret.size() : 0);
+			final List<LFN> findResults = ite.find(path, processedPattern, flags, queueid, queryLimit > 0 ? queryLimit - ret.size() : 0, excludedPatterns);
 
 			if (findResults == null)
 				return null;

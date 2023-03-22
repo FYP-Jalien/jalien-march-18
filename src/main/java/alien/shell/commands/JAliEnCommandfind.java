@@ -4,6 +4,7 @@ import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashSet;
 import java.util.List;
 
 import alien.catalogue.FileSystemUtils;
@@ -83,6 +84,8 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 
 	private String readSiteSorting = null;
 
+	private Collection<String> excludePatterns = null;
+
 	/**
 	 * returns the LFNs that were the result of the find
 	 *
@@ -151,8 +154,8 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			return;
 		}
 
-		lfns = commander.c_api.find(path, alPaths.get(1), query, flags, xmlCollectionPath, queueid, limit != Long.MAX_VALUE ? limit + offset : -1, readSiteSorting);
-		
+		lfns = commander.c_api.find(path, alPaths.get(1), query, flags, xmlCollectionPath, queueid, limit != Long.MAX_VALUE ? limit + offset : -1, readSiteSorting, excludePatterns);
+
 		int count = 0;
 		long size = 0;
 
@@ -259,6 +262,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 		commander.printOutln(helpOption("-f", "return all LFN data as JSON fields (API flag only)"));
 		commander.printOutln(helpOption("-y", "(FOR THE OCDB) return only the biggest version of each file"));
 		commander.printOutln(helpOption("-S <site name>", "Sort the returned list by the distance to the given site"));
+		commander.printOutln(helpOption("-e <pattern>", "Exclude pattern"));
 		commander.printOutln();
 	}
 
@@ -304,6 +308,7 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			parser.accepts("z"); // ignored option, just to maintain compatibility with AliEn
 			parser.accepts("f"); // full LFN details, API only
 			parser.accepts("S").withRequiredArg();
+			parser.accepts("e").withRequiredArg();
 
 			final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
 
@@ -353,6 +358,13 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			if (options.has("S")) {
 				readSiteSorting = options.valueOf("S").toString();
 				bS = true;
+			}
+
+			if (options.has("e")) {
+				excludePatterns = new HashSet<>();
+
+				for (final Object o : options.valuesOf("e"))
+					excludePatterns.add(o.toString());
 			}
 
 			if (alPaths.size() == 0) {
@@ -414,6 +426,8 @@ public class JAliEnCommandfind extends JAliEnBaseCommand {
 			sb.append(" -c");
 		if (readSiteSorting != null)
 			sb.append("-S " + readSiteSorting);
+		if (excludePatterns != null)
+			sb.append("-e " + excludePatterns);
 
 		sb.append("}");
 
