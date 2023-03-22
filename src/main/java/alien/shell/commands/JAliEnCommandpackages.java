@@ -1,5 +1,6 @@
 package alien.shell.commands;
 
+import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
@@ -27,6 +28,8 @@ public class JAliEnCommandpackages extends JAliEnBaseCommand {
 		packs = commander.c_api.getPackages(platform);
 
 		if (packs != null) {
+			Collections.sort(packs);
+			
 			for (final Package p : packs) {
 				boolean display = false;
 
