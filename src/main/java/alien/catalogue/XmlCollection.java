@@ -8,7 +8,9 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.UUID;
 import java.util.logging.Level;
@@ -131,6 +133,8 @@ public class XmlCollection extends LinkedHashSet<LFN> {
 
 		boolean alienTagFound = false;
 
+		final Set<String> lfnsToGetReal = new LinkedHashSet<>();
+
 		while ((sLine = br.readLine()) != null) {
 			sLine = sLine.trim();
 
@@ -156,16 +160,7 @@ public class XmlCollection extends LinkedHashSet<LFN> {
 				final String fileName = sLine.substring(idx + 7, sLine.indexOf('"', idx + 8));
 
 				if (getReal) {
-					if (ConfigUtils.isCentralService()) {
-						if (!this.add(LFNUtils.getLFN(fileName))) {
-							logger.log(Level.WARNING, "Failed to add " + fileName + " to collection " + this.collectionName);
-						}
-					}
-					else {
-						JAliEnCOMMander commander = JAliEnCOMMander.getInstance();
-						if (!this.add(commander.c_api.getLFN(fileName)))
-							logger.log(Level.WARNING, "Failed to add " + fileName + " to collection " + this.collectionName);
-					}
+					lfnsToGetReal.add(fileName);
 				}
 				else {
 					final StringTokenizer st = new StringTokenizer(sLine, "\"", true);
@@ -275,6 +270,35 @@ public class XmlCollection extends LinkedHashSet<LFN> {
 			}
 			catch (final Throwable t) {
 				throw new IOException("Exception parsing XML", t);
+			}
+		}
+
+		if (lfnsToGetReal.size() > 0) {
+			final List<LFN> lfnsToAdd;
+
+			if (ConfigUtils.isCentralService()) {
+				lfnsToAdd = LFNUtils.getLFNs(true, lfnsToGetReal);
+			}
+			else {
+				final JAliEnCOMMander commander = JAliEnCOMMander.getInstance();
+
+				lfnsToAdd = commander.c_api.getLFNs(lfnsToGetReal, true, false);
+			}
+
+			if (lfnsToAdd.size() != lfnsToGetReal.size()) {
+				logger.log(Level.WARNING, "The catalogue has " + lfnsToAdd.size() + " LFNs out of " + lfnsToGetReal.size() + " requested objects");
+
+				lfnsToAdd.stream().forEach((l) -> lfnsToGetReal.remove(l.getCanonicalName()));
+
+				if (lfnsToGetReal.size() < 10)
+					logger.log(Level.WARNING, "Files not found in the catalogue: " + lfnsToGetReal);
+				else
+					logger.log(Level.WARNING, "Too many files were not found in the catalogue, not listing all of " + lfnsToGetReal.size() + " entries here");
+			}
+
+			if (lfnsToAdd.size() > 0) {
+				if (!this.addAll(lfnsToAdd))
+					logger.log(Level.WARNING, "Could not add " + lfnsToAdd.size() + " entries to the collection content");
 			}
 		}
 
