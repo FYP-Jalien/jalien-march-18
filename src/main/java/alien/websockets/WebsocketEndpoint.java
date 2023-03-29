@@ -57,6 +57,9 @@ import lazyj.cache.ExpirationCache;
  *         Implementation of websocket endpoint, that supports plain text and JSON clients
  */
 public class WebsocketEndpoint extends Endpoint {
+	// Ready to receive a command line (of max 128KB in Linux) + JSON serialization
+	private static final int MAX_MESSAGE_LENGTH = 130 * 1024;
+
 	private static final Logger logger = ConfigUtils.getLogger(WebsocketEndpoint.class.getCanonicalName());
 
 	private static final Monitor monitor = MonitorFactory.getMonitor(WebsocketEndpoint.class.getCanonicalName());
@@ -432,6 +435,8 @@ public class WebsocketEndpoint extends Endpoint {
 		private UIPrintWriter out = null;
 		private OutputStream os = null;
 
+		StringBuilder sbBuffer = null;
+
 		private final SessionContext context;
 
 		WSMessageHandler(final SessionContext context, final JAliEnCOMMander commander, final UIPrintWriter out, final OutputStream os) {
@@ -444,22 +449,64 @@ public class WebsocketEndpoint extends Endpoint {
 
 		@Override
 		public void onMessage(final String message, final boolean last) {
-			monitor.incrementCounter("commands");
-
 			if (remoteEndpointBasic == null)
 				return;
 
 			context.touch();
+
+			if (!last) {
+				if (sbBuffer == null)
+					sbBuffer = new StringBuilder(message);
+				else if (sbBuffer.length() + message.length() > MAX_MESSAGE_LENGTH) {
+					synchronized (remoteEndpointBasic) {
+						try {
+							remoteEndpointBasic.sendText("{\"metadata\":{\"exitcode\":\"-1\",\"error\":\"Message too long, limit is now " + MAX_MESSAGE_LENGTH + "\"},\"results\":[]}", true);
+						}
+						catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}
+				}
+				else
+					sbBuffer.append(message);
+
+				return;
+			}
+
+			final String text;
+
+			if (sbBuffer != null) {
+				if (sbBuffer.length() + message.length() > MAX_MESSAGE_LENGTH) {
+					synchronized (remoteEndpointBasic) {
+						try {
+							remoteEndpointBasic.sendText("{\"metadata\":{\"exitcode\":\"-1\",\"error\":\"Message too long, limit is now " + MAX_MESSAGE_LENGTH + "\"},\"results\":[]}", true);
+						}
+						catch (IOException e) {
+							// TODO Auto-generated catch block
+							e.printStackTrace();
+						}
+					}
+
+					return;
+				}
+
+				text = sbBuffer.toString() + message;
+			}
+			else
+				text = message;
+
+			monitor.incrementCounter("commands");
 
 			ArrayList<String> fullCmd;
 
 			// Parse incoming command
 			try {
 				if ("alien.shell.commands.JSONPrintWriter".equals(this.out.getClass().getCanonicalName())) {
-					fullCmd = parseJSON(message);
+					fullCmd = parseJSON(text);
 				}
 				else if ("alien.shell.commands.JShPrintWriter".equals(this.out.getClass().getCanonicalName())) {
-					fullCmd = parsePlainText(message);
+					fullCmd = parsePlainText(text);
 				}
 				else {
 					// this is XMLPrintWriter or some other type of writer
