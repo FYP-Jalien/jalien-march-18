@@ -12,8 +12,12 @@ import java.net.InetSocketAddress;
 import java.security.Principal;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.StringTokenizer;
 import java.util.concurrent.DelayQueue;
 import java.util.concurrent.Delayed;
@@ -42,12 +46,14 @@ import alien.monitoring.CacheMonitor;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
+import alien.shell.ErrNo;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.shell.commands.JSONPrintWriter;
 import alien.shell.commands.JShPrintWriter;
 import alien.shell.commands.UIPrintWriter;
 import alien.shell.commands.XMLPrintWriter;
 import alien.user.AliEnPrincipal;
+import lazyj.Format;
 import lazyj.Utils;
 import lazyj.cache.ExpirationCache;
 
@@ -439,12 +445,46 @@ public class WebsocketEndpoint extends Endpoint {
 
 		private final SessionContext context;
 
+		private boolean jsonWriter = false;
+
 		WSMessageHandler(final SessionContext context, final JAliEnCOMMander commander, final UIPrintWriter out, final OutputStream os) {
 			this.context = context;
 			this.remoteEndpointBasic = context.session.getBasicRemote();
 			this.commander = commander;
 			this.out = out;
 			this.os = os;
+
+			this.jsonWriter = "alien.shell.commands.JSONPrintWriter".equals(this.out.getClass().getCanonicalName());
+		}
+
+		private void writeBackError(final int code, final String message) {
+			final String toWrite;
+
+			if (jsonWriter) {
+				final Map<String, String> metadata = new LinkedHashMap<>(4);
+				metadata.put("exitcode", String.valueOf(code));
+				metadata.put("error", message);
+				metadata.put("user", commander.getUsername());
+				metadata.put("currentdir", commander.getCurrentDirName());
+
+				final Map<String, Object> data = new HashMap<>();
+				data.put("metadata", metadata);
+				data.put("results", Collections.EMPTY_LIST);
+
+				toWrite = Format.toJSON(data, false).toString();
+			}
+			else {
+				toWrite = message;
+			}
+
+			synchronized (remoteEndpointBasic) {
+				try {
+					remoteEndpointBasic.sendText(toWrite, true);
+				}
+				catch (final IOException e) {
+					logger.log(Level.WARNING, "Exception writing back an error message", e);
+				}
+			}
 		}
 
 		@Override
@@ -458,15 +498,8 @@ public class WebsocketEndpoint extends Endpoint {
 				if (sbBuffer == null)
 					sbBuffer = new StringBuilder(message);
 				else if (sbBuffer.length() + message.length() > MAX_MESSAGE_LENGTH) {
-					synchronized (remoteEndpointBasic) {
-						try {
-							remoteEndpointBasic.sendText("{\"metadata\":{\"exitcode\":\"-1\",\"error\":\"Message too long, limit is now " + MAX_MESSAGE_LENGTH + "\"},\"results\":[]}", true);
-						}
-						catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-					}
+					writeBackError(ErrNo.EINVAL.getErrorCode(), "Message too big, limit is at " + MAX_MESSAGE_LENGTH);
+					sbBuffer = null;
 				}
 				else
 					sbBuffer.append(message);
@@ -478,15 +511,7 @@ public class WebsocketEndpoint extends Endpoint {
 
 			if (sbBuffer != null) {
 				if (sbBuffer.length() + message.length() > MAX_MESSAGE_LENGTH) {
-					synchronized (remoteEndpointBasic) {
-						try {
-							remoteEndpointBasic.sendText("{\"metadata\":{\"exitcode\":\"-1\",\"error\":\"Message too long, limit is now " + MAX_MESSAGE_LENGTH + "\"},\"results\":[]}", true);
-						}
-						catch (IOException e) {
-							// TODO Auto-generated catch block
-							e.printStackTrace();
-						}
-					}
+					writeBackError(ErrNo.EINVAL.getErrorCode(), "Message too big, limit is at " + MAX_MESSAGE_LENGTH);
 
 					return;
 				}
@@ -502,7 +527,7 @@ public class WebsocketEndpoint extends Endpoint {
 
 			// Parse incoming command
 			try {
-				if ("alien.shell.commands.JSONPrintWriter".equals(this.out.getClass().getCanonicalName())) {
+				if (jsonWriter) {
 					fullCmd = parseJSON(text);
 				}
 				else if ("alien.shell.commands.JShPrintWriter".equals(this.out.getClass().getCanonicalName())) {
@@ -554,18 +579,15 @@ public class WebsocketEndpoint extends Endpoint {
 				jsonObject = (JSONObject) pobj;
 			}
 			catch (@SuppressWarnings("unused") final ParseException e) {
-				synchronized (remoteEndpointBasic) {
-					remoteEndpointBasic.sendText("{\"metadata\":{\"exitcode\":\"-1\",\"error\":\"Incoming JSON not ok\"},\"results\":[]}", true);
-				}
+				writeBackError(ErrNo.EINVAL.getErrorCode(), "Incoming JSON is not ok");
+
 				throw new IllegalArgumentException();
 			}
 
 			// Filter out cp commands
 			if ("cp".equals(jsonObject.get("command").toString())) {
-				synchronized (remoteEndpointBasic) {
-					remoteEndpointBasic.sendText(
-							"{\"metadata\":{\"exitcode\":\"-1\",\"error\":\"'cp' grid command is not implemented. Please use native client's Cp() method\"},\"results\":[]}", true);
-				}
+				writeBackError(ErrNo.EINVAL.getErrorCode(), "'cp' grid command is not implemented. Please use native client's Cp() method");
+
 				throw new IllegalArgumentException();
 			}
 
