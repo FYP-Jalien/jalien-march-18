@@ -132,7 +132,7 @@ public class JAliEnCOMMander implements Runnable {
 			"df", "du", "fquota", "jquota",
 			"listSEs", "listSEDistance", "setSite", "testSE", "listTransfer", "uuid", "stat", "xrdstat", "randomPFNs", "resyncLDAP", "optimiserLogs",
 			"showTagValue",
-			"time", "timing", "commandlist", "motd", "ping", "version",
+			"time", "timing", "commandlist", "motd", "ping", "version", "echo",
 			"whoami", "user", "whois", "groups", "token",
 			"lfnexpiretime"
 	};
