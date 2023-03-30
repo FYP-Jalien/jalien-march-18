@@ -226,6 +226,12 @@ public class XmlCollection extends LinkedHashSet<LFN> {
 							value(st);
 					}
 
+					if (lowner == null || group == null || perm == null) {
+						// incomplete details, have to load the content from the catalogue
+						lfnsToGetReal.add(lfn);
+						continue;
+					}
+
 					final LFN l = new LFN(lfn);
 
 					if (time != null)
@@ -262,6 +268,12 @@ public class XmlCollection extends LinkedHashSet<LFN> {
 					l.guidtime = guidtime;
 					l.replicated = Utils.stringToBool(replicated, false);
 					l.exists = true;
+
+					if (l.type == 'f' && l.guid == null) {
+						// another case where something is incomplete, for all files we should have the GUID. If unknown, use the catalogue information.
+						lfnsToGetReal.add(lfn);
+						continue;
+					}
 
 					if (!this.add(l))
 						logger.log(Level.WARNING, "Failed to add " + lfn + " to collection " + this.collectionName);
