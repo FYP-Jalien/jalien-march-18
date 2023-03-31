@@ -206,11 +206,11 @@ public class XmlCollection extends LinkedHashSet<LFN> {
 							guid = value(st);
 						else if (tok.equals("perm="))
 							perm = value(st);
-						else if (tok.equals("entryId="))
+						else if (tok.equalsIgnoreCase("entryid="))
 							entryId = value(st);
 						else if (tok.equals("dir="))
 							dir = value(st);
-						else if (tok.equals("jobId="))
+						else if (tok.equalsIgnoreCase("jobid="))
 							jobId = value(st);
 						else if (tok.equals("broken="))
 							broken = value(st);
