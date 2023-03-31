@@ -384,7 +384,7 @@ public class XmlCollection extends LinkedHashSet<LFN> {
 		return command;
 	}
 
-	private static final SimpleDateFormat ALIEN_TIME_FORMAT = new SimpleDateFormat("yyyy-MM-dd hh:mm:ss");
+	private static final SimpleDateFormat ALIEN_TIME_FORMAT = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
 
 	private static String formatTimestamp(final Date d) {
 		if (d == null)
