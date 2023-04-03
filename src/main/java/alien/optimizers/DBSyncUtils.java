@@ -173,7 +173,7 @@ public class DBSyncUtils {
 				logger.log(Level.SEVERE, "Could not get the last updated logs from the OPTIMIZERS db");
 				return "ERROR in getting last log";
 			}
-			if (db.count() <= 0)
+			if (!db.moveNext())
 				return "Introduced class (" + classname + ") did not match any of the contained in the database or allowed patterns";
 
 			final Date lastRan = new Date(db.getl("lastUpdate"));
