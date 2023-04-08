@@ -6,6 +6,7 @@ package alien.api.catalogue;
 import java.util.Arrays;
 import java.util.List;
 
+import alien.api.Cacheable;
 import alien.api.Request;
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
@@ -16,7 +17,7 @@ import lazyj.DBFunctions;
  * @author costing
  * @since Jun 22, 2021
  */
-public class SetAliEnv extends Request {
+public class SetAliEnv extends Request implements Cacheable {
 	private static final long serialVersionUID = 3114356348162956273L;
 
 	private static final Monitor monitor = MonitorFactory.getMonitor(SetAliEnv.class.getCanonicalName());
@@ -60,5 +61,15 @@ public class SetAliEnv extends Request {
 	@Override
 	public List<String> getArguments() {
 		return Arrays.asList(packageNames, keyModifier, cachedAliEnvOutput);
+	}
+
+	@Override
+	public String getKey() {
+		return packageNames + "#" + keyModifier;
+	}
+
+	@Override
+	public long getTimeout() {
+		return 1000 * 60 * 15;
 	}
 }
