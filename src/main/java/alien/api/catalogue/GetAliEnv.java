@@ -48,7 +48,12 @@ public class GetAliEnv extends Request implements Cacheable {
 	public void run() {
 		try (DBFunctions db = ConfigUtils.getDB("admin")) {
 			if (db != null) {
-				db.query("SELECT cachedOutput FROM alienv_cache WHERE packageNames=? AND keyModifier=? AND expires>UNIX_TIMESTAMP();", false, packageNames, keyModifier);
+				db.setQueryTimeout(15);
+				if (!db.query("SELECT cachedOutput FROM alienv_cache WHERE packageNames=? AND keyModifier=? AND expires>UNIX_TIMESTAMP();", false, packageNames, keyModifier)) {
+					cachedAliEnvOutput = null;
+					monitor.incrementCounter("alienv_query_error");
+					return;
+				}
 
 				if (db.moveNext()) {
 					cachedAliEnvOutput = db.gets(1);
@@ -72,7 +77,7 @@ public class GetAliEnv extends Request implements Cacheable {
 
 	@Override
 	public long getTimeout() {
-		return 1000 * 60 * 60;
+		return 1000 * 60 * (cachedAliEnvOutput != null ? 60 : 0);
 	}
 
 	@Override

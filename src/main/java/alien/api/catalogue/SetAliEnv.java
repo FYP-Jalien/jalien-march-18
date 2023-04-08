@@ -25,6 +25,7 @@ public class SetAliEnv extends Request implements Cacheable {
 	private final String packageNames;
 	private final String keyModifier;
 	private String cachedAliEnvOutput;
+	private transient boolean queryOk = false;
 
 	/**
 	 * @param packageNames list of package names
@@ -49,7 +50,10 @@ public class SetAliEnv extends Request implements Cacheable {
 	@Override
 	public void run() {
 		try (DBFunctions db = ConfigUtils.getDB("admin")) {
-			db.query("replace into alienv_cache (packageNames, keyModifier, expires, cachedOutput) values (?, ?, UNIX_TIMESTAMP()+60*60*12, ?);", false, packageNames, keyModifier, cachedAliEnvOutput);
+			db.setQueryTimeout(5);
+			if (db.query("replace into alienv_cache (packageNames, keyModifier, expires, cachedOutput) values (?, ?, UNIX_TIMESTAMP()+60*60*12, ?);", false, packageNames, keyModifier,
+					cachedAliEnvOutput))
+				queryOk = true;
 		}
 
 		monitor.incrementCounter("alienv_cache_set");
@@ -70,6 +74,6 @@ public class SetAliEnv extends Request implements Cacheable {
 
 	@Override
 	public long getTimeout() {
-		return 1000 * 60 * 15;
+		return 1000 * 60 * (queryOk ? 15 : 0);
 	}
 }
