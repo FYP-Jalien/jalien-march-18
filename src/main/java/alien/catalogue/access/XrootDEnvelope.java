@@ -182,7 +182,9 @@ public class XrootDEnvelope implements Serializable {
 						se = value;
 				}
 
-				final GUID g = GUIDUtils.getGUID(UUID.fromString(guid), true);
+				// The actual GUID object is dropped anyway so there is no need to do DB queries for this, like:
+				// GUIDUtils.getGUID(UUID.fromString(guid), true);
+				final GUID g = new GUID(UUID.fromString(guid));
 
 				g.md5 = md5;
 				g.size = size;
