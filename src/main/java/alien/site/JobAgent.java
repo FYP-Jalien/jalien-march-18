@@ -139,6 +139,7 @@ public class JobAgent implements Runnable {
 	private long lastHeartbeat = 0;
 	private long jobStartupTime;
 	private final Containerizer containerizer = ContainerizerFactory.getContainerizer();
+	private boolean checkCoreUsingJava = true;
 
 	private enum jaStatus {
 		/**
@@ -1427,34 +1428,9 @@ public class JobAgent implements Runnable {
 			return "Job was killed";
 
 		// Also check for core directories, and abort if found to avoid filling up disk space
-		final Pattern coreDirPattern = Pattern.compile("^(?!.*\\.inp).*core.*$");
-		try {
-			List<File> coreDirs = Files.walk(new File(jobWorkdir).toPath())
-					.map(Path::toFile)
-					.filter(file -> coreDirPattern.matcher(file.getName()).matches())
-					.collect(Collectors.toList());
-
-			if (coreDirs != null && coreDirs.size() != 0)
-				return "Core directory detected: " + coreDirs.get(0).getName() + ". Aborting!";
-		}
-		catch (Exception e1) {
-			logger.log(Level.WARNING, "Exception while checking for core directories: ", e1);
-
-			logger.log(Level.INFO, "Attempting core check using shell instead");
-
-			String cmd = "find -name 'core*' ! -name '*.inp'";
-
-			CommandOutput output = SystemCommand.bash(cmd,true);
-
-			try (BufferedReader br = output.reader()) {
-				String readArg = br.readLine();
-				if (readArg != null && !readArg.isBlank() && readArg.contains("core"))
-					return "Core directory detected: " + output + ". Aborting!";
-			}
-			catch (Exception e2) {
-				logger.log(Level.WARNING, "Exception while checking for core directories using shell: ", e2);
-			}
-		}
+		final String coreDir = checkForCoreDirectories(checkCoreUsingJava);
+		if (coreDir != null)
+			return "Core directory detected: " + coreDir + ". Aborting!";
 
 		String error = null;
 		// logger.log(Level.INFO, "Checking resources usage");
@@ -1814,6 +1790,48 @@ public class JobAgent implements Runnable {
 		synchronized (notificationEndpoint) {
 			notificationEndpoint.notifyAll();
 		}
+	}
+
+	/**
+	 * 
+	 * Checks for the presence of core directories, either through Java or shell
+	 * 
+	 * @param checkUsingJava
+	 * @return name of dir if found, and null otherwise
+	 */
+	private final String checkForCoreDirectories(boolean checkUsingJava) {
+		if (checkUsingJava) {
+			final Pattern coreDirPattern = Pattern.compile("^(?!.*\\.inp).*core.*$");
+			try {
+				List<File> coreDirs = Files.walk(new File(jobWorkdir).toPath())
+						.map(Path::toFile)
+						.filter(file -> coreDirPattern.matcher(file.getName()).matches())
+						.collect(Collectors.toList());
+
+				if (coreDirs != null && coreDirs.size() != 0)
+					return coreDirs.get(0).getName();
+			}
+			catch (Exception e1) {
+				logger.log(Level.WARNING, "Exception while checking for core directories: ", e1);
+				logger.log(Level.INFO, "Switching to core check using shell instead");
+
+				checkCoreUsingJava = false;
+			}
+		}
+		else {
+			String cmd = "find -name 'core*' ! -name '*.inp'";
+			CommandOutput output = SystemCommand.bash(cmd, true);
+
+			try (BufferedReader br = output.reader()) {
+				String readArg = br.readLine();
+				if (readArg != null && !readArg.isBlank() && readArg.contains("core"))
+					return output.toString();
+			}
+			catch (Exception e2) {
+				logger.log(Level.WARNING, "Exception while checking for core directories using shell: ", e2);
+			}
+		}
+		return null;
 	}
 
 	/**
