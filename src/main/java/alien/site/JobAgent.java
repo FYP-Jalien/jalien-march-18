@@ -1428,9 +1428,17 @@ public class JobAgent implements Runnable {
 			return "Job was killed";
 
 		// Also check for core directories, and abort if found to avoid filling up disk space
-		final String coreDir = checkForCoreDirectories(checkCoreUsingJava);
-		if (coreDir != null)
-			return "Core directory detected: " + coreDir + ". Aborting!";
+		try {
+			final String coreDir = checkForCoreDirectories(checkCoreUsingJava);
+			if (coreDir != null)
+				return "Core directory detected: " + coreDir + ". Aborting!";
+		}
+		catch (final Exception e1) {
+			logger.log(Level.WARNING, "Exception while checking for core directories: ", e1);
+			logger.log(Level.INFO, "Switching to core check using shell instead");
+
+			checkCoreUsingJava = false;
+		}
 
 		String error = null;
 		// logger.log(Level.INFO, "Checking resources usage");
@@ -1799,24 +1807,16 @@ public class JobAgent implements Runnable {
 	 * @param checkUsingJava
 	 * @return name of dir if found, and null otherwise
 	 */
-	private final String checkForCoreDirectories(boolean checkUsingJava) {
+	private final String checkForCoreDirectories(boolean checkUsingJava) throws IOException {
 		if (checkUsingJava) {
 			final Pattern coreDirPattern = Pattern.compile("^(?!.*\\.inp).*core.*$");
-			try {
-				List<File> coreDirs = Files.walk(new File(jobWorkdir).toPath())
-						.map(Path::toFile)
-						.filter(file -> coreDirPattern.matcher(file.getName()).matches())
-						.collect(Collectors.toList());
+			List<File> coreDirs = Files.walk(new File(jobWorkdir).toPath())
+					.map(Path::toFile)
+					.filter(file -> coreDirPattern.matcher(file.getName()).matches())
+					.collect(Collectors.toList());
 
-				if (coreDirs != null && coreDirs.size() != 0)
-					return coreDirs.get(0).getName();
-			}
-			catch (Exception e1) {
-				logger.log(Level.WARNING, "Exception while checking for core directories: ", e1);
-				logger.log(Level.INFO, "Switching to core check using shell instead");
-
-				checkCoreUsingJava = false;
-			}
+			if (coreDirs != null && coreDirs.size() != 0)
+				return coreDirs.get(0).getName();
 		}
 		else {
 			String cmd = "find -name 'core*' ! -name '*.inp'";
