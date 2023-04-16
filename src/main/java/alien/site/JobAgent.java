@@ -1030,6 +1030,7 @@ public class JobAgent implements Runnable {
 		}
 		catch (final IOException | UncheckedIOException e) {
 			logger.log(Level.WARNING, "Error deleting the job workdir, using system commands instead", e);
+			logger.log(Level.INFO, "Proceeding to attempt deleting the following dir using system commands: " + tempDir.getAbsolutePath());
 
 			final CommandOutput rmOutput = SystemCommand.executeCommand(Arrays.asList("rm", "-rf", tempDir.getAbsolutePath()), true);
 
