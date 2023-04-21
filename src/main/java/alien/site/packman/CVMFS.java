@@ -247,13 +247,6 @@ public class CVMFS extends PackMan {
 	}
 
 	/**
-	 * @return path to Singularity runtime in CVMFS
-	 */
-	public static String getSingularityPath() {
-		return CVMFS_BASE_DIR + "/containers/bin/singularity/current/bin";
-	}
-
-	/**
 	 * @return path to Podman runtime in CVMFS
 	 */
 	public static String getPodmanPath() {
