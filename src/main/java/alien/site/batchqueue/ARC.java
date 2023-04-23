@@ -522,7 +522,7 @@ public class ARC extends BatchQueue {
 					final String fk = Objects.toString(e.next());
 
 					for (final String ce : ce_list) {
-						final String s = ce.replaceAll(":.*", ":2811");
+						final String s = ce.replaceAll(":.*", ":");
 						final Pattern pSite = Pattern.compile(s);
 						final Matcher m = pSite.matcher(fk);
 
@@ -603,7 +603,7 @@ public class ARC extends BatchQueue {
 				continue;
 			}
 
-			final String ce = url.replaceAll("^[^:]*:?/*([^:/]+).*", "$1");
+			final String ce = url.replaceAll("^([^:.]+:/*)?([^:/]+).*", "$2");
 			final String name = share.replaceAll(".*:", "");
 
 			final Integer cr = running.get(ce);
