@@ -99,9 +99,7 @@ public class JobAgent implements Runnable {
 	private File tempDir;
 	private File jobTmpDir;
 	private static final String defaultOutputDirPrefix = "/alien-job-";
-	private static final String jobWrapperLogName = "jalien-jobwrapper.log";
 	private String jobWorkdir;
-	private String jobWrapperLogDir;
 	private final String jobstatusFile = ".jalienJobstatus";
 	private final String siteSonarUrl = "http://alimonitor.cern.ch/sitesonar/";
 	private final Charset charSet = StandardCharsets.UTF_8;
@@ -653,8 +651,6 @@ public class JobAgent implements Runnable {
 				putJobTrace("Error. Workdir for job could not be created");
 				return;
 			}
-			
-			jobWrapperLogDir = jobWorkdir + "/" + jobWrapperLogName;
 
 			logger.log(Level.INFO, "Started JA with: " + jdl);
 
@@ -709,7 +705,7 @@ public class JobAgent implements Runnable {
 					i++;
 				else if (cmdCheck[i].contains("alien.site.JobRunner") || cmdCheck[i].contains("alien.site.JobAgent")) {
 					launchCmd.add("-Djobagent.vmid=" + queueId);
-					launchCmd.add("-Djava.util.logging.SimpleFormatter.format='JobID " + queueId + ": %1$tb %1$td, %1$tY %1$tH:%1$tM:%1$tS %2$s %n%4$s: %5$s%6$s%n'");
+					launchCmd.add("-DAliEnConfig=.");
 					launchCmd.add("-cp");
 					launchCmd.add(jarPath + jarName);
 					launchCmd.add("alien.site.JobWrapper");
@@ -1117,7 +1113,7 @@ public class JobAgent implements Runnable {
 
 		String cmd = "taskset -p $$ | cut -d' ' -f6";
 
-		CommandOutput output = SystemCommand.bash(cmd,true);
+		CommandOutput output = SystemCommand.bash(cmd, true);
 
 		try (BufferedReader br = output.reader()) {
 			String readArg;
@@ -1689,21 +1685,15 @@ public class JobAgent implements Runnable {
 
 			props = ep.getProperties();
 
-			props.setProperty("java.util.logging.FileHandler.pattern", jobWrapperLogDir);
-
 			logger.log(Level.INFO, "Logging properties loaded for the JobWrapper");
 		}
 		catch (@SuppressWarnings("unused") final Exception e) {
-
+			// JA doesn't have any logging defined, thus will log to stderr. JW inherits stderr and will log to it as well.
 			logger.log(Level.INFO, "Logging properties for JobWrapper not found.");
 			logger.log(Level.INFO, "Using fallback logging configurations for JobWrapper");
 
-			props.put("handlers", "java.util.logging.FileHandler");
-			props.put("java.util.logging.FileHandler.pattern", jobWrapperLogDir);
-			props.put("java.util.logging.FileHandler.limit", "0");
-			props.put("java.util.logging.FileHandler.count", "1");
-			props.put("alien.log.WarningFileHandler.append", "true");
-			props.put("java.util.logging.FileHandler.formatter", "java.util.logging.SimpleFormatter");
+			props.put("handlers", "java.util.logging.ConsoleHandler");
+			props.put("java.util.logging.SimpleFormatter.format", "JobID " + queueId + ": %1$tb %1$td, %1$tY %1$tH:%1$tM:%1$tS %2$s %n%4$s: %5$s%6$s%n");
 			props.put(".level", "INFO");
 			props.put("lia.level", "WARNING");
 			props.put("lazyj.level", "WARNING");
