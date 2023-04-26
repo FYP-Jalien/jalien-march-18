@@ -518,7 +518,7 @@ public final class ComputingElement extends Thread {
 		else
 			javaDir = CVMFS.getJava32Dir() + "/";
 
-		final String javaCmd = "java -client -Xms16M -Xmx128M -Djdk.lang.Process.launchMechanism=vfork -cp";
+		final String javaCmd = "java -client -Xms16M -Xmx128M -Djdk.lang.Process.launchMechanism=vfork -XX:+UseSerialGC -cp";
 		final String jarDir = "$(dirname $(which jalien))/../lib";
 		final String jarAndClass = "/alien-users.jar alien.site.JobRunner";
 
