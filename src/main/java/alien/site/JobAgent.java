@@ -965,7 +965,7 @@ public class JobAgent implements Runnable {
 			logger.log(Level.INFO, "All done for job " + queueId + ". Final status: " + getWrapperJobStatus());
 			putJobTrace("JobWrapper exit code: " + code);
 			if (code != 0)
-				logger.log(Level.WARNING, "Error encountered: see the JobWrapper logs in: " + env.getOrDefault("TMPDIR", "/tmp") + "/jalien-jobwrapper.log " + " for more details");
+				logger.log(Level.WARNING, "Error encountered in the JobWrapper process");
 
 			if (code == 137)
 				putJobTrace("Warning: job killed due to OOM.");
@@ -1795,8 +1795,9 @@ public class JobAgent implements Runnable {
 	 * 
 	 * Checks for the presence of core directories, either through Java or shell
 	 * 
-	 * @param checkUsingJava
+	 * @param checkUsingJava will use shell instead of Java on false
 	 * @return name of dir if found, and null otherwise
+	 * @throws IOException for errors using Java check
 	 */
 	private final String checkForCoreDirectories(boolean checkUsingJava) throws IOException {
 		if (checkUsingJava) {

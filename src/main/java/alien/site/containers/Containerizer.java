@@ -37,12 +37,12 @@ public abstract class Containerizer {
 	/**
 	 * Working directory
 	 */
-	String workdir = null;
+	protected String workdir = null;
 
 	/**
 	 * Directories to bind-mount for GPU
 	 */
-	String gpuDirs = "";
+	protected String gpuDirs = "";
 
 	/**
 	 * Debug cmd to run
