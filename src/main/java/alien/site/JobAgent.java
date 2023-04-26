@@ -1987,7 +1987,9 @@ public class JobAgent implements Runnable {
 				for (int i = 0; i < probeList.size(); i++) {
 					String testName = (String) probeList.get(i);
 					JSONObject testOutput = runProbe(testName);
-					uploadResults(nodeHostName, alienSiteName, testName, testOutput);
+					
+					if (testOutput!=null)
+						uploadResults(nodeHostName, alienSiteName, testName, testOutput);
 				}
 			}
 			else {
@@ -2147,7 +2149,7 @@ public class JobAgent implements Runnable {
 					try {
 						testOutputJson = (JSONObject) jsonParser.parse(output.toString());
 					}
-					catch (ParseException e) {
+					catch (ParseException | ClassCastException e) {
 						logger.log(Level.SEVERE, "Failed to parse the output of probe " + probeName + " in node " + hostName, e);
 					}
 				}
@@ -2158,8 +2160,9 @@ public class JobAgent implements Runnable {
 				testOutputJson.put("EXITCODE", Integer.valueOf(pTimeout.exitValue()));
 			}
 		}
-		catch (final IOException | InterruptedException e) {
+		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Error while running the probe " + probeName + " in node" + hostName, e);
+			return null;
 		}
 		return testOutputJson;
 	}
