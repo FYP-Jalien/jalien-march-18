@@ -482,6 +482,9 @@ public class ARC extends BatchQueue {
 					final Attribute url = attrs.get("GLUE2EndpointURL");
 					final String url_v = Objects.toString(url.get());
 					urls.put(ep_v, url_v);
+
+					logger.fine("==> ep=" + ep_v + " url=" + url_v);
+
 					continue;
 				}
 
@@ -494,6 +497,9 @@ public class ARC extends BatchQueue {
 
 					final String fKey_v = Objects.toString(fKey.get());
 					shares.add(fKey_v);
+
+					logger.fine("==> map fk=" + fKey_v);
+
 					continue;
 				}
 
@@ -509,6 +515,8 @@ public class ARC extends BatchQueue {
 
 				final String share_v = Objects.toString(share.get());
 
+				logger.fine("==> share=" + share_v);
+
 				final Attribute fKeys = attrs.get("GLUE2ComputingShareComputingEndpointForeignKey");
 
 				if (fKeys == null) {
@@ -521,10 +529,14 @@ public class ARC extends BatchQueue {
 				while (e.hasMore()) {
 					final String fk = Objects.toString(e.next());
 
+					logger.fine("===> ep fk=" + fk);
+
 					for (final String ce : ce_list) {
 						final String s = ce.replaceAll(":.*", ":");
-						final Pattern pSite = Pattern.compile(s);
-						final Matcher m = pSite.matcher(fk);
+						final Pattern pCE = Pattern.compile(s);
+						final Matcher m = pCE.matcher(fk);
+
+						logger.fine("====> ce=" + s);
 
 						//
 						// skip endpoints outside of our CE list,
@@ -535,6 +547,9 @@ public class ARC extends BatchQueue {
 						if (m.find()) {
 							endp.put(share_v, fk);
 							found = true;
+
+							logger.fine("====> found=true");
+
 							break;
 						}
 					}
@@ -550,6 +565,9 @@ public class ARC extends BatchQueue {
 
 				final Attribute r = attrs.get("GLUE2ComputingShareRunningJobs");
 				final Attribute w = attrs.get("GLUE2ComputingShareWaitingJobs");
+
+				logger.fine("==> r=" + (r == null ? "null" : "obj"));
+				logger.fine("==> w=" + (w == null ? "null" : "obj"));
 
 				running_on_share.put(share_v, r == null ? null : r.get());
 				waiting_on_share.put(share_v, w == null ? null : w.get());
@@ -576,18 +594,39 @@ public class ARC extends BatchQueue {
 		for (final String share : shares) {
 			final String ep = endp.get(share);
 
+			logger.fine("--> share=" + share);
+
 			if (ep == null) {
 				continue;
 			}
 
-			final String url = urls.get(ep);
+			logger.fine("---> ep=" + ep);
+
+			String url = urls.get(ep);
 
 			if (url == null) {
-				continue;
+				//
+				// workaround for https://bugzilla.nordugrid.org/show_bug.cgi?id=4116
+				//
+
+				final String hack = ep.replaceAll(":emies:", ":rest:");
+
+				url = urls.get(hack);
+
+				if (url == null) {
+					continue;
+				}
+
+				logger.fine("---> workaround match");
 			}
+
+			logger.fine("---> url=" + url);
 
 			final Object r_obj = running_on_share.get(share);
 			final Object w_obj = waiting_on_share.get(share);
+
+			logger.fine("---> r_obj=" + (r_obj == null ? "null" : "obj"));
+			logger.fine("---> w_obj=" + (w_obj == null ? "null" : "obj"));
 
 			if (r_obj == null || w_obj == null) {
 				continue;
@@ -603,8 +642,13 @@ public class ARC extends BatchQueue {
 				continue;
 			}
 
+			logger.fine("---> r=" + (r == null ? "null" : r_obj.toString()));
+			logger.fine("---> w=" + (w == null ? "null" : w_obj.toString()));
+
 			final String ce = url.replaceAll("^([^:.]+:/*)?([^:/]+).*", "$2");
 			final String name = share.replaceAll(".*:", "");
+
+			logger.fine("---> ce=" + ce + " name=" + name);
 
 			final Integer cr = running.get(ce);
 			final Integer cw = waiting.get(ce);
