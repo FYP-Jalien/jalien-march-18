@@ -513,10 +513,10 @@ public final class ComputingElement extends Thread {
 
 	private static String getStartup() {
 		final String javaDir;
-		if (ConfigUtils.getConfiguration("version").getb("jdk64", false))
-			javaDir = "";
-		else
+		if (!ConfigUtils.getConfiguration("version").getb("jdk64", false))
 			javaDir = CVMFS.getJava32Dir() + "/";
+		else
+			javaDir = "";
 
 		final String javaCmd = "java -client -Xms16M -Xmx128M -Djdk.lang.Process.launchMechanism=vfork -XX:+UseSerialGC -cp";
 		final String jarDir = "$(dirname $(which jalien))/../lib";
