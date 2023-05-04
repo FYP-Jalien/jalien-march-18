@@ -30,12 +30,12 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 	/**
 	 * id of the job to get the JDL for
 	 */
-	private long getJDL = 0;
+	private boolean getJDL = false;
 
 	/**
 	 * id of the job to get the trace for
 	 */
-	private long getTrace = 0;
+	private boolean getTrace = false;
 
 	private final Set<JobStatus> states = new HashSet<>();
 
@@ -105,57 +105,30 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 
 	@Override
 	public void run() {
-		if (getJDL != 0) {
-			final String jdl = commander.q_api.getJDL(getJDL, true);
-			if (jdl != null) {
-				if (commander.bColour)
-					commander.printOutln(ShellColor.jobStateRed() + jdl + ShellColor.reset());
-				else
-					commander.printOutln(jdl);
+		if (users.size() == 0)
+			users.add(commander.getUsername());
 
-				commander.printOut("id", String.valueOf(getJDL));
-				commander.printOut("jdl", jdl);
-			}
-		}
-		else if (getTrace > 0) {
-			final String tracelog = commander.q_api.getTraceLog(getTrace);
+		final List<Job> ps = commander.q_api.getPS(states, users, sites, nodes, mjobs, jobid, orderByKey, limit);
 
-			if (tracelog != null && !tracelog.isBlank()) {
-				if (commander.bColour)
-					commander.printOutln(ShellColor.jobStateBlue() + tracelog + ShellColor.reset());
-				else
-					commander.printOutln(tracelog);
+		if (ps != null)
+			for (final Job j : ps) {
+				commander.outNextResult();
+				final String owner = (j.getOwner() != null) ? j.getOwner() : "";
 
-				commander.printOut("id", String.valueOf(getJDL));
-				commander.printOut("trace", tracelog);
-			}
-			else
-				commander.setReturnCode(ErrNo.ENODATA, "No trace information for " + getTrace);
-		}
-		else {
-			if (users.size() == 0)
-				users.add(commander.getUsername());
+				final String name = (j.name != null) ? j.name.substring(j.name.lastIndexOf('/') + 1) : "";
 
-			final List<Job> ps = commander.q_api.getPS(states, users, sites, nodes, mjobs, jobid, orderByKey, limit);
+				commander.printOut("owner", owner);
+				commander.printOut("id", String.valueOf(j.queueId));
+				commander.printOut("split", String.valueOf(j.split));
+				commander.printOut("priority", String.valueOf(j.priority));
+				commander.printOut("status", j.status().toString());
+				commander.printOut("name", name);
 
-			if (ps != null)
-				for (final Job j : ps) {
-					commander.outNextResult();
-					final String owner = (j.getOwner() != null) ? j.getOwner() : "";
-
+				if (!getTrace && !getJDL) {
 					final String jId = commander.bColour ? ShellColor.bold() + j.queueId + ShellColor.reset() : String.valueOf(j.queueId);
 
-					final String name = (j.name != null) ? j.name.substring(j.name.lastIndexOf('/') + 1) : "";
-
-					commander.printOut("owner", owner);
-					commander.printOut("id", String.valueOf(j.queueId));
-					commander.printOut("split", String.valueOf(j.split));
-					commander.printOut("priority", String.valueOf(j.priority));
-					commander.printOut("status", j.status().toString());
-					commander.printOut("name", name);
-
 					if (bIDOnly) {
-						commander.printOutln(String.valueOf(j.queueId));
+						commander.printOutln(jId);
 					}
 					else if (bL) {
 						final String site = (j.site != null) ? j.site : "";
@@ -173,7 +146,36 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 								+ abbrvStatus(j.status()) + padSpace(2) + padLeft(String.valueOf(name), 32));
 					}
 				}
-		}
+
+				if (getTrace) {
+					final String tracelog = commander.q_api.getTraceLog(j.queueId);
+
+					if (tracelog != null && !tracelog.isBlank()) {
+						if (commander.bColour)
+							commander.printOutln(ShellColor.jobStateBlue() + tracelog + ShellColor.reset());
+						else
+							commander.printOutln(tracelog);
+
+						commander.printOut("trace", tracelog);
+					}
+					else
+						commander.setReturnCode(ErrNo.ENODATA, "No trace information for " + j.queueId);
+				}
+
+				if (getJDL) {
+					final String jdl = commander.q_api.getJDL(j.queueId, true);
+					if (jdl != null) {
+						if (commander.bColour)
+							commander.printOutln(ShellColor.jobStateRed() + jdl + ShellColor.reset());
+						else
+							commander.printOutln(jdl);
+
+						commander.printOut("jdl", jdl);
+					}
+					else
+						commander.setReturnCode(ErrNo.ENODATA, "JDL of " + j.queueId + " could not be retrieved");
+				}
+			}
 	}
 
 	private String printPriority(final JobStatus status, final int priority) {
@@ -459,8 +461,9 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 		commander.printOutln(helpOption("-a", "select jobs of all users"));
 		commander.printOutln(helpOption("-b", "do only black-white output"));
 		commander.printOutln(helpOption("-jdl <jobid>", "display the job jdl"));
-		commander.printOutln(helpOption("-trace <jobid> <tag>*", "display the job trace information"));
+		commander.printOutln(helpOption("-trace <jobid>", "display the job trace information"));
 		commander.printOutln(helpOption("-id", "only list the matching job IDs, for batch processing (implies -b)"));
+		commander.printOutln(helpOption("-q", "quiet, no user printable output, API function only"));
 		commander.printOutln();
 	}
 
@@ -501,7 +504,7 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 			parser.accepts("o").withRequiredArg();
 			parser.accepts("j").withRequiredArg();
 			parser.accepts("l").withRequiredArg().ofType(Integer.class);
-			parser.accepts("q").withRequiredArg();
+			parser.accepts("q").withOptionalArg();
 
 			parser.accepts("M");
 			parser.accepts("X");
@@ -510,137 +513,152 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 			parser.accepts("E");
 			parser.accepts("a");
 			parser.accepts("b");
-			parser.accepts("jdl").withRequiredArg().ofType(Long.class);
-			parser.accepts("trace").withRequiredArg().ofType(Long.class);
+			parser.accepts("jdl").withOptionalArg().ofType(Long.class);
+			parser.accepts("trace").withOptionalArg().ofType(Long.class);
 			parser.accepts("id");
 
 			final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
 
-			if (options.has("jdl") && options.hasArgument("jdl"))
-				try {
-					getJDL = ((Long) options.valueOf("jdl")).longValue();
-				}
-				catch (@SuppressWarnings("unused") final NumberFormatException e) {
-					commander.setReturnCode(ErrNo.EILSEQ, "Illegal job ID " + options.valueOf("jdl"));
-					getJDL = -1;
-				}
-			else if (options.has("trace") && options.hasArgument("trace"))
-				try {
-					getTrace = ((Long) options.valueOf("trace")).longValue();
-				}
-				catch (@SuppressWarnings("unused") final NumberFormatException e) {
-					commander.setReturnCode(ErrNo.EILSEQ, "Illegal job ID " + options.valueOf("trace"));
-					getTrace = -1;
-				}
-			else {
-				if (options.has("s") && options.hasArgument("s")) {
-					final StringTokenizer st = new StringTokenizer((String) options.valueOf("s"), ",");
-					while (st.hasMoreTokens())
-						sites.add(st.nextToken());
+			if (options.has("s") && options.hasArgument("s")) {
+				final StringTokenizer st = new StringTokenizer((String) options.valueOf("s"), ",");
+				while (st.hasMoreTokens())
+					sites.add(st.nextToken());
 
-					states.add(JobStatus.ANY);
-				}
+				states.add(JobStatus.ANY);
+			}
 
-				if (options.has("n") && options.hasArgument("n")) {
-					final StringTokenizer st = new StringTokenizer((String) options.valueOf("n"), ",");
-					while (st.hasMoreTokens())
-						nodes.add(st.nextToken());
-					states.add(JobStatus.ANY);
-				}
+			if (options.has("n") && options.hasArgument("n")) {
+				final StringTokenizer st = new StringTokenizer((String) options.valueOf("n"), ",");
+				while (st.hasMoreTokens())
+					nodes.add(st.nextToken());
+				states.add(JobStatus.ANY);
+			}
 
-				if (options.has("m") && options.hasArgument("m")) {
-					final StringTokenizer st = new StringTokenizer((String) options.valueOf("m"), ",");
+			if (options.has("m") && options.hasArgument("m")) {
+				final StringTokenizer st = new StringTokenizer((String) options.valueOf("m"), ",");
 
-					while (st.hasMoreTokens())
-						try {
-							mjobs.add(Long.valueOf(st.nextToken()));
-						}
-						catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
-							// ignore
-						}
-
-					states.add(JobStatus.ANY);
-				}
-
-				if (options.has("j") && options.hasArgument("j")) {
-					final StringTokenizer st = new StringTokenizer((String) options.valueOf("j"), ",");
-					while (st.hasMoreTokens())
-						try {
-							jobid.add(Long.valueOf(st.nextToken()));
-						}
-						catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
-							// ignore
-						}
-					states.add(JobStatus.ANY);
-					users.add("%");
-				}
-
-				if (options.has("X")) {
-					bL = true;
-
-					states.clear();
-
-					states.addAll(flag_r());
-					states.addAll(flag_s());
-				}
-
-				if (options.has("E")) {
-					states.addAll(flag_f());
-					users.add(commander.getUsername());
-				}
-
-				if (options.has("W")) {
-					states.addAll(flag_s());
-					users.add(commander.getUsername());
-				}
-
-				if (options.has("f") && options.hasArgument("f")) {
-					states.clear();
-
-					decodeFlagsAndStates((String) options.valueOf("f"));
-				}
-
-				if (options.has("u") && options.hasArgument("u")) {
-					final StringTokenizer st = new StringTokenizer((String) options.valueOf("u"), ",");
-					while (st.hasMoreTokens())
-						users.add(st.nextToken());
-				}
-
-				if (options.has("l") && options.hasArgument("l"))
+				while (st.hasMoreTokens())
 					try {
-						final int lim = ((Integer) options.valueOf("l")).intValue();
-						if (lim > 0)
-							limit = lim;
+						mjobs.add(Long.valueOf(st.nextToken()));
 					}
-					catch (@SuppressWarnings("unused") final NumberFormatException e) {
+					catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
 						// ignore
 					}
 
-				if (options.has("Fl") || options.has("L") || (options.has("F") && "l".equals(options.valueOf("F"))))
-					bL = true;
+				states.add(JobStatus.ANY);
+			}
 
-				if ((options.has("o") && options.hasArgument("o")))
-					orderByKey = (String) options.valueOf("o");
+			if (options.has("j") && options.hasArgument("j")) {
+				final StringTokenizer st = new StringTokenizer((String) options.valueOf("j"), ",");
+				while (st.hasMoreTokens())
+					try {
+						jobid.add(Long.valueOf(st.nextToken()));
+					}
+					catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
+						// ignore
+					}
+			}
 
-				//
-				// case 'M':
-				// st_masterjobs = "\\\\0";
+			if (options.has("X")) {
+				bL = true;
 
-				if (options.has("A")) {
-					states.clear();
-					states.add(JobStatus.ANY);
-					users.add(commander.getUsername());
+				states.clear();
+
+				states.addAll(flag_r());
+				states.addAll(flag_s());
+			}
+
+			if (options.has("E")) {
+				states.addAll(flag_f());
+				users.add(commander.getUsername());
+			}
+
+			if (options.has("W")) {
+				states.addAll(flag_s());
+				users.add(commander.getUsername());
+			}
+
+			if (options.has("f") && options.hasArgument("f")) {
+				states.clear();
+
+				decodeFlagsAndStates((String) options.valueOf("f"));
+			}
+
+			if (options.has("u") && options.hasArgument("u")) {
+				final StringTokenizer st = new StringTokenizer((String) options.valueOf("u"), ",");
+				while (st.hasMoreTokens())
+					users.add(st.nextToken());
+			}
+
+			if (options.has("l") && options.hasArgument("l"))
+				try {
+					final int lim = ((Integer) options.valueOf("l")).intValue();
+					if (lim > 0)
+						limit = lim;
+				}
+				catch (@SuppressWarnings("unused") final NumberFormatException e) {
+					// ignore
 				}
 
-				if (options.has("M")) {
-					mjobs.clear();
-					mjobs.add(Long.valueOf(0));
-				}
+			if (options.has("Fl") || options.has("L") || (options.has("F") && "l".equals(options.valueOf("F"))))
+				bL = true;
 
-				if (options.has("a")) {
-					users.clear();
-					users.add("%");
+			if ((options.has("o") && options.hasArgument("o")))
+				orderByKey = (String) options.valueOf("o");
+
+			//
+			// case 'M':
+			// st_masterjobs = "\\\\0";
+
+			if (options.has("A")) {
+				states.clear();
+				states.add(JobStatus.ANY);
+				users.add(commander.getUsername());
+			}
+
+			if (options.has("M")) {
+				mjobs.clear();
+				mjobs.add(Long.valueOf(0));
+			}
+
+			if (options.has("a")) {
+				users.clear();
+				users.add("%");
+			}
+
+			if (options.has("jdl")) {
+				getJDL = true;
+				if (options.hasArgument("jdl")) {
+					jobid.clear();
+					try {
+						jobid.add((Long) options.valueOf("jdl"));
+					}
+					catch (@SuppressWarnings("unused") final NumberFormatException e) {
+						commander.setReturnCode(ErrNo.EILSEQ, "Illegal job ID " + options.valueOf("jdl"));
+					}
 				}
+				else if (jobid.size() == 0)
+					commander.setReturnCode(ErrNo.EINVAL, "No job IDs to get the JDL for");
+			}
+
+			if (options.has("trace")) {
+				getTrace = true;
+				if (options.hasArgument("trace")) {
+					jobid.clear();
+					try {
+						jobid.add((Long) options.valueOf("trace"));
+					}
+					catch (@SuppressWarnings("unused") final NumberFormatException e) {
+						commander.setReturnCode(ErrNo.EILSEQ, "Illegal job ID " + options.valueOf("trace"));
+					}
+				}
+				else if (jobid.size() == 0)
+					commander.setReturnCode(ErrNo.EINVAL, "No job IDs to get the trace for");
+			}
+
+			if (jobid.size() > 0) {
+				states.add(JobStatus.ANY);
+				users.add("%");
 			}
 
 			bIDOnly = options.has("id");
@@ -648,7 +666,9 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 			if (options.has("b") || bIDOnly)
 				commander.bColour = false;
 		}
-		catch (final OptionException e) {
+		catch (
+
+		final OptionException e) {
 			commander.setReturnCode(ErrNo.EINVAL, e.getMessage());
 			setArgumentsOk(false);
 		}
