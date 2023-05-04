@@ -147,8 +147,8 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 
 					final String name = (j.name != null) ? j.name.substring(j.name.lastIndexOf('/') + 1) : "";
 
-					commander.printOut("owner ", owner);
-					commander.printOut("id ", String.valueOf(j.queueId));
+					commander.printOut("owner", owner);
+					commander.printOut("id", String.valueOf(j.queueId));
 					commander.printOut("split", String.valueOf(j.split));
 					commander.printOut("priority", String.valueOf(j.priority));
 					commander.printOut("status", j.status().toString());
@@ -161,7 +161,7 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 						final String site = (j.site != null) ? j.site : "";
 						final String node = (j.node != null) ? j.node : "";
 
-						commander.printOut("site ", site);
+						commander.printOut("site", site);
 						commander.printOut("node", node);
 
 						commander.printOutln(padLeft(String.valueOf(owner), 10) + padSpace(4) + padLeft(jId, 10) + padSpace(2) + printPriority(j.status(), j.priority) + padSpace(2)
