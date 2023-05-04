@@ -1000,7 +1000,7 @@ public class JobAgent implements Runnable {
 					putJobTrace("ERROR: The JobWrapper was killed during saving");
 					changeJobStatus(JobStatus.ERROR_SV, null); // JobWrapper was killed during saving
 				}
-				else if (endState.isBlank()) {
+				else {
 					putJobTrace("ERROR: The JobWrapper was killed before job start");
 					changeJobStatus(JobStatus.ERROR_IB, null); // JobWrapper was killed before payload start
 				}
