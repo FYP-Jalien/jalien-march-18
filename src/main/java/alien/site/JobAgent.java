@@ -527,7 +527,7 @@ public class JobAgent implements Runnable {
 					logger.log(Level.WARNING, "Unable to check for AVX support", ex);
 				}
 
-				if (env.containsKey("ALIENV_ERRORS") && containerizer == null) {
+				if ((env.containsKey("ALIENV_ERRORS") || env.containsKey("XRDCP_ERRORS")) && containerizer == null) {
 					logger.log(Level.SEVERE, "The environment on this node appears to be broken. Please do \"" + CVMFS.getAlienvPrint() + "\" for more debug info.");
 					throw new EOFException("Job matching aborted due to potentially misconfigured environment");
 				}

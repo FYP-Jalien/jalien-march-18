@@ -459,6 +459,8 @@ public final class ComputingElement extends Thread {
 
 		before += "source <( echo $ALIENV ); " + "\n";
 
+		before += "export XRDCP_ERRORS=$(xrdcp 2> >(if grep -q 'error while loading'; then echo 'TRUE'; fi;) ) " + "\n";
+
 		before += "export JALIEN_JOBAGENT_CMD=\"" + getStartup() + "\"\n";
 
 		final String content_str = before + "eval $JALIEN_JOBAGENT_CMD" + "\n" + startup_customization(2);
