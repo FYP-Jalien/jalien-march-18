@@ -422,4 +422,11 @@ public class LDAPHelper {
 		return LDAPHelper.checkLdapTree("(&(objectClass=AliEnVOConfig))", "ou=Config,");
 	}
 
+	/**
+	 * Force a cache refresh to get the latest values from LDAP
+	 */
+	public static void invalidateCache() {
+		cache.refresh();
+		cacheTree.refresh();
+	}
 }

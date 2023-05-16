@@ -127,6 +127,8 @@ public class ResyncLDAP extends Optimizer {
 	 * @param admindb Database instance for USERS_LDAP and USERS_LDAP_ROLE tables
 	 */
 	private static void resyncLDAP() {
+		LDAPHelper.invalidateCache();
+		
 		final int frequency = 3600 * 1000; // 1 hour default
 		logOutput = "";
 
