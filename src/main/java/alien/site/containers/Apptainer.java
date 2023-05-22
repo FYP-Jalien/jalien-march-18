@@ -9,7 +9,7 @@ import java.util.List;
 public class Apptainer extends Containerizer {
 
 	@Override
-	public List<String> containerize(final String cmd, boolean containall) {
+	public List<String> containerize(final String cmd) {
 		final List<String> apptainerCmd = new ArrayList<>();
 		apptainerCmd.add(getBinPath());
 		apptainerCmd.add("exec");
@@ -44,14 +44,9 @@ public class Apptainer extends Containerizer {
 
 		apptainerCmd.add(containerImgPath);
 		apptainerCmd.add("/bin/bash");
+		apptainerCmd.add("-c");
+		apptainerCmd.add(envSetup + debugCmd + cmd);
 
-		if (containall) {
-			apptainerCmd.add("-c");
-			apptainerCmd.add(envSetup + debugCmd + cmd);
-		}
-		else
-			apptainerCmd.add(debugCmd + cmd);
-	
 		return apptainerCmd;
 	}
 

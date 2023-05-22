@@ -45,8 +45,6 @@ import alien.monitoring.Timing;
 import alien.se.SE;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.shell.commands.JAliEnCommandcp;
-import alien.site.containers.Containerizer;
-import alien.site.containers.ContainerizerFactory;
 import alien.site.packman.CVMFS;
 import alien.site.packman.PackMan;
 import alien.taskQueue.JDL;
@@ -408,7 +406,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		logger.log(Level.INFO, "Starting execution of command: " + command);
 
-		List<String> cmd = new LinkedList<>();
+		final List<String> cmd = new LinkedList<>();
 
 		boolean trackTime = false;
 		try {
@@ -455,12 +453,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		cmd.add("echo");
 		cmd.add("payload-" + queueId);
 
-		final Containerizer containerizer = ContainerizerFactory.getContainerizer();
-		if (containerizer != null)
-			cmd = containerizer.containerize(String.join(" ", cmd), false);
-
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
-	
+
 		final ProcessBuilder pBuilder = new ProcessBuilder(new String[] {"bash", "-c",  String.join(" ", cmd)});
 
 		final Map<String, String> processEnv = pBuilder.environment();

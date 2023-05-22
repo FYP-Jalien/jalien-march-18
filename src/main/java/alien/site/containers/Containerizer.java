@@ -192,18 +192,7 @@ public abstract class Containerizer {
 	 * @param cmd
 	 * @return parameter
 	 */
-	public List<String> containerize(String cmd){
-		return containerize(cmd, true);
-	}
-
-	/**
-	* Decorating arguments to run the given command under a container. Returns a
-	* list for use with ProcessBuilders
-	*
-	* @param cmd
-	* @return parameter
-	*/
-   public abstract List<String> containerize(String cmd, boolean containall);
+	public abstract List<String> containerize(String cmd);
 
 	/**
 	 * Decorating arguments to run the given command under a container. Returns a
