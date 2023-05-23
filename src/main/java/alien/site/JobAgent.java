@@ -1002,7 +1002,8 @@ public class JobAgent implements Runnable {
 				}
 				else {
 					putJobTrace("ERROR: The JobWrapper was killed before job start");
-					changeJobStatus(JobStatus.ERROR_IB, null); // JobWrapper was killed before payload start
+					if(endState.isBlank())
+						changeJobStatus(JobStatus.ERROR_IB, null); // JobWrapper was killed before payload start
 				}
 			}
 		}
@@ -1736,7 +1737,7 @@ public class JobAgent implements Runnable {
 		}
 		catch (final IOException e) {
 			logger.log(Level.WARNING, "Attempt to read job status failed. Ignoring: " + e.toString());
-			return "Unread";
+			return "";
 		}
 	}
 
