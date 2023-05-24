@@ -101,16 +101,17 @@ public abstract class Containerizer {
 		final String javaTest = "java -version && ps --version";
 		try {
 			CommandOutput output = SystemCommand.executeCommand(containerize(javaTest), true);
-			BufferedReader br = output.reader();
-			final String outputString = br.lines().collect(Collectors.joining());
-			if (outputString != null && !outputString.isBlank()) {
-				if (!outputString.contains("ps from"))
-					useGpu = false;
-				if (!outputString.contains("Runtime"))
+			try (BufferedReader br = output.reader()) {
+				final String outputString = br.lines().collect(Collectors.joining());
+				if (outputString != null && !outputString.isBlank()) {
+					if (!outputString.contains("ps from"))
+						useGpu = false;
+					if (!outputString.contains("Runtime"))
+						return false;
+				}
+				else
 					return false;
 			}
-			else
-				return false;
 		}
 		catch (final Exception e) {
 			logger.log(Level.WARNING, "Failed to start container: " + e.toString());
@@ -151,7 +152,6 @@ public abstract class Containerizer {
 		return useCgroupsv2;
 	}
 
-
 	/**
 	 * @return String representing supported GPUs by the system. Will contain either 'nvidia[0-9]' (Nvidia), 'kfd' (AMD), or none.
 	 */
@@ -159,7 +159,7 @@ public abstract class Containerizer {
 		final Pattern p = Pattern.compile("^nvidia\\d+$");
 		String[] names = new File("/dev").list((dir, name) -> name.equals("kfd") || p.matcher(name).matches());
 
-		if (names.length == 0)
+		if (names == null || names.length == 0)
 			useGpu = false;
 
 		return String.join(",", names);
@@ -181,6 +181,9 @@ public abstract class Containerizer {
 		return toBind;
 	}
 
+	/**
+	 * @return the value of the $ADDITIONAL_BINDS env variable
+	 */
 	public static final String getCustomBinds() {
 		return System.getenv().getOrDefault("ADDITIONAL_BINDS", "").isBlank() ? "" : System.getenv().get("ADDITIONAL_BINDS") + ",";
 	}
@@ -229,7 +232,7 @@ public abstract class Containerizer {
 	/**
 	 * Memlimit for container
 	 * 
-	 * @param memLimit
+	 * @param newMemLimit
 	 * @return true/false depending on if limit will be applied (requires cgroupsv2)
 	 */
 	public boolean setMemLimit(final int newMemLimit) {
@@ -259,7 +262,7 @@ public abstract class Containerizer {
 			}
 		}
 		catch (final Exception e) {
-			logger.log(Level.WARNING, "Unable to parse debugTag: " + debugTag);
+			logger.log(Level.WARNING, "Unable to parse debugTag: " + debugTag, e);
 		}
 	}
 
