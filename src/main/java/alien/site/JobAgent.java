@@ -499,7 +499,7 @@ public class JobAgent implements Runnable {
 					System.exit(0);
 				}
 			}
-			catch (InterruptedException e1) {
+			catch (@SuppressWarnings("unused") InterruptedException e1) {
 				// ignore
 			}
 		}
@@ -1634,14 +1634,23 @@ public class JobAgent implements Runnable {
 		return space;
 	}
 
+	/**
+	 * @return job ID being processed
+	 */
 	public long getQueueId() {
 		return this.queueId;
 	}
 
+	/**
+	 * @return resubmission counter
+	 */
 	public int getResubmission() {
 		return this.resubmission;
 	}
 
+	/**
+	 * @return payload process ID
+	 */
 	public int getChildPID() {
 		return this.childPID;
 	}

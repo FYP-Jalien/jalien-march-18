@@ -455,7 +455,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
 
-		final ProcessBuilder pBuilder = new ProcessBuilder(new String[] {"bash", "-c",  String.join(" ", cmd)});
+		final ProcessBuilder pBuilder = new ProcessBuilder(new String[] { "bash", "-c", String.join(" ", cmd) });
 
 		final Map<String, String> processEnv = pBuilder.environment();
 		final HashMap<String, String> jBoxEnv = ConfigUtils.exportJBoxVariables();
@@ -1230,12 +1230,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			for (final String entry : Arrays.asList("stdout", "stderr")) {
 				final File logFile = new File(currentDir.getAbsolutePath() + "/" + entry);
 				if (logFile.exists()) {
-					try (final FileChannel out = new FileOutputStream(logFile, true).getChannel()) {
+					try (final FileOutputStream fos = new FileOutputStream(logFile, true); final FileChannel out = fos.getChannel()) {
 						if (Files.size(logFile.toPath()) > 1073741824L) {
 							out.truncate(1073741824L);
 						}
 					}
-					catch (Exception e) {
+					catch (@SuppressWarnings("unused") Exception e) {
 						// ignore
 					}
 				}
