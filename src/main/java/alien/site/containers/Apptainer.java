@@ -45,8 +45,8 @@ public class Apptainer extends Containerizer {
 		apptainerCmd.add(containerImgPath);
 		apptainerCmd.add("/bin/bash");
 
+		apptainerCmd.add("-c");
 		if (containall) {
-			apptainerCmd.add("-c");
 			apptainerCmd.add(envSetup + debugCmd + cmd);
 		}
 		else
