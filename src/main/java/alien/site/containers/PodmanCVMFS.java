@@ -11,7 +11,7 @@ import alien.site.packman.CVMFS;
 public class PodmanCVMFS extends Containerizer {
 
 	@Override
-	public List<String> containerize(final String cmd, boolean containall) {
+	public List<String> containerize(final String cmd) {
 		final List<String> podmanCmd = new ArrayList<>();
 		podmanCmd.add(CVMFS.getPodmanPath() + "/" + "podman");
 		podmanCmd.add("run");

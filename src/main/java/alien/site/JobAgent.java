@@ -499,7 +499,7 @@ public class JobAgent implements Runnable {
 					System.exit(0);
 				}
 			}
-			catch (InterruptedException e1) {
+			catch (@SuppressWarnings("unused") InterruptedException e1) {
 				// ignore
 			}
 		}
@@ -1002,7 +1002,8 @@ public class JobAgent implements Runnable {
 				}
 				else {
 					putJobTrace("ERROR: The JobWrapper was killed before job start");
-					changeJobStatus(JobStatus.ERROR_IB, null); // JobWrapper was killed before payload start
+					if(endState.isBlank())
+						changeJobStatus(JobStatus.ERROR_IB, null); // JobWrapper was killed before payload start
 				}
 			}
 		}
@@ -1633,14 +1634,23 @@ public class JobAgent implements Runnable {
 		return space;
 	}
 
+	/**
+	 * @return job ID being processed
+	 */
 	public long getQueueId() {
 		return this.queueId;
 	}
 
+	/**
+	 * @return resubmission counter
+	 */
 	public int getResubmission() {
 		return this.resubmission;
 	}
 
+	/**
+	 * @return payload process ID
+	 */
 	public int getChildPID() {
 		return this.childPID;
 	}
@@ -1736,7 +1746,7 @@ public class JobAgent implements Runnable {
 		}
 		catch (final IOException e) {
 			logger.log(Level.WARNING, "Attempt to read job status failed. Ignoring: " + e.toString());
-			return "Unread";
+			return "";
 		}
 	}
 

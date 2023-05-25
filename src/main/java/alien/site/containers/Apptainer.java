@@ -24,7 +24,7 @@ public class Apptainer extends Containerizer {
 		}
 
 		apptainerCmd.add("-B");
-		if(workdir != null) {
+		if (workdir != null) {
 			apptainerCmd.add(getCustomBinds() + getGPUdirs() + "/cvmfs:/cvmfs," + workdir + ":" + CONTAINER_JOBDIR + "," + workdir + "/tmp:/tmp");
 			apptainerCmd.add("--pwd");
 			apptainerCmd.add(CONTAINER_JOBDIR);
@@ -44,6 +44,8 @@ public class Apptainer extends Containerizer {
 
 		apptainerCmd.add(containerImgPath);
 		apptainerCmd.add("/bin/bash");
+		apptainerCmd.add("-c");
+		apptainerCmd.add(envSetup + debugCmd + cmd);
 
 		apptainerCmd.add("-c");
 		if (containall) {
@@ -55,7 +57,11 @@ public class Apptainer extends Containerizer {
 		return apptainerCmd;
 	}
 
-	public String getBinPath() {
+	/**
+	 * @return apptainer command to execute, default simply "apptainer" but can be overriden with the $FORCE_BINPATH environment variable
+	 */
+	@SuppressWarnings("static-method")
+	protected String getBinPath() {
 		return System.getenv().getOrDefault("FORCE_BINPATH", "apptainer");
 	}
 }

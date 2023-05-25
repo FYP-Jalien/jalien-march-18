@@ -9,7 +9,7 @@ import java.util.List;
 public class Podman extends Containerizer {
 
 	@Override
-	public List<String> containerize(final String cmd, boolean containall) {
+	public List<String> containerize(final String cmd) {
 		final List<String> podmanCmd = new ArrayList<>();
 		podmanCmd.add("podman");
 		podmanCmd.add("run");

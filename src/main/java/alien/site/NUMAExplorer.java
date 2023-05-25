@@ -22,6 +22,9 @@ import alien.taskQueue.TaskQueueUtils;
 import alien.shell.commands.JAliEnCOMMander;
 import apmon.MonitoredJob;
 
+/**
+ * @author Marta
+ */
 public class NUMAExplorer {
 
 	/**
@@ -37,7 +40,7 @@ public class NUMAExplorer {
 	HashMap<Integer, Integer> jobToNuma;
 	static HashMap<Integer, byte[]> JAToMask;
 	static int[] usedCPUs;
-	HashMap<Integer,JobAgent> activeJAInstances;
+	HashMap<Integer, JobAgent> activeJAInstances;
 
 	// Initial host structure
 	int numCPUs;
@@ -47,6 +50,9 @@ public class NUMAExplorer {
 	HashMap<Integer, Integer> divisionedNUMA;
 	HashMap<Integer, Long> coresPerJob;
 
+	/**
+	 * @param numCPUs
+	 */
 	public NUMAExplorer(int numCPUs) {
 		this.numCPUs = numCPUs;
 		availablePerNode = new HashMap<>();
@@ -110,14 +116,15 @@ public class NUMAExplorer {
 												i += 1;
 											}
 											cpuRange = buildCPURange(initMask, wholeNode, subcounter, rangeArray);
-										} else if (matcher2.matches()) {
+										}
+										else if (matcher2.matches()) {
 											logger.log(Level.INFO, "CPU listing in form of comma-sepparated cores " + range);
 											String[] cores = range.split(",");
 											int[] rangeArray = new int[cores.length];
 											int i = 0;
 											for (String core : cores) {
 												rangeArray[i] = Integer.parseInt(core);
-												i +=1;
+												i += 1;
 											}
 											cpuRange = buildCPURange(initMask, wholeNode, subcounter, rangeArray);
 										}
@@ -130,7 +137,8 @@ public class NUMAExplorer {
 											divisionedNUMA.put(Integer.valueOf(subcounter), Integer.valueOf(numaId));
 											structurePerNode.put(Integer.valueOf(subcounter), cpuRange);
 											initialStructurePerNode.put(Integer.valueOf(subcounter), cpuRange.clone());
-											logger.log(Level.INFO, "Filling initial structure of sub-node counter " + subcounter + " and mask " + getMaskString(initialStructurePerNode.get(Integer.valueOf(subcounter))));
+											logger.log(Level.INFO, "Filling initial structure of sub-node counter " + subcounter + " and mask "
+													+ getMaskString(initialStructurePerNode.get(Integer.valueOf(subcounter))));
 											int coreCount = countAvailableCores(cpuRange);
 											availablePerNode.put(Integer.valueOf(subcounter), Integer.valueOf(coreCount));
 											initialAvailablePerNode.put(Integer.valueOf(subcounter), Integer.valueOf(coreCount));
@@ -166,7 +174,8 @@ public class NUMAExplorer {
 			if (wholeNode == false && initMask[core] == 1) {
 				cpuRange[core] = 0;
 				usedCPUs[core] = -1;
-			} else
+			}
+			else
 				cpuRange[core] = 1;
 		}
 		return cpuRange;
@@ -179,7 +188,8 @@ public class NUMAExplorer {
 			if (wholeNode == false && initMask[core] == 1) {
 				cpuRange[core] = 0;
 				usedCPUs[core] = -1;
-			} else
+			}
+			else
 				cpuRange[core] = 1;
 			coresPerNode.put(Integer.valueOf(core), Integer.valueOf(0));
 		}
@@ -222,7 +232,8 @@ public class NUMAExplorer {
 		int numaNode = getNumaNode(reqCPU, System.currentTimeMillis(), null, availablePerNode);
 		if (numaNode < 0) {
 			finalMask = getPartitionedMask(reqCPU, 0, structurePerNode, availablePerNode, null, -1, true);
-		} else {
+		}
+		else {
 			byte[] availableMask = structurePerNode.get(Integer.valueOf(numaNode));
 			finalMask = buildFinalMask(availableMask, reqCPU, 0, availablePerNode, structurePerNode, null, true);
 		}
@@ -299,15 +310,16 @@ public class NUMAExplorer {
 	private byte[] extendFinalMask(byte[] finalMask, int jobNumber) {
 		byte[] extendedFinalMask = finalMask.clone();
 
-		HashMap<Integer,byte[]> masksToPin = new HashMap<>();
+		HashMap<Integer, byte[]> masksToPin = new HashMap<>();
 		for (Integer job : coresPerJob.keySet()) {
 			byte[] newMask = new byte[numCPUs];
 			for (int i = 0; i < usedCPUs.length; i++) {
-				if ((usedCPUs[i] == job.intValue() || usedCPUs[i] == 0) && (jobToNuma.get(job) == Integer.valueOf(-1) || divisionedNUMA.get(coresPerNode.get(Integer.valueOf(i))) == divisionedNUMA.get(jobToNuma.get(job))))
+				if ((usedCPUs[i] == job.intValue() || usedCPUs[i] == 0)
+						&& (Integer.valueOf(-1).equals(jobToNuma.get(job)) || divisionedNUMA.get(coresPerNode.get(Integer.valueOf(i))).equals(divisionedNUMA.get(jobToNuma.get(job)))))
 					newMask[i] = 1;
 			}
 
-			if (job == Integer.valueOf(jobNumber))
+			if (Integer.valueOf(jobNumber).equals(job))
 				extendedFinalMask = newMask;
 
 			masksToPin.put(job, newMask);
@@ -362,7 +374,7 @@ public class NUMAExplorer {
 	 *
 	 * @param masksToPin
 	 */
-	private void isolateJobs(HashMap<Integer,byte[]> masksToPin, boolean maskExtension) {
+	private void isolateJobs(HashMap<Integer, byte[]> masksToPin, boolean maskExtension) {
 		for (Integer jobId : masksToPin.keySet()) {
 			if (!Arrays.equals(JAToMask.get(jobId), masksToPin.get(jobId))) {
 				if (activeJAInstances.get(jobId) != null) {
@@ -431,7 +443,8 @@ public class NUMAExplorer {
 		}
 	}
 
-	private byte[] getPartitionedMask(Long reqCPU, int jobNumber, HashMap<Integer, byte[]> structure, HashMap<Integer, Integer> available, int[] auxUsedCPUs, int prevAbsoluteNuma, boolean initAssignment) {
+	private byte[] getPartitionedMask(Long reqCPU, int jobNumber, HashMap<Integer, byte[]> structure, HashMap<Integer, Integer> available, int[] auxUsedCPUs, int prevAbsoluteNuma,
+			boolean initAssignment) {
 		byte[] finalMask;
 		logger.log(Level.INFO, "Computing a partitioned mask for job " + jobNumber);
 		HashMap<Integer, Long> freeOnNuma = new HashMap<>();
@@ -459,7 +472,7 @@ public class NUMAExplorer {
 		}
 		if (availableCores >= reqCPU.intValue()) {
 			for (int i = 0; i < divisionedNUMA.keySet().size(); i++) {
-				if (divisionedNUMA.get(Integer.valueOf(i)) == freestIdx) {
+				if (divisionedNUMA.get(Integer.valueOf(i)).equals(freestIdx)) {
 					availableMask = addPinnedCores(structure.get(Integer.valueOf(i)), availableMask);
 				}
 			}
@@ -517,7 +530,7 @@ public class NUMAExplorer {
 	private int[] rearrangeCores(int newJobNumber, Long newReqCPU) {
 		logger.log(Level.INFO, "Starting job CPU cores rearrangement");
 		coresPerJob.put(Integer.valueOf(newJobNumber), newReqCPU);
-		//Init structures of node structure
+		// Init structures of node structure
 		int[] auxUsedCPUs = new int[numCPUs];
 
 		HashMap<Integer, Integer> auxAvailablePerNode = new HashMap<>();
@@ -540,7 +553,8 @@ public class NUMAExplorer {
 			if (numaNode < 0) {
 				if (previousNuma != null && previousNuma.intValue() < 0) {
 					getPartitionedMask(reqCPU, jobNumber, auxStructurePerNode, auxAvailablePerNode, auxUsedCPUs, previousNuma.intValue(), false);
-				} else
+				}
+				else
 					getPartitionedMask(reqCPU, jobNumber, auxStructurePerNode, auxAvailablePerNode, auxUsedCPUs, numaNode, false);
 			}
 			else {
@@ -557,7 +571,8 @@ public class NUMAExplorer {
 		return auxUsedCPUs;
 	}
 
-	private byte[] buildFinalMask(byte[] availableMask, Long reqCPU, int jobNumber, HashMap<Integer, Integer> available, HashMap<Integer, byte[]> structure, int[] auxUsedCPUs, boolean initAssignment) {
+	private byte[] buildFinalMask(byte[] availableMask, Long reqCPU, int jobNumber, HashMap<Integer, Integer> available, HashMap<Integer, byte[]> structure, int[] auxUsedCPUs,
+			boolean initAssignment) {
 		int remainingCPU = reqCPU.intValue();
 		byte[] finalMask = new byte[numCPUs];
 		boolean assignmentDone = false;
@@ -604,6 +619,9 @@ public class NUMAExplorer {
 		return out;
 	}
 
+	/**
+	 * @return cores map
+	 */
 	public static int[] getUsedCPUs() {
 		return usedCPUs;
 	}

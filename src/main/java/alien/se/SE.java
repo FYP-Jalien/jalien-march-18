@@ -520,7 +520,7 @@ public class SE implements Serializable, Comparable<SE> {
 				return Double.parseDouble(factor);
 			}
 			catch (NumberFormatException nfe) {
-				logger.log(Level.WARNING, "Replication factor is not a number for " + seName);
+				logger.log(Level.WARNING, "Replication factor is not a number for " + seName, nfe);
 			}
 		}
 
