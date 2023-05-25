@@ -32,7 +32,7 @@ public abstract class Containerizer {
 	/**
 	 * Location of the container
 	 */
-	protected String containerImgPath;
+	protected static String containerImgPath = System.getenv().getOrDefault("JOB_CONTAINER_PATH", DEFAULT_JOB_CONTAINER_PATH);
 
 	/**
 	 * Working directory
@@ -79,13 +79,12 @@ public abstract class Containerizer {
 	/**
 	 * Command to set the environment for container
 	 */
-	protected static final String envSetup = "source <( " + CVMFS.getAlienvPrint() + apmonConfig + cudaDevices + rocrDevices + " ); ";
+	protected static final String envSetup = "source <( " + CVMFS.getAlienvPrint() + apmonConfig + cudaDevices + rocrDevices + " && echo export JOB_CONTAINER_PATH=" + containerImgPath + " ); ";
 
 	/**
 	 * Simple constructor, initializing the container path from default location or from config/environment (DEFAULT_JOB_CONTAINER_PATH key)
 	 */
 	public Containerizer() {
-		containerImgPath = System.getenv().getOrDefault("JOB_CONTAINER_PATH", DEFAULT_JOB_CONTAINER_PATH);
 		if (!containerImgPath.equals(DEFAULT_JOB_CONTAINER_PATH)) {
 			logger.log(Level.INFO, "Custom JOB_CONTAINER_PATH set. Will use the following image instead: " + containerImgPath);
 		}
