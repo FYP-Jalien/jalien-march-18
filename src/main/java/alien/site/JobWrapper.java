@@ -63,7 +63,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	// Folders and files
 	private final File currentDir = new File(Paths.get(".").toAbsolutePath().normalize().toString());
 	private final String tmpDir = currentDir + "/tmp";
-	private final String timeFile = ".jalienTimes";
+	private final String timeFilePrefix = ".jalienTimes";
 	private final String jobstatusFile = ".jalienJobstatus";
 	private String defaultOutputDirPrefix;
 
@@ -422,7 +422,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			cmd.add("/usr/bin/time");
 			cmd.add("-p");
 			cmd.add("-o");
-			cmd.add(tmpDir + "/" + timeFile + "-" + executionType);
+			cmd.add(tmpDir + "/" + timeFilePrefix + "-" + queueId + "-" + executionType);
 		}
 
 		final int idx = command.lastIndexOf('/');
@@ -448,14 +448,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					while (st.hasMoreTokens())
 						cmd.add(st.nextToken());
 				}
-
-		cmd.add("&&");
-		cmd.add("echo");
-		cmd.add("payload-" + queueId);
-
+		
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
-
-		final ProcessBuilder pBuilder = new ProcessBuilder(new String[] { "bash", "-c", String.join(" ", cmd) });
+	
+		final ProcessBuilder pBuilder = new ProcessBuilder(cmd);
 
 		final Map<String, String> processEnv = pBuilder.environment();
 		final HashMap<String, String> jBoxEnv = ConfigUtils.exportJBoxVariables();
@@ -527,7 +523,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (trackTime) {
 			try {
 
-				putJobLog("proc", "Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFile + "-" + executionType)).replace("\n", ", "));
+				putJobLog("proc", "Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFilePrefix + "-" + queueId + "-" + executionType)).replace("\n", ", "));
 			}
 			catch (@SuppressWarnings("unused") final Exception te) {
 				// Ignore
