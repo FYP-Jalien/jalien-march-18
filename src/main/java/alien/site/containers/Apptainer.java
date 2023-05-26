@@ -13,7 +13,9 @@ public class Apptainer extends Containerizer {
 		final List<String> apptainerCmd = new ArrayList<>();
 		apptainerCmd.add(getBinPath());
 		apptainerCmd.add("exec");
-		apptainerCmd.add("-C");
+
+		if(containall)
+			apptainerCmd.add("-C");
 
 		if (useGpu) {
 			final String gpuString = getGPUString();
