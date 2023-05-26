@@ -9,7 +9,7 @@ import java.util.List;
 public class Docker extends Containerizer {
 
 	@Override
-	public List<String> containerize(final String cmd, boolean containall) {
+	public List<String> containerize(final String cmd) {
 		final List<String> dockerCmd = new ArrayList<>();
 		dockerCmd.add("docker");
 		dockerCmd.add("run");

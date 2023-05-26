@@ -9,6 +9,10 @@ import java.util.List;
 public class Apptainer extends Containerizer {
 
 	@Override
+	public List<String> containerize(final String cmd) {
+		return containerize(cmd, true);
+	}
+
 	public List<String> containerize(final String cmd, boolean containall) {
 		final List<String> apptainerCmd = new ArrayList<>();
 		apptainerCmd.add(getBinPath());
