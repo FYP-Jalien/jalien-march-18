@@ -114,7 +114,7 @@ public abstract class Containerizer {
 			}
 		}
 		catch (final Exception e) {
-			logger.log(Level.WARNING, "Failed to start container: " + e.toString());
+			logger.log(Level.WARNING, "The following containers appear to be unsupported: " + this.getClass().getSimpleName());
 			return false;
 		}
 		return true;
