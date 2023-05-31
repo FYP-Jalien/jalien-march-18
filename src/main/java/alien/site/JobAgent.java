@@ -969,9 +969,6 @@ public class JobAgent implements Runnable {
 			if (code != 0)
 				logger.log(Level.WARNING, "Error encountered in the JobWrapper process");
 
-			if (code == 137)
-				putJobTrace("Warning: job killed due to OOM.");
-
 			return code;
 		}
 		catch (Exception ex) {

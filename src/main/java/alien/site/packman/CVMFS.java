@@ -44,6 +44,7 @@ public class CVMFS extends PackMan {
 	 */
 	private final static String CVMFS_BASE_DIR = "/cvmfs/alice.cern.ch";
 	private final static String JAVA32_DIR = CVMFS_BASE_DIR + "/java/JDKs/i686/jdk-latest/bin";
+	private final static String JAVA64_DIR = CVMFS_BASE_DIR + "/java/JDKs/x86_64/jdk-latest/bin";
 	private static String ALIEN_BIN_DIR = CVMFS_BASE_DIR + "/bin";
 
 	/**
@@ -212,10 +213,17 @@ public class CVMFS extends PackMan {
 	}
 
 	/**
-	 * @return 32b JRE location in CVMFS, to be used for all WN activities due to its much lower virtual memory footprint
+	 * @return 32b JRE location in CVMFS, used for WN activities where its much lower virtual memory footprint is required
 	 */
 	public static String getJava32Dir() {
 		return JAVA32_DIR;
+	}
+
+	/**
+	 * @return 64b JRE location in CVMFS, to be used for all WN activities
+	 */
+	public static String getJava64Dir() {
+		return JAVA64_DIR;
 	}
 
 	/**
