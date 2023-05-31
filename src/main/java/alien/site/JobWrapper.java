@@ -464,8 +464,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		processEnv.putAll(environment_packages);
 		processEnv.putAll(loadJDLEnvironmentVariables());
 		processEnv.putAll(jBoxEnv);
-		processEnv.put("SINGULARITYENV_PREPEND_PATH", processEnv.get("PATH"));
-		processEnv.put("SINGULARITYENV_LD_LIBRARY_PATH", processEnv.get("LD_LIBRARY_PATH"));
+		processEnv.put("APPTAINERENV_PREPEND_PATH", processEnv.get("PATH")); // in case of nested containers
+		processEnv.put("APPTAINERENV_LD_LIBRARY_PATH", processEnv.get("LD_LIBRARY_PATH"));
 		processEnv.put("JALIEN_TOKEN_CERT", saveToFile(tokenCert));
 		processEnv.put("JALIEN_TOKEN_KEY", saveToFile(tokenKey));
 		processEnv.put("ALIEN_JOB_TOKEN", legacyToken); // add legacy token
