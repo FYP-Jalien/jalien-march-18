@@ -20,12 +20,6 @@ public class Apptainer extends Containerizer {
 
 		if (containall)
 			apptainerCmd.add("-C");
-		else {
-			apptainerCmd.add("--env");
-			apptainerCmd.add("PATH=\"" + System.getenv().get("PATH") + "\"");
-			apptainerCmd.add("--env");
-			apptainerCmd.add("LD_LIBRARY_PATH=\"" + System.getenv().get("LD_LIBRARY_PATH") + "\"");
-		}
 
 		if (useGpu) {
 			final String gpuString = getGPUString();
