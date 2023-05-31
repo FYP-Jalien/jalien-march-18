@@ -518,7 +518,7 @@ public final class ComputingElement extends Thread {
 		if (!ConfigUtils.getConfiguration("version").getb("jdk64", true))
 			javaDir = CVMFS.getJava32Dir() + "/";
 		else
-			javaDir = "";
+			javaDir = CVMFS.getJava64Dir() + "/";
 
 		final String javaCmd = "java -client -Xms16M -Xmx128M -Djdk.lang.Process.launchMechanism=vfork -XX:+UseSerialGC -cp";
 		final String jarDir = "$(dirname $(which jalien))/../lib";
