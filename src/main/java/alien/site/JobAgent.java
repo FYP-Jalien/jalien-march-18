@@ -923,7 +923,12 @@ public class JobAgent implements Runnable {
 					// set to 24
 					if ((System.currentTimeMillis() - initTimeJobInfo) > SEND_JOBINFO_INTERVAL) {
 						initTimeJobInfo = initTimeJobInfo + SEND_JOBINFO_INTERVAL;
-						apmon.sendOneJobInfo(mj, true);
+						try {
+							apmon.sendOneJobInfo(mj, true);
+						}
+						catch (NullPointerException npe) {
+							putJobTrace("Warning: monitoring appears to be broken on " + hostName + ". Cause: " + npe.getMessage());
+						}
 					}
 
 					else if (getWrapperJobStatusTimestamp() != lastStatusChange) {
