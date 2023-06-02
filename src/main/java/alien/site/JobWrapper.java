@@ -451,8 +451,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				}
 
 		final ApptainerCVMFS appt = new ApptainerCVMFS();
-		if (appt.isSupported())
+		if (appt.isSupported()) {
+			putJobTrace("Nested containers will be used for payload");
 			cmd = appt.containerize(String.join(" ", cmd), false);
+		}
 		
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
 	
