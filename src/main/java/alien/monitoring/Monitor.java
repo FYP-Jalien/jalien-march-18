@@ -89,7 +89,8 @@ public class Monitor implements Runnable {
 			hostname = "unresolved.hostname";
 
 		if (jobNumber < 0) {
-			final String pattern = MonitorFactory.getConfigString(component, "node_name", component.startsWith("alien.site.") ? "${hostname}:${uuidhash}" : "${hostname}");
+			final String pattern = MonitorFactory.getConfigString(component, "node_name",
+					(component.startsWith("alien.site.") || component.contains("JobRunner")) ? "${hostname}:${uuidhash}" : "${hostname}");
 			String temp = Format.replace(pattern, "${hostname}", hostname);
 			temp = Format.replace(temp, "${pid}", String.valueOf(MonitorFactory.getSelfProcessID()));
 			temp = Format.replace(temp, "${uuidhash}", String.valueOf(Request.getVMID().hashCode()));
