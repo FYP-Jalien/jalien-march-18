@@ -927,7 +927,7 @@ public class JobAgent implements Runnable {
 							apmon.sendOneJobInfo(mj, true);
 						}
 						catch (NullPointerException npe) {
-							putJobTrace("Fatal: ApMon is null on " + hostName + ". npe.getMessage()");
+							putJobTrace("Fatal: ApMon is null on " + hostName + ". " + npe.getMessage());
 							killForcibly(p); // Abort
 						}
 					}
@@ -1728,7 +1728,13 @@ public class JobAgent implements Runnable {
 		}
 	}
 
-	private boolean changeJobStatus(final JobStatus newStatus, final HashMap<String, Object> extrafields) {
+	private boolean changeJobStatus(final JobStatus newStatus, HashMap<String, Object> extrafields) {
+
+		if (extrafields == null) {
+			extrafields = new HashMap<>();
+			extrafields.put("exechost", siteMap.getOrDefault("CEhost", ""));
+		}
+
 		if (!TaskQueueApiUtils.setJobStatus(queueId, resubmission, newStatus, extrafields)) {
 			jobKilled = true;
 			return false;
