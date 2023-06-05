@@ -927,7 +927,8 @@ public class JobAgent implements Runnable {
 							apmon.sendOneJobInfo(mj, true);
 						}
 						catch (NullPointerException npe) {
-							putJobTrace("Warning: monitoring appears to be broken on " + hostName + ". Cause: " + npe.getMessage());
+							putJobTrace("Fatal: ApMon is null on " + hostName + ". npe.getMessage()");
+							killForcibly(p); // Abort
 						}
 					}
 
