@@ -923,7 +923,13 @@ public class JobAgent implements Runnable {
 					// set to 24
 					if ((System.currentTimeMillis() - initTimeJobInfo) > SEND_JOBINFO_INTERVAL) {
 						initTimeJobInfo = initTimeJobInfo + SEND_JOBINFO_INTERVAL;
-						apmon.sendOneJobInfo(mj, true);
+						try {
+							apmon.sendOneJobInfo(mj, true);
+						}
+						catch (NullPointerException npe) {
+							putJobTrace("Fatal: ApMon is null on " + hostName + ". " + npe.getMessage());
+							killForcibly(p); // Abort
+						}
 					}
 
 					else if (getWrapperJobStatusTimestamp() != lastStatusChange) {
@@ -1722,7 +1728,13 @@ public class JobAgent implements Runnable {
 		}
 	}
 
-	private boolean changeJobStatus(final JobStatus newStatus, final HashMap<String, Object> extrafields) {
+	private boolean changeJobStatus(final JobStatus newStatus, HashMap<String, Object> extrafields) {
+
+		if (extrafields == null) {
+			extrafields = new HashMap<>();
+			extrafields.put("exechost", siteMap.getOrDefault("CEhost", ""));
+		}
+
 		if (!TaskQueueApiUtils.setJobStatus(queueId, resubmission, newStatus, extrafields)) {
 			jobKilled = true;
 			return false;
