@@ -648,7 +648,7 @@ public class JobAgent implements Runnable {
 	private void handleJob() {
 		try {
 			if (!createWorkDir()) {
-				changeJobStatus(JobStatus.ERROR_IB, null);
+				changeJobStatus(JobStatus.ERROR_IB, -1);
 				logger.log(Level.INFO, "Error. Workdir for job could not be created");
 				putJobTrace("Error. Workdir for job could not be created");
 				return;
@@ -685,7 +685,7 @@ public class JobAgent implements Runnable {
 			// Cause of error was an unhandled exception on our end. Let's resubmit
 			logger.log(Level.INFO, "Putting job back to waiting " + queueId);
 			putJobTrace("Putting job back to waiting " + queueId);
-			changeJobStatus(JobStatus.WAITING, null);
+			changeJobStatus(JobStatus.WAITING, -1);
 		}
 	}
 
@@ -812,7 +812,7 @@ public class JobAgent implements Runnable {
 			setStatus(jaStatus.ERROR_START);
 
 			putJobTrace("Error starting JobWrapper: exception running " + launchCommand + " : " + ioe.getMessage());
-			changeJobStatus(JobStatus.ERROR_IB, null);
+			changeJobStatus(JobStatus.ERROR_IB, -1);
 
 			setUsedCores(0);
 
@@ -999,16 +999,16 @@ public class JobAgent implements Runnable {
 			if (code != 0) {
 				if ("STARTED".equals(endState) || "RUNNING".equals(endState)) {
 					putJobTrace("ERROR: The JobWrapper was killed before job could complete");
-					changeJobStatus(JobStatus.ERROR_E, null); // JobWrapper was killed before the job could be completed
+					changeJobStatus(JobStatus.ERROR_E, code); // JobWrapper was killed before the job could be completed
 				}
 				else if ("SAVING".equals(endState)) {
 					putJobTrace("ERROR: The JobWrapper was killed during saving");
-					changeJobStatus(JobStatus.ERROR_SV, null); // JobWrapper was killed during saving
+					changeJobStatus(JobStatus.ERROR_SV, code); // JobWrapper was killed during saving
 				}
 				else {
 					putJobTrace("ERROR: The JobWrapper was killed before job start");
 					if(endState.isBlank())
-						changeJobStatus(JobStatus.ERROR_IB, null); // JobWrapper was killed before payload start
+						changeJobStatus(JobStatus.ERROR_IB, code); // JobWrapper was killed before payload start
 				}
 			}
 		}
@@ -1728,12 +1728,16 @@ public class JobAgent implements Runnable {
 		}
 	}
 
-	private boolean changeJobStatus(final JobStatus newStatus, HashMap<String, Object> extrafields) {
+	private boolean changeJobStatus(final JobStatus newStatus, final int exitCode) {
+		final HashMap<String, Object> extrafields = new HashMap<>();
+		extrafields.put("exechost", siteMap.getOrDefault("CEhost", ""));
+		extrafields.put("node", hostName);
 
-		if (extrafields == null) {
-			extrafields = new HashMap<>();
-			extrafields.put("exechost", siteMap.getOrDefault("CEhost", ""));
-		}
+		if (jobWorkdir != null)
+			extrafields.put("path", jobWorkdir);
+
+		if (exitCode != 0)
+			extrafields.put("error", Integer.valueOf(exitCode));
 
 		if (!TaskQueueApiUtils.setJobStatus(queueId, resubmission, newStatus, extrafields)) {
 			jobKilled = true;
