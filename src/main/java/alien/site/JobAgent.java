@@ -605,6 +605,13 @@ public class JobAgent implements Runnable {
 			// process payload
 			handleJob();
 
+			// Resubmit if the job was never able to start
+			if ("ERROR_IB".equals(endState) || endState.isBlank()) {
+				logger.log(Level.INFO, "Putting job " + queueId + " back to waiting");
+				putJobTrace("Putting job back to waiting " + queueId);
+				changeJobStatus(JobStatus.WAITING, -1);
+			}
+
 			cleanup();
 
 			synchronized (requestSync) {
@@ -681,11 +688,6 @@ public class JobAgent implements Runnable {
 		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Unable to handle job", e);
 			putJobTrace("ERROR: Unable to handle job: " + e.toString() + " " + Arrays.toString(e.getStackTrace()));
-
-			// Cause of error was an unhandled exception on our end. Let's resubmit
-			logger.log(Level.INFO, "Putting job back to waiting " + queueId);
-			putJobTrace("Putting job back to waiting " + queueId);
-			changeJobStatus(JobStatus.WAITING, -1);
 		}
 	}
 
