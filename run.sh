@@ -1,5 +1,9 @@
 #!/bin/bash
 
+if [ ! -z "$JAVA_HOME" -a -d "$JAVA_HOME" ]; then
+    export PATH="$JAVA_HOME/bin:$PATH"
+fi
+
 JARFILE_CMD=$(echo "$@" | awk '{for ( x = 1; x <= NF; x++ ) { if ($x == "-jar") {print $(x+1)} }}') #'
 [[ ( -e "${JARFILE_CMD}" ) && ( -f "${JARFILE_CMD}" ) ]] && JARFILE="${JARFILE_CMD}"
 
