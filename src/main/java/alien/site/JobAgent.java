@@ -925,6 +925,7 @@ public class JobAgent implements Runnable {
 						initTimeJobInfo = initTimeJobInfo + SEND_JOBINFO_INTERVAL;
 						try {
 							apmon.sendOneJobInfo(mj, true);
+							monitor.sendParameter("job_id", Long.valueOf(queueId));
 						}
 						catch (NullPointerException npe) {
 							putJobTrace("Fatal: ApMon is null on " + hostName + ". " + npe.getMessage());
