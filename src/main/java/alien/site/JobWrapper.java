@@ -452,7 +452,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		final ApptainerCVMFS appt = new ApptainerCVMFS();
 		if (appt.isSupported()) {
-			putJobTrace("Nested containers will be used for payload");
+			putJobTrace("Using nested containers");
 			cmd = appt.containerize(String.join(" ", cmd), false);
 		}
 		
