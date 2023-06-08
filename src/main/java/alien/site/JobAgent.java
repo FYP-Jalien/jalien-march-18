@@ -787,6 +787,7 @@ public class JobAgent implements Runnable {
 				stdinObj.writeObject(username);
 				stdinObj.writeObject(Long.valueOf(queueId));
 				stdinObj.writeObject(Integer.valueOf(resubmission));
+				stdinObj.writeObject(Integer.valueOf(jobNumber));
 				stdinObj.writeObject(tokenCert);
 				stdinObj.writeObject(tokenKey);
 				stdinObj.writeObject(ce);
