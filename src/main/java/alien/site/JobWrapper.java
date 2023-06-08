@@ -226,7 +226,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			masterjobID = jdl.getLong("MasterjobID");
 		}
 		catch (final IOException | ClassNotFoundException e) {
-			logger.log(Level.SEVERE, "Error: Could not receive data from JobAgent" + e);
+			logger.log(Level.SEVERE, "Error. Could not receive data from JobAgent: " + e);
 			throw e;
 		}
 
@@ -237,14 +237,14 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				JAKeyStore.loadKeyStore();
 			}
 			catch (final Exception e) {
-				logger.log(Level.SEVERE, "Error. Could not load tokenCert and/or tokenKey" + e);
+				logger.log(Level.SEVERE, "Error. Could not load tokenCert and/or tokenKey: " + e);
 				throw e;
 			}
 		}
 
-		hostName = (String) Objects.requireNonNullElse(siteMap.get("Localhost"), "");
-		ceHost = (String) Objects.requireNonNullElse(siteMap.get("CEhost"), siteMap.getOrDefault("Host", ""));
-		packMan = (PackMan) Objects.requireNonNullElse(siteMap.get("PackMan"), new CVMFS(""));
+		hostName = (String) siteMap.getOrDefault(("Localhost"), "");
+		ceHost = (String) siteMap.getOrDefault(("CEhost"), siteMap.getOrDefault("Host", ""));
+		packMan = (PackMan) siteMap.getOrDefault(("PackMan"), new CVMFS(""));
 
 		commander = JAliEnCOMMander.getInstance();
 		c_api = new CatalogueApiUtils(commander);
