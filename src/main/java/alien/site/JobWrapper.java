@@ -243,7 +243,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		hostName = (String) Objects.requireNonNullElse(siteMap.get("Localhost"), "");
-		ceHost = (String) Objects.requireNonNullElse(siteMap.get("CEhost"), hostName);
+		ceHost = (String) Objects.requireNonNullElse(siteMap.get("CEhost"), siteMap.getOrDefault("Host", ""));
 		packMan = (PackMan) Objects.requireNonNullElse(siteMap.get("PackMan"), new CVMFS(""));
 
 		commander = JAliEnCOMMander.getInstance();
