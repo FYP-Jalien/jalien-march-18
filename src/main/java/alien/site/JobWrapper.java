@@ -242,7 +242,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			}
 		}
 
-		hostName = (String) Objects.requireNonNullElse(siteMap.get("Host"), "");
+		hostName = (String) Objects.requireNonNullElse(siteMap.get("Localhost"), "");
 		ceHost = (String) Objects.requireNonNullElse(siteMap.get("CEhost"), hostName);
 		packMan = (PackMan) Objects.requireNonNullElse(siteMap.get("PackMan"), new CVMFS(""));
 
