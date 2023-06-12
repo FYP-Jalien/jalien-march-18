@@ -533,7 +533,7 @@ public class JobAgent implements Runnable {
 						logger.log(Level.SEVERE, "The environment on this node appears to be broken. Please do \"" + CVMFS.getAlienvPrint() + "\" for more debug info.");
 						throw new EOFException("Job matching aborted due to potentially misconfigured environment");
 					}
-					CommandOutput sanityCheck = SystemCommand.bash("ps --version");
+					final CommandOutput sanityCheck = SystemCommand.bash("ps --version");
 					if (!sanityCheck.stdout.contains("from")) {
 						logger.log(Level.SEVERE, "Possibly broken environment or process limit reached: " + sanityCheck.stderr);
 						throw new EOFException("Job matching aborted due to failed sanity check");

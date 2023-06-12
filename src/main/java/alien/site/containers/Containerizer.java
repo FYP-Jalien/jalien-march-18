@@ -1,6 +1,7 @@
 package alien.site.containers;
 
 import java.io.BufferedReader;
+import java.io.EOFException;
 import java.io.File;
 import java.util.Arrays;
 import java.util.List;
@@ -106,14 +107,14 @@ public abstract class Containerizer {
 					if (!outputString.contains("ps from"))
 						useGpu = false;
 					if (!outputString.contains("Runtime"))
-						return false;
+						throw new EOFException("Unknown string: " + outputString);
 				}
 				else
-					return false;
+					throw new EOFException("Returned container probe is null or blank: " + outputString);
 			}
 		}
 		catch (final Exception e) {
-			logger.log(Level.WARNING, "The following containers appear to be unsupported: " + this.getClass().getSimpleName());
+			logger.log(Level.WARNING, "The following containers appear to be unsupported: " + this.getClass().getSimpleName() + ". Reason: ", e);
 			return false;
 		}
 		return true;
