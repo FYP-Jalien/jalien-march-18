@@ -20,7 +20,6 @@ import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.Vector;
@@ -76,6 +75,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	private JDL jdl;
 	private long queueId;
 	private int resubmission;
+	private final int jobNumber;
 	private String username;
 	private String tokenCert;
 	private String tokenKey;
@@ -127,7 +127,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	/**
 	 * ML monitor object
 	 */
-	static final Monitor monitor = MonitorFactory.getMonitor(JobAgent.class.getCanonicalName());
+	static Monitor monitor;
 
 	/**
 	 * ApMon sender
@@ -203,6 +203,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			username = (String) inputFromJobAgent.readObject();
 			queueId = ((Long) inputFromJobAgent.readObject()).longValue();
 			resubmission = ((Integer) inputFromJobAgent.readObject()).intValue();
+			jobNumber = ((Integer) inputFromJobAgent.readObject()).intValue();
 			tokenCert = (String) inputFromJobAgent.readObject();
 			tokenKey = (String) inputFromJobAgent.readObject();
 			ce = (String) inputFromJobAgent.readObject();
@@ -221,10 +222,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			logger.log(Level.INFO, "We received the following username: " + username);
 			logger.log(Level.INFO, "We received the following CE " + ce);
 
+			monitor = MonitorFactory.getMonitor(JobAgent.class.getCanonicalName(), jobNumber);
 			masterjobID = jdl.getLong("MasterjobID");
 		}
 		catch (final IOException | ClassNotFoundException e) {
-			logger.log(Level.SEVERE, "Error: Could not receive data from JobAgent" + e);
+			logger.log(Level.SEVERE, "Error. Could not receive data from JobAgent: " + e);
 			throw e;
 		}
 
@@ -235,14 +237,14 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				JAKeyStore.loadKeyStore();
 			}
 			catch (final Exception e) {
-				logger.log(Level.SEVERE, "Error. Could not load tokenCert and/or tokenKey" + e);
+				logger.log(Level.SEVERE, "Error. Could not load tokenCert and/or tokenKey: " + e);
 				throw e;
 			}
 		}
 
-		hostName = (String) Objects.requireNonNullElse(siteMap.get("Host"), "");
-		ceHost = (String) Objects.requireNonNullElse(siteMap.get("CEhost"), hostName);
-		packMan = (PackMan) Objects.requireNonNullElse(siteMap.get("PackMan"), new CVMFS(""));
+		hostName = (String) siteMap.getOrDefault(("Localhost"), "");
+		ceHost = (String) siteMap.getOrDefault(("CEhost"), siteMap.getOrDefault("Host", ""));
+		packMan = (PackMan) siteMap.getOrDefault(("PackMan"), new CVMFS(""));
 
 		commander = JAliEnCOMMander.getInstance();
 		c_api = new CatalogueApiUtils(commander);

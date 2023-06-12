@@ -966,4 +966,35 @@ public class ConfigUtils {
 			return false;
 		}
 	}
+
+	/**
+	 * @param userString
+	 * @return <code>true</code> if the string is ok
+	 */
+	public static boolean isUserKeyOk(final String userString) {
+		return userString != null && userString.length() > 0 && !userString.equals("?");
+	}
+
+	/**
+	 * @return user home directory, if it can be inferred from the environment
+	 */
+	public static String getUserHome() {
+		String sUserHome = System.getProperty("jalien.userhome");
+
+		if (isUserKeyOk(sUserHome)) {
+			return sUserHome;
+		}
+
+		sUserHome = System.getProperty("user.home");
+
+		if (!isUserKeyOk(sUserHome))
+			sUserHome = System.getenv("HOME");
+
+		if (isUserKeyOk(sUserHome)) {
+			System.setProperty("jalien.userhome", sUserHome);
+			return sUserHome;
+		}
+
+		return null;
+	}
 }
