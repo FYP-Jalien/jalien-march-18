@@ -521,14 +521,14 @@ public final class ComputingElement extends Thread {
 			javaDir = CVMFS.getJava64Dir() + "/";
 
 		final String javaCmd = "java -client -Xms16M -Xmx128M -Djdk.lang.Process.launchMechanism=vfork -XX:+UseSerialGC -cp";
-		final String jarDir = "$(dirname $(which jalien))/../lib";
-		final String jarAndClass = "/alien-users.jar alien.site.JobRunner";
+		final String jarPath = "$(dirname $(which jalien))/../lib/alien-users.jar";
+		final String jarClass = "alien.site.JobRunner";
 
-		final String jarDirCustom = ConfigUtils.getConfiguration("version").gets("custom.jobagent.jar.dir");
-		if (jarDirCustom != null && !jarDirCustom.isBlank())
-			return javaDir + javaCmd + " " + jarDirCustom + jarAndClass;
+		final String jarPathCustom = ConfigUtils.getConfiguration("version").gets("custom.jobagent.jar");
+		if (jarPathCustom != null && !jarPathCustom.isBlank())
+			return javaDir + javaCmd + " " + jarPathCustom + " " + jarClass;
 
-		return javaDir + javaCmd + " " + jarDir + jarAndClass;
+		return javaDir + javaCmd + " " + jarPath+ " " + jarClass;
 	}
 
 	/**
