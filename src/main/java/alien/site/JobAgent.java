@@ -1440,16 +1440,18 @@ public class JobAgent implements Runnable {
 			return "Job was killed";
 
 		// Also check for core directories, and abort if found to avoid filling up disk space
-		try {
-			final String coreDir = checkForCoreDirectories(checkCoreUsingJava);
-			if (coreDir != null)
-				return "Core directory detected: " + coreDir + ". Aborting!";
-		}
-		catch (final Exception e1) {
-			logger.log(Level.WARNING, "Exception while checking for core directories: ", e1);
-			logger.log(Level.INFO, "Switching to core check using shell instead");
+		if (!env.getOrDefault("SKIP_CORECHECK", "").toLowerCase().contains("true")) {
+			try {
+				final String coreDir = checkForCoreDirectories(checkCoreUsingJava);
+				if (coreDir != null)
+					return "Core directory detected: " + coreDir + ". Aborting!";
+			}
+			catch (final Exception e1) {
+				logger.log(Level.WARNING, "Exception while checking for core directories: ", e1);
+				logger.log(Level.INFO, "Switching to core check using shell instead");
 
-			checkCoreUsingJava = false;
+				checkCoreUsingJava = false;
+			}
 		}
 
 		String error = null;
