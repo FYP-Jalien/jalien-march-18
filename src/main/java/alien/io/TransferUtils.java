@@ -627,7 +627,7 @@ public final class TransferUtils {
 			if (db.getb(2, false))
 				ok += db.geti(3);
 			else
-				fail += db.geti(4);
+				fail += db.geti(3);
 		}
 	}
 
