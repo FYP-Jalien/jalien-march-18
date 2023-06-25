@@ -277,13 +277,17 @@ public final class UserFactory {
 		return null;
 	}
 
+	private static boolean isUserKeyOk(final String userString) {
+		return userString != null && userString.length() > 0 && !userString.equals("?");
+	}
+
 	/**
 	 * @return current user's ID, if it can be retrieved from the system
 	 */
 	public static String getUserID() {
 		String sUserId = System.getProperty("userid");
 
-		if (ConfigUtils.isUserKeyOk(sUserId)) {
+		if (isUserKeyOk(sUserId)) {
 			return sUserId;
 		}
 
@@ -292,7 +296,7 @@ public final class UserFactory {
 		if (idOutput != null)
 			sUserId = idOutput.stdout;
 
-		if (ConfigUtils.isUserKeyOk(sUserId)) {
+		if (isUserKeyOk(sUserId)) {
 			System.setProperty("userid", sUserId);
 			return sUserId;
 		}
@@ -306,19 +310,19 @@ public final class UserFactory {
 	public static String getUserName() {
 		String sUserName = System.getProperty("jalien.username");
 
-		if (ConfigUtils.isUserKeyOk(sUserName)) {
+		if (isUserKeyOk(sUserName)) {
 			return sUserName;
 		}
 
 		sUserName = System.getProperty("user.name");
 
-		if (!ConfigUtils.isUserKeyOk(sUserName))
+		if (!isUserKeyOk(sUserName))
 			sUserName = SystemCommand.bash("id -u -n").stdout;
 
-		if (!ConfigUtils.isUserKeyOk(sUserName))
+		if (!isUserKeyOk(sUserName))
 			sUserName = System.getenv("USER");
 
-		if (ConfigUtils.isUserKeyOk(sUserName)) {
+		if (isUserKeyOk(sUserName)) {
 			System.setProperty("jalien.username", sUserName);
 			return sUserName;
 		}
@@ -330,6 +334,22 @@ public final class UserFactory {
 	 * @return user home directory, if it can be inferred from the environment
 	 */
 	public static String getUserHome() {
-		return ConfigUtils.getUserHome();
+		String sUserHome = System.getProperty("jalien.userhome");
+
+		if (isUserKeyOk(sUserHome)) {
+			return sUserHome;
+		}
+
+		sUserHome = System.getProperty("user.home");
+
+		if (!isUserKeyOk(sUserHome))
+			sUserHome = System.getenv("HOME");
+
+		if (isUserKeyOk(sUserHome)) {
+			System.setProperty("jalien.userhome", sUserHome);
+			return sUserHome;
+		}
+
+		return null;
 	}
 }
