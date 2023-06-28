@@ -18,7 +18,7 @@ public class MLConfigurationSource implements ConfigSource {
 	public Map<String, ExtProperties> getConfiguration() {
 		final Map<String, ExtProperties> tmp = new HashMap<>();
 		tmp.put("config", getConfigFromML());
-		tmp.put("logging", getConfigFromML());
+		//tmp.put("logging", getConfigFromML());
 		return tmp;
 	}
 
