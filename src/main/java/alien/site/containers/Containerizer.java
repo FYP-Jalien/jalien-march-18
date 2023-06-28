@@ -114,7 +114,7 @@ public abstract class Containerizer {
 			}
 		}
 		catch (final Exception e) {
-			logger.log(Level.WARNING, "The following containers appear to be unsupported: " + this.getClass().getSimpleName() + ". Reason: ", e);
+			logger.log(Level.FINE, "The following containers appear to be unsupported: " + this.getClass().getSimpleName() + ". Reason: ", e);
 			return false;
 		}
 		return true;
