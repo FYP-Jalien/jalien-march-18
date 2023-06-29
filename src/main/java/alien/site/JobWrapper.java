@@ -75,7 +75,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	private JDL jdl;
 	private long queueId;
 	private int resubmission;
-	private final int jobNumber;
 	private String username;
 	private String tokenCert;
 	private String tokenKey;
@@ -127,7 +126,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	/**
 	 * ML monitor object
 	 */
-	static Monitor monitor;
+	static Monitor monitor = MonitorFactory.getMonitor(JobAgent.class.getCanonicalName());
 
 	/**
 	 * ApMon sender
@@ -203,7 +202,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			username = (String) inputFromJobAgent.readObject();
 			queueId = ((Long) inputFromJobAgent.readObject()).longValue();
 			resubmission = ((Integer) inputFromJobAgent.readObject()).intValue();
-			jobNumber = ((Integer) inputFromJobAgent.readObject()).intValue();
 			tokenCert = (String) inputFromJobAgent.readObject();
 			tokenKey = (String) inputFromJobAgent.readObject();
 			ce = (String) inputFromJobAgent.readObject();
@@ -222,7 +220,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			logger.log(Level.INFO, "We received the following username: " + username);
 			logger.log(Level.INFO, "We received the following CE " + ce);
 
-			monitor = MonitorFactory.getMonitor(JobAgent.class.getCanonicalName(), jobNumber);
 			masterjobID = jdl.getLong("MasterjobID");
 		}
 		catch (final IOException | ClassNotFoundException e) {

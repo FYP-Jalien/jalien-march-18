@@ -1,6 +1,7 @@
 package alien.monitoring;
 
 import java.lang.management.ManagementFactory;
+import java.lang.management.MemoryMXBean;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
@@ -84,6 +85,24 @@ public class SelfMonitor implements MonitoringObject {
 			paramNames.add("jvm_memory_usage");
 			paramValues.add(Double.valueOf(usedMemory * 100d / totalMemory));
 		}
+
+		 MemoryMXBean memoryMXBean = ManagementFactory.getMemoryMXBean();
+
+		final long initHeapMemory = memoryMXBean.getHeapMemoryUsage().getInit();
+		paramNames.add("jvm_heap_init_memory");
+		paramValues.add(Double.valueOf(initHeapMemory / MB));
+
+		final long usedHeapMemory = memoryMXBean.getHeapMemoryUsage().getUsed();
+		paramNames.add("jvm_heap_used_memory");
+		paramValues.add(Double.valueOf(usedHeapMemory / MB));
+
+		final long maxHeapMemory = memoryMXBean.getHeapMemoryUsage().getMax();
+		paramNames.add("jvm_heap_max_memory");
+		paramValues.add(Double.valueOf(maxHeapMemory / MB));
+
+		final long committedHeapMemory = memoryMXBean.getHeapMemoryUsage().getCommitted();
+		paramNames.add("jvm_heap_committed_memory");
+		paramValues.add(Double.valueOf(committedHeapMemory / MB));
 
 		paramNames.add("jvm_available_processors");
 		paramValues.add(Integer.valueOf(r.availableProcessors()));

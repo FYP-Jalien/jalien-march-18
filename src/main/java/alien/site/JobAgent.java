@@ -793,7 +793,6 @@ public class JobAgent implements Runnable {
 				stdinObj.writeObject(username);
 				stdinObj.writeObject(Long.valueOf(queueId));
 				stdinObj.writeObject(Integer.valueOf(resubmission));
-				stdinObj.writeObject(Integer.valueOf(jobNumber));
 				stdinObj.writeObject(tokenCert);
 				stdinObj.writeObject(tokenKey);
 				stdinObj.writeObject(ce);
@@ -2159,7 +2158,7 @@ public class JobAgent implements Runnable {
 			final File f = new File(scriptPath);
 
 			if (f.exists() && f.canExecute()) {
-				final ProcessBuilder pBuilder = new ProcessBuilder("sh", scriptPath);
+				final ProcessBuilder pBuilder = new ProcessBuilder("bash", scriptPath);
 				// pBuilder.redirectError(Redirect.INHERIT);
 				// pBuilder.redirectOutput(Redirect.INHERIT);
 				logger.log(Level.INFO, ("Running " + probeName + ".sh..."));
