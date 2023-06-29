@@ -449,8 +449,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 						cmd.add(st.nextToken());
 				}
 
+		logger.log(Level.INFO, "Checking if we can use nested containers...");
 		final ApptainerCVMFS appt = new ApptainerCVMFS();
 		if (!metavars.containsKey("DISABLE_NESTED_CONTAINERS") && appt.isSupported()) {
+			logger.log(Level.INFO, "Using nested containers");
 			putJobTrace("Using nested containers");
 			cmd = appt.containerize(String.join(" ", cmd), false);
 		}
