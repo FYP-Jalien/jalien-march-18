@@ -19,8 +19,8 @@ import java.net.HttpURLConnection;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.nio.charset.Charset;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -534,7 +534,7 @@ public class JobAgent implements Runnable {
 						throw new EOFException("Job matching aborted due to potentially misconfigured environment");
 					}
 					final CommandOutput sanityCheck = SystemCommand.bash("ps --version");
-					if (!sanityCheck.stdout.contains("from")) {
+					if (!sanityCheck.stderr.isBlank()) {
 						logger.log(Level.SEVERE, "Possibly broken environment or process limit reached: " + sanityCheck.stderr);
 						throw new EOFException("Job matching aborted due to failed sanity check");
 					}
