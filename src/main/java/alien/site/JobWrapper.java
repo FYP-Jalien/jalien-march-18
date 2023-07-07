@@ -512,15 +512,15 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		try {
 			sun.misc.Signal.handle(new sun.misc.Signal("INT"), sig -> {
+				killSigReceived = true;
 				logger.log(Level.SEVERE, "JobWrapper: SIGINT received. Shutting down NOW!"); // Handled by JA
 				putJobTrace("JobWrapper: SIGINT received. Shutting down NOW!");
-				killSigReceived = true;
 			});
 
 			sun.misc.Signal.handle(new sun.misc.Signal("TERM"), sig -> {
+				killSigReceived = true;
 				System.err.println("SIGTERM received. Killing payload and proceeding to upload.");
 				putJobTrace("JobWrapper: SIGTERM received. Killing payload and proceeding to upload.");
-				killSigReceived = true;
 				if (payload.isAlive()) {
 					payload.destroyForcibly();
 				}
@@ -530,9 +530,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			if (payload.isAlive()) {
 				payload.destroyForcibly();
+				killSigReceived = true;
 				logger.log(Level.SEVERE, "Payload process destroyed by timeout in wrapper!");
 				putJobTrace("JobWrapper: Payload process destroyed by timeout in wrapper!");
-				killSigReceived = true;
 			}
 			logger.log(Level.SEVERE, "Payload has finished execution.");
 		}
