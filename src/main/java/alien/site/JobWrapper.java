@@ -82,11 +82,14 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	private String ce;
 	private String legacyToken;
 	private long ttl;
+
 	/**
 	 * @uml.property name="jobStatus"
 	 * @uml.associationEnd
 	 */
 	private JobStatus jobStatus;
+
+	private boolean killSigReceived = false;
 
 	private final Long masterjobID;
 
@@ -328,8 +331,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 				if (execExitCode < 0)
 					putJobTrace("Failed to start execution of payload. Exit code: " + Math.abs(execExitCode));
-				else
-					putJobTrace("Warning: executable exit code was " + execExitCode);
+				else {
+					if (killSigReceived)
+						putJobTrace("Payload killed. Executable exit code was " + execExitCode);
+					else
+						putJobTrace("Warning: executable exit code was " + execExitCode);
+				}
 
 				return uploadOutputFiles(JobStatus.ERROR_E, execExitCode) ? execExitCode : -1;
 			}
@@ -507,11 +514,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			sun.misc.Signal.handle(new sun.misc.Signal("INT"), sig -> {
 				logger.log(Level.SEVERE, "JobWrapper: SIGINT received. Shutting down NOW!"); // Handled by JA
 				putJobTrace("JobWrapper: SIGINT received. Shutting down NOW!");
+				killSigReceived = true;
 			});
 
 			sun.misc.Signal.handle(new sun.misc.Signal("TERM"), sig -> {
 				System.err.println("SIGTERM received. Killing payload and proceeding to upload.");
 				putJobTrace("JobWrapper: SIGTERM received. Killing payload and proceeding to upload.");
+				killSigReceived = true;
 				if (payload.isAlive()) {
 					payload.destroyForcibly();
 				}
@@ -523,6 +532,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				payload.destroyForcibly();
 				logger.log(Level.SEVERE, "Payload process destroyed by timeout in wrapper!");
 				putJobTrace("JobWrapper: Payload process destroyed by timeout in wrapper!");
+				killSigReceived = true;
 			}
 			logger.log(Level.SEVERE, "Payload has finished execution.");
 		}
