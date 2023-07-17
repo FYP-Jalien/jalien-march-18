@@ -121,31 +121,21 @@ public abstract class Containerizer {
 	}
 
 	/**
-	 * @return <code>true</code> if mounted and running a simple command (java -version) is possible with cgv2 constraints
+	 * @return <code>true</code> if mounted and running isSupported() is possible with cgv2 constraints
 	 */
 	public boolean checkCgroupsv2() {
-		useCgroupsv2 = false;
 		try {
 			CommandOutput output = SystemCommand.executeCommand(Arrays.asList("/bin/bash", "-c", "mount -l | grep cgroup"));
-			try (BufferedReader br = output.reader()) {
-				final String outputString = br.lines().collect(Collectors.joining());
-				if (outputString != null && !outputString.isBlank()) {
-					if (outputString.contains("cgroup2"))
-						useCgroupsv2 = true;
-				}
-			}
-			catch (Exception e2) {
-				logger.log(Level.WARNING, "Could not get output from cgroupsv2 check: ", e2);
-			}
+			final String outputString = output.reader().lines().collect(Collectors.joining());
+			if (outputString == null || outputString.isBlank() || !outputString.contains("cgroup2"))
+				return false;
 		}
 		catch (final Exception e) {
-			logger.log(Level.WARNING, "Failed to check for cgroupsv2 support: " + e.toString());
+			logger.log(Level.WARNING, "Failed to check for cgroupsv2 support: ", e);
 			return false;
 		}
 
-		if (useCgroupsv2 == false)
-			return false;
-
+		useCgroupsv2 = true;
 		if (!isSupported())
 			useCgroupsv2 = false;
 
