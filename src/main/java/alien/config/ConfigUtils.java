@@ -618,7 +618,7 @@ public class ConfigUtils {
 		HashMap<String, Object> hostConfig = null;
 		String site = null;
 
-		// siteDNsForHostname might contain more than one site. Let's see if one of the them has the configuration
+		// siteDNsForHostname might contain more than one site. Let's see if one of them has the configuration
 		while (siteDNsForHostname.iterator().hasNext()) {
 			final String dn = siteDNsForHostname.iterator().next();
 
@@ -654,7 +654,7 @@ public class ConfigUtils {
 		}
 
 		if (hostConfig.containsKey("host_ce")) {
-			final HashMap<String, Object> ceConfig = getCEConfigFromLdap(checkContent, site, hostConfig.get("host_ce").toString());
+			final HashMap<String, Object> ceConfig = getCEConfigFromLdap(checkContent, site, hostName);
 
 			final String partitions = getPartitions("ALICE::" + site + "::" + hostConfig.get("host_ce"));
 
@@ -750,14 +750,14 @@ public class ConfigUtils {
 	/**
 	 * @param checkContent
 	 * @param site
-	 * @param cename
+	 * @param hostname
 	 * @return CE information based on the site and ce name for the host
 	 */
-	public static HashMap<String, Object> getCEConfigFromLdap(final boolean checkContent, final String site, final String cename) {
-		final HashMap<String, Object> ceConfig = LDAPHelper.checkLdapTree("(&(name=" + cename + "))", "ou=CE,ou=Services,ou=" + site + ",ou=Sites,", "ce");
+	public static HashMap<String, Object> getCEConfigFromLdap(final boolean checkContent, final String site, final String hostname) {
+		final HashMap<String, Object> ceConfig = LDAPHelper.checkLdapTree("(&(host=" + hostname + "))", "ou=CE,ou=Services,ou=" + site + ",ou=Sites,", "ce");
 
 		if (checkContent && ceConfig.size() == 0) {
-			logger.severe("Error: cannot find ce configuration in LDAP for CE: " + cename);
+			logger.severe("Error: cannot find ce configuration in LDAP for CE: " + hostname);
 			return null;
 		}
 		return ceConfig;
