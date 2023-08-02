@@ -131,7 +131,7 @@ public final class ComputingElement extends Thread {
 
 				try {
 					final HashMap<String, Object> newConfig = ConfigUtils.getConfigFromLdap();
-					if (newConfig != null) {
+					if (newConfig != null && !config.equals(newConfig)) {
 						config = newConfig;
 
 						site = (String) config.get("site_accountname");
@@ -143,6 +143,7 @@ public final class ComputingElement extends Thread {
 							logger.info("[" + field + ": " + entry + "]");
 						});
 					}
+					lastStartupScriptGenerated = 0;
 				}
 				catch (Exception ex) {
 					logger.log(Level.WARNING, "Error syncing with LDAP: ", ex);

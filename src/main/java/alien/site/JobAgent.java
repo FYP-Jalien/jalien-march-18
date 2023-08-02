@@ -659,6 +659,8 @@ public class JobAgent implements Runnable {
 		MonitorFactory.stopMonitor(monitor);
 
 		logger.log(Level.INFO, "JobAgent finished, id: " + jobAgentId + " totalJobs: " + totalJobs.get());
+		Thread.currentThread().interrupt();
+		return;
 	}
 
 	private void handleJob() {
