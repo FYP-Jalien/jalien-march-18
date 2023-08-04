@@ -697,7 +697,7 @@ public class LFNUtils {
 	 * @param queueid
 	 *            a job id to filter for its files
 	 * @param queryLimit if strictly positive then restrict the number of returned entries to this many; if more would be produced, exit with an exception
-	 * @param excludedPatterns 
+	 * @param excludedPatterns
 	 * @return the list of LFNs that match
 	 */
 	public static Collection<LFN> find(final String path, final String pattern, final String query, final int flags, final AliEnPrincipal owner, final String xmlCollectionName, final Long queueid,
@@ -1632,6 +1632,8 @@ public class LFNUtils {
 
 			boolean allOk = false;
 
+			final String indexTableEntryQuery;
+
 			try {
 				// insert the "" directory in the destination table
 				String insertEmptyQuery = "INSERT INTO L" + tableName + "L (owner, lfn, dir, gowner, type, perm) VALUES (?, '', 0, ?, 'd', ?)";
@@ -1676,7 +1678,7 @@ public class LFNUtils {
 						return "Failed to delete the entries from the old table:\n" + deleteQuery;
 
 					// insert lfn into indextable
-					String indexTableEntryQuery = "INSERT INTO INDEXTABLE (hostIndex, tableName, lfn) VALUES (" + lfn.indexTableEntry.hostIndex + ", " + tableName + ", \""
+					indexTableEntryQuery = "INSERT INTO INDEXTABLE (hostIndex, tableName, lfn) VALUES (" + lfn.indexTableEntry.hostIndex + ", " + tableName + ", \""
 							+ Format.escSQL(lfn.getCanonicalName()) + "\")";
 
 					if (!dbu.executeQuery(indexTableEntryQuery))
@@ -1695,10 +1697,25 @@ public class LFNUtils {
 				}
 			}
 
+			String message = "The table L" + tableName + "L has been created successfully";
+
+			for (final Host h : CatalogueUtils.getAllHosts()) {
+				if (h.hostIndex != lfn.indexTableEntry.hostIndex)
+					try (DBFunctions dbOtherHosts = h.getDB()) {
+						if (dbOtherHosts != null)
+							if (!dbOtherHosts.query(indexTableEntryQuery)) {
+								message = "INDEXTABLE of host " + h.hostIndex
+										+ " could not be updated with the same value as the other tables. We are in an inconsistent state! Failed query:\n" + indexTableEntryQuery;
+
+								logger.log(Level.SEVERE, message);
+							}
+					}
+			}
+
 			// update the timestamp where the INDEXTABLE has last been modified
 			CatalogueUtils.setIndexTableUpdate();
 
-			return "The table L" + tableName + "L has been created successfully";
+			return message;
 		}
 	}
 
