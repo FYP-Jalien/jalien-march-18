@@ -10,6 +10,7 @@ import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
+import java.util.UUID;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -277,12 +278,20 @@ public class SE implements Serializable, Comparable<SE> {
 	 * @return the PFN for this storage
 	 */
 	public String generatePFN(final GUID guid) {
+		return generatePFN(guid.guid);
+	}
+
+	/**
+	 * @param guid
+	 * @return the PFN for this storage
+	 */
+	public String generatePFN(final UUID guid) {
 		String ret = generateProtocol();
 
 		if (ret == null)
 			return ret;
 
-		ret += generatePath(guid.guid.toString());
+		ret += generatePath(guid.toString());
 		return StringFactory.get(ret);
 	}
 
