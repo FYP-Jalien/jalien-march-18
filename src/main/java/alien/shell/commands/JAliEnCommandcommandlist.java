@@ -16,7 +16,7 @@ public class JAliEnCommandcommandlist extends JAliEnBaseCommand {
 	public void run() {
 		if (interactiveShell) {
 			// behavior needed by the Java interactive shell, @see BusyBox
-			commander.printOutln(JAliEnCOMMander.getCommandList());
+			commander.printOutln(JAliEnCOMMander.getCommandList(commander.getUser()));
 		}
 		else {
 			for (String command : commander.getUserAvailableCommands())

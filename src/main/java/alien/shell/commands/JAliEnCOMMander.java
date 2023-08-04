@@ -328,6 +328,16 @@ public class JAliEnCOMMander implements Runnable {
 	 * @return array of commands
 	 */
 	public static String getCommandList() {
+		return getCommandList(null);
+	}
+
+	/**
+	 * get list of commands
+	 * @param user 
+	 *
+	 * @return array of commands
+	 */
+	public static String getCommandList(final AliEnPrincipal user) {
 		final StringBuilder commands = new StringBuilder();
 
 		for (int i = 0; i < commandList.length; i++) {
@@ -337,7 +347,7 @@ public class JAliEnCOMMander implements Runnable {
 			commands.append(commandList[i]);
 		}
 
-		if (AliEnPrincipal.roleIsAdmin(AliEnPrincipal.userRole()))
+		if (user != null && user.hasRole("admin"))
 			for (int i = 0; i < jAliEnAdminCommandList.length; i++) {
 				if (i > 0)
 					commands.append(' ');
