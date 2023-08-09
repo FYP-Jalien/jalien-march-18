@@ -1379,6 +1379,8 @@ public class JobAgent implements Runnable {
 		logger.log(Level.INFO, procinfo);
 
 		putJobLog("proc", procinfo);
+		
+		// TODO call `TaskQueueApiUtils.setJobStatus(queueId, resubmission, null, extrafields)` with the job accounting data as extrafields 
 
 		lastHeartbeat = System.currentTimeMillis();
 	}

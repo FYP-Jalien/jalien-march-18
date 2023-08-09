@@ -77,7 +77,10 @@ public class SetJobStatus extends Request {
 			return;
 		}
 
-		TaskQueueUtils.setJobStatus(this.jobnumber, this.status, null, this.extrafields);
+		if (this.status!=null)
+			TaskQueueUtils.setJobStatus(this.jobnumber, this.status, null, this.extrafields);
+		else
+			TaskQueueUtils.setJobExtraFields(this.jobnumber, this.extrafields);
 
 		if (this.extrafields != null)
 			this.extrafields.clear();

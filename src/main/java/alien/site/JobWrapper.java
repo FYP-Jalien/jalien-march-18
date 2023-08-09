@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import alien.api.Request;
 import alien.api.TomcatServer;
 import alien.api.catalogue.CatalogueApiUtils;
 import alien.api.taskQueue.TaskQueueApiUtils;
@@ -1102,6 +1103,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		else if (jobStatus == JobStatus.RUNNING) {
 			extrafields.put("spyurl", hostName + ":" + TomcatServer.getPort());
 			extrafields.put("node", hostName);
+			extrafields.put("agentuuid", Request.getVMID().toString());
+			
+			// TODO add "cpu" with columns from QUEUE_CPU
 		}
 
 		try {

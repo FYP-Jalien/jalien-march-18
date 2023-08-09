@@ -98,14 +98,17 @@ public class TaskQueueUtils {
 		fieldMap = new HashMap<>();
 		fieldMap.put("path_table", "QUEUEJDL");
 		fieldMap.put("path_field", "path");
-		fieldMap.put("spyurl_table", "QUEUEPROC");
-		fieldMap.put("spyurl_field", "spyurl");
 		fieldMap.put("node_table", "QUEUE");
 		fieldMap.put("node_field", "nodeId");
 		fieldMap.put("exechost_table", "QUEUE");
 		fieldMap.put("exechost_field", "execHostId");
 		fieldMap.put("error_table", "QUEUE");
 		fieldMap.put("error_field", "error");
+
+		for (final String column : new String[] { "spyurl", "agentuuid", "maxrsize", "cputime", "ncpu", "batchid", "cost", "mem", "si2k", "runtimes", "maxvsize", "cpu" }) {
+			fieldMap.put(column + "_table", "QUEUEPROC");
+			fieldMap.put(column + "_field", column);
+		}
 	}
 
 	static {
@@ -833,36 +836,7 @@ public class TaskQueueUtils {
 			if (JobStatus.finalStates().contains(newStatus) || newStatus == JobStatus.SAVED_WARN || newStatus == JobStatus.SAVED)
 				deleteJobToken(job);
 
-			String execHost = "NO_SITE";
-
-			if (extrafields != null) {
-				if (logger.isLoggable(Level.FINE))
-					logger.log(Level.FINE, "extrafields: " + extrafields.toString());
-
-				for (final Map.Entry<String, Object> entry : extrafields.entrySet()) {
-					final String key = entry.getKey();
-					final Object value = entry.getValue();
-
-					if (fieldMap.containsKey(entry.getKey() + "_table")) {
-						final HashMap<String, Object> map = new HashMap<>();
-
-						int hostId;
-						if (key.contains("node") || key.contains("exechost")) {
-							hostId = TaskQueueUtils.getOrInsertFromLookupTable("host", value.toString());
-							map.put(fieldMap.get(key + "_field"), Integer.valueOf(hostId));
-						}
-						else
-							map.put(fieldMap.get(key + "_field"), value);
-
-						map.put("queueId", Long.valueOf(job));
-
-						final String query = DBFunctions.composeUpdate(fieldMap.get(key + "_table"), map, QUEUEID);
-						db.query(query);
-					}
-				}
-
-				execHost = extrafields.getOrDefault("exechost", execHost).toString();
-			}
+			final String execHost = setJobExtraFields(job, extrafields);
 
 			sendJobStatusToML(job, newStatus, execHost);
 
@@ -874,8 +848,80 @@ public class TaskQueueUtils {
 	}
 
 	/**
+	 * @param job
+	 * @param extrafields
+	 * @return the execution site
+	 */
+	public static final String setJobExtraFields(final long job, final Map<String, Object> extrafields) {
+		String execSite = "NO_SITE";
+
+		if (extrafields != null && extrafields.size() > 0) {
+			if (logger.isLoggable(Level.FINE))
+				logger.log(Level.FINE, "extrafields: " + extrafields.toString());
+
+			try (DBFunctions db = getQueueDB()) {
+				for (final Map.Entry<String, Object> entry : extrafields.entrySet()) {
+					final String key = entry.getKey();
+					final Object value = entry.getValue();
+
+					if (fieldMap.containsKey(entry.getKey() + "_table")) {
+						final HashMap<String, Object> map = new HashMap<>();
+
+						if (value instanceof Map) {
+							final int id = getOrInsertType(entry.getKey(), (Map<?, ?>) value);
+							map.put(fieldMap.get(key + "_field") + "Id", Integer.valueOf(id));
+						}
+						else {
+							if (key.contains("node") || key.contains("exechost")) {
+								final int hostId = getOrInsertFromLookupTable("host", value.toString());
+								map.put(fieldMap.get(key + "_field"), Integer.valueOf(hostId));
+							}
+							else
+								map.put(fieldMap.get(key + "_field"), value);
+						}
+
+						map.put("queueId", Long.valueOf(job));
+
+						final String query = DBFunctions.composeUpdate(fieldMap.get(key + "_table"), map, QUEUEID);
+						db.query(query);
+					}
+				}
+			}
+
+			execSite = extrafields.getOrDefault("exechost", execSite).toString();
+		}
+
+		return execSite;
+	}
+
+	private static int getOrInsertType(final String key, final Map<?, ?> values) {
+		try (DBFunctions db = getQueueDB()) {
+			final HashMap<String, Object> map = new HashMap<>();
+
+			final StringBuilder select = new StringBuilder("SELECT id FROM QUEUE_" + key.toUpperCase() + " WHERE true ");
+
+			final List<Object> queryParameters = new ArrayList<>();
+
+			for (final Map.Entry<?, ?> entry : values.entrySet()) {
+				map.put(entry.getKey().toString(), entry.getValue());
+				select.append(" AND ").append(entry.getKey().toString()).append("=?");
+				queryParameters.add(entry.getValue());
+			}
+
+			if (db.query(select.toString(), false, queryParameters.toArray()) && db.moveNext())
+				return db.geti(1);
+
+			db.setLastGeneratedKey(true);
+			if (db.query(DBFunctions.composeInsert("QUEUE_" + key.toUpperCase(), map)))
+				return db.getLastGeneratedKey().intValue();
+
+			return 0;
+		}
+	}
+
+	/**
 	 * Tell the central ML instance about the status update for this job ID
-	 * 
+	 *
 	 * @param job
 	 * @param newStatus
 	 * @param execHost
@@ -2757,10 +2803,11 @@ public class TaskQueueUtils {
 
 	/**
 	 * Cache Site Sonar constraints
+	 *
 	 * @return the cached sitesonar constraints
 	 */
 	public static synchronized HashMap<String, String> getConstraintCache() {
-		long currentTimestamp = System.currentTimeMillis();
+		final long currentTimestamp = System.currentTimeMillis();
 		// Refresh constraint cache every 10 minutes
 		if (currentTimestamp - lastConstraintUpdatedTimestamp > CACHE_REFRESH_INTERVAL) {
 			System.err.println("Refreshing constraint cache as it is expired");
@@ -2772,8 +2819,8 @@ public class TaskQueueUtils {
 
 				logger.log(Level.INFO, "Updating constraint cache at " + currentTimestamp);
 				while (db.moveNext()) {
-					String constraintName = db.gets("name");
-					String constraintExpression = db.gets("expression");
+					final String constraintName = db.gets("name");
+					final String constraintExpression = db.gets("expression");
 					constraintCache.put(constraintName, constraintExpression);
 					logger.log(Level.INFO, "Added the constraint name: " + constraintName + ", type: "
 							+ constraintExpression + " to the constraint cache");
@@ -3794,10 +3841,10 @@ public class TaskQueueUtils {
 
 		if (constraints != null && constraints.size() > 0) {
 			// Constraint name is the constraint key
-			for (String key : constraints.keySet()) {
+			for (final String key : constraints.keySet()) {
 				// eg - key : CGROUPSv2_AVAILABLE
 				// eg - value : taken from JDL (true)
-				Object constraintValue = jdl.get(key); // check if JDL has a pattern matching the constraint key
+				final Object constraintValue = jdl.get(key); // check if JDL has a pattern matching the constraint key
 				if (constraintValue != null) {
 					params.put(key, constraintValue);
 				}
@@ -4029,10 +4076,7 @@ public class TaskQueueUtils {
 			logger.log(Level.FINE, "Going to add the following resultsJdl to pid " + queueId + ": " + jdl);
 
 		try (DBFunctions db = getQueueDB()) {
-			if (db == null)
-				return false;
-
-			if (!db.query("update QUEUEJDL set resultsJdl=? where queueId=?", false, jdl.toString(), queueId))
+			if ((db == null) || !db.query("update QUEUEJDL set resultsJdl=? where queueId=?", false, jdl.toString(), queueId))
 				return false;
 
 			return true;
