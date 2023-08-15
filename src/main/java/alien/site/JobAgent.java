@@ -1941,7 +1941,6 @@ public class JobAgent implements Runnable {
 			"LSB_JOBID",
 			"PBS_JOBID",
 			"PBS_JOBNAME",
-			"JOB_ID",
 			"CREAM_JOBID",
 			"GRID_GLOBAL_JOBID",
 			"JOB_ID"
