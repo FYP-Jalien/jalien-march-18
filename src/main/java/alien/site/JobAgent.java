@@ -1843,7 +1843,7 @@ public class JobAgent implements Runnable {
 	 */
 	private final String checkForCoreDirectories(boolean checkUsingJava) throws IOException {
 		if (checkUsingJava) {
-			final Pattern coreDirPattern = Pattern.compile("^(?!.*\\.inp).*core.*$");
+			final Pattern coreDirPattern = Pattern.compile("^core(?!.*\\.inp$).*$");
 			List<File> coreDirs = Files.walk(new File(jobWorkdir).toPath())
 					.map(Path::toFile)
 					.filter(file -> coreDirPattern.matcher(file.getName()).matches())
