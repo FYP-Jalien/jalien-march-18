@@ -915,8 +915,8 @@ public class JobAgent implements Runnable {
 						t.cancel();
 						heartMon.interrupt();
 						if (!jobKilled) {
-							logger.log(Level.SEVERE, "Process overusing resources: " + error);
-							putJobTrace("ERROR[FATAL]: Process overusing resources");
+							logger.log(Level.SEVERE, "Monitor has detected an error: " + error);
+							putJobTrace("[FATAL]: Monitor has detected an error: " + error);
 							putJobTrace(error);
 							killGracefully(p);
 						}
