@@ -66,7 +66,7 @@ public class NUMAExplorer {
 		activeJAInstances = new HashMap<>();
 		jobToNuma = new HashMap<>();
 		usedCPUs = new int[numCPUs];
-		fillNumaTopology(JobAgent.initialMask, JobAgent.wholeNode);
+		fillNumaTopology(JobAgent.initialMask, JobAgent.wholeNode, false);
 	}
 
 	/**
@@ -75,7 +75,14 @@ public class NUMAExplorer {
 	 * @param initMask mask from which allocation starts
 	 * @param wholeNode wether if we run in a whole-node scenario
 	 */
-	private void fillNumaTopology(byte[] initMask, boolean wholeNode) {
+	private void fillNumaTopology(byte[] initMask, boolean wholeNode, boolean updateInit) {
+		logger.log(Level.INFO, "Filling initial NUMA structure with mask " + getMaskString(initMask) + " . Are we updating the initial configuration? " + updateInit);
+		availablePerNode.clear();
+		initialAvailablePerNode.clear();
+		structurePerNode.clear();
+		initialStructurePerNode.clear();
+		divisionedNUMA.clear();
+		coresPerNode.clear();
 		int subcounter = 0;
 		String filename = "/sys/devices/system/node/";
 		File numaDir = new File(filename);
@@ -175,8 +182,10 @@ public class NUMAExplorer {
 				cpuRange[core] = 0;
 				usedCPUs[core] = -1;
 			}
-			else
+			else {
+				usedCPUs[core] = 0;
 				cpuRange[core] = 1;
+			}
 		}
 		return cpuRange;
 	}
@@ -243,7 +252,18 @@ public class NUMAExplorer {
 				usedCPUs[i] = -1;
 		}
 
+		byte[] reversedFinalMask = reverseMask(finalMask);
+
+		fillNumaTopology(reversedFinalMask, JobAgent.wholeNode, true);
+
 		return arrayToTaskset(finalMask);
+	}
+
+	static byte[] reverseMask(byte[] mask) {
+		byte[] reversed = new byte[mask.length];
+		for (int i =0; i < mask.length; i++)
+			reversed[i] = (byte)(mask[i] ^ 1);
+		return reversed;
 	}
 
 	/**
