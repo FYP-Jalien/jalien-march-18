@@ -774,6 +774,12 @@ public class ResyncLDAP extends Optimizer {
 					}
 
 					final String iodaemons = getLdapContentSE(ouSE, se, "ioDaemons", null);
+
+					if (iodaemons == null || iodaemons.isBlank()) {
+						logger.log(Level.SEVERE, "Empty ioDaemons for " + se + " : " + ouSE);
+						continue;
+					}
+
 					final String[] temp = iodaemons.split(":");
 					String seioDaemons = "";
 					if (temp.length > 2) {
@@ -802,8 +808,8 @@ public class ResyncLDAP extends Optimizer {
 					}
 
 					String path = getLdapContentSE(ouSE, se, "savedir", null);
-					if ("".equals(path)) {
-						logger.log(Level.INFO, "Error getting the savedir for " + seName);
+					if (path == null || path.isBlank()) {
+						logger.log(Level.INFO, "Error getting the savedir for " + seName + " : " + ouSE);
 						return;
 					}
 
