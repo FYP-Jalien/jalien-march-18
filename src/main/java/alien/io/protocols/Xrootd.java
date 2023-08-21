@@ -22,19 +22,29 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.IOException;
 import java.io.StringReader;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 import alien.catalogue.GUID;
 import alien.catalogue.PFN;
@@ -44,6 +54,7 @@ import alien.io.IOUtils;
 import alien.se.SE;
 import alien.user.UserFactory;
 import lazyj.Format;
+import lazyj.Utils;
 import lia.util.process.ExternalProcess.ExitStatus;
 import utils.ExternalCalls;
 import utils.ProcessWithTimeout;
@@ -1160,6 +1171,211 @@ public class Xrootd extends Protocol {
 			return false;
 
 		return true;
+	}
+
+	/**
+	 * @author costing
+	 * @since 2023-08-17
+	 */
+	public static final class PFNStagingStatus {
+		boolean onTape;
+		boolean online;
+		boolean path_exists;
+		boolean requested;
+
+		String path;
+
+		/**
+		 * @param status
+		 */
+		public PFNStagingStatus(final String status) {
+			try (BufferedReader br = new BufferedReader(new StringReader(status))) {
+				String line;
+
+				while ((line = br.readLine()) != null) {
+					int idx = line.indexOf(':');
+
+					if (idx >= 0) {
+						final String key = line.substring(0, idx);
+
+						if (key.equals("Path"))
+							path = line.substring(idx + 1).trim();
+						else if (key.equals("Flags")) {
+							String flags = line.substring(idx + 1).trim();
+							idx = flags.indexOf('\n');
+							if (idx > 0)
+								flags = flags.substring(0, idx);
+
+							onTape = flags.contains("BackUpExists");
+							online = !flags.contains("Offline");
+							path_exists = flags.contains("IsReadable");
+							requested = false;
+						}
+					}
+				}
+			}
+			catch (@SuppressWarnings("unused") final IOException e) {
+				// ignore
+			}
+		}
+
+		/**
+		 * @param o JSON fragment to process
+		 */
+		public PFNStagingStatus(final JSONObject o) {
+			onTape = Utils.stringToBool(o.get("on_tape").toString(), false);
+			online = Utils.stringToBool(o.get("online").toString(), false);
+			path = o.get("path").toString();
+			path_exists = Utils.stringToBool(o.get("path_exists").toString(), false);
+			requested = Utils.stringToBool(o.get("requested").toString(), false);
+		}
+
+		@Override
+		public String toString() {
+			return path + ": exists=" + path_exists + ", online=" + online + ", onTape=" + onTape + ", requested=" + requested;
+		}
+	}
+
+	/**
+	 * @param pfns
+	 * @return the staging status of the indicated PFNs
+	 */
+	public Map<PFN, PFNStagingStatus> getStagingStatus(final Collection<PFN> pfns) {
+		final Map<PFN, PFNStagingStatus> ret = new HashMap<>();
+
+		final Map<SE, Collection<PFN>> perSE = new HashMap<>();
+
+		for (final PFN p : pfns)
+			perSE.computeIfAbsent(p.getSE(), (k) -> new HashSet<>()).add(p);
+
+		for (final Map.Entry<SE, Collection<PFN>> entry : perSE.entrySet())
+			ret.putAll(getStagingStatus(entry.getKey(), entry.getValue()));
+
+		return ret;
+	}
+
+	private static final int PREPARE_PFNS_PER_COMMAND = 32;
+
+	private Map<PFN, PFNStagingStatus> getStagingStatus(final SE se, final Collection<PFN> pfns) {
+		final Map<PFN, PFNStagingStatus> ret = new HashMap<>();
+
+		if (pfns == null || pfns.size() == 0)
+			return ret;
+
+		if (pfns.size() > PREPARE_PFNS_PER_COMMAND) {
+			final Set<PFN> subset = new HashSet<>();
+
+			for (final PFN p : pfns) {
+				if (subset.size() < PREPARE_PFNS_PER_COMMAND)
+					subset.add(p);
+
+				if (subset.size() >= PREPARE_PFNS_PER_COMMAND) {
+					ret.putAll(getStagingStatus(se, pfns));
+					subset.clear();
+				}
+			}
+
+			if (subset.size() > 0)
+				ret.putAll(getStagingStatus(se, pfns));
+
+			return ret;
+		}
+
+		URL url;
+		try {
+			url = new URL(se.generateProtocol());
+
+			final String host = url.getHost();
+			final int port = url.getPort() > 0 ? url.getPort() : 1094;
+
+			final List<String> command = new ArrayList<>();
+
+			command.add(xrootd_default_path + "/bin/xrdfs");
+			command.add(host + ":" + port);
+			command.add("query");
+			command.add("prepare");
+			command.add("0");
+
+			for (final PFN p : pfns) {
+				final String pfn = p.getPFN();
+				final URL upfn = new URL(pfn);
+				command.add(upfn.getPath());
+			}
+
+			final ProcessBuilder pBuilder = new ProcessBuilder(command);
+
+			checkLibraryPath(pBuilder);
+			setCommonEnv(pBuilder, null);
+
+			pBuilder.redirectErrorStream(true);
+
+			ExitStatus exitStatus;
+
+			final int processTimeout = pfns.size() * 10;
+
+			try {
+				final Process p = pBuilder.start();
+
+				final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
+				pTimeout.waitFor(processTimeout, TimeUnit.SECONDS);
+				exitStatus = pTimeout.getExitStatus();
+				setLastExitStatus(exitStatus);
+			}
+			catch (final InterruptedException ie) {
+				setLastExitStatus(null);
+				setLastCommand(command);
+				throw new SourceException(INTERRUPTED_WHILE_WAITING_FOR_COMMAND, "Interrupted while waiting for the following command to finish:\n" + getFormattedLastCommand(), ie);
+			}
+			catch (final IOException e) {
+				setLastExitStatus(null);
+				setLastCommand(command);
+				throw new SourceException(SourceExceptionCode.XRDFS_CANNOT_CONFIRM_UPLOAD, "IOException running this command:\n" + getFormattedLastCommand(), e);
+			}
+
+			final JSONParser jsonParser = new JSONParser();
+
+			final String stdout = exitStatus.getStdOut();
+
+			if (stdout.startsWith("{")) {
+				final JSONObject out = (JSONObject) jsonParser.parse(stdout);
+
+				final JSONArray ja = (JSONArray) out.get("responses");
+
+				for (final Object o : ja) {
+					final PFNStagingStatus status = new PFNStagingStatus((JSONObject) o);
+
+					for (final PFN p : pfns) {
+						System.err.println(p.pfn + " <-> " + status.path);
+
+						if (p.pfn.contains(status.path)) {
+							ret.put(p, status);
+							break;
+						}
+					}
+				}
+			}
+			else {
+				if (stdout.contains("Request 3001 not supported")) {
+					for (final PFN p : pfns) {
+						final String stat = xrdstat(p, false, false, false);
+
+						ret.put(p, new PFNStagingStatus(stat));
+					}
+				}
+			}
+		}
+		catch (final MalformedURLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		catch (final IOException ioe) {
+			logger.log(Level.WARNING, "Cannot get the staging status", ioe);
+		}
+		catch (final ParseException e) {
+			logger.log(Level.WARNING, "JSON error", e);
+		}
+
+		return ret;
 	}
 
 	/**
