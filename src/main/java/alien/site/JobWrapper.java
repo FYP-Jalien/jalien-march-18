@@ -17,6 +17,7 @@ import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Hashtable;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -27,6 +28,8 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import alien.api.Request;
 import alien.api.TomcatServer;
@@ -50,9 +53,12 @@ import alien.site.packman.CVMFS;
 import alien.site.packman.PackMan;
 import alien.taskQueue.JDL;
 import alien.taskQueue.JobStatus;
+import alien.taskQueue.TaskQueueUtils;
 import alien.user.JAKeyStore;
 import alien.user.UserFactory;
 import apmon.ApMon;
+import apmon.ApMonMonitoringConstants;
+import apmon.BkThread;
 import lazyj.Format;
 import lia.util.process.ExternalProcesses;
 
@@ -385,6 +391,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		putJobTrace("Starting execution");
 
 		changeStatus(JobStatus.RUNNING);
+
 		final int code = executeCommand(jdl.gets("Executable"), jdl.getArguments(), environment_packages, "execution");
 
 		return code;
@@ -464,9 +471,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			putJobTrace("Using nested containers");
 			cmd = appt.containerize(String.join(" ", cmd), false);
 		}
-		
+
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
-	
+
 		final ProcessBuilder pBuilder = new ProcessBuilder(cmd);
 
 		final Map<String, String> processEnv = pBuilder.environment();
@@ -1104,8 +1111,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			extrafields.put("spyurl", hostName + ":" + TomcatServer.getPort());
 			extrafields.put("node", hostName);
 			extrafields.put("agentuuid", Request.getVMID().toString());
-			
+
 			// TODO add "cpu" with columns from QUEUE_CPU
+			HashMap<String,Object> cpuExtraFields = getStaticCPUAccounting();
+			extrafields.put("cpu", cpuExtraFields);
+
+			extrafields.put("ncpu", TaskQueueUtils.getCPUCores(jdl));
+			extrafields.put("mem", Runtime.getRuntime().maxMemory());
 		}
 
 		try {
@@ -1359,5 +1371,72 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 	private boolean putJobTrace(final String value) {
 		return putJobLog("trace", value);
+	}
+
+	private HashMap<String, Object> getStaticCPUAccounting() {
+		HashMap<String, Object> cpuExtraFields = new HashMap<>();
+
+		try {
+			Hashtable<Long, String> cpuinfo;
+			cpuinfo = BkThread.getCpuInfo();
+			cpuExtraFields.put("processor_count", BkThread.getNumCPUs());
+			cpuExtraFields.put("model_name", cpuinfo.getOrDefault(ApMonMonitoringConstants.LGEN_CPU_MODEL_NAME, null));
+			cpuExtraFields.put("vendor_id", cpuinfo.getOrDefault(ApMonMonitoringConstants.LGEN_CPU_VENDOR_ID, null));
+			cpuExtraFields.put("cpu_family", cpuinfo.getOrDefault(ApMonMonitoringConstants.LGEN_CPU_FAMILY, null));
+			cpuExtraFields.put("model", cpuinfo.getOrDefault(ApMonMonitoringConstants.LGEN_CPU_MODEL, null));
+		} catch (Exception e) {
+			logger.log(Level.SEVERE, "Could not get information from BkThread: " + e.toString());
+		}
+
+
+		boolean ht = false;
+		try {
+			final List<String> lines = Files.readAllLines(Paths.get("/proc/cpuinfo"));
+			Integer cores = null;
+			Integer siblings = null;
+			String microcode = null;
+
+			final Pattern flagsPattern = Pattern.compile("^flags\\s*:([\\w ]+)");
+			final Pattern coresPattern = Pattern.compile("^cpu cores\\s*:\\s*([0-9]+)\\s*");
+			final Pattern siblingsPattern = Pattern.compile("^siblings\\s*:\\s*([0-9]+)\\s*");
+			final Pattern microcodePattern = Pattern.compile("^microcode\\s*:([\\w\\s]+)");
+
+			Matcher m;
+			for (final String line : lines) {
+				m = flagsPattern.matcher(line);
+				if (m.matches() && (line.contains("ht ") || line.contains(" ht"))) {
+					ht = true;
+				}
+
+				m = coresPattern.matcher(line);
+				if (m.matches()) {
+					if (cores == null)
+						cores = 0;
+					cores += Integer.valueOf(m.group(1));
+				}
+
+				m = siblingsPattern.matcher(line);
+				if (m.matches()) {
+					if (siblings == null)
+						siblings = 0;
+					siblings += Integer.valueOf(m.group(1));
+				}
+
+				m = microcodePattern.matcher(line);
+				if (m.matches()) {
+					microcode = m.group(1);
+					cpuExtraFields.put("microcode", microcode);
+				}
+
+			}
+
+			cpuExtraFields.put("cores", cores);
+			cpuExtraFields.put("siblings", siblings);
+			cpuExtraFields.put("ht", ht ? 1 : 0);
+		} catch (Exception e) {
+			logger.log(Level.SEVERE, "Could not read/parse /proc/cpuinfo: " + e.toString());
+		}
+
+		return cpuExtraFields;
 	}
 }

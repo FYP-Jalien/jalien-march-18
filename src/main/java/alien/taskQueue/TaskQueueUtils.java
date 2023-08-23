@@ -869,7 +869,8 @@ public class TaskQueueUtils {
 
 						if (value instanceof Map) {
 							final int id = getOrInsertType(entry.getKey(), (Map<?, ?>) value);
-							map.put(fieldMap.get(key + "_field") + "Id", Integer.valueOf(id));
+							if (id > 0)
+								map.put(fieldMap.get(key + "_field") + "Id", Integer.valueOf(id));
 						}
 						else {
 							if (key.contains("node") || key.contains("exechost")) {
@@ -915,7 +916,7 @@ public class TaskQueueUtils {
 			if (db.query(DBFunctions.composeInsert("QUEUE_" + key.toUpperCase(), map)))
 				return db.getLastGeneratedKey().intValue();
 
-			return 0;
+			return -1;
 		}
 	}
 

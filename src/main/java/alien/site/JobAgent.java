@@ -15,12 +15,13 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.UncheckedIOException;
 import java.lang.ProcessBuilder.Redirect;
+import java.math.BigInteger;
 import java.net.HttpURLConnection;
 import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
@@ -47,8 +48,12 @@ import java.util.logging.Logger;
 import java.util.logging.SimpleFormatter;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.math.BigInteger;
 import java.util.stream.Collectors;
+
+import org.json.simple.JSONArray;
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+import org.json.simple.parser.ParseException;
 
 import alien.api.DispatchSSLClient;
 import alien.api.Request;
@@ -76,11 +81,6 @@ import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
 import lia.util.process.ExternalProcesses;
 import sun.misc.Signal;
-
-import org.json.simple.JSONArray;
-import org.json.simple.JSONObject;
-import org.json.simple.parser.JSONParser;
-import org.json.simple.parser.ParseException;
 import utils.ProcessWithTimeout;
 
 /**
@@ -124,6 +124,7 @@ public class JobAgent implements Runnable {
 	private int cpuCores = 1;
 	private long ttl;
 	private String endState = "";
+	private Float jobPrice = Float.valueOf(1);
 
 	private static AtomicInteger totalJobs = new AtomicInteger(0);
 	private final int jobNumber;
@@ -240,6 +241,7 @@ public class JobAgent implements Runnable {
 	private Integer RES_NOCPUS = Integer.valueOf(1);
 	private String RES_CPUMHZ = "";
 	private String RES_CPUFAMILY = "";
+	private String RES_BATCH_INFO = "";
 
 	// Resource management vars
 
@@ -599,6 +601,12 @@ public class JobAgent implements Runnable {
 				RUNNING_DISK -= reqDisk;
 				logger.log(Level.INFO, "Currently available CPUCores: " + RUNNING_CPU);
 				logger.log(Level.INFO, "Task isolation is set to " + cpuIsolation);
+
+				jobPrice = jdl.getFloat("Price");
+				if (jobPrice == null)
+					jobPrice = Float.valueOf(1);
+				logger.log(Level.INFO, "Job Price is set to " + jobPrice);
+
 				requestSync.notifyAll();
 			}
 
@@ -1379,8 +1387,22 @@ public class JobAgent implements Runnable {
 		logger.log(Level.INFO, procinfo);
 
 		putJobLog("proc", procinfo);
-		
-		// TODO call `TaskQueueApiUtils.setJobStatus(queueId, resubmission, null, extrafields)` with the job accounting data as extrafields 
+
+
+		if (finalReporting) {
+			HashMap<String, Object> extrafields = new HashMap<> ();
+			extrafields.put("maxrsize", RES_RMEMMAX);
+			extrafields.put("cputime", RES_CPUTIME);
+			extrafields.put("cost", RES_RUNTIME * jobPrice); // walltime * price = realtime * nr_cores * price
+			extrafields.put("si2k", "1"); // TODO - speedup factor (to be updated)
+			extrafields.put("runtimes", RES_RUNTIME);
+			extrafields.put("maxvsize", RES_VMEMMAX);
+			extrafields.put("batchid", RES_BATCH_INFO); // TODO - send from sendBatchInfo();
+
+			if (!TaskQueueApiUtils.setJobStatus(queueId, resubmission, null, extrafields)) {
+				logger.log(Level.INFO, "Could not send accounting data");
+			}
+		}
 
 		lastHeartbeat = System.currentTimeMillis();
 	}
@@ -1565,17 +1587,28 @@ public class JobAgent implements Runnable {
 					try {
 						final List<String> lines = Files.readAllLines(Paths.get(env.get(var)));
 						for (final String line : lines) {
-							if (line.contains("GlobalJobId"))
-								putJobTrace("BatchId " + line);
+							if (line.contains("GlobalJobId")) {
+								String traceLine = "BatchId " + line;
+								putJobTrace(traceLine);
+								RES_BATCH_INFO += traceLine + ";";
+							}
 						}
 					}
 					catch (final IOException e) {
 						logger.log(Level.WARNING, "Error getting batch info from file " + env.get(var) + ":", e);
 					}
 				}
-				else
-					putJobTrace("BatchId " + var + ": " + env.get(var));
+				else {
+					String traceLine = "BatchId " + var + ": " + env.get(var);
+					putJobTrace(traceLine);
+					RES_BATCH_INFO += traceLine + ";";
+				}
 			}
+		}
+
+		HashMap<String, Object> extrafields = new HashMap<String,Object>(Map.of("batchid", RES_BATCH_INFO));
+		if (!TaskQueueApiUtils.setJobStatus(jobNumber, resubmission, null, extrafields)) {
+			logger.log(Level.INFO, "Could not send batchid for accounting");
 		}
 	}
 
@@ -1834,9 +1867,9 @@ public class JobAgent implements Runnable {
 	}
 
 	/**
-	 * 
+	 *
 	 * Checks for the presence of core directories, either through Java or shell
-	 * 
+	 *
 	 * @param checkUsingJava will use shell instead of Java on false
 	 * @return name of dir if found, and null otherwise
 	 * @throws IOException for errors using Java check
@@ -2028,7 +2061,7 @@ public class JobAgent implements Runnable {
 				for (int i = 0; i < probeList.size(); i++) {
 					String testName = (String) probeList.get(i);
 					JSONObject testOutput = runProbe(testName);
-					
+
 					if (testOutput!=null)
 						uploadResults(nodeHostName, alienSiteName, testName, testOutput);
 				}
