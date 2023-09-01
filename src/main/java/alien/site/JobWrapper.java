@@ -1392,17 +1392,31 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		boolean ht = false;
 		try {
 			final List<String> lines = Files.readAllLines(Paths.get("/proc/cpuinfo"));
-			Integer cores = null;
-			Integer siblings = null;
 			String microcode = null;
 
+			final Pattern physicalIdPattern = Pattern.compile("^physical id\\s*:\\s*([\\w ]+)");
 			final Pattern flagsPattern = Pattern.compile("^flags\\s*:([\\w ]+)");
 			final Pattern coresPattern = Pattern.compile("^cpu cores\\s*:\\s*([0-9]+)\\s*");
 			final Pattern siblingsPattern = Pattern.compile("^siblings\\s*:\\s*([0-9]+)\\s*");
 			final Pattern microcodePattern = Pattern.compile("^microcode\\s*:([\\w\\s]+)");
 
+			HashMap<Integer, HashMap<String, Integer>> physicalCPUs = new HashMap<>();
+
+			Integer physicalId = -1;
+			HashMap<String, Integer> physicalCPU = null;
+
 			Matcher m;
 			for (final String line : lines) {
+				m = physicalIdPattern.matcher(line);
+				if (m.matches()) {
+					physicalId = Integer.valueOf(m.group(1));
+					physicalCPU = physicalCPUs.get(physicalId);
+					if (physicalCPU == null) {
+						physicalCPU = new HashMap<>();
+						physicalCPUs.put(physicalId, physicalCPU);
+					}
+				}
+
 				m = flagsPattern.matcher(line);
 				if (m.matches() && (line.contains("ht ") || line.contains(" ht"))) {
 					ht = true;
@@ -1410,16 +1424,22 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 				m = coresPattern.matcher(line);
 				if (m.matches()) {
-					if (cores == null)
-						cores = 0;
-					cores += Integer.valueOf(m.group(1));
+					Integer coresLine = Integer.valueOf(m.group(1));
+					if (physicalCPU != null) {
+						Integer coresPerPhysicalCPU = physicalCPU.get("cores");
+						if (coresPerPhysicalCPU == null || (coresPerPhysicalCPU != null && coresLine > coresPerPhysicalCPU))
+							physicalCPU.put("cores", coresLine);
+					}
 				}
 
 				m = siblingsPattern.matcher(line);
 				if (m.matches()) {
-					if (siblings == null)
-						siblings = 0;
-					siblings += Integer.valueOf(m.group(1));
+					Integer siblingsLine = Integer.valueOf(m.group(1));
+					if (physicalCPU != null) {
+						Integer siblingsPerPhysicalCPU = physicalCPU.get("siblings");
+						if (siblingsPerPhysicalCPU == null || (siblingsPerPhysicalCPU != null && siblingsLine > siblingsPerPhysicalCPU))
+							physicalCPU.put("siblings", siblingsLine);
+					}
 				}
 
 				m = microcodePattern.matcher(line);
@@ -1428,6 +1448,14 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					cpuExtraFields.put("microcode", microcode);
 				}
 
+			}
+
+			Integer cores = 0;
+			Integer siblings = 0;
+
+			for (Integer id : physicalCPUs.keySet()) {
+				cores += physicalCPUs.get(id).get("cores") != null ? physicalCPUs.get(id).get("cores") : 0;
+				siblings += physicalCPUs.get(id).get("siblings") != null ? physicalCPUs.get(id).get("siblings") : 0;
 			}
 
 			cpuExtraFields.put("cores", cores);
