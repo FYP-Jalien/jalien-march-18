@@ -185,9 +185,7 @@ public abstract class Containerizer {
 	 * @param cmd
 	 * @return parameter
 	 */
-	public List<String> containerize(String cmd) {
-		return containerize(cmd);
-	}
+	public abstract List<String> containerize(String cmd);
 
 	/**
 	 * Decorating arguments to run the given command under a container. Returns a
