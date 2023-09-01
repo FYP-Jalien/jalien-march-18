@@ -905,8 +905,6 @@ public class JobAgent implements Runnable {
 
 		int code = -1;
 
-		logger.log(Level.INFO, "About to enter monitor loop. Is the JobWrapper process alive?: " + p.isAlive());
-
 		final Thread heartMon = new Thread(heartbeatMonitor(p));
 		heartMon.start();
 
