@@ -3546,6 +3546,12 @@ public class TaskQueueUtils {
 						"UPDATE SITEQUEUES set " + j.getStatusName() + "=GREATEST(" + j.getStatusName() + "-1,0), " + targetStatus.name() + "=GREATEST(" + targetStatus.name() + ",0)+1 where siteid=?",
 						false, Integer.valueOf(j.siteid));
 
+				if (!db.query("UPDATE QUEUEPROC SET maxrsize=null,cputime=null,ncpu=null,batchid=null,cost=null,cpufamily=null,cpu=null,rsize=null,"
+							+ "spyurl=null,runtime=null,mem=null,si2k=null,cpuspeed=null,vsize=null,runtimes=null,procinfotime=null,maxvsize=null,"
+							+ "agentuuid=null,cpuId=null where queueId=?", false, Long.valueOf(queueId))) {
+					logger.severe("Resubmit: cannot update QUEUEPROC for job: " + queueId);
+				}
+
 				// if the job was attached to a node, we tell him to hara-kiri
 				if (j.node != null && (js == JobStatus.STARTED || js == JobStatus.RUNNING || js == JobStatus.ASSIGNED || js == JobStatus.ZOMBIE || js == JobStatus.SAVING)) {
 					logger.fine("Resubmit: sending kill message to job " + queueId);
