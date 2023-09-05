@@ -1398,7 +1398,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			final Pattern flagsPattern = Pattern.compile("^flags\\s*:([\\w ]+)");
 			final Pattern coresPattern = Pattern.compile("^cpu cores\\s*:\\s*([0-9]+)\\s*");
 			final Pattern siblingsPattern = Pattern.compile("^siblings\\s*:\\s*([0-9]+)\\s*");
-			final Pattern microcodePattern = Pattern.compile("^microcode\\s*:([\\w\\s]+)");
+			final Pattern microcodePattern = Pattern.compile("^microcode\\s*:(\\s*[\\w\\s]+)");
 
 			HashMap<Integer, HashMap<String, Integer>> physicalCPUs = new HashMap<>();
 
@@ -1445,9 +1445,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				m = microcodePattern.matcher(line);
 				if (m.matches()) {
 					microcode = m.group(1);
-					cpuExtraFields.put("microcode", microcode);
+					cpuExtraFields.put("microcode", microcode.trim());
 				}
-
 			}
 
 			Integer cores = 0;
