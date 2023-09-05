@@ -45,6 +45,7 @@ public class CVMFS extends PackMan {
 	private final static String CVMFS_BASE_DIR = "/cvmfs/alice.cern.ch";
 	private final static String JAVA32_DIR = CVMFS_BASE_DIR + "/java/JDKs/i686/jdk-latest/bin";
 	private final static String JAVA64_DIR = CVMFS_BASE_DIR + "/java/JDKs/x86_64/jdk-latest/bin";
+	private final static String JAVA_ARM_DIR = CVMFS_BASE_DIR + "/java/JDKs/aarch64/jdk-latest/bin";
 	private static String ALIEN_BIN_DIR = CVMFS_BASE_DIR + "/bin";
 
 	/**
@@ -224,6 +225,13 @@ public class CVMFS extends PackMan {
 	 */
 	public static String getJava64Dir() {
 		return JAVA64_DIR;
+	}
+
+	/**
+	 * @return Aarch64 JRE location in CVMFS, to be used for Arm WNs
+	 */
+	public static String getJavaArmDir() {
+		return JAVA_ARM_DIR;
 	}
 
 	/**

@@ -445,6 +445,9 @@ public class JobAgent implements Runnable {
 		catch (final ApMonException e) {
 			logger.log(Level.WARNING, "Problem with the monitoring objects ApMon Exception: " + e.toString());
 		}
+		catch (final Exception e) {
+			logger.log(Level.WARNING, "Unknown exception: " + e.toString());
+		}
 
 		wholeNode = ((Boolean) siteMap.getOrDefault("WholeNode", Boolean.valueOf(false))).booleanValue();
 		initialMask = getInitialMask();

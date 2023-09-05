@@ -516,7 +516,10 @@ public final class ComputingElement extends Thread {
 
 	private static String getStartup() {
 		final String javaDir;
-		if (!ConfigUtils.getConfiguration("version").getb("jdk64", true))
+
+		if (ConfigUtils.getConfiguration("version").getb("jdkArm", true) )
+			javaDir = CVMFS.getJavaArmDir() + "/";
+		else if (!ConfigUtils.getConfiguration("version").getb("jdk64", true))
 			javaDir = CVMFS.getJava32Dir() + "/";
 		else
 			javaDir = CVMFS.getJava64Dir() + "/";
