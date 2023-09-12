@@ -120,9 +120,16 @@ public final class ComputingElement extends Thread {
 		logger.info("Looping");
 		while (true) {
 
-			if (JAKeyStore.expireSoon(commander.getUser().getUserCert()[0].getNotAfter().getTime())) {
-				logger.log(Level.WARNING, "Certificate is about to expire");
-				System.exit(0);
+			try {
+				if (JAKeyStore.checkExpireSoonAndReload() >= 2) {
+					// we need at least a couple of days if valid identity to request JA tokens with
+					logger.log(Level.WARNING, "Certificate is about to expire and a newer one was not available");
+					System.exit(0);
+				}
+			}
+			catch (Exception e) {
+				logger.log(Level.SEVERE, "Exception reloading the identity", e);
+				System.exit(1);
 			}
 
 			if (System.currentTimeMillis() - lastLdapRefresh > LDAP_REFRESH_INTERVAL) {
@@ -534,7 +541,7 @@ public final class ComputingElement extends Thread {
 		if (jarPathCustom != null && !jarPathCustom.isBlank())
 			return javaDir + javaCmd + " " + jarPathCustom + " " + jarClass;
 
-		return javaDir + javaCmd + " " + jarPath+ " " + jarClass;
+		return javaDir + javaCmd + " " + jarPath + " " + jarClass;
 	}
 
 	/**
