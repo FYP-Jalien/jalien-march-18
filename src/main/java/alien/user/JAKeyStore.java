@@ -313,7 +313,12 @@ public class JAKeyStore {
 			}
 			catch (@SuppressWarnings("unused") final Exception e) {
 				try (BufferedReader br = new BufferedReader(new InputStreamReader(System.in))) {
-					passwd = br.readLine().toCharArray();
+					final String line = br.readLine();
+
+					if (line != null)
+						passwd = line.toCharArray();
+					else
+						logger.log(Level.WARNING, "Failed to read a password from System.in");
 				}
 				catch (final IOException ioe) {
 					logger.log(Level.WARNING, "Error asking for a password interactively", ioe);
@@ -342,9 +347,9 @@ public class JAKeyStore {
 
 	/**
 	 * @param certString
-	 *            programatically set the token certificate
+	 *            programmatically set the token certificate
 	 * @param keyString
-	 *            programatically set the token key
+	 *            programmatically set the token key
 	 * @throws Exception
 	 *             if something goes wrong
 	 */
@@ -794,7 +799,7 @@ public class JAKeyStore {
 			tokenkeypath = defaultTokenKeyPath;
 
 		final GetTokenCertificate tokRequest = new GetTokenCertificate(userIdentity, userIdentity.getDefaultUser(), TokenCertificateType.USER_CERTIFICATE, null,
-				TokenCertificateType.USER_CERTIFICATE.getMaxValidity());
+				/* TokenCertificateType.USER_CERTIFICATE.getMaxValidity() */ 1);
 
 		final GetTokenCertificate tokReply;
 
@@ -803,6 +808,11 @@ public class JAKeyStore {
 		}
 		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Token request failed", e);
+			return false;
+		}
+
+		if (tokReply == null) {
+			logger.log(Level.SEVERE, "Null token was returned by the call");
 			return false;
 		}
 
@@ -933,6 +943,11 @@ public class JAKeyStore {
 	}
 
 	/**
+	 * 2 days
+	 */
+	private static final long SOON_EXPIRATION_LIMIT = 1000L * 60 * 60 * 24 * 2;
+
+	/**
 	 * Check if the certificate will expire in the next two days
 	 *
 	 * @param endTime expiration time of the certificate
@@ -940,7 +955,7 @@ public class JAKeyStore {
 	 * @return <code>true</code> if the certificate will be valid for less than two days
 	 */
 	public static boolean expireSoon(final long endTime) {
-		return endTime - System.currentTimeMillis() < 1000L * 60 * 60 * 24 * 2;
+		return endTime - System.currentTimeMillis() < SOON_EXPIRATION_LIMIT;
 	}
 
 	/**
@@ -997,5 +1012,91 @@ public class JAKeyStore {
 		context.init(kmf.getKeyManagers(), JAKeyStore.trusts, null);
 
 		return context.getSocketFactory();
+	}
+
+	private static long certificateNextCheck = 0;
+
+	private static int certificateCheckCode = 1;
+
+	/**
+	 * @return
+	 *         <ul>
+	 *         <li>0: the identity was renewed, the new one is valid and will not expire soon</li>
+	 *         <li>1: the current identity is valid and will not expire soon</li>
+	 *         <li>2: the current identity is valid but it will expire soon</li>
+	 *         </ul>
+	 * @throws IOException in case of any error loading certificates / using expired ones etc
+	 */
+	public static synchronized int checkExpireSoonAndReload() throws IOException {
+		if (System.currentTimeMillis() < certificateNextCheck) {
+			// don't check that frequently
+			if (certificateCheckCode == 0)
+				certificateCheckCode = 1;
+
+			return certificateCheckCode;
+		}
+
+		KeyStore store = getKeyStore();
+
+		if (store == null)
+			throw new IOException("No keystore is loaded");
+
+		Certificate[] certs;
+		try {
+			certs = store.getCertificateChain("User.cert");
+		}
+		catch (final KeyStoreException e) {
+			throw new IOException("Could not extract the User.cert component from the key store", e);
+		}
+
+		if (certs == null || certs.length == 0)
+			throw new IOException("The identity doesn't have a User.cert componenet");
+
+		if (!(certs[0] instanceof X509Certificate))
+			throw new IOException("The identity is not a X.509 certificate");
+
+		final long oldExpirationTime = ((X509Certificate) certs[0]).getNotAfter().getTime();
+
+		if (!expireSoon(oldExpirationTime)) {
+			// defer all certificate checks until it will soon expire
+			certificateNextCheck = oldExpirationTime - SOON_EXPIRATION_LIMIT;
+			return certificateCheckCode = 1;
+		}
+
+		keystore_loaded = false;
+
+		store = getKeyStore();
+
+		if (store == null)
+			throw new IOException("No keystore was found after reloading");
+
+		try {
+			certs = store.getCertificateChain("User.cert");
+		}
+		catch (final KeyStoreException e) {
+			throw new IOException("Could not extract the User.cert component from the key store after reloading", e);
+		}
+
+		if (certs == null || certs.length == 0)
+			throw new IOException("The identity doesn't have a User.cert component after reloading");
+
+		if (!(certs[0] instanceof X509Certificate))
+			throw new IOException("The reloaded identity is not a X.509 certificate");
+
+		final long newExpirationTime = ((X509Certificate) certs[0]).getNotAfter().getTime();
+
+		if (newExpirationTime < System.currentTimeMillis())
+			throw new IOException("Cannot continue with an expired identity");
+
+		if (newExpirationTime <= oldExpirationTime) {
+			// nothing changed, we should check again as we get closer to the expiration time
+			// certificateNextCheck = (System.currentTimeMillis() + newExpirationTime) / 2;
+			return certificateCheckCode = 2;
+		}
+
+		// the certificate was renewed, next check as we get closer to the expiration time
+		certificateNextCheck = newExpirationTime - SOON_EXPIRATION_LIMIT;
+
+		return certificateCheckCode = 0;
 	}
 }
