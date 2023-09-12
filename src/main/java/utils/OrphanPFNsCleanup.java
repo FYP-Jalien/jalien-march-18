@@ -373,8 +373,14 @@ public class OrphanPFNsCleanup {
 								else {
 									final int threads = getPoolSize(seNumber);
 
-									executor.setCorePoolSize(threads);
-									executor.setMaximumPoolSize(threads);
+									if (threads > executor.getCorePoolSize()) {
+										executor.setMaximumPoolSize(threads);
+										executor.setCorePoolSize(threads);
+									}
+									else {
+										executor.setCorePoolSize(threads);
+										executor.setMaximumPoolSize(threads);
+									}
 								}
 
 								List<UUID> nullUUIDs = new ArrayList<>();
