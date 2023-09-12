@@ -236,6 +236,13 @@ public class JSh {
 
 		try (BufferedReader out = new BufferedReader(new InputStreamReader(p.getInputStream())); PrintWriter pw = new PrintWriter(p.getOutputStream())) {
 			final String user_key = JAKeyStore.getClientKeyPath();
+
+			if (user_key == null) {
+				System.err.println("Key not found in ~/.globus/userkey.pem");
+				p.destroy();
+				return false;
+			}
+
 			final char[] certificate_password = JAKeyStore.requestPassword(user_key);
 			if (certificate_password != null) {
 				pw.println(certificate_password);
