@@ -38,6 +38,7 @@ public class JCentral {
 			// catalogueAPIService.start();
 			JAKeyStore.loadKeyStore();
 			TomcatServer.startTomcatServer();
+			TomcatServer.startConnectorReloader();
 
 			JOptimizers.getInstance();
 
