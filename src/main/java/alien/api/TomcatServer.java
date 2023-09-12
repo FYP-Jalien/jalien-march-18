@@ -1,10 +1,11 @@
 package alien.api;
 
-import java.io.File;
+import java.io.IOException;
 import java.net.BindException;
 import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.security.KeyStore;
+import java.util.Date;
 import java.util.concurrent.Executor;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.ThreadPoolExecutor;
@@ -20,7 +21,7 @@ import org.apache.catalina.servlets.DefaultServlet;
 import org.apache.catalina.startup.Tomcat;
 import org.apache.catalina.util.ServerInfo;
 import org.apache.coyote.ProtocolHandler;
-import org.apache.coyote.http11.Http11NioProtocol;
+import org.apache.coyote.http11.AbstractHttp11Protocol;
 import org.apache.tomcat.util.descriptor.web.LoginConfig;
 import org.apache.tomcat.util.descriptor.web.SecurityCollection;
 import org.apache.tomcat.util.descriptor.web.SecurityConstraint;
@@ -33,7 +34,6 @@ import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.user.JAKeyStore;
 import alien.user.LdapCertificateRealm;
-import alien.user.UserFactory;
 import alien.websockets.WebsocketListener;
 import alien.websockets.WebsocketServlet;
 
@@ -63,7 +63,7 @@ public class TomcatServer {
 	/**
 	 * The expiration date of the certificate, used as server cert in tomcat
 	 */
-	private static long expirationTime;
+	private static long expirationTime = 0;
 
 	/**
 	 * Start the Tomcat server on a given port
@@ -160,12 +160,6 @@ public class TomcatServer {
 	 * @param tomcatPort
 	 */
 	private static Connector createSslConnector(final int tomcatPort, final String bindAddress) {
-		final String keystorePass = new String(JAKeyStore.pass);
-
-		final KeyStore serverIdentity = ConfigUtils.isCentralService() ? JAKeyStore.getKeyStore() : JAKeyStore.tokenCert;
-
-		expirationTime = JAKeyStore.getExpirationTime(JAKeyStore.getKeyStore());
-
 		final Connector connector = new Connector("org.apache.coyote.http11.Http11Nio2Protocol");
 
 		connector.setProperty("address", ConfigUtils.getConfig().gets("alien.api.TomcatServer.bindAddress", bindAddress));
@@ -180,36 +174,76 @@ public class TomcatServer {
 		connector.setProperty("compression", "on");
 		connector.setProperty("compressionMinSize", "1");
 		connector.setProperty("useSendFile", "false");
-		connector.setProperty("defaultSSLHostConfigName", "localhost");
+		connector.setProperty("defaultSSLHostConfigName", "_default_");
 
-		final SSLHostConfig hostconfig = new SSLHostConfig();
-		hostconfig.setHostName("localhost");
-		hostconfig.setCertificateVerification("require");
-		hostconfig.setTrustStore(JAKeyStore.trustStore);
-		hostconfig.setTruststorePassword(keystorePass);
-		hostconfig.setSslProtocol("TLS");
-		hostconfig.setProtocols("TLSv1.2");
-
-		final SSLHostConfigCertificate cert = new SSLHostConfigCertificate(hostconfig, Type.UNDEFINED);
-		cert.setCertificateKeystore(serverIdentity);
-		cert.setCertificateKeystorePassword(new String(JAKeyStore.pass));
-
-		hostconfig.addCertificate(cert);
-
-		connector.addSslHostConfig(hostconfig);
+		if (!setServerIdentity(connector))
+			return null;
 
 		return connector;
 	}
 
-	/**
-	 * Reload the key and trust stores
-	 */
-	private static void reload(final Connector connector) {
-		final ProtocolHandler protocolHandler = connector.getProtocolHandler();
-		if (protocolHandler instanceof Http11NioProtocol) {
-			final Http11NioProtocol http11NioProtocol = (Http11NioProtocol) protocolHandler;
-			http11NioProtocol.reloadSslHostConfigs();
+	private static boolean setServerIdentity(final Connector connector) {
+		// the token certificate has the correct purpose (web server)
+		final KeyStore serverIdentity = ConfigUtils.isCentralService() ? JAKeyStore.getKeyStore() : JAKeyStore.tokenCert;
+
+		if (serverIdentity == null) {
+			logger.log(Level.SEVERE, "No identity is available");
+			return false;
 		}
+
+		final long newExpirationTime = JAKeyStore.getExpirationTime(serverIdentity);
+
+		if (expirationTime >= newExpirationTime)
+			return true;
+
+		expirationTime = newExpirationTime;
+
+		logger.log(Level.INFO, "Identity will expire on " + expirationTime + " (" + new Date(expirationTime) + ")");
+
+		final String keystorePass = new String(JAKeyStore.pass);
+
+		SSLHostConfig existingHostConfig = null;
+
+		for (final SSLHostConfig host : connector.findSslHostConfigs()) {
+			if (host.getHostName().equals("_default_")) {
+				existingHostConfig = host;
+				break;
+			}
+		}
+
+		final SSLHostConfig hostconfig;
+
+		if (existingHostConfig == null) {
+			logger.log(Level.INFO, "Creating the initial Tomcat SSL host configuration");
+			hostconfig = new SSLHostConfig();
+			hostconfig.setHostName("_default_");
+			hostconfig.setCertificateVerification("require");
+			hostconfig.setTrustStore(JAKeyStore.trustStore);
+			hostconfig.setTruststorePassword(keystorePass);
+			hostconfig.setSslProtocol("TLS");
+			hostconfig.setProtocols("TLSv1.2");
+		}
+		else {
+			logger.log(Level.INFO, "Reusing the existing SSL host configuration");
+			hostconfig = existingHostConfig;
+		}
+
+		final SSLHostConfigCertificate cert = new SSLHostConfigCertificate(hostconfig, Type.RSA);
+		cert.setCertificateKeystore(serverIdentity);
+		cert.setCertificateKeystorePassword(new String(JAKeyStore.pass));
+
+		hostconfig.getCertificates().clear();
+		hostconfig.addCertificate(cert);
+
+		if (existingHostConfig != null) {
+			final ProtocolHandler protocol = connector.getProtocolHandler();
+			if (protocol instanceof AbstractHttp11Protocol)
+				((AbstractHttp11Protocol<?>) protocol).reloadSslHostConfigs();
+		}
+		else
+			connector.addSslHostConfig(hostconfig);
+
+		return true;
 	}
 
 	/**
@@ -305,31 +339,34 @@ public class TomcatServer {
 	}
 
 	/**
-	 * Check tomcat's server certificate every 12 hour. Load fresh token if current one is going to expire
+	 * Check tomcat's server certificate every 12 hours. Load fresh token if current one is going to expire
 	 */
 	public static void startConnectorReloader() {
 		new Thread() {
 			@Override
 			public void run() {
-				final String dirName = System.getProperty("java.io.tmpdir") + File.separator;
-				final String keystoreName = dirName + "keystore.jks_" + UserFactory.getUserID();
-				final String truststoreName = dirName + "truststore.jks_" + UserFactory.getUserID();
-
 				try {
 					while (true) {
-						sleep(12 * 60 * 60 * 1000);
-						if (JAKeyStore.expireSoon(expirationTime)) {
-							if (ConfigUtils.isCentralService()) {
-								JAKeyStore.saveKeyStore(JAKeyStore.getKeyStore(), keystoreName, JAKeyStore.pass);
-								expirationTime = JAKeyStore.getExpirationTime(JAKeyStore.getKeyStore());
-							}
-							else {
-								JAKeyStore.saveKeyStore(JAKeyStore.tokenCert, keystoreName, JAKeyStore.pass);
-								expirationTime = JAKeyStore.getExpirationTime(JAKeyStore.tokenCert);
-							}
-							JAKeyStore.saveKeyStore(JAKeyStore.trustStore, truststoreName, JAKeyStore.pass);
+						sleep(12 * 60 * 60 * 1000L);
 
-							reload(tomcatServer.tomcat.getConnector());
+						try {
+							if (JAKeyStore.checkExpireSoonAndReload() == 0) {
+								// identity was renewed
+								if (!ConfigUtils.isCentralService())
+									if (!JAKeyStore.bootstrapFirstToken()) {
+										logger.log(Level.SEVERE, "Failed to request a new token");
+										System.exit(2);
+									}
+							}
+						}
+						catch (final IOException e) {
+							logger.log(Level.SEVERE, "Identity error, exiting", e);
+							System.exit(1);
+						}
+
+						if (!setServerIdentity(tomcatServer.tomcat.getConnector())) {
+							logger.log(Level.SEVERE, "Could not apply the identity on the running Tomcat instance");
+							System.exit(3);
 						}
 					}
 				}
