@@ -405,6 +405,8 @@ public final class ComputingElement extends Thread {
 		// before += "export cerequirements=\'" + System.getenv().get("cerequirements") + "\'\n";
 		// if (System.getenv().containsKey("partition"))
 		// before += "export partition=\"" + System.getenv().get("partition") + "\"\n";
+		if (config.containsKey("ce_cerequirements"))
+			before += "export cerequirements=\'" + config.get("ce_cerequirements") + "\'\n";
 		if (siteMap.containsKey("RequiredCpusCe"))
 			before += "export RequiredCpusCe=\"" + siteMap.get("RequiredCpusCe") + "\"\n";
 		if (siteMap.containsKey("cpuIsolation"))
