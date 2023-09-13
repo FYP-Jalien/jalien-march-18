@@ -83,7 +83,7 @@ public class ARC extends BatchQueue {
 		if (config.get(ce_env_str) == null) {
 			final String msg = ce_env_str + " needs to be defined!";
 			logger.warning(msg);
-			config.put(ce_env_str, new TreeSet<String>());
+			config.put(ce_env_str, new TreeSet<>());
 		}
 
 		try {
@@ -632,18 +632,18 @@ public class ARC extends BatchQueue {
 				continue;
 			}
 
-			Integer r = null, w = null;
+			int r = 0, w = 0;
 
 			try {
-				r = Integer.valueOf(r_obj.toString());
-				w = Integer.valueOf(w_obj.toString());
+				r = Integer.parseInt(r_obj.toString());
+				w = Integer.parseInt(w_obj.toString());
 			}
 			catch (@SuppressWarnings("unused") final Exception e) {
 				continue;
 			}
 
-			logger.fine("---> r=" + (r == null ? "null" : r_obj.toString()));
-			logger.fine("---> w=" + (w == null ? "null" : w_obj.toString()));
+			logger.fine("---> r=" + r);
+			logger.fine("---> w=" + w);
 
 			final String ce = url.replaceAll("^([^:.]+:/*)?([^:/]+).*", "$2");
 			final String name = share.replaceAll(".*:", "");
@@ -657,14 +657,13 @@ public class ARC extends BatchQueue {
 				continue;
 			}
 
-			logger.info(String.format("--> waiting: %5d, running: %5d, share '%s' on %s",
-					w, r, name, ce));
+			logger.info(String.format("--> waiting: %5d, running: %5d, share '%s' on %s", Integer.valueOf(w), Integer.valueOf(r), name, ce));
 
-			running.put(ce, Integer.valueOf(cr.intValue() + r.intValue()));
-			tot_running += r.intValue();
+			running.put(ce, Integer.valueOf(cr.intValue() + r));
+			tot_running += r;
 
-			waiting.put(ce, Integer.valueOf(cw.intValue() + w.intValue()));
-			tot_waiting += w.intValue();
+			waiting.put(ce, Integer.valueOf(cw.intValue() + w));
+			tot_waiting += w;
 
 			n++;
 		}

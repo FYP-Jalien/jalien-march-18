@@ -1389,12 +1389,11 @@ public class JobAgent implements Runnable {
 
 		putJobLog("proc", procinfo);
 
-
 		if (finalReporting) {
-			HashMap<String, Object> extrafields = new HashMap<> ();
+			HashMap<String, Object> extrafields = new HashMap<>();
 			extrafields.put("maxrsize", RES_RMEMMAX);
 			extrafields.put("cputime", RES_CPUTIME);
-			extrafields.put("cost", RES_RUNTIME * jobPrice); // walltime * price = realtime * nr_cores * price
+			extrafields.put("cost", Float.valueOf(RES_RUNTIME.floatValue() * jobPrice.floatValue())); // walltime * price = realtime * nr_cores * price
 			extrafields.put("si2k", "1"); // TODO - speedup factor (to be updated)
 			extrafields.put("runtimes", RES_RUNTIME);
 			extrafields.put("maxvsize", RES_VMEMMAX);
@@ -1607,7 +1606,7 @@ public class JobAgent implements Runnable {
 			}
 		}
 
-		HashMap<String, Object> extrafields = new HashMap<String,Object>(Map.of("batchid", RES_BATCH_INFO));
+		HashMap<String, Object> extrafields = new HashMap<>(Map.of("batchid", RES_BATCH_INFO));
 		if (!TaskQueueApiUtils.setJobStatus(jobNumber, resubmission, null, extrafields)) {
 			logger.log(Level.INFO, "Could not send batchid for accounting");
 		}
@@ -2063,7 +2062,7 @@ public class JobAgent implements Runnable {
 					String testName = (String) probeList.get(i);
 					JSONObject testOutput = runProbe(testName);
 
-					if (testOutput!=null)
+					if (testOutput != null)
 						uploadResults(nodeHostName, alienSiteName, testName, testOutput);
 				}
 			}

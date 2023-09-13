@@ -123,7 +123,7 @@ public class Dispatcher {
 		}
 
 		if (isCacheable && ret != null)
-			cache.put(key, new WeakReference<Request>(ret), ((Cacheable) ret).getTimeout());
+			cache.put(key, new WeakReference<>(ret), ((Cacheable) ret).getTimeout());
 
 		return ret;
 	}

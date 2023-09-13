@@ -126,7 +126,7 @@ public abstract class Containerizer {
 	public boolean checkCgroupsv2() {
 		try {
 			CommandOutput output = SystemCommand.executeCommand(Arrays.asList("/bin/bash", "-c", "mount -l | grep cgroup"));
-			final String outputString = output.reader().lines().collect(Collectors.joining());
+			final String outputString = output.stdout;
 			if (outputString == null || outputString.isBlank() || !outputString.contains("cgroup2"))
 				return false;
 		}
@@ -206,7 +206,7 @@ public abstract class Containerizer {
 	 * 
 	 * @param newContainerPath
 	 */
-	public void setContainerPath(final String newContainerPath) {
+	public static void setContainerPath(final String newContainerPath) {
 		containerImgPath = newContainerPath;
 	}
 

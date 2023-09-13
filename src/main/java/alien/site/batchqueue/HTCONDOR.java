@@ -86,7 +86,7 @@ public class HTCONDOR extends BatchQueue {
 		if (config.get(ce_env_str) == null) {
 			final String msg = ce_env_str + " needs to be defined!";
 			logger.warning(msg);
-			config.put(ce_env_str, new TreeSet<String>());
+			config.put(ce_env_str, new TreeSet<>());
 		}
 
 		try {

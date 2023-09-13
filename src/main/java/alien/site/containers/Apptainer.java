@@ -13,6 +13,11 @@ public class Apptainer extends Containerizer {
 		return containerize(cmd, true);
 	}
 
+	/**
+	 * @param cmd
+	 * @param containall
+	 * @return the command line arguments to pass to apptainer
+	 */
 	public List<String> containerize(final String cmd, boolean containall) {
 		final List<String> apptainerCmd = new ArrayList<>();
 		apptainerCmd.add(getBinPath());

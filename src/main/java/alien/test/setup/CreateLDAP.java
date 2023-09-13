@@ -405,7 +405,7 @@ public class CreateLDAP {
 
 		ArrayList<String> objClasses = new ArrayList<>(1);
 		objClasses.add(objClass);
-		addToLDAP(objClasses, new HashMap<String, Object>(0), attribute);
+		addToLDAP(objClasses, new HashMap<>(0), attribute);
 
 	}
 

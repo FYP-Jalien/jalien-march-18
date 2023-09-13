@@ -1113,11 +1113,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			extrafields.put("agentuuid", Request.getVMID().toString());
 
 			// TODO add "cpu" with columns from QUEUE_CPU
-			HashMap<String,Object> cpuExtraFields = getStaticCPUAccounting();
+			HashMap<String, Object> cpuExtraFields = getStaticCPUAccounting();
 			extrafields.put("cpu", cpuExtraFields);
 
-			extrafields.put("ncpu", TaskQueueUtils.getCPUCores(jdl));
-			extrafields.put("mem", Runtime.getRuntime().maxMemory());
+			extrafields.put("ncpu", Integer.valueOf(TaskQueueUtils.getCPUCores(jdl)));
+			extrafields.put("mem", Long.valueOf(Runtime.getRuntime().maxMemory()));
 		}
 
 		try {
@@ -1373,21 +1373,21 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		return putJobLog("trace", value);
 	}
 
-	private HashMap<String, Object> getStaticCPUAccounting() {
+	private static HashMap<String, Object> getStaticCPUAccounting() {
 		HashMap<String, Object> cpuExtraFields = new HashMap<>();
 
 		try {
 			Hashtable<Long, String> cpuinfo;
 			cpuinfo = BkThread.getCpuInfo();
-			cpuExtraFields.put("processor_count", BkThread.getNumCPUs());
+			cpuExtraFields.put("processor_count", Integer.valueOf(BkThread.getNumCPUs()));
 			cpuExtraFields.put("model_name", cpuinfo.getOrDefault(ApMonMonitoringConstants.LGEN_CPU_MODEL_NAME, null));
 			cpuExtraFields.put("vendor_id", cpuinfo.getOrDefault(ApMonMonitoringConstants.LGEN_CPU_VENDOR_ID, null));
 			cpuExtraFields.put("cpu_family", cpuinfo.getOrDefault(ApMonMonitoringConstants.LGEN_CPU_FAMILY, null));
 			cpuExtraFields.put("model", cpuinfo.getOrDefault(ApMonMonitoringConstants.LGEN_CPU_MODEL, null));
-		} catch (Exception e) {
+		}
+		catch (Exception e) {
 			logger.log(Level.SEVERE, "Could not get information from BkThread: " + e.toString());
 		}
-
 
 		boolean ht = false;
 		try {
@@ -1402,14 +1402,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			HashMap<Integer, HashMap<String, Integer>> physicalCPUs = new HashMap<>();
 
-			Integer physicalId = -1;
 			HashMap<String, Integer> physicalCPU = null;
 
 			Matcher m;
 			for (final String line : lines) {
 				m = physicalIdPattern.matcher(line);
 				if (m.matches()) {
-					physicalId = Integer.valueOf(m.group(1));
+					Integer physicalId = Integer.valueOf(m.group(1));
 					physicalCPU = physicalCPUs.get(physicalId);
 					if (physicalCPU == null) {
 						physicalCPU = new HashMap<>();
@@ -1427,7 +1426,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					Integer coresLine = Integer.valueOf(m.group(1));
 					if (physicalCPU != null) {
 						Integer coresPerPhysicalCPU = physicalCPU.get("cores");
-						if (coresPerPhysicalCPU == null || (coresPerPhysicalCPU != null && coresLine > coresPerPhysicalCPU))
+						if (coresPerPhysicalCPU == null || coresLine.intValue() > coresPerPhysicalCPU.intValue())
 							physicalCPU.put("cores", coresLine);
 					}
 				}
@@ -1437,7 +1436,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					Integer siblingsLine = Integer.valueOf(m.group(1));
 					if (physicalCPU != null) {
 						Integer siblingsPerPhysicalCPU = physicalCPU.get("siblings");
-						if (siblingsPerPhysicalCPU == null || (siblingsPerPhysicalCPU != null && siblingsLine > siblingsPerPhysicalCPU))
+						if (siblingsPerPhysicalCPU == null || siblingsLine.intValue() > siblingsPerPhysicalCPU.intValue())
 							physicalCPU.put("siblings", siblingsLine);
 					}
 				}
@@ -1449,18 +1448,19 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				}
 			}
 
-			Integer cores = 0;
-			Integer siblings = 0;
+			int cores = 0;
+			int siblings = 0;
 
-			for (Integer id : physicalCPUs.keySet()) {
-				cores += physicalCPUs.get(id).get("cores") != null ? physicalCPUs.get(id).get("cores") : 0;
-				siblings += physicalCPUs.get(id).get("siblings") != null ? physicalCPUs.get(id).get("siblings") : 0;
+			for (final HashMap<String, Integer> cpuEntry : physicalCPUs.values()) {
+				cores += cpuEntry.getOrDefault("cores", Integer.valueOf(0)).intValue();
+				siblings += cpuEntry.getOrDefault("siblings", Integer.valueOf(0)).intValue();
 			}
 
-			cpuExtraFields.put("cores", cores);
-			cpuExtraFields.put("siblings", siblings);
-			cpuExtraFields.put("ht", ht ? 1 : 0);
-		} catch (Exception e) {
+			cpuExtraFields.put("cores", Integer.valueOf(cores));
+			cpuExtraFields.put("siblings", Integer.valueOf(siblings));
+			cpuExtraFields.put("ht", Integer.valueOf(ht ? 1 : 0));
+		}
+		catch (Exception e) {
 			logger.log(Level.SEVERE, "Could not read/parse /proc/cpuinfo: " + e.toString());
 		}
 

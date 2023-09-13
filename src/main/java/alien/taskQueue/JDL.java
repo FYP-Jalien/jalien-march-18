@@ -941,7 +941,7 @@ public class JDL implements Serializable {
 			return;
 		}
 
-		set(key, new LinkedHashSet<String>());
+		set(key, new LinkedHashSet<>());
 	}
 
 	/**
