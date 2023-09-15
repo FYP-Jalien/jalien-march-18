@@ -43,6 +43,7 @@ import alien.catalogue.GUIDUtils;
 import alien.catalogue.LFN;
 import alien.catalogue.PFN;
 import alien.config.ConfigUtils;
+import alien.io.IOUtils;
 import alien.io.Transfer;
 import alien.io.protocols.Protocol;
 import alien.io.protocols.TempFileManager;
@@ -333,7 +334,11 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 
 							while ((zipentry = zi.getNextEntry()) != null)
 								if (zipentry.getName().equals(archiveFileName)) {
-									final FileOutputStream fos = new FileOutputStream(file);
+									File targetFile = file;
+									if (targetFile == null)
+										targetFile = File.createTempFile("xrootd-get", null, IOUtils.getTemporaryDirectory());
+
+									final FileOutputStream fos = new FileOutputStream(targetFile);
 
 									final byte[] buf = new byte[8192];
 
@@ -345,7 +350,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 									fos.close();
 									zi.closeEntry();
 
-									output = file;
+									output = targetFile;
 
 									break;
 								}
@@ -522,7 +527,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 				commander.setReturnCode(105, "No replicas for this LFN: " + lfn.getCanonicalName());
 
 			if (resultFile == null)
-				commander.setReturnCode(106, "Could not get the file: " + lfn.getCanonicalName() + " to " + (writeToLocalFile != null ? writeToLocalFile.getAbsolutePath() : " a temporary file")
+				commander.setReturnCode(106, "Could not get the file: " + lfn.getCanonicalName() + " to " + (writeToLocalFile != null ? writeToLocalFile.getAbsolutePath() : "a temporary file")
 						+ (lastException != null ? ", error was: " + lastException.getMessage() : ""));
 		}
 
