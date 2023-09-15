@@ -336,7 +336,7 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 								if (zipentry.getName().equals(archiveFileName)) {
 									File targetFile = file;
 									if (targetFile == null)
-										targetFile = File.createTempFile("xrootd-get", null, IOUtils.getTemporaryDirectory());
+										targetFile = File.createTempFile("zip-extract", null, IOUtils.getTemporaryDirectory());
 
 									final FileOutputStream fos = new FileOutputStream(targetFile);
 
@@ -351,6 +351,9 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 									zi.closeEntry();
 
 									output = targetFile;
+
+									TempFileManager.putTemp(alien.catalogue.GUIDUtils.createGuid(), output);
+									TempFileManager.release(output);
 
 									break;
 								}
