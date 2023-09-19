@@ -60,7 +60,7 @@ public class JAliEnCommandjquota extends JAliEnBaseCommand {
 				else
 					commander.printOutln();
 
-				commander.printOutln(q.toString());
+				commander.printOutln(q.toString(true));
 			}
 
 			if (command.equals("set")) {
