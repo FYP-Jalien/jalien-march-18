@@ -5,6 +5,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLConnection;
 import java.net.URLEncoder;
@@ -15,10 +16,10 @@ import java.nio.file.Paths;
 import java.security.KeyFactory;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
-import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 import java.util.logging.Level;
@@ -37,29 +38,18 @@ import com.auth0.jwt.JWT;
 import com.auth0.jwt.algorithms.Algorithm;
 
 import alien.site.Functions;
-
 import lazyj.Utils;
 
-import lia.util.process.ExternalProcess.ExitStatus;
-
 /**
- *
+ * @author Sergiu
+ * @since 2023-09-21
  */
 public class SFAPI extends BatchQueue {
 
 	private final Map<String, String> environment;
-	private TreeSet<String> envFromConfig;
-	private final String submitCmd;
-	private String submitArgs = "";
-	private String clientId = "";
-	private String killCmd;
-	private String killArgs = "";
-	private String statusCmd;
-	private String statusArgs = "";
+	private String clientId;
 	private String runArgs = "";
 	private String batchArgs = "";
-	private final String user;
-	private File temp_file;
 
 	/**
 	 * @param conf
@@ -67,52 +57,31 @@ public class SFAPI extends BatchQueue {
 	 */
 	@SuppressWarnings("unchecked")
 	public SFAPI(final HashMap<String, Object> conf, final Logger logr) {
-		String statusOpts;
 		this.environment = System.getenv();
 		this.config = conf;
 		this.logger = logr;
 
 		this.logger.info("This VO-Box is " + config.get("ALIEN_CM_AS_LDAP_PROXY") + ", site is " + config.get("site_accountname"));
 
+		TreeSet<String> envFromConfig = null;
+
 		try {
-			this.envFromConfig = (TreeSet<String>) this.config.get("ce_environment");
+			envFromConfig = (TreeSet<String>) this.config.get("ce_environment");
 		}
 		catch (final ClassCastException e) {
 			logger.severe(e.toString());
 		}
 
-		this.temp_file = null;
-
-		// Get SLURM
-		this.submitCmd = (String) config.getOrDefault("ce_submitcmd", "sbatch");
-		this.killCmd = (String) config.getOrDefault("ce_killcmd", "scancel");
-		this.statusCmd = (String) config.getOrDefault("ce_statuscmd", "squeue");
-
 		this.clientId = (String) config.getOrDefault("ce_cliendid", "");
-
-		this.submitArgs = readArgFromLdap("ce_submitarg");
-		this.killArgs = readArgFromLdap("ce_killarg");
-		this.runArgs = readArgFromLdap("ce_runarg");
-		this.batchArgs = readArgFromLdap("ce_batcharg");
-		this.statusArgs = readArgFromLdap("ce_statusarg");
 
 		// Get args from the environment
 		if (envFromConfig != null) {
 			for (final String env_field : envFromConfig) {
-				if (env_field.contains("SUBMIT_ARGS")) {
-					this.submitArgs = getValue(env_field, "SUBMIT_ARGS", this.submitArgs);
-				}
-				if (env_field.contains("STATUS_ARGS")) {
-					this.statusArgs = getValue(env_field, "STATUS_ARGS", this.statusArgs);
-				}
 				if (env_field.contains("RUN_ARGS")) {
 					this.runArgs = getValue(env_field, "RUN_ARGS", this.runArgs);
 				}
 				if (env_field.contains("BATCH_ARGS")) {
 					this.batchArgs = getValue(env_field, "BATCH_ARGS", this.batchArgs);
-				}
-				if (env_field.contains("KILL_ARGS")) {
-					this.killArgs = getValue(env_field, "KILL_ARGS", this.killArgs);
 				}
 				if (env_field.contains("CLIENT_ID")) {
 					this.clientId = getValue(env_field, "CLIENT_ID", this.clientId);
@@ -120,27 +89,10 @@ public class SFAPI extends BatchQueue {
 			}
 		}
 
-		this.submitArgs = environment.getOrDefault("SUBMIT_ARGS", submitArgs);
-		this.statusArgs = environment.getOrDefault("STATUS_ARGS", this.statusArgs);
-		this.runArgs = environment.getOrDefault("RUN_ARGS", this.runArgs);
-		this.killArgs = environment.getOrDefault("KILL_ARGS", this.killArgs);
-		this.batchArgs = environment.getOrDefault("BATCH_ARGS", this.batchArgs);
-
 		this.clientId = environment.getOrDefault("CLIENT_ID", clientId);
-
-		user = environment.get("USER");
-
-		statusOpts = "-h -o \"%i %t %j\" -u " + user;
-
-		statusCmd = statusCmd + " " + statusOpts;
-
-		killArgs += " --ctld -Q -u " + user;
-		// killArgs += " --ctld -Q";
-
-		killCmd = killCmd + killArgs;
 	}
 
-	public String getScript(String script) {
+	private String getScript(final String script) {
 
 		this.logger.info("Submit SFAPI");
 		this.logger.info("script location " + script);
@@ -228,59 +180,63 @@ public class SFAPI extends BatchQueue {
 		return submit_cmd;
 	}
 
-	public void sendJob(HttpsURLConnection https, String script) throws IOException{
+	private static void sendJob(final HttpsURLConnection https, final String script) throws IOException {
 		https.setDoOutput(true);
-		OutputStream os = https.getOutputStream();
-		os.write("isPath=false".getBytes());
-		System.out.println("Script out " + script);
-		os.write(("&job=" + URLEncoder.encode(script, StandardCharsets.UTF_8)).getBytes());
-		os.flush();
-		os.close();
+		try (OutputStream os = https.getOutputStream()) {
+			os.write("isPath=false".getBytes());
+			// System.out.println("Script out " + script);
+			os.write(("&job=" + URLEncoder.encode(script, StandardCharsets.UTF_8)).getBytes());
+		}
 	}
 
-	public static void setProps(HttpsURLConnection https, String token) throws IOException{
+	private static void setProps(final HttpsURLConnection https, final String token) {
 		https.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 		https.setRequestProperty("authorization", "Bearer " + token);
 		https.setRequestProperty("Accept", "application/json");
 	}
 
-	public JSONObject getResponse(HttpsURLConnection https) {
+	private JSONObject getResponse(final HttpsURLConnection https) {
 		int responseCode;
-		StringBuffer response = new StringBuffer();
-		JSONParser parser = new JSONParser();
+		final StringBuffer response = new StringBuffer();
+		final JSONParser parser = new JSONParser();
 		JSONObject json = null;
 
 		try {
 			responseCode = https.getResponseCode();
 
-		} catch (IOException e) {
+		}
+		catch (final IOException e) {
 			e.printStackTrace();
 			return null;
 		}
 
 		this.logger.info("Response Code :: " + responseCode);
 
-		if (responseCode == HttpsURLConnection.HTTP_OK) { //success
+		if (responseCode == HttpURLConnection.HTTP_OK) { // success
 			try (BufferedReader in = new BufferedReader(new InputStreamReader(https.getInputStream()));) {
-			String inputLine;
+				String inputLine;
 
-			while ((inputLine = in.readLine()) != null) {
-				response.append(inputLine);
-			}
-			in.close();
+				while ((inputLine = in.readLine()) != null) {
+					response.append(inputLine);
+				}
+				in.close();
 
-			// print result
-			//System.out.println(response.toString());
-			} catch (IOException e) {
+				// print result
+				// System.out.println(response.toString());
 			}
-		} else {
-			//System.out.println("POST request did not work.");
+			catch (final IOException e) {
+				logger.log(Level.WARNING, "Exception handling the content for an 200 code", e);
+			}
+		}
+		else {
+			// System.out.println("POST request did not work.");
 			this.logger.severe("Request didn't work");
 		}
 
 		try {
-			json = (JSONObject) parser.parse(response.toString());;
-		} catch (ParseException e) {
+			json = (JSONObject) parser.parse(response.toString());
+		}
+		catch (final ParseException e) {
 			e.printStackTrace();
 			return null;
 		}
@@ -289,22 +245,22 @@ public class SFAPI extends BatchQueue {
 		return json;
 	}
 
-	public static RSAPrivateKey readPrivateKey(File file) throws Exception {
-		String key = new String(Files.readAllBytes(file.toPath()), Charset.defaultCharset());
+	private static RSAPrivateKey readPrivateKey(final File file) throws Exception {
+		final String key = new String(Files.readAllBytes(file.toPath()), Charset.defaultCharset());
 
-		String privateKeyPEM = key
-			.replace("-----BEGIN PRIVATE KEY-----", "")
-			.replaceAll(System.lineSeparator(), "")
-			.replace("-----END PRIVATE KEY-----", "");
+		final String privateKeyPEM = key
+				.replace("-----BEGIN PRIVATE KEY-----", "")
+				.replaceAll(System.lineSeparator(), "")
+				.replace("-----END PRIVATE KEY-----", "");
 
-		byte[] encoded = Base64.getDecoder().decode(privateKeyPEM);
+		final byte[] encoded = Base64.getDecoder().decode(privateKeyPEM);
 
-		KeyFactory keyFactory = KeyFactory.getInstance("RSA");
-		PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(encoded);
+		final KeyFactory keyFactory = KeyFactory.getInstance("RSA");
+		final PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(encoded);
 		return (RSAPrivateKey) keyFactory.generatePrivate(keySpec);
 	}
 
-	public static HttpsURLConnection getConnection(String urlString, String method) {
+	private static HttpsURLConnection getConnection(final String urlString, final String method) {
 
 		HttpsURLConnection https = null;
 
@@ -318,42 +274,42 @@ public class SFAPI extends BatchQueue {
 			https.setDoInput(true);
 			https.setConnectTimeout(30000);
 			https.setReadTimeout(120000);
-		} catch (IOException e) {
+		}
+		catch (final IOException e) {
 			e.printStackTrace();
 		}
 
 		return https;
 	}
 
-	public static void sendAuthReq(HttpsURLConnection https, String token) throws IOException{
+	private static void sendAuthReq(final HttpsURLConnection https, final String token) throws IOException {
 		https.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
 		https.setDoOutput(true);
-		OutputStream os = https.getOutputStream();
-		os.write("grant_type=client_credentials".getBytes());
-		os.write("&client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-bearer".getBytes());
-		os.write(("&client_assertion=" + token).getBytes());
-		os.flush();
-		os.close();
+		try (OutputStream os = https.getOutputStream()) {
+			os.write("grant_type=client_credentials".getBytes());
+			os.write("&client_assertion_type=urn%3Aietf%3Aparams%3Aoauth%3Aclient-assertion-type%3Ajwt-bearer".getBytes());
+			os.write(("&client_assertion=" + token).getBytes());
+		}
 	}
 
-	public String getToken() {
+	private String getToken() {
 		String accessToken = "";
 		try {
-			RSAPrivateKey rsaPrivateKey = readPrivateKey(new File("./privateKey8"));
-			Algorithm algorithm = Algorithm.RSA256(rsaPrivateKey);
-			String token = JWT.create()
-				.withIssuer(clientId)
-				.withSubject(clientId)
-				.withAudience("https://oidc.nersc.gov/c2id/token")
-				.withExpiresAt(new Date(System.currentTimeMillis() + 5 * 60 * 1000))
-				.sign(algorithm);
-			//System.out.println(token);
+			final RSAPrivateKey rsaPrivateKey = readPrivateKey(new File("./privateKey8"));
+			final Algorithm algorithm = Algorithm.RSA256(rsaPrivateKey);
+			final String token = JWT.create()
+					.withIssuer(clientId)
+					.withSubject(clientId)
+					.withAudience("https://oidc.nersc.gov/c2id/token")
+					.withExpiresAt(new Date(System.currentTimeMillis() + 5 * 60 * 1000))
+					.sign(algorithm);
+			// System.out.println(token);
 
-			HttpsURLConnection https = getConnection("https://oidc.nersc.gov/c2id/token", "POST");
+			final HttpsURLConnection https = getConnection("https://oidc.nersc.gov/c2id/token", "POST");
 
 			sendAuthReq(https, token);
 
-			JSONObject json = getResponse(https);
+			final JSONObject json = getResponse(https);
 
 			if (json == null) {
 				this.logger.severe("Could not generate auth token");
@@ -361,7 +317,8 @@ public class SFAPI extends BatchQueue {
 			}
 
 			accessToken = json.get("access_token").toString();
-		} catch (Exception exception){
+		}
+		catch (final Exception exception) {
 			exception.printStackTrace();
 		}
 		return accessToken;
@@ -369,14 +326,14 @@ public class SFAPI extends BatchQueue {
 
 	@Override
 	public void submit(final String script) {
-		String batchScript = getScript(script);
-		String accessToken = getToken();
+		final String batchScript = getScript(script);
+		final String accessToken = getToken();
 		JSONObject json;
 		HttpsURLConnection getTasks;
 
 		try {
 
-			HttpsURLConnection postJob = getConnection("https://api.nersc.gov/api/v1.2/compute/jobs/perlmutter", "POST");
+			final HttpsURLConnection postJob = getConnection("https://api.nersc.gov/api/v1.2/compute/jobs/perlmutter", "POST");
 			setProps(postJob, accessToken);
 			sendJob(postJob, batchScript);
 			json = getResponse(postJob);
@@ -386,23 +343,24 @@ public class SFAPI extends BatchQueue {
 				return;
 			}
 
-			//System.out.println("json is " + json.toString());
-			String task_id = json.get("task_id").toString();
+			// System.out.println("json is " + json.toString());
+			final String task_id = json.get("task_id").toString();
 
 			getTasks = getConnection("https://api.nersc.gov/api/v1.2/tasks/" + task_id, "GET");
 			setProps(getTasks, accessToken);
 			json = getResponse(getTasks);
-			//System.out.println("json is " + json.toString());
-		} catch (Exception e) {
+			// System.out.println("json is " + json.toString());
+		}
+		catch (final Exception e) {
 			e.printStackTrace();
 		}
 
 	}
 
 	JSONArray getJobs() throws Exception {
-		HttpsURLConnection getJobs = getConnection("https://api.nersc.gov/api/v1.2/compute/jobs/perlmutter?index=0&kwargs=user%3Dalicepro&sacct=false", "GET");
+		final HttpsURLConnection getJobs = getConnection("https://api.nersc.gov/api/v1.2/compute/jobs/perlmutter?index=0&kwargs=user%3Dalicepro&sacct=false", "GET");
 		JSONObject json = null;
-		String accessToken = getToken();
+		final String accessToken = getToken();
 		setProps(getJobs, accessToken);
 		json = getResponse(getJobs);
 
@@ -411,47 +369,51 @@ public class SFAPI extends BatchQueue {
 			return null;
 		}
 
-		JSONArray jobs = (JSONArray)json.get("output");
+		final JSONArray jobs = (JSONArray) json.get("output");
 
 		return jobs;
 	}
+
+	private static final Pattern PAT_ACTIVE_JOBS = Pattern.compile("(R)|(S)|(CG)");
 
 	/**
 	 * @return number of currently active jobs
 	 */
 	@Override
 	public int getNumberActive() {
-		final Pattern pat = Pattern.compile("(R)|(S)|(CG)");
-
-		ArrayList<String> states = new ArrayList<String>();
+		List<?> states;
 		try {
-			JSONArray jobs = getJobs();
-			//System.out.println(jobs);
-			states = (ArrayList<String>) jobs.stream().map(obj -> (((JSONObject) obj).get("st")))
-				.filter(state -> pat.matcher((String) state).matches())
-				.collect(Collectors.toList());
-		} catch (Exception e) {
+			final JSONArray jobs = getJobs();
+			// System.out.println(jobs);
+			states = ((List<?>) jobs).stream().map(obj -> (((JSONObject) obj).get("st")))
+					.filter(state -> PAT_ACTIVE_JOBS.matcher((String) state).matches())
+					.collect(Collectors.toList());
+		}
+		catch (final Exception e) {
 			e.printStackTrace();
 			return 0;
 		}
 		return states.size();
 	}
+
+	private static final Pattern PAT_QUEUED_JOBS = Pattern.compile("(PD)|(CF)");
 
 	/**
 	 * @return number of queued jobs
 	 */
 	@Override
 	public int getNumberQueued() {
-		final Pattern pat = Pattern.compile("(PD)|(CF)");
-		ArrayList<String> states = new ArrayList<String>();
+		List<?> states;
 
 		try {
-			JSONArray jobs = getJobs();
-			//System.out.println(jobs);
-			states = (ArrayList<String>) jobs.stream().map(obj -> (((JSONObject) obj).get("st")))
-				.filter(state -> pat.matcher((String) state).matches())
-				.collect(Collectors.toList());
-		} catch (Exception e) {
+			final JSONArray jobs = getJobs();
+			// System.out.println(jobs);
+
+			states = ((List<?>) jobs).stream().map(obj -> (((JSONObject) obj).get("st")))
+					.filter(state -> PAT_QUEUED_JOBS.matcher((String) state).matches())
+					.collect(Collectors.toList());
+		}
+		catch (final Exception e) {
 			e.printStackTrace();
 			return 0;
 		}
@@ -459,10 +421,10 @@ public class SFAPI extends BatchQueue {
 		return states.size();
 	}
 
-	public void killJob(String jobId, String token) {
+	private void killJob(final String jobId, final String token) {
 		JSONObject json;
 
-		HttpsURLConnection killJob = getConnection("https://api.nersc.gov/api/v1.2/compute/jobs/perlmutter/" + jobId, "DELETE");
+		final HttpsURLConnection killJob = getConnection("https://api.nersc.gov/api/v1.2/compute/jobs/perlmutter/" + jobId, "DELETE");
 
 		killJob.setRequestProperty("authorization", "Bearer " + token);
 		killJob.setRequestProperty("Accept", "application/json");
@@ -473,39 +435,24 @@ public class SFAPI extends BatchQueue {
 			this.logger.severe("Could get kill job " + jobId);
 		}
 
-		//System.out.println("response is " + json.toString());
+		// System.out.println("response is " + json.toString());
 	}
 
 	@Override
 	public int kill() {
-		String accessToken = getToken();
+		final String accessToken = getToken();
 
 		try {
-			JSONArray jobs = getJobs();
-			//System.out.println(jobs);
-			jobs.stream().map(obj -> (((JSONObject) obj).get("jobid")))
-				.forEach(jobId -> killJob((String) jobId, accessToken));
-		} catch (Exception e) {
+			final JSONArray jobs = getJobs();
+			// System.out.println(jobs);
+			((List<?>) jobs).stream().map(obj -> (((JSONObject) obj).get("jobid")))
+					.forEach(jobId -> killJob((String) jobId, accessToken));
+		}
+		catch (final Exception e) {
 			e.printStackTrace();
 			return -1;
 		}
 
 		return 0;
-	}
-
-	@SuppressWarnings("unchecked")
-	private String readArgFromLdap(final String argToRead) {
-		if (!config.containsKey(argToRead) || config.get(argToRead) == null)
-			return "";
-		else if ((config.get(argToRead) instanceof TreeSet)) {
-			final StringBuilder args = new StringBuilder();
-			for (final String arg : (TreeSet<String>) config.get(argToRead)) {
-				args.append(arg).append(' ');
-			}
-			return args.toString();
-		}
-		else {
-			return config.get(argToRead).toString();
-		}
 	}
 }
