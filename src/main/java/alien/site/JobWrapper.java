@@ -365,9 +365,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				return valUploadExitCode;
 			}
 
-			// Cleanup trailing processes before uploading
-			cleanupProcesses(queueId, pid);
-
 			if (!uploadOutputFiles(JobStatus.DONE)) {
 				logger.log(Level.SEVERE, "Failed to upload output files");
 				return -1;
@@ -855,6 +852,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	}
 
 	private boolean uploadOutputFiles(final JobStatus exitStatus, final int exitCode) {
+		cleanupProcesses(queueId, pid);
+
 		boolean uploadedAllOutFiles = true;
 		boolean uploadedNotAllCopies = false;
 
