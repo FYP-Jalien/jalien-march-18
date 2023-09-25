@@ -325,7 +325,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (downloader.downloadExitCode != 0) {
 				logger.log(Level.SEVERE, "Failed to get inputfiles");
 				changeStatus(JobStatus.ERROR_IB, downloader.downloadExitCode);
-				return -1;
+				return -3;
 			}
 
 			// run payload

@@ -623,10 +623,10 @@ public class JobAgent implements Runnable {
 			setStatus(jaStatus.JOB_STARTED);
 
 			// process payload
-			handleJob();
+			int exitCode = handleJob();
 
-			// Resubmit if the job was never able to start
-			if ("ERROR_IB".equals(endState) || endState.isBlank()) {
+			// Resubmit if the job was never able to start, but not if inputfile(s) could not be fetched
+			if (("ERROR_IB".equals(endState) || endState.isBlank()) && exitCode != 3) {
 				logger.log(Level.INFO, "Putting job " + queueId + " back to waiting");
 				putJobTrace("Putting job back to waiting " + queueId);
 				changeJobStatus(JobStatus.WAITING, -1);
@@ -674,13 +674,13 @@ public class JobAgent implements Runnable {
 		return;
 	}
 
-	private void handleJob() {
+	private int handleJob() {
 		try {
 			if (!createWorkDir()) {
 				changeJobStatus(JobStatus.ERROR_IB, -1);
 				logger.log(Level.INFO, "Error. Workdir for job could not be created");
 				putJobTrace("Error. Workdir for job could not be created");
-				return;
+				return -1;
 			}
 
 			logger.log(Level.INFO, "Started JA with: " + jdl);
@@ -705,11 +705,12 @@ public class JobAgent implements Runnable {
 			}
 
 			// Start and monitor execution
-			monitorExecution(p, true);
+			return monitorExecution(p, true);
 		}
 		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Unable to handle job", e);
 			putJobTrace("ERROR: Unable to handle job: " + e.toString() + " " + Arrays.toString(e.getStackTrace()));
+			return -1;
 		}
 	}
 
