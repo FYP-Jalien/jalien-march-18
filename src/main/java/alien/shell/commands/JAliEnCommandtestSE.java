@@ -204,16 +204,18 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 
 		pTarget.ticket = null;
 
+		boolean returnCode = false;
+
 		try (Timing t = new Timing()) {
 			commander.printOut("  Open delete test: ");
 
 			try {
 				if (xrootd.delete(pTarget, false)) {
 					commander.printOutln("delete worked" + notOK);
-					return true;
+					returnCode = true;
 				}
-
-				commander.printOutln("delete failed" + expected);
+				else
+					commander.printOutln("delete failed" + expected);
 			}
 			catch (final IOException ioe) {
 				commander.printOutln("delete failed" + expected);
@@ -228,7 +230,7 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 			pTarget.ticket = oldTicket;
 		}
 
-		return false;
+		return returnCode;
 	}
 
 	@Override
@@ -457,7 +459,7 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 					infoPFN.ticket = null;
 
 					final SpaceInfo info = xrootd.getSpaceInfo(infoPFN);
-					
+
 					info.applyReplicaCorrection(se.getReplicationFactor());
 
 					commander.printOutln(info.toString());
