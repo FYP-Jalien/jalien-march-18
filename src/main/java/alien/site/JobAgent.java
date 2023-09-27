@@ -1401,6 +1401,7 @@ public class JobAgent implements Runnable {
 			extrafields.put("batchid", RES_BATCH_INFO); // TODO - send from sendBatchInfo();
 
 			if (!TaskQueueApiUtils.setJobStatus(queueId, resubmission, null, extrafields)) {
+				jobKilled = true;
 				logger.log(Level.INFO, "Could not send accounting data");
 			}
 		}
@@ -1609,6 +1610,7 @@ public class JobAgent implements Runnable {
 
 		HashMap<String, Object> extrafields = new HashMap<>(Map.of("batchid", RES_BATCH_INFO));
 		if (!TaskQueueApiUtils.setJobStatus(jobNumber, resubmission, null, extrafields)) {
+			jobKilled = true;
 			logger.log(Level.INFO, "Could not send batchid for accounting");
 		}
 	}
