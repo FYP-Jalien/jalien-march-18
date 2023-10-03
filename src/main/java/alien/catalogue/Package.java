@@ -1,6 +1,7 @@
 package alien.catalogue;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -50,9 +51,9 @@ public class Package implements Comparable<Package>, Serializable {
 	/**
 	 * Platform - to - LFN mapping
 	 */
-	private final Map<String, String> platforms = new HashMap<>();
+	private final Map<String, String> platforms = new HashMap<>(2);
 
-	private Set<String> deps = null;
+	private Map<String, Set<String>> deps = new HashMap<>(2);
 
 	/**
 	 * @param db
@@ -167,28 +168,47 @@ public class Package implements Comparable<Package>, Serializable {
 	/**
 	 * Get the package names that are required by this package.
 	 *
-	 * @return the set of packages
+	 * @return the set of packages, for one of the available platforms
 	 */
-	public Set<String> getDependencies() {
-		if (deps != null)
-			return deps;
+	public Set<String> getDependencies(){
+		return getDependencies(null);
+	}
 
-		deps = new HashSet<>();
+	/**
+	 * Get the package names that are required by this package.
+	 *
+	 * @return the set of packages, if possible for the indicated platform, otherwise an arbitrary one from the available ones
+	 */
+	public Set<String> getDependencies(final String desiredPlatform) {
+		if (deps != null && deps.size()>0){
+			if (desiredPlatform == null)
+				return deps.values().iterator().next();
 
-		final Set<String> dirs = new HashSet<>();
+			final Set<String> platformDeps = deps.get(desiredPlatform);
+			if (platformDeps!=null)
+				return platformDeps;
+		}
 
-		for (final String lfn : platforms.values())
-			if (lfn.indexOf('/') >= 0)
-				dirs.add(lfn.substring(0, lfn.lastIndexOf('/') + 1));
+		final Set<String> platformDeps = new HashSet<>();
 
-		if (dirs.size() == 0)
-			return deps;
+		if (platforms.size() == 0)
+			return platformDeps;
+
+		final ArrayList<Map.Entry<String,String>> files = new ArrayList<>(platforms.size());
+
+		for (final Map.Entry<String, String> entry: platforms.entrySet())
+			if (entry.getKey().equals(desiredPlatform))
+				files.add(0, entry);
+			else
+				files.add(entry);
 
 		try (DBFunctions dbDeps = ConfigUtils.getDB("alice_data")) {
 			dbDeps.setReadOnly(true);
 			dbDeps.setQueryTimeout(60);
 
-			for (final String dir : dirs)
+			for (final Map.Entry<String,String> entry : files){
+				String dir = entry.getValue();
+
 				for (final String tableName : LFNUtils.getTagTableNames(dir, "PackageDef", true)) {
 					dbDeps.query("SELECT dependencies FROM " + tableName + " WHERE ? like concat(file,'%')", false, dir);
 
@@ -196,14 +216,18 @@ public class Package implements Comparable<Package>, Serializable {
 						final StringTokenizer st = new StringTokenizer(dbDeps.gets(1), ", ");
 
 						while (st.hasMoreTokens())
-							deps.add(st.nextToken());
+							platformDeps.add(st.nextToken());
 					}
 
-					if (deps.size() > 0)
-						return deps;
+					if (platformDeps.size() > 0){
+						deps.put(entry.getKey(), platformDeps);
+						return platformDeps;
+					}
 				}
+			}
 		}
 
-		return deps;
+		deps.put("<unknown>", platformDeps);
+		return platformDeps;
 	}
 }
