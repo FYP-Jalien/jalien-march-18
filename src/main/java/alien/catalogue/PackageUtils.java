@@ -373,9 +373,9 @@ public class PackageUtils {
 
 		try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
 			if (db != null) {
-				if (!db.query("REPLACE INTO " + table + " (file, dependencies) VALUES (?, ?);", false, packageWithVersionDir, dependencies)) {
-					logger.log(Level.WARNING, "Failed to insert the dependencies for " + packageWithVersionDir + ": " + db.getLastError());
-					throw new IOException("Failed to insert the dependencies for " + packageWithVersionDir + ": " + db.getLastError());
+				if (!db.query("REPLACE INTO " + table + " (file, dependencies) VALUES (?, ?);", false, platformArchive, dependencies)) {
+					logger.log(Level.WARNING, "Failed to insert the dependencies for " + platformArchive + ": " + db.getLastError());
+					throw new IOException("Failed to insert the dependencies for " + platformArchive + ": " + db.getLastError());
 				}
 			}
 			else
