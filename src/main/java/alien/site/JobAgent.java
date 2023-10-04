@@ -595,7 +595,6 @@ public class JobAgent implements Runnable {
 				sendBatchInfo();
 				if (jobKilled) {
 					putJobTrace("Error: this job is not supposed to be running anymore. Aborting.");
-					changeJobStatus(JobStatus.KILLED, -1);
 					throw new EOFException("Job is not supposed to be running");
 				}
 
@@ -1615,7 +1614,7 @@ public class JobAgent implements Runnable {
 		}
 
 		HashMap<String, Object> extrafields = new HashMap<>(Map.of("batchid", RES_BATCH_INFO));
-		if (!TaskQueueApiUtils.setJobStatus(jobNumber, resubmission, null, extrafields)) {
+		if (!TaskQueueApiUtils.setJobStatus(queueId, resubmission, null, extrafields)) {
 			jobKilled = true;
 			logger.log(Level.INFO, "Could not send batchid for accounting");
 		}
