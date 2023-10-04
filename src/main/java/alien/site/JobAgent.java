@@ -591,7 +591,13 @@ public class JobAgent implements Runnable {
 				logger.log(Level.INFO, jdl.getExecutable());
 				logger.log(Level.INFO, username);
 				logger.log(Level.INFO, Long.toString(queueId));
+
 				sendBatchInfo();
+				if (jobKilled) {
+					putJobTrace("Error: this job is not supposed to be running anymore. Aborting.");
+					changeJobStatus(JobStatus.KILLED, -1);
+					throw new EOFException("Job is not supposed to be running");
+				}
 
 				reqCPU = Long.valueOf(TaskQueueUtils.getCPUCores(jdl));
 				setUsedCores(1);
