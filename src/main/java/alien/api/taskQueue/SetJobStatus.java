@@ -53,7 +53,7 @@ public class SetJobStatus extends Request {
 
 	@Override
 	public List<String> getArguments() {
-		return Arrays.asList(String.valueOf(jobnumber), status != null ? status.toString() : null, extrafields != null ? extrafields.toString() : null);
+		return Arrays.asList(jobnumber + "/" + resubmission, status != null ? status.toString() : null, extrafields != null ? extrafields.toString() : null);
 	}
 
 	@Override
@@ -77,7 +77,7 @@ public class SetJobStatus extends Request {
 			return;
 		}
 
-		if (this.status!=null)
+		if (this.status != null)
 			TaskQueueUtils.setJobStatus(this.jobnumber, this.status, null, this.extrafields);
 		else
 			TaskQueueUtils.setJobExtraFields(this.jobnumber, this.extrafields);
