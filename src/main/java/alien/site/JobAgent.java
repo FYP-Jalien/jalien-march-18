@@ -914,7 +914,7 @@ public class JobAgent implements Runnable {
 
 		int code = -1;
 
-		final Thread heartMon = new Thread(heartbeatMonitor(p));
+		final Thread heartMon = new Thread(heartbeatMonitor(p), "Heartbeat Monitor");
 		heartMon.start();
 
 		long initTimeSendResourcess = System.currentTimeMillis();
