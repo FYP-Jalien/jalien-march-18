@@ -170,22 +170,24 @@ public class Package implements Comparable<Package>, Serializable {
 	 *
 	 * @return the set of packages, for one of the available platforms
 	 */
-	public Set<String> getDependencies(){
+	public Set<String> getDependencies() {
 		return getDependencies(null);
 	}
 
 	/**
 	 * Get the package names that are required by this package.
+	 * 
+	 * @param desiredPlatform from the available plaforms for this package, use this one if available. If not (or <code>null</code>) the first available value would be used.
 	 *
 	 * @return the set of packages, if possible for the indicated platform, otherwise an arbitrary one from the available ones
 	 */
 	public Set<String> getDependencies(final String desiredPlatform) {
-		if (deps != null && deps.size()>0){
+		if (deps != null && deps.size() > 0) {
 			if (desiredPlatform == null)
 				return deps.values().iterator().next();
 
 			final Set<String> platformDeps = deps.get(desiredPlatform);
-			if (platformDeps!=null)
+			if (platformDeps != null)
 				return platformDeps;
 		}
 
@@ -194,9 +196,9 @@ public class Package implements Comparable<Package>, Serializable {
 		if (platforms.size() == 0)
 			return platformDeps;
 
-		final ArrayList<Map.Entry<String,String>> files = new ArrayList<>(platforms.size());
+		final ArrayList<Map.Entry<String, String>> files = new ArrayList<>(platforms.size());
 
-		for (final Map.Entry<String, String> entry: platforms.entrySet())
+		for (final Map.Entry<String, String> entry : platforms.entrySet())
 			if (entry.getKey().equals(desiredPlatform))
 				files.add(0, entry);
 			else
@@ -206,7 +208,7 @@ public class Package implements Comparable<Package>, Serializable {
 			dbDeps.setReadOnly(true);
 			dbDeps.setQueryTimeout(60);
 
-			for (final Map.Entry<String,String> entry : files){
+			for (final Map.Entry<String, String> entry : files) {
 				String dir = entry.getValue();
 
 				for (final String tableName : LFNUtils.getTagTableNames(dir, "PackageDef", true)) {
@@ -219,7 +221,7 @@ public class Package implements Comparable<Package>, Serializable {
 							platformDeps.add(st.nextToken());
 					}
 
-					if (platformDeps.size() > 0){
+					if (platformDeps.size() > 0) {
 						deps.put(entry.getKey(), platformDeps);
 						return platformDeps;
 					}
