@@ -493,6 +493,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		processEnv.put("TMP", currentDir.getAbsolutePath() + "/tmp");
 		processEnv.put("TMPDIR", currentDir.getAbsolutePath() + "/tmp");
 
+		// Same values used in the Xrootd class for xrdcp command line. Solves deadlocked FST situation. 
+		processEnv.put("XRD_CONNECTIONWINDOW", "3");
+		processEnv.put("XRD_CONNECTIONRETRY", "1");
+		processEnv.put("XRD_TIMEOUTRESOLUTION", "1");
+
 		processEnv.putAll(metavars);
 
 		if (!parentHostname.isBlank())
