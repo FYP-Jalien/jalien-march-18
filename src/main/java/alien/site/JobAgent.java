@@ -751,10 +751,6 @@ public class JobAgent implements Runnable {
 				putJobTrace("Support for containers detected. Will use: " + containerizer.getContainerizerName());
 				containerizer.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
 
-				// Only used on Cgroupsv2 hosts
-				if (containerizer.setMemLimit(jobMaxMemoryMB))
-					putJobTrace("Warning: This host has support for cgroups v2. New features will be used.");
-
 				if (jdl.gets("DebugTag") != null)
 					containerizer.enableDebug(jdl.gets("DebugTag"));
 

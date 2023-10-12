@@ -439,7 +439,7 @@ public class NUMAExplorer {
 					}
 				}
 				catch (final Exception e) {
-					logger.log(Level.WARNING, "Could not apply CPU mask " + e);
+					logger.log(Level.WARNING, "Could not apply CPU mask: " + e);
 				}
 			}
 		}

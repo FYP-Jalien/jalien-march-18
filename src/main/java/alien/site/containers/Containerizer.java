@@ -3,7 +3,6 @@ package alien.site.containers;
 import java.io.BufferedReader;
 import java.io.EOFException;
 import java.io.File;
-import java.util.Arrays;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -50,16 +49,6 @@ public abstract class Containerizer {
 	 * 
 	 */
 	protected String debugCmd = "";
-
-	/**
-	 * For resource constraints
-	 */
-	protected boolean useCgroupsv2 = false;
-
-	/**
-	 * For resource constraints
-	 */
-	protected int memLimit = 0;
 
 	/**
 	 * Set to false if mounting GPU libraries breaks container or no GPU strings found
@@ -118,28 +107,6 @@ public abstract class Containerizer {
 			return false;
 		}
 		return true;
-	}
-
-	/**
-	 * @return <code>true</code> if mounted and running isSupported() is possible with cgv2 constraints
-	 */
-	public boolean checkCgroupsv2() {
-		try {
-			CommandOutput output = SystemCommand.executeCommand(Arrays.asList("/bin/bash", "-c", "mount -l | grep cgroup"));
-			final String outputString = output.stdout;
-			if (outputString == null || outputString.isBlank() || !outputString.contains("cgroup2"))
-				return false;
-		}
-		catch (final Exception e) {
-			logger.log(Level.WARNING, "Failed to check for cgroupsv2 support: ", e);
-			return false;
-		}
-
-		useCgroupsv2 = true;
-		if (!isSupported())
-			useCgroupsv2 = false;
-
-		return useCgroupsv2;
 	}
 
 	/**
@@ -217,17 +184,6 @@ public abstract class Containerizer {
 	 */
 	public void setWorkdir(final String newWorkdir) {
 		workdir = newWorkdir;
-	}
-
-	/**
-	 * Memlimit for container
-	 * 
-	 * @param newMemLimit
-	 * @return true/false depending on if limit will be applied (requires cgroupsv2)
-	 */
-	public boolean setMemLimit(final int newMemLimit) {
-		memLimit = newMemLimit;
-		return checkCgroupsv2();
 	}
 
 	/**
