@@ -12,6 +12,7 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.Vector;
+import java.util.concurrent.TimeUnit;
 import java.util.Comparator;
 import java.util.Map;
 import java.util.Collections;
@@ -431,7 +432,11 @@ public class NUMAExplorer {
 				logger.log(Level.INFO, "Constraining PID " + pid);
 				try {
 					final Process CPUConstrainer = Runtime.getRuntime().exec("taskset -a -cp " + isolCmd + " " + pid);
-					CPUConstrainer.waitFor();
+
+					if (!CPUConstrainer.waitFor(60, TimeUnit.SECONDS)) {
+						CPUConstrainer.destroyForcibly();
+						throw new InterruptedException("Timed out");
+					}
 				}
 				catch (final Exception e) {
 					logger.log(Level.WARNING, "Could not apply CPU mask " + e);
