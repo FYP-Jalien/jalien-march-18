@@ -170,7 +170,7 @@ public class CVMFS extends PackMan {
 
 		String source = co.stdout;
 
-		if (source.isBlank()) {
+		if (source.isBlank() || source.length() < 60) {
 			logger.log(Level.SEVERE, "alienv didn't return anything useful");
 			return null;
 		}
