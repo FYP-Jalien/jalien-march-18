@@ -75,10 +75,20 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 
 		return f;
 	}
+	
+	private final String expected() {
+		if (commander.bColour)
+			return " (" + ShellColor.jobStateGreen() + "expected" + ShellColor.reset() + ")";
+	
+		return " (expected)";
+	}
 
-	private static final String expected = " (" + ShellColor.jobStateGreen() + "expected" + ShellColor.reset() + ")";
-
-	private static final String notOK = " (" + ShellColor.jobStateRed() + "NOT OK" + ShellColor.reset() + ")";
+	private final String notOK() {
+		if (commander.bColour)
+			return " (" + ShellColor.jobStateRed() + "NOT OK" + ShellColor.reset() + ")";
+		
+		return " (NOT OK)";
+	}
 
 	private void afterCommandPrinting(final Timing t, final Xrootd xrootd) {
 		if (showCommand)
@@ -127,10 +137,10 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 			File tempFile = null;
 			try {
 				tempFile = xrootd.get(pTarget, null);
-				commander.printOutln("reading worked" + notOK + " please check authorization configuration");
+				commander.printOutln("reading worked" + notOK() + " please check authorization configuration");
 			}
 			catch (final IOException ioe) {
-				commander.printOutln("read back failed" + expected);
+				commander.printOutln("read back failed" + expected());
 
 				if (verbose)
 					commander.printOutln("    " + ioe.getMessage());
@@ -153,10 +163,10 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 
 				try {
 					downloadHTTP(httpURL);
-					commander.printOutln("reading worked " + notOK + ", it should request an access envelope too");
+					commander.printOutln("reading worked " + notOK() + ", it should request an access envelope too");
 				}
 				catch (final IOException ioe) {
-					commander.printOutln("read back failed " + expected);
+					commander.printOutln("read back failed " + expected());
 
 					if (verbose)
 						commander.printOutln("  " + ioe.getMessage());
@@ -211,14 +221,14 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 
 			try {
 				if (xrootd.delete(pTarget, false)) {
-					commander.printOutln("delete worked" + notOK);
+					commander.printOutln("delete worked" + notOK());
 					returnCode = true;
 				}
 				else
-					commander.printOutln("delete failed" + expected);
+					commander.printOutln("delete failed" + expected());
 			}
 			catch (final IOException ioe) {
-				commander.printOutln("delete failed" + expected);
+				commander.printOutln("delete failed" + expected());
 
 				if (verbose)
 					commander.printOutln(ioe.getMessage());
@@ -293,14 +303,14 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 				try {
 					xrootd.put(pTarget, referenceFile, false);
 
-					commander.printOutln("could write, " + notOK + ", please check authorization configuration");
+					commander.printOutln("could write, " + notOK() + ", please check authorization configuration");
 
 					wasAdded = true;
 
 					commander.c_api.registerEnvelopes(Arrays.asList(writeTicket.envelope.getEncryptedEnvelope()), BOOKING_STATE.COMMITED);
 				}
 				catch (final IOException ioe) {
-					commander.printOutln("cannot write" + expected);
+					commander.printOutln("cannot write" + expected());
 
 					if (verbose)
 						commander.printOutln("    " + ioe.getMessage());
@@ -331,14 +341,14 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 				try {
 					xrootd.put(pTarget, referenceFile);
 
-					commander.printOutln("could write" + expected);
+					commander.printOutln("could write" + expected());
 
 					wasAdded = true;
 
 					commander.c_api.registerEnvelopes(Arrays.asList(writeTicket.envelope.getEncryptedEnvelope()), BOOKING_STATE.COMMITED);
 				}
 				catch (final IOException ioe) {
-					commander.printOutln("cannot write " + notOK + "\n    " + ioe.getMessage());
+					commander.printOutln("cannot write " + notOK() + "\n    " + ioe.getMessage());
 				}
 
 				afterCommandPrinting(t, xrootd);
@@ -365,10 +375,10 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 						File tempFile = null;
 						try {
 							tempFile = xrootd.get(infoPFN, null);
-							commander.printOutln("file read back ok" + expected);
+							commander.printOutln("file read back ok" + expected());
 						}
 						catch (final IOException ioe) {
-							commander.printOutln("cannot read " + notOK + ":\n    " + ioe.getMessage());
+							commander.printOutln("cannot read " + notOK() + ":\n    " + ioe.getMessage());
 						}
 						finally {
 							if (tempFile != null) {
@@ -387,10 +397,10 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 							commander.printOut("  Authenticated HTTP read access: ");
 							try {
 								downloadHTTP(authURL);
-								commander.printOutln("reading worked " + expected);
+								commander.printOutln("reading worked " + expected());
 							}
 							catch (final IOException ioe) {
-								commander.printOutln("read back failed " + notOK);
+								commander.printOutln("read back failed " + notOK());
 
 								if (verbose)
 									commander.printOutln("  " + ioe.getMessage());
@@ -438,13 +448,13 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 						final PFN delPFN = del.getPFNs().iterator().next();
 
 						if (xrootd.delete(delPFN))
-							commander.printOutln("delete worked ok" + expected);
+							commander.printOutln("delete worked ok" + expected());
 					}
 					catch (final IOException ioe) {
-						commander.printOutln("couldn't delete " + notOK + ":\n    " + ioe.getMessage());
+						commander.printOutln("couldn't delete " + notOK() + ":\n    " + ioe.getMessage());
 					}
 					catch (final ServerException e) {
-						commander.printOutln("couldn't get a delete token " + notOK + ":\n    " + e.getMessage());
+						commander.printOutln("couldn't get a delete token " + notOK() + ":\n    " + e.getMessage());
 					}
 
 					afterCommandPrinting(t, xrootd);

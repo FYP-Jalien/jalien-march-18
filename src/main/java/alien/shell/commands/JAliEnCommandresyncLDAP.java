@@ -19,7 +19,7 @@ public class JAliEnCommandresyncLDAP extends JAliEnBaseCommand {
 		try {
 			final ManualResyncLDAP manualCall = Dispatcher.execute(new ManualResyncLDAP());
 
-			commander.printOutln(ShellColor.jobStateRed() + manualCall.getLogOutput().trim() + ShellColor.reset());
+			commander.printOutln(optionalColor(ShellColor.jobStateRed()) + manualCall.getLogOutput().trim() + optionalColor(ShellColor.reset()));
 		}
 		catch (final ServerException e) {
 			commander.setReturnCode(ErrNo.ENODATA, "Could not get the log output from resyncLDAP command : " + e.getMessage());

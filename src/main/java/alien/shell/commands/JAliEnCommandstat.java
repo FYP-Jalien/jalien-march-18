@@ -142,7 +142,7 @@ public class JAliEnCommandstat extends JAliEnBaseCommand {
 					commander.printOut("Expires: " + lfn.expiretime + " (" + lfn.expiretime.getTime() + ")");
 
 					if (lfn.expiretime.getTime() <= System.currentTimeMillis())
-						commander.printOutln(ShellColor.jobStateRed() + " EXPIRED" + ShellColor.reset());
+						commander.printOutln(optionalColor(ShellColor.jobStateRed()) + " EXPIRED" + optionalColor(ShellColor.reset()));
 					else
 						commander.printOutln(" which is in " + Format.toInterval(lfn.expiretime.getTime() - System.currentTimeMillis()));
 				}

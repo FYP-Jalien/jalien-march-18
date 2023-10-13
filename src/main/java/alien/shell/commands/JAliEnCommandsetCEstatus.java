@@ -20,9 +20,9 @@ public class JAliEnCommandsetCEstatus extends JAliEnBaseCommand {
 		try {
 			final List<String> updatedCEs = commander.q_api.setCEStatus(statusValue, ceNames);
 			if (updatedCEs.size() > 0)
-				commander.printOutln(ShellColor.jobStateGreen() + "Success: " + ShellColor.reset() + " Status " + statusValue + " correctly set to CEs " + updatedCEs);
+				commander.printOutln(optionalColor(ShellColor.jobStateGreen()) + "Success: " + optionalColor(ShellColor.reset()) + " Status " + statusValue + " correctly set to CEs " + updatedCEs);
 			else
-				commander.printOutln(ShellColor.jobStateRed() + "Error: " + ShellColor.reset() + " Could not set status " + statusValue + " to CEs " + ceNames);
+				commander.printOutln(optionalColor(ShellColor.jobStateRed()) + "Error: " + optionalColor(ShellColor.reset()) + " Could not set status " + statusValue + " to CEs " + ceNames);
 		} catch (@SuppressWarnings("unused") Exception e) {
 			commander.printOutln("Users must have the admin role to perform this action");
 		}

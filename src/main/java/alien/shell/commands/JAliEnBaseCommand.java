@@ -235,4 +235,14 @@ public abstract class JAliEnBaseCommand implements Runnable {
 
 		return ret;
 	}
+
+	/**
+	 * Pass the term code of a color only if the bColor flag is enabled
+	 * 
+	 * @param termColor
+	 * @return the argument value if <code>bColour=true</code>, the empty string if not
+	 */
+	protected String optionalColor(final String termColor) {
+		return commander.bColour ? termColor : "";
+	}
 }

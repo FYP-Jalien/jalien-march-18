@@ -641,6 +641,7 @@ public class JAliEnCOMMander implements Runnable {
 		this.arg = arg;
 
 		if (this.out != null && this.arg != null) {
+			bColour = out.colour();
 			status.set(1);
 			COMMAND_EXECUTOR.submit(this);
 		}
@@ -716,10 +717,14 @@ public class JAliEnCOMMander implements Runnable {
 		// ( AliEnPrincipal.roleIsAdmin( AliEnPrincipal.userRole()) &&
 				!Arrays.asList(jAliEnAdminCommandList).contains(comm) /* ) */) {
 			if (Arrays.asList(hiddenCommandList).contains(comm)) {
-				if ("blackwhite".equals(comm) && out != null)
+				if ("blackwhite".equals(comm) && out != null) {					
 					out.blackwhitemode();
-				else if ("color".equals(comm) && out != null)
+					bColour = out.colour();
+				}
+				else if ("color".equals(comm) && out != null) {					
 					out.colourmode();
+					bColour = out.colour();
+				}
 				// else if ("shutdown".equals(comm))
 				// jbox.shutdown();
 				// } else if (!"setshell".equals(comm)) {

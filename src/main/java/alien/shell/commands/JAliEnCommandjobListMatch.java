@@ -47,13 +47,13 @@ public class JAliEnCommandjobListMatch extends JAliEnBaseCommand {
 			String status = ce.status;
 			switch (status) {
 				case "open":
-					status = ShellColor.jobStateGreen() + status + ShellColor.reset();
+					status = optionalColor(ShellColor.jobStateGreen()) + status + optionalColor(ShellColor.reset());
 					break;
 				case "locked":
-					status = ShellColor.jobStateRed() + status + ShellColor.reset();
+					status = optionalColor(ShellColor.jobStateRed()) + status + optionalColor(ShellColor.reset());
 					break;
 				default:
-					status = ShellColor.jobStateYellow() + status + ShellColor.reset();
+					status = optionalColor(ShellColor.jobStateYellow()) + status + optionalColor(ShellColor.reset());
 			}
 
 			commander.printOutln(padLeft(String.format("%1$" + maxCENameLength + "s", ce.ceName), maxCENameLength) + "\t" + padLeft(status, 4) + "\t\t"

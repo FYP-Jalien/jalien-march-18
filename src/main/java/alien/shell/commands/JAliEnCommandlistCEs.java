@@ -75,13 +75,13 @@ public class JAliEnCommandlistCEs extends JAliEnBaseCommand {
 
 			switch (status) {
 				case "open":
-					status = ShellColor.jobStateGreen() + status + ShellColor.reset();
+					status = optionalColor(ShellColor.jobStateGreen()) + status + optionalColor(ShellColor.reset());
 					break;
 				case "locked":
-					status = ShellColor.jobStateRed() + status + ShellColor.reset();
+					status = optionalColor(ShellColor.jobStateRed()) + status + optionalColor(ShellColor.reset());
 					break;
 				default:
-					status = ShellColor.jobStateYellow() + status + ShellColor.reset();
+					status = optionalColor(ShellColor.jobStateYellow()) + status + optionalColor(ShellColor.reset());
 			}
 
 			if (printVerbose)

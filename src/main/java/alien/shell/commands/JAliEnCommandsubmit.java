@@ -77,7 +77,7 @@ public class JAliEnCommandsubmit extends JAliEnCommandcat {
 
 			queueId = commander.q_api.submitJob(jdl);
 			if (queueId > 0) {
-				commander.printOutln("Your new job ID is " + ShellColor.blue() + queueId + ShellColor.reset());
+				commander.printOutln("Your new job ID is " + optionalColor(ShellColor.blue()) + queueId + optionalColor(ShellColor.reset()));
 				commander.printOut("jobId", String.valueOf(queueId));
 			}
 			else

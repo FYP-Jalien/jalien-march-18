@@ -240,12 +240,12 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 			final boolean isOnline = xrootd.isOnline(onePfnToCheck != null ? onePfnToCheck : p);
 
 			if (isOnline) {
-				commander.printOutln(ShellColor.jobStateGreen() + "Online" + ShellColor.reset());
+				commander.printOutln(optionalColor(ShellColor.jobStateGreen()) + "Online" + optionalColor(ShellColor.reset()));
 
 				commander.printOut("status", "online");
 			}
 			else {
-				commander.printOutln(ShellColor.jobStateYellow() + "Offline" + ShellColor.reset());
+				commander.printOutln(optionalColor(ShellColor.jobStateYellow()) + "Offline" + optionalColor(ShellColor.reset()));
 
 				commander.printOut("status", "offline");
 			}
@@ -253,7 +253,7 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 		catch (final Throwable t) {
 			final String error = t.getMessage();
 
-			commander.printOutln(ShellColor.jobStateRed() + "IO error" + ShellColor.reset());
+			commander.printOutln(optionalColor(ShellColor.jobStateRed()) + "IO error" + optionalColor(ShellColor.reset()));
 
 			commander.printOut("status", "error");
 
@@ -280,7 +280,7 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 			final PFN targetPFN = onePfnToCheck != null ? onePfnToCheck : p;
 
 			if (!ignoreStat && xrootd.isOnline(targetPFN)) {
-				commander.printOutln(ShellColor.jobStateGreen() + "Online" + ShellColor.reset());
+				commander.printOutln(optionalColor(ShellColor.jobStateGreen()) + "Online" + optionalColor(ShellColor.reset()));
 
 				commander.printOut("status", "online");
 
@@ -289,14 +289,14 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 
 			xrootd.prepare(onePfnToCheck != null ? onePfnToCheck : p);
 
-			commander.printOutln(ShellColor.jobStateYellow() + "prepare request sent" + ShellColor.reset());
+			commander.printOutln(optionalColor(ShellColor.jobStateYellow()) + "prepare request sent" + optionalColor(ShellColor.reset()));
 
 			commander.printOut("status", "prepare_queued");
 		}
 		catch (final Throwable t) {
 			final String error = t.getMessage();
 
-			commander.printOutln(ShellColor.jobStateRed() + "prepare request failed" + ShellColor.reset());
+			commander.printOutln(optionalColor(ShellColor.jobStateRed()) + "prepare request failed" + optionalColor(ShellColor.reset()));
 
 			commander.printOut("status", "prepare_failed");
 
@@ -367,14 +367,14 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 				}
 
 				if (warning != null) {
-					commander.printOutln(ShellColor.jobStateYellow() + "WARNING" + ShellColor.reset());
+					commander.printOutln(optionalColor(ShellColor.jobStateYellow()) + "WARNING" + optionalColor(ShellColor.reset()));
 					commander.printOutln("\t\t" + warning);
 
 					commander.printOut("status", "not_tested");
 					commander.printOut("warningMessage", warning);
 				}
 				else {
-					commander.printOutln(ShellColor.jobStateGreen() + "OK" + ShellColor.reset());
+					commander.printOutln(optionalColor(ShellColor.jobStateGreen()) + "OK" + optionalColor(ShellColor.reset()));
 					commander.printOutln("\t\tDownloaded file matches the catalogue details"
 							+ (timing > 0 ? ", retrieving took " + Format.toInterval(timing) + " (" + Format.size(referenceGUID.size * 1000. / timing) + "/s)" : ""));
 
@@ -388,7 +388,7 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 			}
 			else {
 				// just namespace check, no actual IO
-				commander.printOutln(ShellColor.jobStateGreen() + "OK" + ShellColor.reset());
+				commander.printOutln(optionalColor(ShellColor.jobStateGreen()) + "OK" + optionalColor(ShellColor.reset()));
 
 				commander.printOut("status", "ok");
 
@@ -402,7 +402,7 @@ public class JAliEnCommandxrdstat extends JAliEnBaseCommand {
 		catch (final Throwable t) {
 			final String error = t.getMessage();
 
-			commander.printOutln(ShellColor.jobStateRed() + "ERR" + ShellColor.reset());
+			commander.printOutln(optionalColor(ShellColor.jobStateRed()) + "ERR" + optionalColor(ShellColor.reset()));
 
 			commander.printOut("status", "error");
 
