@@ -832,6 +832,14 @@ public class JobAgent implements Runnable {
 				stdout.read();
 			}
 
+			// Setup cgroup for wrapper if supported ("runner" cgroup exists)
+			final String currentCgroup = CgroupUtils.getCurrentCgroup(Math.toIntExact(p.pid()));
+			if (currentCgroup.contains("runner")) {
+				final String newCgroup = currentCgroup.replace("runner", "agents");
+				
+				CgroupUtils.createCgroup(newCgroup, Thread.currentThread().getName());
+				CgroupUtils.moveProcessToCgroup(newCgroup, Math.toIntExact(p.pid()));
+			}
 		}
 		catch (final Exception ioe) {
 			logger.log(Level.SEVERE, "Exception running " + launchCommand + " : " + ioe.getMessage());

@@ -1,9 +1,5 @@
 package alien.site;
 
-import java.io.File;
-import java.nio.file.Files;
-import java.nio.file.Paths;
-import java.util.Arrays;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -11,7 +7,6 @@ import alien.api.DispatchSSLClient;
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
-import lazyj.commands.SystemCommand;
 
 /**
  * @author sweisz
@@ -60,7 +55,7 @@ public class JobRunner extends JobAgent {
 
 		int jrPid = MonitorFactory.getSelfProcessID();
 
-		createSelfCgroup(jrPid);
+		CgroupUtils.setupTopCgroups(jrPid);
 
 		while (timestamp < ttlEnd) {
 			synchronized (JobAgent.requestSync) {
@@ -114,31 +109,5 @@ public class JobRunner extends JobAgent {
 		ConfigUtils.switchToForkProcessLaunching();
 		final JobRunner jr = new JobRunner();
 		jr.run();
-	}
-
-	private boolean createSelfCgroup(int selfPid) {
-		if (new File("/sys/fs/cgroup/cgroup.controllers").isFile()) {
-			try {
-				final String slotCgroup = SystemCommand.bash("echo /sys/fs/cgroup$(cat /proc/" + selfPid + "/cgroup | grep slot | cut -d \":\" -f 3)").stdout;
-
-				File runnerSubCgroup = new File(slotCgroup + "/runner");
-				runnerSubCgroup.mkdir();
-
-				if (!runnerSubCgroup.exists())
-					return false;
-
-				String procsToMove = Files.readString(Paths.get(slotCgroup + "/cgroup.procs"));
-				Arrays.stream(procsToMove.split("\\r?\\n")).forEach(line -> SystemCommand.bash("echo " + line + " >> " + runnerSubCgroup.getPath() + "/cgroup.procs"));
-
-				SystemCommand.bash("echo +memory >> " + slotCgroup + "/cgroup.subtree_control");
-
-				return true;
-			}
-			catch (final Exception e) {
-				return false;
-			}
-		}
-		else
-			return false;
 	}
 }
