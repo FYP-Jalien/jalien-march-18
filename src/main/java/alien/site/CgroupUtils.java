@@ -25,7 +25,7 @@ public class CgroupUtils {
 	 * Creates new cgroups from current root for JobRunner ("runner") and JobAgents/JobWrappers ("agents"). Also
 	 * moves JobRunner to "runner", and delegates controllers.
 	 * 
-	 * @param runnerPid
+	 * @param runnerPid pid for JobRunner
 	 * @return true if both cgroups were created, and process successfully moved
 	 */
 	public static boolean setupTopCgroups(int runnerPid) {
@@ -53,13 +53,16 @@ public class CgroupUtils {
 
 	/**
 	 * 
-	 * Creates a new cgroup given a directory
+	 * Creates a new cgroup given a valid path and name
 	 * 
 	 * @param name name of the new cgroup to be created
 	 * @param dir location in the fs tree for the new cgroup
 	 * @return true if cgroup was created
 	 */
 	public static boolean createCgroup(String dir, String name) {
+		if (!dir.contains("/sys/fs/cgroup"))
+			return false;
+
 		final File newCgroup = new File(dir + "/" + name);
 		newCgroup.mkdir();
 
