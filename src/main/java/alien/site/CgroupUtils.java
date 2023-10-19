@@ -35,7 +35,7 @@ public class CgroupUtils {
 			if (createCgroup(slotCgroup, "runner") && createCgroup(slotCgroup, "agents")) {
 				try {
 					final String procsToMove = Files.readString(Paths.get(slotCgroup + "/cgroup.procs"));
-					Arrays.stream(procsToMove.split("\\r?\\n")).forEach(line -> SystemCommand.bash("echo " + line + " >> " + slotCgroup + "/runner/cgroup.procs"));
+					Arrays.stream(procsToMove.split("\\r?\\n")).forEach(line -> moveProcessToCgroup(slotCgroup + "/runner/cgroup.procs", Integer.parseInt(line)));
 
 					// TODO: delegate all controllers
 					SystemCommand.bash("echo +memory >> " + slotCgroup + "/cgroup.subtree_control");
@@ -66,10 +66,7 @@ public class CgroupUtils {
 		final File newCgroup = new File(dir + "/" + name);
 		newCgroup.mkdir();
 
-		if (!newCgroup.exists())
-			return false;
-		else
-			return true;
+		return newCgroup.exists();
 	}
 
 	/**
