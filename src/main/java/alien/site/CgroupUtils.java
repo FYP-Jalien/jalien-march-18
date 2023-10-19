@@ -1,8 +1,10 @@
 package alien.site;
 
 import java.io.File;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 
 import lazyj.commands.SystemCommand;
@@ -35,7 +37,7 @@ public class CgroupUtils {
 			if (createCgroup(slotCgroup, "runner") && createCgroup(slotCgroup, "agents")) {
 				try {
 					final String procsToMove = Files.readString(Paths.get(slotCgroup + "/cgroup.procs"));
-					Arrays.stream(procsToMove.split("\\r?\\n")).forEach(line -> moveProcessToCgroup(slotCgroup + "/runner/cgroup.procs", Integer.parseInt(line)));
+					Arrays.stream(procsToMove.split("\\r?\\n")).forEach(line -> moveProcessToCgroup(slotCgroup + "/runner", Integer.parseInt(line)));
 
 					// TODO: delegate all controllers
 					SystemCommand.bash("echo +memory >> " + slotCgroup + "/cgroup.subtree_control");
@@ -79,7 +81,7 @@ public class CgroupUtils {
 	 */
 	public static boolean moveProcessToCgroup(String cgroup, int pid) {
 		try {
-			SystemCommand.bash("echo " + pid + " >> " + cgroup + "/cgroup.procs");
+			Files.writeString(Paths.get(cgroup + "/cgroup.procs"), String.valueOf(pid), StandardOpenOption.APPEND);
 			return Files.readString(Paths.get(cgroup + "/cgroup.procs")).contains(String.valueOf(pid));
 		}
 		catch (final Exception e) {
@@ -103,4 +105,21 @@ public class CgroupUtils {
 		}
 	}
 
+	public static void setMemoryHigh(int pid, String limit) {
+		try {
+			Files.writeString(Paths.get(getCurrentCgroup(pid) + "/memory.high"), limit, StandardOpenOption.WRITE);
+		}
+		catch (IOException e) {
+			// Ignore
+		}
+	}
+
+	public static void setMemoryMax(int pid, String limit) {
+		try {
+			Files.writeString(Paths.get(getCurrentCgroup(pid) + "/memory.max"), limit, StandardOpenOption.WRITE);
+		}
+		catch (IOException e) {
+			// Ignore
+		}
+	}
 }
