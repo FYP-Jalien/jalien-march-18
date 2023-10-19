@@ -14,7 +14,7 @@ public class CgroupUtils {
 
 	/**
 	 * 
-	 * @return true if system uses cgroupsv2 
+	 * @return true if system uses cgroupsv2
 	 */
 	public static boolean haveCgroupsv2() {
 		return (new File("/sys/fs/cgroup/cgroup.controllers").isFile());
@@ -37,7 +37,7 @@ public class CgroupUtils {
 					final String procsToMove = Files.readString(Paths.get(slotCgroup + "/cgroup.procs"));
 					Arrays.stream(procsToMove.split("\\r?\\n")).forEach(line -> SystemCommand.bash("echo " + line + " >> " + slotCgroup + "/runner/cgroup.procs"));
 
-					//TODO: delegate all controllers
+					// TODO: delegate all controllers
 					SystemCommand.bash("echo +memory >> " + slotCgroup + "/cgroup.subtree_control");
 					SystemCommand.bash("echo +memory >> " + slotCgroup + "/agents/cgroup.subtree_control");
 
@@ -51,15 +51,15 @@ public class CgroupUtils {
 		return false;
 	}
 
-/**
- * 
- * Creates a new cgroup given a directory
- * 
- * @param name name of the new cgroup to be created
- * @param dir location in the fs tree for the new cgroup
- * @return true if cgroup was created
- */
-	public static boolean createCgroup(String dir, String name){
+	/**
+	 * 
+	 * Creates a new cgroup given a directory
+	 * 
+	 * @param name name of the new cgroup to be created
+	 * @param dir location in the fs tree for the new cgroup
+	 * @return true if cgroup was created
+	 */
+	public static boolean createCgroup(String dir, String name) {
 		final File newCgroup = new File(dir + "/" + name);
 		newCgroup.mkdir();
 
@@ -77,9 +77,9 @@ public class CgroupUtils {
 	 * @param pid process pid
 	 * @return true if process was moved
 	 */
-	public static boolean moveProcessToCgroup(String cgroup, int pid){
+	public static boolean moveProcessToCgroup(String cgroup, int pid) {
 		try {
-			SystemCommand.bash("echo " + pid + " >> " + cgroup + "/cgroup.procs");	
+			SystemCommand.bash("echo " + pid + " >> " + cgroup + "/cgroup.procs");
 			return Files.readString(Paths.get(cgroup + "/cgroup.procs")).contains(String.valueOf(pid));
 		}
 		catch (final Exception e) {

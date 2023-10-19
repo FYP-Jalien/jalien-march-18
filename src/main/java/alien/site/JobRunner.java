@@ -62,7 +62,7 @@ public class JobRunner extends JobAgent {
 				try {
 					if (checkParameters()) {
 						logger.log(Level.INFO, "Spawned thread nr " + i);
-						jaThread = new Thread(new JobAgent(), "JobAgent #" + i);
+						jaThread = new Thread(new JobAgent(), "JobAgent_" + i);
 						jaThread.start();
 						if (cpuIsolation == true)
 							checkAndApplyIsolation(jrPid);

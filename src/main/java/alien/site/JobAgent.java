@@ -835,10 +835,10 @@ public class JobAgent implements Runnable {
 			// Setup cgroup for wrapper if supported ("runner" cgroup exists)
 			final String currentCgroup = CgroupUtils.getCurrentCgroup(Math.toIntExact(p.pid()));
 			if (currentCgroup.contains("runner")) {
-				final String newCgroup = currentCgroup.replace("runner", "agents");
+				final String agentsCgroup = currentCgroup.replace("runner", "agents");
 				
-				CgroupUtils.createCgroup(newCgroup, Thread.currentThread().getName());
-				CgroupUtils.moveProcessToCgroup(newCgroup, Math.toIntExact(p.pid()));
+				CgroupUtils.createCgroup(agentsCgroup, Thread.currentThread().getName());
+				CgroupUtils.moveProcessToCgroup(agentsCgroup + "/" + Thread.currentThread().getName(), Math.toIntExact(p.pid()));
 			}
 		}
 		catch (final Exception ioe) {
