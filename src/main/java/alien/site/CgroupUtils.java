@@ -94,7 +94,7 @@ public class CgroupUtils {
 	 * Returns the cgroup of a given pid
 	 * 
 	 * @param pid
-	 * @return
+	 * @return String path of cgroup in the fs
 	 */
 	public static String getCurrentCgroup(int pid) {
 		try {
@@ -105,6 +105,13 @@ public class CgroupUtils {
 		}
 	}
 
+	/**
+	 * 
+	 * Sets memory.high for cgroup of given pid, if possible
+	 * 
+	 * @param pid
+	 * @param limit as string with size + unit (e.g. 500M)
+	 */
 	public static void setMemoryHigh(int pid, String limit) {
 		try {
 			Files.writeString(Paths.get(getCurrentCgroup(pid) + "/memory.high"), limit, StandardOpenOption.WRITE);
@@ -114,6 +121,13 @@ public class CgroupUtils {
 		}
 	}
 
+	/**
+	 * 
+	 * Sets memory.max for cgroup of given pid, if possible
+	 * 
+	 * @param pid
+	 * @param limit as string with size + unit (e.g. 500M)
+	 */
 	public static void setMemoryMax(int pid, String limit) {
 		try {
 			Files.writeString(Paths.get(getCurrentCgroup(pid) + "/memory.max"), limit, StandardOpenOption.WRITE);
