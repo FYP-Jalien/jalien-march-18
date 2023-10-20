@@ -98,7 +98,7 @@ public class CgroupUtils {
 	 */
 	public static String getCurrentCgroup(int pid) {
 		try {
-			return SystemCommand.bash("echo /sys/fs/cgroup$(cat /proc/" + pid + "/cgroup | grep slot | cut -d \":\" -f 3)").stdout;
+			return SystemCommand.bash("echo /sys/fs/cgroup$(cat /proc/" + pid + "/cgroup | grep _ | cut -d \":\" -f 3)").stdout;
 		}
 		catch (final Exception e) {
 			return "";
