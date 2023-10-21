@@ -1,6 +1,7 @@
 package alien.shell.commands;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -21,7 +22,7 @@ import lazyj.Format;
 
 /**
  * @author costing
- * @since 2018-08-15
+ * @since 2023-10-21
  */
 public class JAliEnCommandarchiveList extends JAliEnBaseCommand {
 	private ArrayList<String> alPaths = null;
@@ -40,37 +41,36 @@ public class JAliEnCommandarchiveList extends JAliEnBaseCommand {
 					if (g != null)
 						uuids.put(UUID.fromString(lfnName), g);
 					else {
-						commander.printErrln("GUID " + lfnName + " doesn't exist in the catalogue");
-						commander.setReturnCode(ErrNo.ENOENT, lfnName);
+						commander.setReturnCode(ErrNo.ENOENT, lfnName + " does not exist in the catalogue");
 					}
 				}
 				else {
 					commander.printErrln("LFN " + lfnName + " doesn't exist in the catalogue");
-					commander.setReturnCode(ErrNo.ENOENT, lfnName);
+					commander.setReturnCode(ErrNo.ENOENT, lfnName + " does not exist in the catalogue");
 				}
 			}
 			else
 				uuids.put(lfn.guid, lfn);
 		}
 
-		ArchiveContent ac = new ArchiveContent(commander.getUser(), uuids.keySet());
+		ArchiveContent ac = new ArchiveContent(commander.getUser(), new HashSet<>(uuids.keySet()));
 
 		try {
 			ac = Dispatcher.execute(ac);
 		}
 		catch (final Exception e) {
-			commander.setReturnCode(ErrNo.EREMOTEIO, e.getMessage());
+			commander.setReturnCode(ErrNo.EREMOTEIO, "Server threw an exception: " + e.getMessage());
 			return;
 		}
 
 		final Map<UUID, Map<GUID, String>> content = ac.getContents();
 
-		for (final Map.Entry<UUID, Map<GUID, String>> entry : content.entrySet()) {
-			final CatalogEntity entity = uuids.get(entry.getKey());
+		for (final Map.Entry<UUID, CatalogEntity> e : uuids.entrySet()) {
+			final CatalogEntity entity = e.getValue();
 
 			commander.printOutln("Content of: " + entity.getName() + " (" + entity.getSize() + " bytes = " + Format.size(entity.getSize()) + ")");
 
-			final Map<GUID, String> members = entry.getValue();
+			final Map<GUID, String> members = content.get(e.getKey());
 
 			if (members == null || members.size() == 0) {
 				commander.printOutln("  there are no files pointing to this entry, looks like this is not a ZIP archive");
@@ -80,12 +80,13 @@ public class JAliEnCommandarchiveList extends JAliEnBaseCommand {
 			for (final Map.Entry<GUID, String> member : members.entrySet()) {
 				final GUID memberGuid = member.getKey();
 
-				commander.printOutln("archive_guid", entry.getKey().toString());
+				commander.printOutln("archive_guid", e.getKey().toString());
 				commander.printOutln("archive_name", entity.getName());
 				commander.printOutln("member_guid", memberGuid.toString());
 				commander.printOutln("member_size", String.valueOf(memberGuid.getSize()));
 
-				commander.printOutln("  " + member.getValue() + " , guid " + memberGuid.guid + " (" + memberGuid.getSize() + " bytes = " + Format.size(memberGuid.getSize()) + ")");
+				commander.printOutln("  " + member.getValue() + "\t , guid " + memberGuid.guid + " (" + memberGuid.getSize() + " bytes = " + Format.size(memberGuid.getSize()) + " = "
+						+ Format.point(memberGuid.getSize() * 100. / entity.getSize()) + "% of the archive)");
 
 				commander.outNextResult();
 			}
