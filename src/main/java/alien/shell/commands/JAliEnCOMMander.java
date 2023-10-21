@@ -125,7 +125,7 @@ public class JAliEnCOMMander implements Runnable {
 			"ls", "find", "toXml", "cat", "whereis", "cp", "rm", "mv", "touch", "type", "lfn2guid", "guid2lfn", "guidinfo", "access", "commit", "chown", "chmod", "deleteMirror", "md5sum", "mirror",
 			"grep",
 			"changeDiff",
-			"listFilesFromCollection",
+			"listFilesFromCollection", "listArchive",
 			"packages",
 			"listCEs", "jobListMatch", "listpartitions", "setCEstatus",
 			"submit", "ps", "masterjob", "kill", "w", "uptime", "resubmit", "top", "registerOutput",

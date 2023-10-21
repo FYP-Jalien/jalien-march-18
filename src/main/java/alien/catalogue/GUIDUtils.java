@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
-import java.util.TreeSet;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
@@ -161,7 +160,7 @@ public final class GUIDUtils {
 	 * @param guid
 	 * @return the set of GUIDs pointing to this archive, or <code>null</code> if there is no such file
 	 */
-	public static Set<GUID> getReferringGUID(final UUID guid) {
+	public static Map<GUID, String> getReferringGUID(final UUID guid) {
 		final int host = getGUIDHost(guid);
 
 		if (host < 0)
@@ -183,17 +182,22 @@ public final class GUIDUtils {
 			if (monitor != null)
 				monitor.incrementCounter("GUID_db_lookup");
 
-			if (!db.query("select G" + tableName + "L.* from G" + tableName + "L INNER JOIN G" + tableName + "L_PFN USING (guidId) where pfn like ?;", false, "guid:///" + guid.toString() + "?ZIP=%"))
+			if (!db.query("select G" + tableName + "L.*, pfn from G" + tableName + "L INNER JOIN G" + tableName + "L_PFN USING (guidId) where pfn like ?;", false,
+					"guid:///" + guid.toString() + "?ZIP=%"))
 				throw new IllegalStateException("Failed querying the G" + tableName + "L table for guid " + guid);
 
 			if (!db.moveNext())
 				return null;
 
-			final Set<GUID> ret = new TreeSet<>();
+			final Map<GUID, String> ret = new LinkedHashMap<>();
 
 			do
 				try {
-					ret.add(new GUID(db, host, tableName));
+					final String pfn = db.gets("pfn");
+
+					final String name = pfn.substring(pfn.indexOf("?ZIP=") + 5);
+
+					ret.put(new GUID(db, host, tableName), name);
 				}
 				catch (final Exception e) {
 					logger.log(Level.WARNING, "Exception instantiating guid " + guid + " from " + tableName, e);
