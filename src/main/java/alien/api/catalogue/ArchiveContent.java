@@ -1,7 +1,7 @@
 package alien.api.catalogue;
 
 import java.util.Arrays;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -16,10 +16,10 @@ import alien.user.AliEnPrincipal;
  * Get the available tags associated to a path
  *
  * @author costing
- * @since 2020-02-25
+ * @since 2023-10-21
  */
 public class ArchiveContent extends Request {
-	private static final long serialVersionUID = -8097151852196189205L;
+	private static final long serialVersionUID = 322992661938966482L;
 
 	private final Set<UUID> uuids;
 	private Map<UUID, Map<GUID, String>> contents;
@@ -40,7 +40,7 @@ public class ArchiveContent extends Request {
 
 	@Override
 	public void run() {
-		this.contents = new LinkedHashMap<>();
+		this.contents = new HashMap<>();
 
 		for (final UUID uuid : this.uuids) {
 			final Map<GUID, String> members = GUIDUtils.getReferringGUID(uuid);

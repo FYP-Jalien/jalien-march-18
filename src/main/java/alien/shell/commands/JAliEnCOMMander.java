@@ -125,7 +125,7 @@ public class JAliEnCOMMander implements Runnable {
 			"ls", "find", "toXml", "cat", "whereis", "cp", "rm", "mv", "touch", "type", "lfn2guid", "guid2lfn", "guidinfo", "access", "commit", "chown", "chmod", "deleteMirror", "md5sum", "mirror",
 			"grep",
 			"changeDiff",
-			"listFilesFromCollection", "listArchive",
+			"listFilesFromCollection", "archiveList",
 			"packages",
 			"listCEs", "jobListMatch", "listpartitions", "setCEstatus",
 			"submit", "ps", "masterjob", "kill", "w", "uptime", "resubmit", "top", "registerOutput",
@@ -333,7 +333,8 @@ public class JAliEnCOMMander implements Runnable {
 
 	/**
 	 * get list of commands
-	 * @param user 
+	 * 
+	 * @param user
 	 *
 	 * @return array of commands
 	 */
@@ -717,11 +718,11 @@ public class JAliEnCOMMander implements Runnable {
 		// ( AliEnPrincipal.roleIsAdmin( AliEnPrincipal.userRole()) &&
 				!Arrays.asList(jAliEnAdminCommandList).contains(comm) /* ) */) {
 			if (Arrays.asList(hiddenCommandList).contains(comm)) {
-				if ("blackwhite".equals(comm) && out != null) {					
+				if ("blackwhite".equals(comm) && out != null) {
 					out.blackwhitemode();
 					bColour = out.colour();
 				}
-				else if ("color".equals(comm) && out != null) {					
+				else if ("color".equals(comm) && out != null) {
 					out.colourmode();
 					bColour = out.colour();
 				}
