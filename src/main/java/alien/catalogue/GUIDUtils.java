@@ -189,7 +189,7 @@ public final class GUIDUtils {
 			if (!db.moveNext())
 				return null;
 
-			final Map<GUID, String> ret = new LinkedHashMap<>();
+			final Map<GUID, String> ret = new HashMap<>();
 
 			do
 				try {
