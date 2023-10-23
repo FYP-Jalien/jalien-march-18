@@ -838,7 +838,7 @@ public class JobAgent implements Runnable {
 				final String agentsCgroup = currentCgroup.replace("runner", "agents");
 				
 				CgroupUtils.createCgroup(agentsCgroup, Thread.currentThread().getName());
-				CgroupUtils.moveProcessToCgroup(agentsCgroup + "/" + Thread.currentThread().getName(), Math.toIntExact(p.pid()));
+				CgroupUtils.moveProcessToCgroup(agentsCgroup + "/" + Thread.currentThread().getName(), getWrapperPid());
 			}
 		}
 		catch (final Exception ioe) {
