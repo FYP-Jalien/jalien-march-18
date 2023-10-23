@@ -449,6 +449,7 @@ public class BookingTable {
 				guid.expiretime = null;
 				guid.type = 0;
 				guid.aclId = -1;
+				guid.jobid = db.getl("jobid");
 			}
 
 			if (db.moveNext())

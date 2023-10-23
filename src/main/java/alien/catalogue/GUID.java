@@ -123,6 +123,11 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 	public final int tableName;
 
 	/**
+	 * Job ID that created this file.
+	 */
+	public long jobid = 0;
+
+	/**
 	 * LFNs associated to this GUID
 	 */
 	Set<LFN> lfns;
@@ -216,6 +221,8 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 		md5 = StringFactory.get(db.gets("md5"));
 
 		perm = StringFactory.get(db.gets("perm"));
+
+		jobid = db.getl("jobid");
 	}
 
 	/**
@@ -292,7 +299,7 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 	}
 
 	private boolean insert(final DBFunctions db) {
-		final String q = "INSERT INTO G" + tableName + "L (ctime, owner, ref, seStringList, seAutoStringList, aclId, expiretime, size, gowner, guid, type, md5, perm) VALUES ("
+		final String q = "INSERT INTO G" + tableName + "L (ctime, owner, ref, seStringList, seAutoStringList, aclId, expiretime, size, gowner, guid, type, md5, perm, jobid) VALUES ("
 				+ (ctime == null ? "null" : "'" + formatDate(ctime) + "'") + "," + // ctime
 				"'" + Format.escSQL(owner) + "'," + // owner
 				"0," + // ref
@@ -305,7 +312,8 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 				"string2binary('" + guid + "')," + // guid
 				(type == 0 ? "null" : "'" + type + "'") + "," + // type
 				"'" + Format.escSQL(md5) + "'," + // md5
-				"'" + Format.escSQL(perm) + "'" + // perm
+				"'" + Format.escSQL(perm) + "'," + // perm
+				(jobid > 0 ? String.valueOf(jobid) : "NULL") + // job ID
 				");";
 
 		final boolean previouslySet = db.setLastGeneratedKey(true);
@@ -353,7 +361,8 @@ public class GUID implements Comparable<GUID>, CatalogEntity {
 	public String toString() {
 		return "guidID\t\t: " + guidId + " (exists: " + exists + ")\n" + "ctime\t\t: " + (ctime != null ? ctime.toString() : "null") + "\n" + "owner\t\t: " + owner + ":" + gowner + "\n"
 				+ "SE lists\t: " + seStringList + " , " + seAutoStringList + "\n" + "aclId\t\t: " + aclId + "\n" + "expireTime\t: " + expiretime + "\n" + "size\t\t: " + size + "\n" + "guid\t\t: "
-				+ guid + "\n" + "type\t\t: " + (type != (char) 0 ? type : '0') + " (" + (int) type + ")\n" + "md5\t\t: " + md5 + "\n" + "permissions\t: " + perm;
+				+ guid + "\n" + "type\t\t: " + (type != (char) 0 ? type : '0') + " (" + (int) type + ")\n" + "md5\t\t: " + md5 + "\n" + "permissions\t: " + perm + "\njob ID\t: "
+				+ (jobid > 0 ? String.valueOf(jobid) : "unknown");
 	}
 
 	private static final Set<Integer> stringToSet(final String s) {

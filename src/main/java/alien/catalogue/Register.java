@@ -175,6 +175,7 @@ public class Register {
 			g.type = 0; // as in the catalogue
 			g.perm = "755";
 			g.aclId = -1;
+			g.jobid = jobId;
 		}
 
 		if (!g.seStringList.contains(Integer.valueOf(se.seNumber))) {

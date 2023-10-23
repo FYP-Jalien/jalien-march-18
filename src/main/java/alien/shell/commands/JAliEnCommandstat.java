@@ -53,6 +53,11 @@ public class JAliEnCommandstat extends JAliEnBaseCommand {
 		commander.printOut("perm", g.perm);
 		commander.printOut("size", String.valueOf(g.size));
 
+		if (g.jobid > 0) {
+			commander.printOutln(prefix + "Job ID: " + g.jobid);
+			commander.printOut("jobid", String.valueOf(g.jobid));
+		}
+
 		if (bV) {
 			commander.printOut("host", String.valueOf(g.host));
 			commander.printOut("tableName", String.valueOf(g.tableName));
