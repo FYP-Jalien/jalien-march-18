@@ -182,23 +182,19 @@ public final class GUIDUtils {
 			if (monitor != null)
 				monitor.incrementCounter("GUID_db_lookup");
 
-			long jobid = 0;
-
 			if (!db.query("SELECT jobid FROM G" + tableName + "L WHERE guid=string2binary(?)", false, guid.toString()))
 				throw new IllegalStateException("Failed querying the G" + tableName + "L table for guid " + guid);
 
 			if (!db.moveNext())
 				return null;
 
-			jobid = db.getl(1);
+			final long jobid = db.getl(1);
 
 			final String q = "select G" + tableName + "L.*, pfn from G" + tableName + "L INNER JOIN G" + tableName + "L_PFN USING (guidId) where " + (jobid > 0 ? "jobid=" + jobid + " AND " : "")
 					+ "pfn like ?;";
 
-			System.err.println(q);
-
 			if (!db.query(q, false, "guid:///" + guid.toString() + "?ZIP=%"))
-				throw new IllegalStateException("Failed querying the G" + tableName + "L table for guid " + guid);
+				throw new IllegalStateException("Failed querying the G" + tableName + "L + PFN table for guid " + guid);
 
 			if (!db.moveNext())
 				return null;
