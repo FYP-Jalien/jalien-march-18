@@ -98,7 +98,13 @@ public class CgroupUtils {
 	 */
 	public static String getCurrentCgroup(int pid) {
 		try {
-			return SystemCommand.bash("echo /sys/fs/cgroup$(cat /proc/" + pid + "/cgroup | grep _ | cut -d \":\" -f 3)").stdout;
+			String groups[] = Files.readString(Paths.get("/proc/" + pid + "/cgroup")).split(System.lineSeparator());
+
+			for (String group : groups) {
+				if (group.contains("_"))
+					return group;
+			}
+			return "";
 		}
 		catch (final Exception e) {
 			return "";
