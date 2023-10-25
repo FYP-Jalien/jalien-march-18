@@ -79,6 +79,8 @@ import apmon.MonitoredJob;
 import lazyj.ExtProperties;
 import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
+import lia.util.process.ExternalProcess.ExecutorFinishStatus;
+import lia.util.process.ExternalProcess.ExitStatus;
 import lia.util.process.ExternalProcesses;
 import sun.misc.Signal;
 import utils.ProcessWithTimeout;
@@ -541,9 +543,9 @@ public class JobAgent implements Runnable {
 						logger.log(Level.SEVERE, "The environment on this node appears to be broken. Please do \"" + CVMFS.getAlienvPrint() + "\" for more debug info.");
 						throw new EOFException("Job matching aborted due to potentially misconfigured environment");
 					}
-					final CommandOutput sanityCheck = SystemCommand.bash("ps --version");
-					if (!sanityCheck.stderr.isBlank()) {
-						logger.log(Level.SEVERE, "Possibly broken environment or process limit reached: " + sanityCheck.stderr);
+					final ExitStatus sanityCheck = ProcessWithTimeout.executeCommand(List.of("ps", "--version"), false, true, 1, TimeUnit.MINUTES);
+					if (sanityCheck.getExecutorFinishStatus() != ExecutorFinishStatus.NORMAL || sanityCheck.getExtProcExitStatus() != 0 || !sanityCheck.getStdErr().isBlank()) {
+						logger.log(Level.SEVERE, "Possibly broken environment or process limit reached: " + sanityCheck);
 						throw new EOFException("Job matching aborted due to failed sanity check");
 					}
 				}
@@ -836,7 +838,7 @@ public class JobAgent implements Runnable {
 			final String currentCgroup = CgroupUtils.getCurrentCgroup(Math.toIntExact(p.pid()));
 			if (currentCgroup.contains("runner")) {
 				final String agentsCgroup = currentCgroup.replace("runner", "agents");
-				
+
 				CgroupUtils.createCgroup(agentsCgroup, Thread.currentThread().getName());
 				CgroupUtils.moveProcessToCgroup(agentsCgroup + "/" + Thread.currentThread().getName(), getWrapperPid());
 			}
