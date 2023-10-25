@@ -2,6 +2,7 @@ package utils;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.util.List;
 import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -227,5 +228,42 @@ public final class ProcessWithTimeout {
 	public ExitStatus getExitStatus() {
 		final ExecutorFinishStatus status = (exitedOk ? (exitValue == 0 ? ExecutorFinishStatus.NORMAL : ExecutorFinishStatus.ERROR) : ExecutorFinishStatus.TIMED_OUT);
 		return new ExitStatus(-1, exitValue, status, sbOut.toString(), sbErr.toString());
+	}
+
+	/**
+	 * @param command tokenized command to execute
+	 * @param redirectStderr whether or not to redirect stderr to stdout
+	 * @param cleanEnvironment whether or not to start from a clean environment (<code>true</code>) or inherit it from the JVM (<code>false</code>)
+	 * @param timeoutValue how much time to wait for
+	 * @param unit unit of time to wait, applies to timeoutValue
+	 * @return the ExitStatus (stdout, stderr, process exit status - if normal - and the execution status)
+	 */
+	public static ExitStatus executeCommand(final List<String> command, final boolean redirectStderr, final boolean cleanEnvironment, final int timeoutValue, final TimeUnit unit) {
+		final ProcessBuilder pBuilder = new ProcessBuilder(command);
+
+		if (cleanEnvironment)
+			pBuilder.environment().clear();
+
+		pBuilder.redirectErrorStream(redirectStderr);
+
+		try {
+			final Process p = pBuilder.start();
+
+			final ProcessWithTimeout pTimeout = new ProcessWithTimeout(p, pBuilder);
+			pTimeout.waitFor(timeoutValue, unit);
+			return pTimeout.getExitStatus();
+		}
+		catch (final IOException ioe) {
+			if (logger.isLoggable(Level.WARNING))
+				logger.log(Level.WARNING, "Exception executing `" + command + "` with cleanEnv=" + cleanEnvironment, ioe);
+
+			return new ExitStatus(-1, 0, ExecutorFinishStatus.ERROR, null, null);
+		}
+		catch (final InterruptedException e) {
+			if (logger.isLoggable(Level.WARNING))
+				logger.log(Level.WARNING, "Interrupted while executing `" + command + "` with cleanEnv=" + cleanEnvironment + " and " + timeoutValue + " " + unit, e);
+
+			return new ExitStatus(-1, 0, ExecutorFinishStatus.TIMED_OUT, null, null);
+		}
 	}
 }
