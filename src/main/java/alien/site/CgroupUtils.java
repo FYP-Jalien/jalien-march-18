@@ -46,7 +46,7 @@ public class CgroupUtils {
 					return true;
 				}
 				catch (final Exception e) {
-					return false;
+					// Ignore
 				}
 			}
 		}
@@ -99,7 +99,6 @@ public class CgroupUtils {
 	public static String getCurrentCgroup(int pid) {
 		try {
 			String groups[] = Files.readString(Paths.get("/proc/" + pid + "/cgroup")).split(System.lineSeparator());
-
 			for (String group : groups) {
 				if (group.contains("_"))
 					return "/sys/fs/cgroup" + group.split(":")[2];
@@ -156,7 +155,7 @@ public class CgroupUtils {
 			Files.writeString(Paths.get(getCurrentCgroup(pid) + "/cgroup.kill"), "1", StandardOpenOption.WRITE);
 		}
 		catch (IOException e) {
-			// ignore
+			return false;
 		}
 		return true;
 	}
