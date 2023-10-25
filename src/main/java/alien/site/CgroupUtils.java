@@ -102,13 +102,13 @@ public class CgroupUtils {
 
 			for (String group : groups) {
 				if (group.contains("_"))
-					return group;
+					return "/sys/fs/cgroup" + group.split(":")[2];
 			}
-			return "";
 		}
 		catch (final Exception e) {
-			return "";
+			// Ignore
 		}
+		return "";
 	}
 
 	/**
