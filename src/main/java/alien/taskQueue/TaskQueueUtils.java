@@ -790,6 +790,9 @@ public class TaskQueueUtils {
 
 				if (newStatus == JobStatus.ERROR_EW)
 					extra += ",resubmission=resubmission+1";
+				
+				if (newStatus == JobStatus.WAITING)
+					extra += ",resubmission=resubmission+1";
 
 				newstatus = Integer.valueOf(newStatus.getAliEnLevel());
 				q = "UPDATE QUEUE SET statusId=?" + extra + " WHERE queueId=?;";
