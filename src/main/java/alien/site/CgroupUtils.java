@@ -136,4 +136,22 @@ public class CgroupUtils {
 			// Ignore
 		}
 	}
+
+	/**
+	 * 
+	 * Deletes all cgroups from the root of the given pid
+	 * 
+	 * @param pid
+	 * @return true if no errors when
+	 */
+	public static boolean cleanupCgroups(int pid) {
+		try {
+			// TODO: delete recursively if cgroup.kill is not available.
+			Files.writeString(Paths.get(getCurrentCgroup(pid) + "/cgroup.kill"), "1", StandardOpenOption.WRITE);
+		}
+		catch (IOException e) {
+			// ignore
+		}
+		return true;
+	}
 }
