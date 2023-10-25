@@ -6,6 +6,7 @@ import alien.shell.ErrNo;
 import alien.shell.ShellColor;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
+import lazyj.Utils;
 
 /**
  * @author marta
@@ -23,7 +24,8 @@ public class JAliEnCommandsetCEstatus extends JAliEnBaseCommand {
 				commander.printOutln(optionalColor(ShellColor.jobStateGreen()) + "Success: " + optionalColor(ShellColor.reset()) + " Status " + statusValue + " correctly set to CEs " + updatedCEs);
 			else
 				commander.printOutln(optionalColor(ShellColor.jobStateRed()) + "Error: " + optionalColor(ShellColor.reset()) + " Could not set status " + statusValue + " to CEs " + ceNames);
-		} catch (@SuppressWarnings("unused") Exception e) {
+		}
+		catch (@SuppressWarnings("unused") Exception e) {
 			commander.printOutln("Users must have the admin role to perform this action");
 		}
 	}
@@ -66,9 +68,9 @@ public class JAliEnCommandsetCEstatus extends JAliEnBaseCommand {
 			return;
 		}
 
-		if (statusValue.toLowerCase().contains("open") || "open".contains(statusValue.toLowerCase()))
+		if (statusValue.toLowerCase().contains("open") || "open".contains(statusValue.toLowerCase()) || Utils.stringToBool(statusValue, false))
 			statusValue = "open";
-		else if (statusValue.toLowerCase().contains("locked") || "locked".contains(statusValue.toLowerCase()))
+		else if (statusValue.toLowerCase().contains("locked") || "locked".contains(statusValue.toLowerCase()) || !Utils.stringToBool(statusValue, true))
 			statusValue = "locked";
 		else {
 			setArgumentsOk(false);
