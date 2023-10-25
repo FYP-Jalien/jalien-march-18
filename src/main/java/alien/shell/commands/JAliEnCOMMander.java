@@ -743,7 +743,17 @@ public class JAliEnCOMMander implements Runnable {
 			final Object[] param = { this, args };
 
 			try {
-				jcommand = getCommand(comm, param);
+				final UIPrintWriter savedOut = out;
+
+				if (help)
+					out = null;
+
+				try {
+					jcommand = getCommand(comm, param);
+				}
+				finally {
+					out = savedOut;
+				}
 			}
 			catch (final Exception e) {
 				if (e.getCause() instanceof OptionException || e.getCause() instanceof NumberFormatException) {
@@ -776,6 +786,7 @@ public class JAliEnCOMMander implements Runnable {
 						// Force enable stdout message
 						nomsg = false;
 						jcommand.printHelp();
+						setReturnCode(0, "");
 					}
 					else if (jcommand.areArgumentsOk() && (args.size() != 0 || jcommand.canRunWithoutArguments())) {
 						jcommand.run();
