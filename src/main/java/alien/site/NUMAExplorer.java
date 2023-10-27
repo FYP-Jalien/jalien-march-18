@@ -431,12 +431,7 @@ public class NUMAExplorer {
 			for (Integer pid : children) {
 				logger.log(Level.INFO, "Constraining PID " + pid);
 				try {
-					final Process CPUConstrainer = Runtime.getRuntime().exec("taskset -a -cp " + isolCmd + " " + pid);
-
-					if (!CPUConstrainer.waitFor(60, TimeUnit.SECONDS)) {
-						CPUConstrainer.destroyForcibly();
-						throw new InterruptedException("Timed out");
-					}
+					ProcessWithTimeout.executeCommand(Arrays.asList("taskset", "-a", "-cp", isolCmd, String.valueOf(pid)), false, true, 60, TimeUnit.SECONDS);
 				}
 				catch (final Exception e) {
 					logger.log(Level.WARNING, "Could not apply CPU mask: " + e);
