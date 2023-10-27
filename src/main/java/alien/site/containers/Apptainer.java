@@ -43,9 +43,6 @@ public class Apptainer extends Containerizer {
 		else
 			apptainerCmd.add("/cvmfs:/cvmfs");
 
-		apptainerCmd.add("--no-mount");
-		apptainerCmd.add("tmp");
-
 		apptainerCmd.add(containerImgPath);
 		apptainerCmd.add("/bin/bash");
 		apptainerCmd.add("-c");
