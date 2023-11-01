@@ -476,32 +476,38 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		final Map<String, String> processEnv = pBuilder.environment();
 		final HashMap<String, String> jBoxEnv = ConfigUtils.exportJBoxVariables();
 
-		processEnv.putAll(environment_packages);
-		processEnv.putAll(loadJDLEnvironmentVariables());
-		processEnv.putAll(jBoxEnv);
-		processEnv.put("APPTAINERENV_PREPEND_PATH", processEnv.get("PATH")); // in case of nested containers
-		processEnv.put("APPTAINERENV_LD_LIBRARY_PATH", processEnv.get("LD_LIBRARY_PATH"));
-		processEnv.put("JALIEN_TOKEN_CERT", saveToFile(tokenCert));
-		processEnv.put("JALIEN_TOKEN_KEY", saveToFile(tokenKey));
-		processEnv.put("ALIEN_JOB_TOKEN", legacyToken); // add legacy token
-		processEnv.put("ALIEN_PROC_ID", String.valueOf(queueId));
-		processEnv.put("ALIEN_MASTERJOB_ID", String.valueOf(masterjobID != null ? masterjobID.longValue() : queueId));
-		processEnv.put("ALIEN_SITE", siteMap.get("Site").toString());
-		processEnv.put("ALIEN_USER", username);
+		try {
+			processEnv.putAll(environment_packages);
+			processEnv.putAll(loadJDLEnvironmentVariables());
+			processEnv.putAll(jBoxEnv);
+			processEnv.put("APPTAINERENV_PREPEND_PATH", processEnv.get("PATH")); // in case of nested containers
+			processEnv.put("APPTAINERENV_LD_LIBRARY_PATH", processEnv.get("LD_LIBRARY_PATH"));
+			processEnv.put("JALIEN_TOKEN_CERT", saveToFile(tokenCert));
+			processEnv.put("JALIEN_TOKEN_KEY", saveToFile(tokenKey));
+			processEnv.put("ALIEN_JOB_TOKEN", legacyToken); // add legacy token
+			processEnv.put("ALIEN_PROC_ID", String.valueOf(queueId));
+			processEnv.put("ALIEN_MASTERJOB_ID", String.valueOf(masterjobID != null ? masterjobID.longValue() : queueId));
+			processEnv.put("ALIEN_SITE", siteMap.get("Site").toString());
+			processEnv.put("ALIEN_USER", username);
 
-		processEnv.put("HOME", currentDir.getAbsolutePath());
-		processEnv.put("TMP", currentDir.getAbsolutePath() + "/tmp");
-		processEnv.put("TMPDIR", currentDir.getAbsolutePath() + "/tmp");
+			processEnv.put("HOME", currentDir.getAbsolutePath());
+			processEnv.put("TMP", currentDir.getAbsolutePath() + "/tmp");
+			processEnv.put("TMPDIR", currentDir.getAbsolutePath() + "/tmp");
 
-		// Same values used in the Xrootd class for xrdcp command line. Solves deadlocked FST situation. 
-		processEnv.put("XRD_CONNECTIONWINDOW", "3");
-		processEnv.put("XRD_CONNECTIONRETRY", "1");
-		processEnv.put("XRD_TIMEOUTRESOLUTION", "1");
+			// Same values used in the Xrootd class for xrdcp command line. Solves deadlocked FST situation.
+			processEnv.put("XRD_CONNECTIONWINDOW", "3");
+			processEnv.put("XRD_CONNECTIONRETRY", "1");
+			processEnv.put("XRD_TIMEOUTRESOLUTION", "1");
 
-		processEnv.putAll(metavars);
+			processEnv.putAll(metavars);
 
-		if (!parentHostname.isBlank())
-			processEnv.put("PARENT_HOSTNAME", parentHostname);
+			if (!parentHostname.isBlank())
+				processEnv.put("PARENT_HOSTNAME", parentHostname);
+		}
+		catch (final Exception ex) {
+			logger.log(Level.WARNING, "One or more environment entries could not be loaded", ex);
+			putJobTrace("Warning: One or more environment entries could not be loaded");
+		}
 
 		pBuilder.redirectOutput(Redirect.appendTo(new File(currentDir, "stdout")));
 		pBuilder.redirectError(Redirect.appendTo(new File(currentDir, "stderr")));
