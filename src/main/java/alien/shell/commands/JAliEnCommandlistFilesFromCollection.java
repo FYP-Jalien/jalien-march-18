@@ -11,6 +11,7 @@ import alien.shell.ErrNo;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
+import lazyj.Format;
 
 /**
  * @author ron
@@ -36,6 +37,11 @@ public class JAliEnCommandlistFilesFromCollection extends JAliEnBaseCommand {
 	 * The -v flag is passed by a check in AliAnalysisAlien.cxx to check if the argument is an AliEn collection
 	 */
 	private boolean bV = false;
+
+	/**
+	 * Total shown at the end of the execution
+	 */
+	private boolean bT = false;
 
 	/**
 	 * execute the type
@@ -69,6 +75,8 @@ public class JAliEnCommandlistFilesFromCollection extends JAliEnBaseCommand {
 			return;
 		}
 
+		long lTotalSize = 0;
+
 		final StringBuilder sb = new StringBuilder();
 		for (final LFN lfn : lfns) {
 			commander.outNextResult();
@@ -89,9 +97,15 @@ public class JAliEnCommandlistFilesFromCollection extends JAliEnBaseCommand {
 				sb.append(")");
 			}
 			sb.append("\n");
+
+			lTotalSize += lfn.size;
 		}
 
 		commander.printOutln(sb.toString());
+
+		if (bT && lfns.size() > 0)
+			commander.printOutln(lfns.size() + " files of " + lTotalSize + " bytes (" + Format.size(lTotalSize) + "), average file size is " + (lTotalSize / lfns.size()) + " ("
+					+ Format.size(lTotalSize / lfns.size()) + ")");
 	}
 
 	/**
@@ -103,6 +117,7 @@ public class JAliEnCommandlistFilesFromCollection extends JAliEnBaseCommand {
 		commander.printOutln(helpUsage("listFilesFromCollection", "[-options] collection"));
 		commander.printOutln(helpStartOptions());
 		commander.printOutln(helpOption("-z", "show size and other file details"));
+		commander.printOutln(helpOption("-t", "total size and number of files at the end of the listing"));
 		commander.printOutln(helpOption("-s", "silent (API only)"));
 		commander.printOutln();
 	}
@@ -134,6 +149,7 @@ public class JAliEnCommandlistFilesFromCollection extends JAliEnBaseCommand {
 		parser.accepts("z");
 		parser.accepts("s");
 		parser.accepts("v");
+		parser.accepts("t");
 
 		final OptionSet options = parser.parse(alArguments.toArray(new String[] {}));
 
@@ -142,6 +158,7 @@ public class JAliEnCommandlistFilesFromCollection extends JAliEnBaseCommand {
 
 		bZ = options.has("z");
 		bV = options.has("v");
+		bT = options.has("t");
 
 		if (options.nonOptionArguments().size() != 1) {
 			setArgumentsOk(false);
