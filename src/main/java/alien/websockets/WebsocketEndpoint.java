@@ -250,6 +250,11 @@ public class WebsocketEndpoint extends Endpoint {
 			userIdentity.setRemotePort(remoteIPandPort.getPort());
 
 			remoteHostAddress = remoteIP.getHostAddress();
+
+			if (remoteIP.isLoopbackAddress() || remoteIP.isSiteLocalAddress() || remoteIP.isLinkLocalAddress()) {
+				// map localhost and site local addresses to the same close site as the current JVM, hopefully without further http queries
+				closeSiteCache.put(remoteHostAddress, ConfigUtils.getCloseSite(), 1000L * 60 * 60 * 24);
+			}
 		}
 		else
 			remoteHostAddress = null;
