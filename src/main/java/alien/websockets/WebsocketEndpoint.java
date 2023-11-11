@@ -269,7 +269,7 @@ public class WebsocketEndpoint extends Endpoint {
 		monitor.incrementCounter("new_sessions");
 	}
 
-	private static ExpirationCache<String, String> closeSiteCache = new ExpirationCache<>(2000);
+	private static ExpirationCache<String, String> closeSiteCache = new ExpirationCache<>(20000);
 
 	/**
 	 * Get the client's closest site
