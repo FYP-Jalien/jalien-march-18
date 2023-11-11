@@ -155,6 +155,9 @@ public class ConfigUtils {
 
 		if (logger.isLoggable(Level.FINE))
 			logger.log(Level.FINE, "Configuration loaded. Own logging configuration: " + (logging != null ? "true" : "false") + ", ML configuration detected: " + hasMLConfig());
+
+		if (getConfig().geti("lazyj.Utils.download.trace", 0) > 0)
+			System.setProperty("lazyj.Utils.download.trace", getConfig().gets("lazyj.Utils.download.trace"));
 	}
 
 	/**
