@@ -3,6 +3,7 @@ package alien.shell.commands;
 import java.io.IOException;
 import java.util.List;
 
+import alien.config.ConfigUtils;
 import alien.shell.ErrNo;
 import joptsimple.OptionException;
 import lazyj.Format;
@@ -27,18 +28,12 @@ public class JAliEnCommandsetSite extends JAliEnBaseCommand {
 		}
 
 		if (targetSiteName.equalsIgnoreCase("auto")) {
-			try {
-				final String autoSiteName = Utils.download("http://alimonitor.cern.ch/services/getClosestSite.jsp", null);
+			final String autoSiteName = ConfigUtils.getCloseSite();
 
-				if (autoSiteName != null && autoSiteName.length() > 0)
-					targetSiteName = autoSiteName.trim();
-				else {
-					commander.setReturnCode(ErrNo.EREMOTEIO, "Could not map you to a site name at the moment, keeping previous value of " + commander.getSite());
-					return;
-				}
-			}
-			catch (final IOException ioe) {
-				commander.setReturnCode(ErrNo.EAGAIN, "Could not retrieve the site name from the external service: " + ioe.getMessage());
+			if (autoSiteName != null && autoSiteName.length() > 0)
+				targetSiteName = autoSiteName.trim();
+			else {
+				commander.setReturnCode(ErrNo.EREMOTEIO, "Could not map you to a site name at the moment, keeping previous value of " + commander.getSite());
 				return;
 			}
 		}
