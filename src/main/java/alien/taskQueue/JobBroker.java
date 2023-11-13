@@ -648,8 +648,12 @@ public class JobBroker {
 			}
 
 			if (matchRequest.containsKey("Partition") && !",,".equals(matchRequest.get("Partition"))) {
-				where += "and ? like concat('%,',`partition`, ',%') ";
+				where += " and ? like concat('%,',`partition`, ',%') ";
 				bindValues.add(matchRequest.get("Partition"));
+			}
+			else {
+				// if the CE is not in any partition, it can only pick up jobs that have no partition restrictions
+				where += " and `partition`='%' ";
 			}
 
 			final String CeRequirements = Objects.isNull(matchRequest.get("ce_requirements")) ? "" : matchRequest.get("ce_requirements").toString();
