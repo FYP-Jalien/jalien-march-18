@@ -446,6 +446,8 @@ public final class ComputingElement extends Thread {
 			before += "export CPUCores=\"" + getValuesFromLDAPField(config.get("ce_matcharg")).get("cpucores") + "\"\n";
 		if (siteMap.containsKey("closeSE"))
 			before += "export closeSE=\"" + siteMap.get("closeSE") + "\"\n";
+		if (siteMap.containsKey("Partition"))
+			before += "export partition=\"" + siteMap.get("Partition") + "\"\n";
 
 		final ExtProperties containerConfig = ConfigUtils.getConfiguration("container");
 		if (Objects.nonNull(containerConfig)) {
@@ -642,6 +644,8 @@ public final class ComputingElement extends Thread {
 
 		// CE storage space does not matter for WNs
 		siteMap.remove("Disk");
+
+		
 
 		if (config.containsKey("ce_matcharg") && getValuesFromLDAPField(config.get("ce_matcharg")).containsKey("cpucores")) {
 			siteMap.put("CPUCores", Integer.valueOf(getValuesFromLDAPField(config.get("ce_matcharg")).get("cpucores")));
