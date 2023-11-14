@@ -41,7 +41,8 @@ public class PackageUtils {
 	 */
 	static final Monitor monitor = MonitorFactory.getMonitor(IndexTableEntry.class.getCanonicalName());
 
-	private static long lastCacheCheck = 0;
+	private static long lastPackageCacheCheck = 0;
+	private static long lastCVMFSCacheCheck = 0;
 
 	private static Map<String, Package> packages = null;
 
@@ -68,6 +69,7 @@ public class PackageUtils {
 				}
 
 				cacheCheck();
+				cvmfsCacheCheck();
 			}
 		}
 
@@ -85,7 +87,7 @@ public class PackageUtils {
 	}
 
 	private static synchronized void cacheCheck() {
-		if ((System.currentTimeMillis() - lastCacheCheck) > 1000 * 60) {
+		if ((System.currentTimeMillis() - lastPackageCacheCheck) > 1000 * 60) {
 			final Map<String, Package> newPackages = new ConcurrentHashMap<>();
 
 			try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
@@ -118,6 +120,16 @@ public class PackageUtils {
 				}
 			}
 
+			lastPackageCacheCheck = System.currentTimeMillis();
+
+			if (newPackages.size() > 0 || packages == null)
+				packages = newPackages;
+		}
+	}
+
+	private static synchronized void cvmfsCacheCheck() {
+		// `alienv q` takes ~10s with a warm CVMFS cache, don't run it too often
+		if ((System.currentTimeMillis() - lastCVMFSCacheCheck) > 1000 * 60 * 5) {
 			final Set<String> newCvmfsPackages = new HashSet<>();
 
 			try {
@@ -148,13 +160,10 @@ public class PackageUtils {
 				logger.log(Level.WARNING, "Exception getting the CVMFS package list", t);
 			}
 
-			lastCacheCheck = System.currentTimeMillis();
-
-			if (newPackages.size() > 0 || packages == null)
-				packages = newPackages;
-
 			if (newCvmfsPackages.size() > 0 || cvmfsPackages == null)
 				cvmfsPackages = newCvmfsPackages;
+
+			lastCVMFSCacheCheck = System.currentTimeMillis();
 		}
 	}
 
@@ -162,7 +171,7 @@ public class PackageUtils {
 	 * Force a reload of package list from the database.
 	 */
 	public static void refresh() {
-		lastCacheCheck = 0;
+		lastPackageCacheCheck = lastCVMFSCacheCheck = 0;
 
 		BACKGROUND_REFRESHER.wakeup();
 	}
@@ -223,7 +232,7 @@ public class PackageUtils {
 	 */
 	public static Set<String> getCvmfsPackages() {
 		if (cvmfsPackages == null)
-			cacheCheck();
+			cvmfsCacheCheck();
 		else
 			BACKGROUND_REFRESHER.wakeup();
 
@@ -241,8 +250,11 @@ public class PackageUtils {
 
 		if (packages == null)
 			cacheCheck();
-		else
-			BACKGROUND_REFRESHER.wakeup();
+
+		if (cvmfsPackages == null)
+			cvmfsCacheCheck();
+
+		BACKGROUND_REFRESHER.wakeup();
 
 		if (packages == null)
 			return "Package list could not be fetched from the database";
