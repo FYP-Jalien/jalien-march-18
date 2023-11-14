@@ -420,6 +420,7 @@ public final class ComputingElement extends Thread {
 			before += "export cpuIsolation=\"" + siteMap.get("cpuIsolation") + "\"\n";
 		before += "export ALIEN_CM_AS_LDAP_PROXY=\"" + config.get("ALIEN_CM_AS_LDAP_PROXY") + "\"\n";
 		before += "export site=\"" + site + "\"\n";
+		before += "export ALIEN_SITE=\"" + site + "\"\n";
 		before += "export CE=\"" + siteMap.get("CE") + "\"\n";
 		before += "export CEhost=\"" + siteMap.get("Localhost") + "\"\n";
 		before += "export TTL=\"" + siteMap.get("TTL") + "\"\n";
@@ -645,12 +646,9 @@ public final class ComputingElement extends Thread {
 		// CE storage space does not matter for WNs
 		siteMap.remove("Disk");
 
-		
-
 		if (config.containsKey("ce_matcharg") && getValuesFromLDAPField(config.get("ce_matcharg")).containsKey("cpucores")) {
 			siteMap.put("CPUCores", Integer.valueOf(getValuesFromLDAPField(config.get("ce_matcharg")).get("cpucores")));
 		}
-
 	}
 
 	/**
