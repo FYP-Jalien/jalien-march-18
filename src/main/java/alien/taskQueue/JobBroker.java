@@ -7,11 +7,13 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -23,6 +25,7 @@ import alien.api.Dispatcher;
 import alien.api.taskQueue.CE;
 import alien.api.token.GetTokenCertificate;
 import alien.api.token.TokenCertificateType;
+import alien.catalogue.PackageUtils;
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
@@ -506,6 +509,33 @@ public class JobBroker {
 			job.put("JDL", jdl);
 			job.put("User", user);
 			job.put("Resubmission", Integer.valueOf(resubmission));
+
+			try {
+				final JDL j = new JDL(jdl);
+
+				final Collection<String> packages = j.getList("Packages");
+
+				if (packages != null && packages.size() > 0) {
+					Set<String> platforms = null;
+
+					for (final String pEntry : packages) {
+						final alien.catalogue.Package p = PackageUtils.getPackage(pEntry);
+
+						if (platforms == null)
+							platforms = p.getPlatforms();
+						else
+							platforms.retainAll(p.getPlatforms());
+					}
+
+					if (platforms != null && platforms.size() > 0)
+						job.put("Platforms", String.valueOf(platforms));
+					else
+						logger.log(Level.WARNING, "No common platforms for the packages of " + queueId + " : " + packages);
+				}
+			}
+			catch (final Exception e) {
+				logger.log(Level.SEVERE, "Exception parsing the JDL of " + queueId, e);
+			}
 
 			if (logger.isLoggable(Level.FINE))
 				logger.log(Level.FINE, "Going to return " + queueId + " and " + user + " and " + jdl);
