@@ -511,7 +511,7 @@ public class JobBroker {
 			job.put("Resubmission", Integer.valueOf(resubmission));
 
 			try {
-				final JDL j = new JDL(jdl);
+				final JDL j = new JDL(Job.sanitizeJDL(jdl));
 
 				final Collection<String> packages = j.getList("Packages");
 
@@ -521,6 +521,9 @@ public class JobBroker {
 					for (final String pEntry : packages) {
 						final alien.catalogue.Package p = PackageUtils.getPackage(pEntry);
 
+						if (p.getPlatforms().contains("source"))
+							continue;
+						
 						if (platforms == null)
 							platforms = p.getPlatforms();
 						else
