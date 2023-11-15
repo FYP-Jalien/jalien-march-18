@@ -67,11 +67,6 @@ public abstract class Containerizer {
 	private static final String apmonConfig = System.getenv().containsKey("APMON_CONFIG") ? " && echo export APMON_CONFIG=" + System.getenv().get("APMON_CONFIG") : "";
 
 	/**
-	 * Command to set the environment for container
-	 */
-	protected static final String envSetup = "source <( " + CVMFS.getAlienvPrint() + apmonConfig + cudaDevices + rocrDevices + " && echo export JOB_CONTAINER_PATH=" + containerImgPath + " ); ";
-
-	/**
 	 * Simple constructor, initializing the container path from default location or from config/environment (DEFAULT_JOB_CONTAINER_PATH key)
 	 */
 	public Containerizer() {
@@ -191,6 +186,14 @@ public abstract class Containerizer {
 	 */
 	public String getWorkdir() {
 		return workdir;
+	}
+
+	/**
+	 * 
+	 * @return Command to set the environment for container as string
+	 */
+	protected static final String getEnvSetup(){
+		return "source <( " + CVMFS.getAlienvPrint() + apmonConfig + cudaDevices + rocrDevices + " && echo export JOB_CONTAINER_PATH=" + containerImgPath + " ); ";
 	}
 
 	/**

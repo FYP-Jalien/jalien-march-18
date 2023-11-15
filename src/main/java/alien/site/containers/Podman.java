@@ -29,7 +29,7 @@ public class Podman extends Containerizer {
 		podmanCmd.add(containerImgPath);
 		podmanCmd.add("/bin/bash");
 		podmanCmd.add("-c");
-		podmanCmd.add(envSetup + cmd);
+		podmanCmd.add(getEnvSetup() + cmd);
 
 		return podmanCmd;
 	}

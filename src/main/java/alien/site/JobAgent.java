@@ -634,7 +634,6 @@ public class JobAgent implements Runnable {
 			// Resubmit if the job was never able to start, but not if inputfile(s) could not be fetched
 			// or if has already been resubmitted several times (>=10)
 			if (("ERROR_IB".equals(endState) || endState.isBlank()) && exitCode != 3 && resubmission < 10) {
-
 				logger.log(Level.INFO, "Putting job " + queueId + " back to waiting");
 				putJobTrace("Putting job back to waiting " + queueId);
 				changeJobStatus(JobStatus.WAITING, -1);
