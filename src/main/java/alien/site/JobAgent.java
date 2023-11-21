@@ -116,6 +116,7 @@ public class JobAgent implements Runnable {
 	private String jobAgentId;
 	private final String workdir;
 	private String legacyToken;
+	private String platforms;
 	private HashMap<String, Object> matchedJob;
 	private static HashMap<String, Object> siteMap = null;
 	private int workdirMaxSizeMB;
@@ -580,6 +581,7 @@ public class JobAgent implements Runnable {
 				tokenCert = (String) matchedJob.get("TokenCertificate");
 				tokenKey = (String) matchedJob.get("TokenKey");
 				legacyToken = (String) matchedJob.get("LegacyToken");
+				platforms = (String) matchedJob.get("Platforms");
 
 				monitor.sendParameter("job_id", Long.valueOf(queueId));
 
@@ -588,6 +590,14 @@ public class JobAgent implements Runnable {
 				matchedJob.entrySet().forEach(entry -> {
 					logger.log(Level.INFO, entry.getKey() + " " + entry.getValue());
 				});
+
+				if (platforms != null && platforms.contains("el6-x86_64")) {
+					putJobTrace("Warning: this job requires packages from a platform past EOL: " + platforms + ".");
+					if (containerizer != null && !env.containsKey("JOB_CONTAINER_PATH")) {
+						containerizer.setContainerPath(CVMFS.getCompatContainerPath());
+						putJobTrace("Compatibility mode available: an older container will be used. Be warned this feature may be removed soon!");
+					}
+				}
 
 				logger.log(Level.INFO, jdl.getExecutable());
 				logger.log(Level.INFO, username);

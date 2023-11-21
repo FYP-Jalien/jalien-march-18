@@ -168,7 +168,7 @@ public abstract class Containerizer {
 	 * 
 	 * @param newContainerPath
 	 */
-	public static void setContainerPath(final String newContainerPath) {
+	public void setContainerPath(final String newContainerPath) {
 		containerImgPath = newContainerPath;
 	}
 
