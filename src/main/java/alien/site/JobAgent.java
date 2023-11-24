@@ -531,6 +531,9 @@ public class JobAgent implements Runnable {
 							((ArrayList<String>) siteMap.get("NoUsers")).add("alihyperloop");
 						if (!noUsers.contains("alitrain"))
 							((ArrayList<String>) siteMap.get("NoUsers")).add("alitrain");
+						if (!noUsers.contains("aliprod"))
+							((ArrayList<String>) siteMap.get("NoUsers")).add("aliprod");
+						logger.log(Level.WARNING, "This host appears to be missing AVX support, and will be blocked from running the following jobs: " + noUsers.toString());
 					}
 				}
 				catch (IOException | NullPointerException ex) {
