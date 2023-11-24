@@ -48,7 +48,7 @@ public class Apptainer extends Containerizer {
 		apptainerCmd.add("-c");
 		
 		if (containall) {
-			apptainerCmd.add(getEnvSetup() + debugCmd + cmd);
+			apptainerCmd.add(sourceEnvCmd() + debugCmd + cmd);
 		}
 		else
 			apptainerCmd.add(debugCmd + cmd);

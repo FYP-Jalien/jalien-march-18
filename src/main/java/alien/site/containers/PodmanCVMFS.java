@@ -34,7 +34,7 @@ public class PodmanCVMFS extends Containerizer {
 		podmanCmd.add(containerImgPath);
 		podmanCmd.add("/bin/bash");
 		podmanCmd.add("-c");
-		podmanCmd.add(getEnvSetup() + cmd);
+		podmanCmd.add(sourceEnvCmd() + cmd);
 
 		return podmanCmd;
 	}

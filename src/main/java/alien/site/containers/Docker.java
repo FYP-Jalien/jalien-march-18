@@ -29,7 +29,7 @@ public class Docker extends Containerizer {
 		dockerCmd.add(containerImgPath);
 		dockerCmd.add("/bin/bash");
 		dockerCmd.add("-c");
-		dockerCmd.add(getEnvSetup() + cmd);
+		dockerCmd.add(sourceEnvCmd() + cmd);
 
 		return dockerCmd;
 	}
