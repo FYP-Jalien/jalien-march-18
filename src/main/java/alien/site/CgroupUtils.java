@@ -100,7 +100,7 @@ public class CgroupUtils {
 		try {
 			String groups[] = Files.readString(Paths.get("/proc/" + pid + "/cgroup")).split(System.lineSeparator());
 			for (String group : groups) {
-				if (group.contains("_"))
+				if (!group.contains("freezer"))
 					return "/sys/fs/cgroup" + group.split(":")[2];
 			}
 		}
