@@ -1215,7 +1215,7 @@ public class JDL implements Serializable {
 	 * @return <code>true</code> if this extra requirement was added
 	 */
 	public final boolean addRequirement(final String requirement) {
-		if (requirement == null || requirement.length() == 0)
+		if (requirement == null || requirement.isBlank())
 			return false;
 
 		final Object old = get("Requirements");
@@ -1226,10 +1226,9 @@ public class JDL implements Serializable {
 			if (old instanceof StringBuilder)
 				newValue = (StringBuilder) old;
 			else {
-				newValue = new StringBuilder();
-				newValue.append(getString(old));
+				set("Requirements", getString(old));
 
-				set("Requirements", newValue);
+				newValue = (StringBuilder) get("Requirements");
 			}
 
 			if (newValue.indexOf(requirement) >= 0)
@@ -1239,9 +1238,9 @@ public class JDL implements Serializable {
 				newValue.append(" && ");
 		}
 		else {
-			newValue = new StringBuilder();
-
-			set("Requirements", newValue);
+			set("Requirements", new StringBuilder());
+			
+			newValue = (StringBuilder) get("Requirements");
 		}
 
 		if (requirement.matches("^\\(.+\\)$"))
@@ -1614,11 +1613,11 @@ public class JDL implements Serializable {
 
 		return false;
 	}
-	
+
 	/**
 	 * @return the JSON-serialized content of the JDL
 	 */
-	public String toJson(){
+	public String toJson() {
 		final Map<String, Object> sorted = sortContent();
 
 		Format.JSONFragment jsonFragment = Format.toJSON(sorted, true);
