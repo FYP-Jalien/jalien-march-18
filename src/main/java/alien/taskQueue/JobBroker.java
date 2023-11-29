@@ -523,15 +523,19 @@ public class JobBroker {
 
 						if (p.getPlatforms().contains("source"))
 							continue;
-						
+
 						if (platforms == null)
 							platforms = p.getPlatforms();
 						else
 							platforms.retainAll(p.getPlatforms());
 					}
 
-					if (platforms != null && platforms.size() > 0)
+					if (platforms != null && platforms.size() > 0) {
+						if (logger.isLoggable(Level.INFO))
+							logger.log(Level.INFO, "Platforms for " + queueId + ": " + platforms);
+
 						job.put("Platforms", String.valueOf(platforms));
+					}
 					else
 						logger.log(Level.WARNING, "No common platforms for the packages of " + queueId + " : " + packages);
 				}
