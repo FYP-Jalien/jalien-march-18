@@ -1578,7 +1578,7 @@ public class TaskQueueUtils {
 
 		Float price = jdl.getFloat("Price");
 
-		if (price == null)
+		if (price == null || price.floatValue() < 1)
 			price = Float.valueOf(1);
 
 		jdl.set("Price", price);
@@ -1600,7 +1600,7 @@ public class TaskQueueUtils {
 		}
 
 		Integer cpuCores = jdl.getInteger("CPUCores");
-		if (cpuCores == null)
+		if (cpuCores == null || cpuCores.intValue() < 1)
 			cpuCores = Integer.valueOf(1);
 
 		jdl.set("CPUCores", String.valueOf(cpuCores));
@@ -1637,15 +1637,13 @@ public class TaskQueueUtils {
 		// set the requirements anew
 		jdl.delete("Requirements");
 
-		jdl.addRequirement("other.Type == \"machine\"");
-
 		final Collection<String> packages = jdl.getList("Packages");
+
+		jdl.addRequirement(jdl.gets("OrigRequirements"));
 
 		if (packages != null)
 			for (final String pack : packages)
 				jdl.addRequirement("member(other.Packages,\"" + pack + "\")");
-
-		jdl.addRequirement(jdl.gets("OrigRequirements"));
 
 		jdl.addRequirement("other.TTL > " + ttl);
 		jdl.addRequirement("other.Price <= " + price.intValue());
