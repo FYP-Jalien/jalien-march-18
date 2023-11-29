@@ -790,7 +790,7 @@ public class TaskQueueUtils {
 
 				if (newStatus == JobStatus.ERROR_EW)
 					extra += ",resubmission=resubmission+1";
-				
+
 				if (newStatus == JobStatus.WAITING)
 					extra += ",resubmission=resubmission+1";
 
@@ -1592,8 +1592,12 @@ public class TaskQueueUtils {
 
 		jdl.set("Type", "Job");
 
-		if (jdl.get("OrigRequirements") == null)
-			jdl.set("OrigRequirements", jdl.get("Requirements"));
+		if (jdl.get("OrigRequirements") == null) {
+			final Object req = jdl.get("Requirements");
+
+			if (req != null && (req instanceof StringBuilder) && !((StringBuilder) req).toString().isBlank())
+				jdl.set("OrigRequirements", req);
+		}
 
 		Integer cpuCores = jdl.getInteger("CPUCores");
 		if (cpuCores == null)
@@ -3550,8 +3554,8 @@ public class TaskQueueUtils {
 						false, Integer.valueOf(j.siteid));
 
 				if (!db.query("UPDATE QUEUEPROC SET maxrsize=null,cputime=null,ncpu=null,batchid=null,cost=null,cpufamily=null,cpu=null,rsize=null,"
-							+ "spyurl=null,runtime=null,mem=null,si2k=null,cpuspeed=null,vsize=null,runtimes=null,procinfotime=null,maxvsize=null,"
-							+ "agentuuid=null,cpuId=null where queueId=?", false, Long.valueOf(queueId))) {
+						+ "spyurl=null,runtime=null,mem=null,si2k=null,cpuspeed=null,vsize=null,runtimes=null,procinfotime=null,maxvsize=null,"
+						+ "agentuuid=null,cpuId=null where queueId=?", false, Long.valueOf(queueId))) {
 					logger.severe("Resubmit: cannot update QUEUEPROC for job: " + queueId);
 				}
 
