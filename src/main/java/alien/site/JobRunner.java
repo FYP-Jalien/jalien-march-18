@@ -1,5 +1,8 @@
 package alien.site;
 
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -7,6 +10,7 @@ import alien.api.DispatchSSLClient;
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
+import alien.shell.commands.JAliEnCOMMander;
 
 /**
  * @author sweisz
@@ -23,6 +27,8 @@ public class JobRunner extends JobAgent {
 	 * ML monitor object
 	 */
 	static final Monitor monitor = MonitorFactory.getMonitor(JobRunner.class.getCanonicalName());
+
+	private final JAliEnCOMMander commander = JAliEnCOMMander.getInstance();
 
 	static {
 		monitor.addMonitoring("resource_status", (names, values) -> {
@@ -109,5 +115,36 @@ public class JobRunner extends JobAgent {
 		ConfigUtils.switchToForkProcessLaunching();
 		final JobRunner jr = new JobRunner();
 		jr.run();
+	}
+
+	/**
+	 * Gets the JA sorter by different strategies to record in DB
+	 *
+	 * @param slotMem Total memory consumed in the slot
+	 */
+	public static void recordHighestConsumer(double slotMem, String reason, double parsedSlotLimit) {
+		SorterByAbsoluteMemoryUsage jobSorter1 = new SorterByAbsoluteMemoryUsage();
+		sortByComparator(slotMem, jobSorter1, reason, parsedSlotLimit);
+		SorterByRelativeMemoryUsage jobSorter2 = new SorterByRelativeMemoryUsage();
+		sortByComparator(slotMem, jobSorter2, reason, parsedSlotLimit);
+		SorterByTemporalGrowth jobSorter3 = new SorterByTemporalGrowth();
+		sortByComparator(slotMem, jobSorter3, reason, parsedSlotLimit);
+	}
+
+	private static void sortByComparator(double slotMem, Comparator jobSorter, String reason, double parsedSlotLimit) {
+		ArrayList<JobAgent> sortedJA = new ArrayList<JobAgent>(MemoryController.activeJAInstances.values());
+		for (JobAgent ja : sortedJA)
+			ja.checkProcessResources();
+		String sorterId = jobSorter.getClass().getCanonicalName().split("\\.")[jobSorter.getClass().getCanonicalName().split("\\.").length -1];
+		Collections.sort(sortedJA, jobSorter);
+		if (MemoryController.debugMemoryController) {
+			logger.log(Level.INFO, "Sorted jobs with " + sorterId + ": ");
+			for (JobAgent ja : sortedJA)
+				logger.log(Level.INFO, "Job " + ja.getQueueId() + " consuming VMEM " + ja.RES_VMEM.doubleValue() * 1024 + " MB and RMEM " + ja.RES_RMEM.doubleValue() * 1024 + " MB RAM");
+		}
+		boolean success = sortedJA.get(0).recordPreemption( System.currentTimeMillis(), slotMem, sortedJA.get(0).RES_VMEM.doubleValue(), reason, parsedSlotLimit, sortedJA.size(), sorterId);
+		if (!success) {
+			logger.log(Level.INFO, "Could not record preemption on central DB");
+		}
 	}
 }

@@ -4094,4 +4094,89 @@ public class TaskQueueUtils {
 			return true;
 		}
 	}
+
+	/**
+	 * Records preemption or system kill by oom
+	 *
+	 * @param queueId
+	 * @param preemptionTs
+	 * @param killingTs
+	 * @param preemptionSlotMemory
+	 * @param preemptionJobMemory
+	 * @param numConcurrentJobs
+	 * @param preemptionTechnique
+	 * @param resubmissionCounter
+	 * @param hostName
+	 * @param siteName
+	 * @return <code>true</code> if the recording could be done
+	 */
+	public static boolean recordPreemption(final long queueId, final long preemptionTs, final long killingTs, final double preemptionSlotMemory, final double preemptionJobMemory, final int numConcurrentJobs, final String preemptionTechnique, final int resubmissionCounter, final String hostName, final String siteName) {
+		try (DBFunctions db = getQueueDB()) {
+			if (db == null)
+				return false;
+
+			if (logger.isLoggable(Level.FINE))
+				logger.log(Level.FINE, "Going to record preemption for job " + queueId);
+
+			db.setReadOnly(false);
+			db.setQueryTimeout(60);
+
+			logger.log(Level.INFO, "Recording preemption for job " + queueId);
+			int siteId = getSiteId(siteName);
+			Integer hostId = getHostId(hostName);
+			if (preemptionTs != 0) {
+				logger.log(Level.INFO, "Job was preempted at ts " + preemptionTs);
+				String q = "INSERT INTO oom_preemptions (queueId, preemptionTs,preemptionSlotMemory,preemptionJobMemory,numConcurrentJobs,preemptionTechnique,resubmissionCounter,hostId,siteId) VALUES ("+queueId+","+preemptionTs+","+preemptionSlotMemory+","+preemptionJobMemory+","+numConcurrentJobs+",'"+preemptionTechnique+"',"+ resubmissionCounter + "," + hostId + "," + siteId + ");";
+				if (!db.query(q))
+					return false;
+			} else if (killingTs != 0) {
+				logger.log(Level.INFO, "Job was killed at ts " + killingTs);
+				String q = "SELECT queueId FROM oom_preemptions where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId=" + siteId + ";";
+				db.query(q);
+				if (db.moveNext()) {
+					q = "UPDATE oom_preemptions set systemKillTs=" + killingTs + " where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId=" + siteId + " and systemKillTs is null;";
+					if (!db.query(q))
+						return false;
+				} else {
+					q = "INSERT INTO oom_preemptions (queueId,systemKillTs,resubmissionCounter,hostId,siteId) VALUES (" + queueId + "," + killingTs + "," + resubmissionCounter + "," + hostId + "," + siteId + ");";
+					if (!db.query(q))
+						return false;
+				}
+			}
+		}
+		return true;
+	}
+
+	/**
+	 * Checks if the job was detected to consume too much memory and updates its final status in oom_preemptions
+	 *
+	 * @param queueId
+	 * @param finalStatus
+	 * @param resubmissionCounter
+	 * @param hostName
+	 * @param siteName
+	 * @return <code>true</code> if the status update could be done
+	 */
+	public static boolean setFinalStatusOOM(final long queueId, final JobStatus finalStatus, final int resubmissionCounter, final String hostName, final String siteName) {
+		try (DBFunctions db = getQueueDB()) {
+			if (db == null)
+				return false;
+
+			if (logger.isLoggable(Level.FINE))
+				logger.log(Level.FINE, "Going to record preemption for job " + queueId);
+
+			db.setReadOnly(false);
+
+			db.setQueryTimeout(60);
+			int siteId = getSiteId(siteName);
+			Integer hostId = getHostId(hostName);
+			int statusId = finalStatus.getAliEnLevel();
+			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId=" + siteId + ";";
+			if (!db.query(q))
+				return false;
+			if (db.getUpdateCount() == 0)
+				logger.log(Level.INFO, "Updating status but not in oom db (" + queueId + " - " + finalStatus.toString() +")");
+		}
+		return true;
+	}
 }

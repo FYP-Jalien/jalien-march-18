@@ -7,6 +7,7 @@ import java.util.logging.Logger;
 import alien.api.taskQueue.GetMatchJob;
 import alien.api.taskQueue.JobKilledException;
 import alien.api.taskQueue.PutJobLog;
+import alien.api.taskQueue.RecordPreemption;
 import alien.api.taskQueue.SetJobStatus;
 import alien.api.token.GetTokenCertificate;
 import alien.config.ConfigUtils;
@@ -178,6 +179,9 @@ public class Dispatcher {
 
 			// Allows JobAgents to retrieve job token certificates for the actual job to run with
 			if (r instanceof GetTokenCertificate)
+				return true;
+
+			if (r instanceof RecordPreemption)
 				return true;
 
 			// TODO : add above all commands that a JobAgent should run (setting job status, uploading traces)

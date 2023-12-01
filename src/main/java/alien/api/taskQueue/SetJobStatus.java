@@ -77,9 +77,14 @@ public class SetJobStatus extends Request {
 			return;
 		}
 
-		if (this.status != null)
+		if (this.status != null) {
 			TaskQueueUtils.setJobStatus(this.jobnumber, this.status, null, this.extrafields);
-		else
+			if (extrafields.keySet().contains("node") && extrafields.keySet().contains("CE")) {
+				String execHost = (String)extrafields.get("node");
+				String siteName = (String)extrafields.get("CE");
+				TaskQueueUtils.setFinalStatusOOM(this.jobnumber, this.status, this.resubmission, execHost, siteName);
+			}
+		} else
 			TaskQueueUtils.setJobExtraFields(this.jobnumber, this.extrafields);
 
 		if (this.extrafields != null)

@@ -513,4 +513,29 @@ public class TaskQueueApiUtils {
 		}
 		return null;
 	}
+
+	/**
+	 * Records preemption in central DB
+	 *
+	 * @param queueId
+	 * @param preemptionTs
+	 * @param killingTs
+	 * @param preemptionSlotMemory
+	 * @param preemptionJobMemory
+	 * @param numConcurrentJobs
+	 * @param preemptionTechnique
+	 * @param resubmission
+	 * @param hostName
+	 * @return
+	 */
+	public boolean recordPreemption(long queueId, long preemptionTs, long killingTs, double preemptionSlotMemory, double preemptionJobMemory, int numConcurrentJobs, String preemptionTechnique, int resubmission, String hostName, String siteName) {
+		try {
+			Dispatcher.execute(new RecordPreemption(queueId, preemptionTs, killingTs, preemptionSlotMemory, preemptionJobMemory, numConcurrentJobs, preemptionTechnique, resubmission, hostName, siteName));
+		}
+		catch (final ServerException e) {
+			System.out.println("Could not record preemption of job " + queueId + e.getMessage());
+			return false;
+		}
+		return true;
+	}
 }

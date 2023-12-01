@@ -60,6 +60,8 @@ import apmon.ApMon;
 import apmon.ApMonMonitoringConstants;
 import apmon.BkThread;
 import lazyj.Format;
+import lazyj.commands.CommandOutput;
+import lazyj.commands.SystemCommand;
 import lia.util.process.ExternalProcesses;
 
 /**
@@ -550,6 +552,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				logger.log(Level.SEVERE, "Payload process destroyed by timeout in wrapper!");
 				putJobTrace("JobWrapper: Payload process destroyed by timeout in wrapper!");
 			}
+
+			boolean detectedOOM = checkOOMEvents();
+
+			if (detectedOOM)
+				logger.log(Level.SEVERE, "An OOM Error has been detected running the job " + queueId);
+
 			logger.log(Level.SEVERE, "Payload has finished execution.");
 		}
 		catch (final InterruptedException e) {
@@ -567,6 +575,57 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		return payload.exitValue();
+	}
+
+	/**
+	 * Records job killed by the system due to oom
+	 *
+	 * @return <code>true</code> if the recording could be done
+	 */
+	protected boolean recordKilling() {
+		logger.log(Level.INFO, "Recording system kill of job " + queueId + " (site: " + ce + " - host: " + hostName + ")");
+		putJobTrace("System killed job due to OOM");
+		if (!commander.q_api.recordPreemption(queueId, 0, System.currentTimeMillis(), 0, 0, 0, null, resubmission, hostName, ce)) {
+			return false;
+		}
+		//To be taken out when not killing
+		//changeStatus(JobStatus.ERROR_E);
+		return true;
+	}
+
+	/**
+	 * Analyzes if job was killed by the system due to oom
+	 *
+	 * @return <code>true</code> if the job ended in oom
+	 */
+	private boolean checkOOMEvents() {
+		boolean usingCgroupsv2 = new File("/sys/fs/cgroup/cgroup.controllers").isFile();
+		String cgroupId = MemoryController.parseCgroupsPath(usingCgroupsv2);
+		String lastLog = getDmesgOutput("dmesg | egrep -i " + cgroupId + " | egrep -Ei 'oom-kill|Memory cgroup stats'");
+		if (!lastLog.isEmpty()) {
+			Double timing = Double.valueOf(lastLog.substring(lastLog.indexOf("[") + 1, lastLog.indexOf("]")));
+			double uptime = MemoryController.parseUptime();
+			double elapsedTime = uptime - timing.doubleValue();
+			if (MemoryController.debugMemoryController)
+				logger.log(Level.INFO, "Parsed time from boot in dmesg is " + timing + ", with a system uptime of " + uptime + ". From hast dmesg log, " + elapsedTime + "s elapsed");
+			if (elapsedTime < 5 * 60) { // We check if it is from less than five minutes ago
+				return recordKilling();
+			}
+		} else
+			logger.log(Level.INFO, "Did not get any OOM error from dmesg");
+		return false;
+	}
+
+	private static String getDmesgOutput(String dmesgCmd) {
+		if (MemoryController.debugMemoryController)
+			logger.log(Level.INFO, "Parsing dmesg logs with: " + dmesgCmd);
+		CommandOutput co = SystemCommand.bash(dmesgCmd);
+		if (co.stderr != null && !co.stderr.isEmpty())
+			logger.log(Level.WARNING, "Could not execute dmesg on the host to parse OOM");
+		if (MemoryController.debugMemoryController)
+			logger.log(Level.INFO, "Dmesg output " + co);
+		String lastLog = co.stdout.split("\n")[co.stdout.split("\n").length - 1];
+		return lastLog;
 	}
 
 	private String saveToFile(final String content) {
@@ -1110,6 +1169,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		final HashMap<String, Object> extrafields = new HashMap<>();
 		extrafields.put("exechost", ceHost);
+		extrafields.put("CE", ce);
+		extrafields.put("node", hostName);
 
 		// if final status with saved files, we set the path
 		if (jobStatus == JobStatus.DONE || jobStatus == JobStatus.DONE_WARN || jobStatus == JobStatus.ERROR_E || jobStatus == JobStatus.ERROR_V) {

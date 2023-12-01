@@ -118,9 +118,9 @@ public class JobAgent implements Runnable {
 	private String legacyToken;
 	private String platforms;
 	private HashMap<String, Object> matchedJob;
-	private static HashMap<String, Object> siteMap = null;
+	protected static HashMap<String, Object> siteMap = null;
 	private int workdirMaxSizeMB;
-	private int jobMaxMemoryMB;
+	protected int jobMaxMemoryMB;
 	private MonitoredJob mj;
 	private Double prevCpuTime;
 	private long prevTime = 0;
@@ -133,14 +133,14 @@ public class JobAgent implements Runnable {
 	private final int jobNumber;
 
 	// Other
-	private final String hostName;
+	protected final String hostName;
 	private final JAliEnCOMMander commander = JAliEnCOMMander.getInstance();
 	private String jarPath;
 	private String jarName;
 	private int childPID;
 	private long lastHeartbeat = 0;
 	private long jobStartupTime;
-	private final Containerizer containerizer = ContainerizerFactory.getContainerizer();
+	protected final Containerizer containerizer = ContainerizerFactory.getContainerizer();
 	private boolean checkCoreUsingJava = true;
 
 	private enum jaStatus {
@@ -231,8 +231,8 @@ public class JobAgent implements Runnable {
 	private static final Double ZERO = Double.valueOf(0);
 
 	private Double RES_WORKDIR_SIZE = ZERO;
-	private Double RES_VMEM = ZERO;
-	private Double RES_RMEM = ZERO;
+	protected Double RES_VMEM = ZERO;
+	protected Double RES_RMEM = ZERO;
 	private Double RES_VMEMMAX = ZERO;
 	private Double RES_RMEMMAX = ZERO;
 	private Double RES_MEMUSAGE = ZERO;
@@ -308,6 +308,13 @@ public class JobAgent implements Runnable {
 	// static final NUMAExplorer numaExplorer = new NUMAExplorer(Runtime.getRuntime().availableProcessors());
 	static boolean wholeNode;
 	static byte[] initialMask;
+
+	// Memory management
+	private static MemoryController memoryController;
+	private boolean alreadyPreempted = false;
+
+	protected static final Object workDirSizeSync = new Object();
+	private static HashMap<Long, Integer> slotWorkdirsMaxSize;
 
 	/**
 	 */
@@ -456,6 +463,19 @@ public class JobAgent implements Runnable {
 		synchronized (cpuSync) {
 			if (numaExplorer == null && cpuIsolation == true)
 				numaExplorer = new NUMAExplorer(RES_NOCPUS.intValue());
+		}
+		logger.log(Level.INFO, "Going to register memory limits ... ");
+		synchronized(env) {
+			if (memoryController == null) {
+				memoryController = new MemoryController(MAX_CPU.longValue());
+				Thread tMemController = new Thread(memoryController, "MemoryController");
+				tMemController.setDaemon(true);
+				tMemController.start();
+			}
+			synchronized(workDirSizeSync) {
+				if (slotWorkdirsMaxSize == null)
+					slotWorkdirsMaxSize = new HashMap<>();
+			}
 		}
 
 		try {
@@ -620,6 +640,10 @@ public class JobAgent implements Runnable {
 				logger.log(Level.INFO, "Job requested CPU Disk: " + reqCPU + " " + reqDisk);
 
 				RUNNING_CPU -= reqCPU;
+				synchronized(env){
+					RUNNING_DISK = recomputeDiskSpace();
+				}
+				logger.log(Level.INFO, "The recomputed disk space is " + RUNNING_DISK);
 				RUNNING_DISK -= reqDisk;
 				logger.log(Level.INFO, "Currently available CPUCores: " + RUNNING_CPU);
 				logger.log(Level.INFO, "Task isolation is set to " + cpuIsolation);
@@ -681,6 +705,14 @@ public class JobAgent implements Runnable {
 				attempts.getAndIncrement();
 			else
 				attempts.set(1);
+
+			synchronized(env) {
+				logger.log(Level.INFO, "Removing job from Memory Controller Registries");
+				MemoryController.removeJobFromRegistries(queueId);
+				synchronized(workDirSizeSync) {
+					slotWorkdirsMaxSize.remove(queueId);
+				}
+			}
 		}
 
 		setStatus(jaStatus.FINISHING_JA);
@@ -695,6 +727,8 @@ public class JobAgent implements Runnable {
 	}
 
 	private int handleJob() {
+		int returnValue = 0;
+		Process p = null;
 		try {
 			if (!createWorkDir()) {
 				changeJobStatus(JobStatus.ERROR_IB, -1);
@@ -720,7 +754,6 @@ public class JobAgent implements Runnable {
 
 			ttl = ttlForJob();
 
-			Process p;
 			synchronized (cpuSync) {
 				p = launchJobWrapper(generateLaunchCommand());
 				if (p != null && p.isAlive())
@@ -728,13 +761,23 @@ public class JobAgent implements Runnable {
 			}
 
 			// Start and monitor execution
-			return monitorExecution(p, true);
+			returnValue = monitorExecution(p, true);
 		}
 		catch (final Exception e) {
 			logger.log(Level.SEVERE, "Unable to handle job", e);
 			putJobTrace("ERROR: Unable to handle job: " + e.toString() + " " + Arrays.toString(e.getStackTrace()));
-			return -1;
+			returnValue = -1;
+
+		} finally {
+			boolean oom = checkOOMDump();
+			endState = getWrapperJobStatus();
+			if (oom && !endState.startsWith("ERROR")) {
+				changeJobStatus(JobStatus.ERROR_E, -1);
+				if (p != null)
+					killGracefully(p);
+			}
 		}
+		return returnValue;
 	}
 
 	/**
@@ -753,7 +796,12 @@ public class JobAgent implements Runnable {
 				logger.log(Level.INFO, cmdCheck[i]);
 				if (cmdCheck[i].contains("-cp"))
 					i++;
+				else if (cmdCheck[i].contains("-Xms"))
+					launchCmd.add("-Xms50M");
+				else if (cmdCheck[i].contains("-Xmx"))
+					launchCmd.add("-Xmx50M");
 				else if (cmdCheck[i].contains("alien.site.JobRunner") || cmdCheck[i].contains("alien.site.JobAgent")) {
+					launchCmd.add("-XX:OnOutOfMemoryError=\"echo 'Process %p has run out of memory' > ./" + queueId + ".oom\"");
 					launchCmd.add("-Djobagent.vmid=" + queueId);
 					launchCmd.add("-DAliEnConfig=.");
 					launchCmd.add("-cp");
@@ -854,7 +902,6 @@ public class JobAgent implements Runnable {
 			final String currentCgroup = CgroupUtils.getCurrentCgroup(Math.toIntExact(p.pid()));
 			if (currentCgroup.contains("runner")) {
 				final String agentsCgroup = currentCgroup.replace("runner", "agents");
-
 				CgroupUtils.createCgroup(agentsCgroup, Thread.currentThread().getName());
 				CgroupUtils.moveProcessToCgroup(agentsCgroup + "/" + Thread.currentThread().getName(), getWrapperPid());
 			}
@@ -889,6 +936,7 @@ public class JobAgent implements Runnable {
 			// apmon.addJobToMonitor(wrapperPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString());
 			mj = new MonitoredJob(childPID, jobWorkdir, ce + "_Jobs", matchedJob.get("queueId").toString(), cpuCores);
 			mj.setJobStartupTime(jobStartupTime);
+			MemoryController.activeJAInstances.put(Long.valueOf(queueId),this);
 
 			String monitoring = jdl.gets("Monitoring");
 			if (monitoring != null && monitoring.toUpperCase().contains("PAYLOAD")) {
@@ -951,16 +999,28 @@ public class JobAgent implements Runnable {
 					if (error != null) {
 						t.cancel();
 						heartMon.interrupt();
-						if (!jobKilled) {
+						if (!jobKilled && !jobOOMPreempted) {
 							logger.log(Level.SEVERE, "Monitor has detected an error: " + error);
 							putJobTrace("[FATAL]: Monitor has detected an error: " + error);
 							putJobTrace(error);
 							killGracefully(p);
 						}
 						else {
-							logger.log(Level.SEVERE, "ERROR[FATAL]: Job KILLED by user! Terminating...");
-							putJobTrace("ERROR[FATAL]: Job KILLED by user! Terminating...");
-							killForcibly(p);
+							if (jobOOMPreempted){
+								changeJobStatus(JobStatus.ERROR_E, -1);
+								logger.log(Level.SEVERE, "ERROR[FATAL]: Job PREEMPTED due to memory overconsumption. Terminating...");
+								putJobTrace("ERROR[FATAL]: Job PREEMPTED due to memory overconsumption. Terminating...");
+								killGracefully(p);
+								/*synchronized(MemoryController.lockMemoryController) {
+									logger.log(Level.INFO, "Preemption of job " + queueId + " is going to be done NOW");
+									MemoryController.preemptingJob = false;
+								}*/
+							} else {
+								logger.log(Level.SEVERE, "ERROR[FATAL]: Job KILLED by user! Terminating...");
+								putJobTrace("ERROR[FATAL]: Job KILLED by user! Terminating...");
+								killForcibly(p);
+							}
+
 						}
 						return 1;
 					}
@@ -1238,6 +1298,7 @@ public class JobAgent implements Runnable {
 		if (timeleft <= 0)
 			return false;
 
+		RUNNING_DISK = recomputeDiskSpace();
 		if (RUNNING_DISK.longValue() <= 10 * 1024) {
 			if (!System.getenv().containsKey("JALIEN_IGNORE_STORAGE")) {
 				logger.log(Level.WARNING, "There is not enough space left: " + RUNNING_DISK);
@@ -1251,6 +1312,38 @@ public class JobAgent implements Runnable {
 			return false;
 
 		return true;
+	}
+
+	/**
+	 * Re-computes the disk space available
+	 *
+	 * @return the amount of disk left
+	 */
+	public Long recomputeDiskSpace() {
+		long recomputedDisk =  getFreeSpace((String)siteMap.get("workdir"));
+		logger.log(Level.INFO, "Recomputing disk space of " + (String)siteMap.get("workdir") + ". Starting with a free space of " + recomputedDisk);
+		synchronized(workDirSizeSync) {
+			for (Long runningJob : slotWorkdirsMaxSize.keySet()) {
+				int maxSize = slotWorkdirsMaxSize.get(runningJob).intValue();
+				String runningJobWorkdir = (String)siteMap.get("workdir") + "/" + defaultOutputDirPrefix + runningJob;
+
+				Path workdirPath = Paths.get(runningJobWorkdir);
+				long workdirSize = 0;
+				try {
+					workdirSize = Files.walk(workdirPath)
+					  .filter(p -> p.toFile().isFile())
+					  .mapToLong(p -> p.toFile().length())
+					  .sum();
+				}
+				catch (IOException e) {
+					logger.log(Level.INFO, "Could not compute current size of job workdir " + runningJobWorkdir, e);
+				}
+
+			    recomputedDisk = recomputedDisk + workdirSize - maxSize;
+			    logger.log(Level.INFO, "WorkdirSize=" + workdirSize + ", maxSize=" + maxSize + ", recomputedDisk=" + recomputedDisk);
+			}
+		}
+		return Long.valueOf(recomputedDisk);
 	}
 
 	/**
@@ -1276,6 +1369,16 @@ public class JobAgent implements Runnable {
 				logger.log(Level.INFO, "JobRunner pinned to mask " + initMask);
 			}
 		}
+	}
+
+	private boolean checkOOMDump() {
+		File f = new File(jobWorkdir + "/" + queueId + ".oom");
+		if (f.exists() && !f.isDirectory()) {
+			logger.log(Level.SEVERE, "Detected an OOM on the JobWrapper JVM. Aborting.");
+			putJobTrace("Detected an OOM on the JobWrapper JVM. Aborting.");
+			return true;
+		}
+		return false;
 	}
 
 	private int computeTimeLeft(final Level loggingLevel) {
@@ -1340,6 +1443,9 @@ public class JobAgent implements Runnable {
 
 		workdirMaxSizeMB = TaskQueueUtils.getWorkDirSizeMB(jdl, cpuCores);
 		putJobTrace("Local disk space limit: " + workdirMaxSizeMB + "MB");
+		synchronized(workDirSizeSync) {
+			slotWorkdirsMaxSize.put(Long.valueOf(queueId), Integer.valueOf(workdirMaxSizeMB));
+		}
 
 		// Memory use
 		final String maxmemory = jdl.gets("Memorysize");
@@ -1426,6 +1532,8 @@ public class JobAgent implements Runnable {
 			extrafields.put("runtimes", RES_RUNTIME);
 			extrafields.put("maxvsize", RES_VMEMMAX);
 			extrafields.put("batchid", RES_BATCH_INFO); // TODO - send from sendBatchInfo();
+			extrafields.put("CE", ce);
+			extrafields.put("node", hostName);
 
 			if (!TaskQueueApiUtils.setJobStatus(queueId, resubmission, null, extrafields)) {
 				jobKilled = true;
@@ -1476,6 +1584,45 @@ public class JobAgent implements Runnable {
 
 	private boolean jobKilled = false;
 
+	private boolean jobOOMPreempted = false;
+
+	/**
+	 * Records job preemption in the central db
+	 *
+	 * @param preemptionTs
+	 * @param preemptionSlotMemory
+	 * @param preemptionJobMemory
+	 * @param numConcurrentJobs
+	 * @param preemptionTechnique
+	 * @return
+	 */
+	protected boolean recordPreemption(final long preemptionTs, final double preemptionSlotMemory, final double preemptionJobMemory, final String reason, final double parsedSlotLimit, final int numConcurrentJobs, final String preemptionTechnique) {
+		/*synchronized(MemoryController.lockMemoryController) {
+			logger.log(Level.INFO, "Preemption of job " + queueId + " (site: " + ce + " - host: " + hostName + ") starts - going to be killed EVENTUALLY");
+			MemoryController.preemptingJob = true;
+		}*/
+		if (!alreadyPreempted) {
+			logger.log(Level.INFO, "Recording preemption of job " + queueId);
+			if (!commander.q_api.recordPreemption(queueId, preemptionTs, 0, preemptionSlotMemory/1024, preemptionJobMemory, numConcurrentJobs, preemptionTechnique, resubmission, hostName, ce)) {
+				return false;
+			}
+			putJobTrace("Preemption starts using method " + preemptionTechnique + ". Job consuming " + preemptionJobMemory + " MB (slot has a total usage of " + preemptionSlotMemory/1024 + " MB, parsed limit of " + parsedSlotLimit + " MB due to " + reason + ").");
+			alreadyPreempted = true;
+			String cgroupPIDs = "/sys/fs/cgroup/memory" + MemoryController.cgroupId + "/tasks";
+			if (CgroupUtils.haveCgroupsv2())
+				cgroupPIDs = MemoryController.cgroupRootPath + "/cgroup.procs";
+			if (MemoryController.debugMemoryController)
+				logger.log(Level.INFO, "Sorting processes by consumed memory from source " + cgroupPIDs);
+			List<String> processTree = MemoryController.getCgroupProcessTree(cgroupPIDs);
+			putJobTrace("Appending cgroup processes memory consumption for dbg (PSS --> process cmd) -- Please ignore colors\n -------------");
+			for (String p : processTree)
+				putJobTrace(p);
+			putJobTrace("------------");
+		}
+		//	jobOOMPreempted = true;
+		return true;
+	}
+
 	private boolean putJobLog(final String key, final String value) {
 		if (jobKilled)
 			return false;
@@ -1492,9 +1639,13 @@ public class JobAgent implements Runnable {
 		return putJobLog("trace", value);
 	}
 
-	private String checkProcessResources() { // checks and maintains sandbox
+	protected String checkProcessResources() { // checks and maintains sandbox
 		if (jobKilled)
 			return "Job was killed";
+
+		if (jobOOMPreempted) {
+			return "Job was preempted due to memory overconsumption";
+		}
 
 		// Also check for core directories, and abort if found to avoid filling up disk space
 		if (!env.getOrDefault("SKIP_CORECHECK", "").toLowerCase().contains("true")) {
@@ -1812,6 +1963,7 @@ public class JobAgent implements Runnable {
 		final HashMap<String, Object> extrafields = new HashMap<>();
 		extrafields.put("exechost", siteMap.getOrDefault("CEhost", ""));
 		extrafields.put("node", hostName);
+		extrafields.put("CE", siteMap.getOrDefault("CE", ""));
 
 		if (jobWorkdir != null)
 			extrafields.put("path", jobWorkdir);
@@ -2173,7 +2325,7 @@ public class JobAgent implements Runnable {
 	private void addConstraintsToSiteMap(String nodeName, String alienSite) {
 		try {
 
-			final URL url = new URL(siteSonarUrl + "constraints.jsp?hostname=" + URLEncoder.encode(nodeName, charSet) +
+			final URL url = new URL(siteSonarUrl + "constraints-marta.jsp?hostname=" + URLEncoder.encode(nodeName, charSet) +
 					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
 			JSONObject constraints = makeRequest(url, nodeName, alienSite);
 			if (constraints != null && constraints.keySet().size() > 0) {
@@ -2235,7 +2387,7 @@ public class JobAgent implements Runnable {
 				final Process process = pBuilder.start();
 
 				StringBuilder output = new StringBuilder();
-				BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+				BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream(),StandardCharsets.UTF_8));
 
 				String line;
 				while ((line = reader.readLine()) != null) {
@@ -2249,7 +2401,7 @@ public class JobAgent implements Runnable {
 					logger.log(Level.WARNING, "Site Sonar probe " + probeName + " didn't finish in due time");
 				}
 				else {
-					logger.log(Level.FINE, "Output of " + probeName + ": " + output);
+					logger.log(Level.WARNING, "Output of " + probeName + ": " + output.toString());
 					try {
 						testOutputJson = (JSONObject) jsonParser.parse(output.toString());
 					}
