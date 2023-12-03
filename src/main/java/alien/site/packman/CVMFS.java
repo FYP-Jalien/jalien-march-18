@@ -266,7 +266,10 @@ public class CVMFS extends PackMan {
 	 * @return path to Apptainer runtime in CVMFS
 	 */
 	public static String getApptainerPath() {
-		return CVMFS_BASE_DIR + "/containers/bin/apptainer/current/bin";
+		if (System.getProperty("os.arch").contains("aarch64"))
+			return CVMFS_BASE_DIR + "/containers/bin/apptainer/current-aarch64/bin";
+		else
+			return CVMFS_BASE_DIR + "/containers/bin/apptainer/current/bin";
 	}
 
 	/**
