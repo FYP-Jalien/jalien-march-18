@@ -620,8 +620,8 @@ public class JobAgent implements Runnable {
 						putJobTrace("Warning: this job requires packages from a platform past EOL: " + platforms + ".");
 						putJobTrace("An older container will be used. Be warned this feature may be removed soon!");
 					}
-					System.err.println(CVMFS.getContainerPath(platforms));
-					containerizer.setContainerPath(CVMFS.getContainerPath(platforms));
+					if (containerizer != null && !env.containsKey("JOB_CONTAINER_PATH"))
+						containerizer.setContainerPath(CVMFS.getContainerPath(platforms));
 				}
 
 				logger.log(Level.INFO, jdl.getExecutable());
