@@ -615,12 +615,13 @@ public class JobAgent implements Runnable {
 					logger.log(Level.INFO, entry.getKey() + " " + entry.getValue());
 				});
 
-				if (platforms != null && platforms.contains("el6-x86_64")) {
-					putJobTrace("Warning: this job requires packages from a platform past EOL: " + platforms + ".");
-					if (containerizer != null && !env.containsKey("JOB_CONTAINER_PATH")) {
-						containerizer.setContainerPath(CVMFS.getCompatContainerPath());
-						putJobTrace("Compatibility mode available: an older container will be used. Be warned this feature may be removed soon!");
+				if (platforms != null) {
+					if (platforms.contains("el6-x86_64")) {
+						putJobTrace("Warning: this job requires packages from a platform past EOL: " + platforms + ".");
+						putJobTrace("An older container will be used. Be warned this feature may be removed soon!");
 					}
+					System.err.println(CVMFS.getContainerPath(platforms));
+					containerizer.setContainerPath(CVMFS.getContainerPath(platforms));
 				}
 
 				logger.log(Level.INFO, jdl.getExecutable());

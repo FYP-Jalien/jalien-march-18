@@ -11,11 +11,14 @@ import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.MatchResult;
+import java.util.regex.Pattern;
 
 import alien.api.Dispatcher;
 import alien.api.catalogue.GetAliEnv;
@@ -252,14 +255,21 @@ public class CVMFS extends PackMan {
 	 * @return path to job container
 	 */
 	public static String getContainerPath() {
-		return CVMFS_BASE_DIR + "/containers/fs/singularity/el9";
+		return CVMFS_BASE_DIR + "/containers/fs/singularity/prod";
 	}
 
 	/**
-	 * @return path to job container for older compatibility
+	 * @return path to job container compatible with given platforms
 	 */
-	public static String getCompatContainerPath() {
-		return CVMFS_BASE_DIR + "/containers/fs/singularity/centos7";
+	public static String getContainerPath(String platforms) {
+		String[] identified_platforms = Pattern.compile("el[0-99]-(x86_64|aarch64)").matcher(platforms).results().map(MatchResult::group).toArray(String[]::new);
+
+		Arrays.sort(identified_platforms, new Comparator<String>() {
+			public int compare(String s1, String s2) {
+				return Integer.valueOf(s1.split("-")[0].replaceAll("[^0-9]", "")).compareTo(Integer.valueOf(s2.split("-")[0].replaceAll("[^0-9]", "")));
+			}
+		});
+		return CVMFS_BASE_DIR + "/containers/fs/singularity/compat_" + identified_platforms[0];
 	}
 
 	/**
