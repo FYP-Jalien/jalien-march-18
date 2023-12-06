@@ -20,7 +20,7 @@ import lazyj.commands.SystemCommand;
  */
 public abstract class Containerizer {
 
-	private static final String DEFAULT_JOB_CONTAINER_PATH = CVMFS.getContainerPath();
+	private static final String DEFAULT_JOB_CONTAINER_PATH = CVMFS.getDefaultContainerPath();
 
 	/**
 	 * Sandbox location

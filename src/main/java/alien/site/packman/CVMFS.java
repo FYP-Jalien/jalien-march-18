@@ -252,24 +252,29 @@ public class CVMFS extends PackMan {
 	}
 
 	/**
-	 * @return path to job container
+	 * @return path to default job container
 	 */
-	public static String getContainerPath() {
-		return CVMFS_BASE_DIR + "/containers/fs/singularity/prod";
+	public static String getDefaultContainerPath() {
+		return CVMFS_BASE_DIR + "/containers/fs/singularity/el9";
 	}
 
 	/**
 	 * @return path to job container compatible with given platforms
 	 */
-	public static String getContainerPath(String platforms) {
-		String[] identified_platforms = Pattern.compile("el[0-99]-(x86_64|aarch64)").matcher(platforms).results().map(MatchResult::group).toArray(String[]::new);
+	public static String getContainerPath(final String platforms) {
+		String[] identified_platforms = Pattern.compile("(el|SLC)([0-99]-(x86_64|aarch64)|[0-99]$)").matcher(platforms).results().map(MatchResult::group).toArray(String[]::new);
 
-		Arrays.sort(identified_platforms, new Comparator<String>() {
-			public int compare(String s1, String s2) {
-				return Integer.valueOf(s1.split("-")[0].replaceAll("[^0-9]", "")).compareTo(Integer.valueOf(s2.split("-")[0].replaceAll("[^0-9]", "")));
-			}
-		});
-		return CVMFS_BASE_DIR + "/containers/fs/singularity/compat_" + identified_platforms[0];
+		if (identified_platforms.length > 0) {
+			Arrays.sort(identified_platforms, new Comparator<String>() {
+				public int compare(String s1, String s2) {
+					return Integer.valueOf(s1.split("-")[0].replaceAll("[^0-9]", "")).compareTo(Integer.valueOf(s2.split("-")[0].replaceAll("[^0-9]", "")));
+				}
+			});
+			final String containerForPlatform = CVMFS_BASE_DIR + "/containers/fs/singularity/compat_" + identified_platforms[0];
+			if (new File(containerForPlatform).exists())
+				return containerForPlatform;
+		}
+		return getDefaultContainerPath();
 	}
 
 	/**
