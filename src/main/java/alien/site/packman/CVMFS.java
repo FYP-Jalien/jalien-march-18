@@ -262,7 +262,7 @@ public class CVMFS extends PackMan {
 	 * @return path to job container compatible with given platforms
 	 */
 	public static String getContainerPath(final String platforms) {
-		String[] identified_platforms = Pattern.compile("(el|SLC)([0-99]-(x86_64|aarch64)|[0-99]$)").matcher(platforms).results().map(MatchResult::group).toArray(String[]::new);
+		String[] identified_platforms = Pattern.compile("(el|SLC)([0-9]{1,2}-(x86_64|aarch64)|[0-9]{1,2}$)").matcher(platforms).results().map(MatchResult::group).toArray(String[]::new);
 
 		if (identified_platforms.length > 0) {
 			Arrays.sort(identified_platforms, new Comparator<String>() {
