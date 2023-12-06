@@ -41,6 +41,7 @@ import java.util.stream.Collectors;
 import alien.api.Dispatcher;
 import alien.api.ServerException;
 import alien.api.catalogue.LFNfromString;
+import alien.api.taskQueue.GetPS;
 import alien.catalogue.BookingTable;
 import alien.catalogue.CatalogueUtils;
 import alien.catalogue.LFN;
@@ -1117,7 +1118,7 @@ public class TaskQueueUtils {
 	 * @return the ps listing
 	 */
 	public static List<Job> getPS(final Collection<JobStatus> states, final Collection<String> users, final Collection<String> sites, final Collection<String> nodes, final Collection<Long> mjobs,
-			final Collection<Long> jobids, final String orderByKey, final int limit) {
+								  final Collection<Long> jobids, final HashMap<GetPS.PsFilters, Collection<Object>> filters, final String orderByKey, final int limit) {
 
 		final List<Job> ret = new ArrayList<>();
 
@@ -1159,6 +1160,41 @@ public class TaskQueueUtils {
 
 				if (!first)
 					where += whe + ") ) and ";
+			}
+
+			// Iterating time filter
+			for (Map.Entry<GetPS.PsFilters, Collection<Object>> filterEntry : filters.entrySet()) {
+				
+				// Filter name
+				GetPS.PsFilters filter = filterEntry.getKey();
+				// List of values for the filter
+				Collection<Object> filterValues = filterEntry.getValue();
+				
+				// Custom logic for each filter
+				switch (filter) {
+					case mtime:
+						if (filterValues != null) {
+							ArrayList<Object> filterValuesList = new ArrayList<>(filterValues);
+							// mtime filter must have two elements. If the endTime is not defined, 0 is added from the parser.
+							if (filterValuesList.size() == 2) {
+								String startTime = String.valueOf(filterValuesList.get(0));
+								String endTime = String.valueOf(filterValuesList.get(1));
+								if (Integer.parseInt(startTime) >= Integer.parseInt(endTime)) {
+									where += " (mtime between (NOW() - INTERVAL " + startTime + " HOUR) " +
+											"and (NOW() - INTERVAL " + endTime + " HOUR)) and ";
+									break;
+								} else {
+									// incorrect time intervals
+								}
+							} else {
+								// we cannot accept more than 2 parameters
+							}
+						}
+						break;
+					// add more filters...
+					default:
+						break;
+				}
 			}
 
 			if (users != null && users.size() > 0 && !users.contains("%")) {
