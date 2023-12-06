@@ -39,8 +39,8 @@ public class MemoryController implements Runnable {
 
 	final JAliEnCOMMander commander = JAliEnCOMMander.getInstance();
 
-	private double memHardLimit;
-	private double memswHardLimit;
+	protected static double memHardLimit;
+	protected static double memswHardLimit;
 	private boolean swapUsageAllowed;
 	private static long slotCPUs;
 
@@ -49,6 +49,7 @@ public class MemoryController implements Runnable {
 
 	static HashMap<Long, Double> memPastPerJob;
 	static HashMap<Long, Double> memCurrentPerJob;
+	static HashMap<Long, Double> derivativePerJob;
 
 	static HashMap<Long, JobAgent> activeJAInstances; // This variable is repeated to NUMAExplorer
 
@@ -58,7 +59,9 @@ public class MemoryController implements Runnable {
 
 	static Object lockMemoryController = new Object();
 
-	protected static boolean debugMemoryController = true;
+	protected static int preemptionRound;
+
+	protected static boolean debugMemoryController = false;
 
 	final static long SLOT_MEMORY_MARGIN = 50000; // Margin left to the slot before taking the preemption decision. 50MB * NCORES
 	final static long SLOT_SWAP_MARGIN = 1000000; // Margin left to the machine swap before taking the preemption decision. 1GB
@@ -70,10 +73,12 @@ public class MemoryController implements Runnable {
 		cgroupRootPath = "";
 		memPastPerJob = new HashMap<>();
 		memCurrentPerJob = new HashMap<>();
+		derivativePerJob = new HashMap<>();
 		activeJAInstances = new HashMap<>();
 		memHardLimit = 0;
 		this.slotCPUs = slotCPUs;
 		swapUsageAllowed = true;
+		preemptionRound = 0;
 		registerCgroupPath();
 		registerHTCondorPeriodicRemove();
 		logger.log(Level.INFO, "Parsed global memory limit of " + memHardLimit);
@@ -94,7 +99,8 @@ public class MemoryController implements Runnable {
 					if (s.startsWith("JobMemoryLimit"))
 						break;
 				}
-				logger.log(Level.INFO, "Parsed memory limit for periodic_remove in classad is " + s + " kB");
+				if (s != null)
+					logger.log(Level.INFO, "Parsed memory limit for periodic_remove in classad is " + s + " kB");
 				if (s != null && !s.isBlank() && !s.isEmpty()) {
 					double tmpMemHardLimit = Double.valueOf(s.split("=")[1]).doubleValue();
 					if (memHardLimit == 0 || tmpMemHardLimit < memHardLimit)
@@ -368,6 +374,7 @@ public class MemoryController implements Runnable {
 			if (memCurrentPerJob.get(queueId) != null)
 				memPastPerJob.put(queueId, memCurrentPerJob.get(queueId));
 			memCurrentPerJob.put(queueId, runningJA.RES_VMEM);
+			updateGrowthDerivative(runningJA, queueId);
 			if (cgroupRootPath.isEmpty())
 				slotMem += runningJA.RES_VMEM.doubleValue();
 		}
@@ -395,6 +402,18 @@ public class MemoryController implements Runnable {
 				JobRunner.recordHighestConsumer(slotMem, approachingLimit, boundMem);
 			}
 		}
+	}
+
+	private static void updateGrowthDerivative(JobAgent ja, Long queueId) {
+		Double growthDerivativePast = derivativePerJob.get(queueId);
+		if (growthDerivativePast == null) {
+			growthDerivativePast = Double.valueOf(0d);
+		}
+		double growthCurrent = (memCurrentPerJob.getOrDefault(queueId, Double.valueOf(0)).doubleValue() - memPastPerJob.getOrDefault(queueId, Double.valueOf(0)).doubleValue());
+		double normalizationFactor = 2000 * ja.cpuCores; // lets normalize by 2GB per core
+		growthCurrent = growthCurrent / normalizationFactor;
+		growthCurrent += growthDerivativePast.doubleValue()/3;
+		derivativePerJob.put(queueId, Double.valueOf(growthCurrent));
 	}
 
 	private static double computeSlotMemory(String[] memTypes) {
@@ -626,10 +645,12 @@ class SorterByTemporalGrowth implements Comparator<JobAgent> {
 
 	@Override
 	public int compare(JobAgent ja1, JobAgent ja2) {
-		double memGrowthJA1 = MemoryController.memCurrentPerJob.getOrDefault(Long.valueOf(ja1.getQueueId()), Double.valueOf(0)).doubleValue()
+		/*double memGrowthJA1 = MemoryController.memCurrentPerJob.getOrDefault(Long.valueOf(ja1.getQueueId()), Double.valueOf(0)).doubleValue()
 				- MemoryController.memPastPerJob.getOrDefault(Long.valueOf(ja1.getQueueId()), Double.valueOf(0)).doubleValue();
 		double memGrowthJA2 = MemoryController.memCurrentPerJob.getOrDefault(Long.valueOf(ja2.getQueueId()), Double.valueOf(0)).doubleValue()
-				- MemoryController.memPastPerJob.getOrDefault(Long.valueOf(ja2.getQueueId()), Double.valueOf(0)).doubleValue();
+				- MemoryController.memPastPerJob.getOrDefault(Long.valueOf(ja2.getQueueId()), Double.valueOf(0)).doubleValue();*/
+		double memGrowthJA1 = MemoryController.derivativePerJob.getOrDefault(Long.valueOf(ja1.getQueueId()), Double.valueOf(0d)).doubleValue();
+		double memGrowthJA2 = MemoryController.derivativePerJob.getOrDefault(Long.valueOf(ja2.getQueueId()), Double.valueOf(0d)).doubleValue();
 		if (MemoryController.debugMemoryController)
 			logger.log(Level.INFO, "Comparing ja1 " + ja1.getQueueId() + " RES_VMEM " + ja1.RES_VMEM.doubleValue() + ", memGrowth " + memGrowthJA1
 					+ " and ja2 " + ja2.getQueueId() + " RES_VMEM " + ja2.RES_VMEM.doubleValue() + ", memGrowth " + memGrowthJA2);

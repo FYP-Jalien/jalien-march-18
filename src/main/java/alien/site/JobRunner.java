@@ -140,11 +140,17 @@ public class JobRunner extends JobAgent {
 		if (MemoryController.debugMemoryController) {
 			logger.log(Level.INFO, "Sorted jobs with " + sorterId + ": ");
 			for (JobAgent ja : sortedJA)
-				logger.log(Level.INFO, "Job " + ja.getQueueId() + " consuming VMEM " + ja.RES_VMEM.doubleValue() * 1024 + " MB and RMEM " + ja.RES_RMEM.doubleValue() * 1024 + " MB RAM");
+				logger.log(Level.INFO, "Job " + ja.getQueueId() + " consuming VMEM " + ja.RES_VMEM.doubleValue() + " MB and RMEM " + ja.RES_RMEM.doubleValue() + " MB RAM");
 		}
-		boolean success = sortedJA.get(0).recordPreemption( System.currentTimeMillis(), slotMem, sortedJA.get(0).RES_VMEM.doubleValue(), reason, parsedSlotLimit, sortedJA.size(), sorterId);
-		if (!success) {
-			logger.log(Level.INFO, "Could not record preemption on central DB");
+		long preemptionTs = System.currentTimeMillis();
+		if (!sortedJA.get(0).alreadyPreempted) {
+			for (JobAgent ja : sortedJA) {
+				boolean success = ja.recordPreemption( preemptionTs, slotMem, ja.RES_VMEM.doubleValue(), reason, parsedSlotLimit, sortedJA.size(), sortedJA.get(0).getQueueId());
+				if (!success) {
+					logger.log(Level.INFO, "Could not record preemption on central DB");
+				}
+			}
+			MemoryController.preemptionRound += 1;
 		}
 	}
 }

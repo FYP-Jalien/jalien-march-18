@@ -124,7 +124,7 @@ public class JobAgent implements Runnable {
 	private MonitoredJob mj;
 	private Double prevCpuTime;
 	private long prevTime = 0;
-	private int cpuCores = 1;
+	protected int cpuCores = 1;
 	private long ttl;
 	private String endState = "";
 	private Float jobPrice = Float.valueOf(1);
@@ -311,7 +311,7 @@ public class JobAgent implements Runnable {
 
 	// Memory management
 	private static MemoryController memoryController;
-	private boolean alreadyPreempted = false;
+	protected boolean alreadyPreempted = false;
 
 	protected static final Object workDirSizeSync = new Object();
 	private static HashMap<Long, Integer> slotWorkdirsMaxSize;
@@ -1594,24 +1594,33 @@ public class JobAgent implements Runnable {
 	 * @param preemptionSlotMemory
 	 * @param preemptionJobMemory
 	 * @param numConcurrentJobs
-	 * @param preemptionTechnique
+	 * @param wouldPreempt
 	 * @return
 	 */
-	protected boolean recordPreemption(final long preemptionTs, final double preemptionSlotMemory, final double preemptionJobMemory, final String reason, final double parsedSlotLimit, final int numConcurrentJobs, final String preemptionTechnique) {
+	protected boolean recordPreemption(final long preemptionTs, final double preemptionSlotMemory, final double preemptionJobMemory, final String reason, final double parsedSlotLimit, final int numConcurrentJobs, long wouldPreempt) {
 		/*synchronized(MemoryController.lockMemoryController) {
 			logger.log(Level.INFO, "Preemption of job " + queueId + " (site: " + ce + " - host: " + hostName + ") starts - going to be killed EVENTUALLY");
 			MemoryController.preemptingJob = true;
 		}*/
-		if (!alreadyPreempted) {
-			logger.log(Level.INFO, "Recording preemption of job " + queueId);
-			if (!commander.q_api.recordPreemption(queueId, preemptionTs, 0, preemptionSlotMemory/1024, preemptionJobMemory, numConcurrentJobs, preemptionTechnique, resubmission, hostName, ce)) {
-				return false;
-			}
-			putJobTrace("Preemption starts using method " + preemptionTechnique + ". Job consuming " + preemptionJobMemory + " MB (slot has a total usage of " + preemptionSlotMemory/1024 + " MB, parsed limit of " + parsedSlotLimit + " MB due to " + reason + ").");
+		//if (!alreadyPreempted) {
+		logger.log(Level.INFO, "Recording preemption of job " + wouldPreempt + " (data from co-executor " + queueId + ")");
+		double memoryPerCore = Math.round(preemptionJobMemory / cpuCores * 100.0) / 100.0;
+		double memHardLimitRounded = Math.round(MemoryController.memHardLimit / 1024 * 100.0) / 100.0;
+		double memswHardLimitRounded = Math.round(MemoryController.memswHardLimit /1024 * 100.0) / 100.0;
+		Double growthDerivative = MemoryController.derivativePerJob.get(Long.valueOf(queueId));
+		double elapsedTime = (System.currentTimeMillis() - jobAgentStartTime) /1000.; // convert to seconds
+		double timePortion = elapsedTime / ttl;
+		if (MemoryController.debugMemoryController)
+			logger.log(Level.INFO, "DBG: Have a time elapsed of " + elapsedTime + ". With ttl of " + ttl + ", time portion is " + timePortion);
+		if (!commander.q_api.recordPreemption(queueId, preemptionTs, 0, preemptionSlotMemory/1024, preemptionJobMemory, numConcurrentJobs, resubmission, hostName, ce, memoryPerCore, growthDerivative.doubleValue(), timePortion, username, MemoryController.preemptionRound, wouldPreempt, memHardLimitRounded, memswHardLimitRounded)) {
+			return false;
+		}
+		if (queueId == wouldPreempt) {
+			putJobTrace("Preemption starts. Job consuming " + preemptionJobMemory + " MB (slot has a total usage of " + preemptionSlotMemory/1024 + " MB, parsed limit of " + parsedSlotLimit + " MB due to " + reason + ").");
 			alreadyPreempted = true;
 			String cgroupPIDs = "/sys/fs/cgroup/memory" + MemoryController.cgroupId + "/tasks";
 			if (CgroupUtils.haveCgroupsv2())
-				cgroupPIDs = MemoryController.cgroupRootPath + "/cgroup.procs";
+				cgroupPIDs = CgroupUtils.getCurrentCgroup(childPID) + "/cgroup.procs";
 			if (MemoryController.debugMemoryController)
 				logger.log(Level.INFO, "Sorting processes by consumed memory from source " + cgroupPIDs);
 			List<String> processTree = MemoryController.getCgroupProcessTree(cgroupPIDs);
@@ -1620,6 +1629,7 @@ public class JobAgent implements Runnable {
 				putJobTrace(p);
 			putJobTrace("------------");
 		}
+		//}
 		//	jobOOMPreempted = true;
 		return true;
 	}

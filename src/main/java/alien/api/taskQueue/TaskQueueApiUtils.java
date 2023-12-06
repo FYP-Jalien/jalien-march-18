@@ -523,14 +523,20 @@ public class TaskQueueApiUtils {
 	 * @param preemptionSlotMemory
 	 * @param preemptionJobMemory
 	 * @param numConcurrentJobs
-	 * @param preemptionTechnique
 	 * @param resubmission
 	 * @param hostName
+	 * @param memoryPerCore
+	 * @param growthDerivative
+	 * @param timeElapsed
+	 * @param preemptionRound
+	 * @param wouldPreempt
+	 * @param memHardLimit
+	 * @param memswHardLimit
 	 * @return
 	 */
-	public boolean recordPreemption(long queueId, long preemptionTs, long killingTs, double preemptionSlotMemory, double preemptionJobMemory, int numConcurrentJobs, String preemptionTechnique, int resubmission, String hostName, String siteName) {
+	public boolean recordPreemption(long queueId, long preemptionTs, long killingTs, double preemptionSlotMemory, double preemptionJobMemory, int numConcurrentJobs, int resubmission, String hostName, String siteName, double memoryPerCore, double growthDerivative, double timeElapsed, String username, int preemptionRound, long wouldPreempt, double memHardLimit, double memswHardLimit) {
 		try {
-			Dispatcher.execute(new RecordPreemption(queueId, preemptionTs, killingTs, preemptionSlotMemory, preemptionJobMemory, numConcurrentJobs, preemptionTechnique, resubmission, hostName, siteName));
+			Dispatcher.execute(new RecordPreemption(queueId, preemptionTs, killingTs, preemptionSlotMemory, preemptionJobMemory, numConcurrentJobs, resubmission, hostName, siteName, memoryPerCore, growthDerivative, timeElapsed, username, preemptionRound, wouldPreempt, memHardLimit, memswHardLimit));
 		}
 		catch (final ServerException e) {
 			System.out.println("Could not record preemption of job " + queueId + e.getMessage());

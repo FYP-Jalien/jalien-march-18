@@ -585,7 +585,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	protected boolean recordKilling() {
 		logger.log(Level.INFO, "Recording system kill of job " + queueId + " (site: " + ce + " - host: " + hostName + ")");
 		putJobTrace("System killed job due to OOM");
-		if (!commander.q_api.recordPreemption(queueId, 0, System.currentTimeMillis(), 0, 0, 0, null, resubmission, hostName, ce)) {
+		if (!commander.q_api.recordPreemption(queueId, 0, System.currentTimeMillis(), 0, 0, 0, resubmission, hostName, ce, 0, 0, 0, username, 0, 0, 0, 0)) {
 			return false;
 		}
 		//To be taken out when not killing
