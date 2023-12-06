@@ -10,7 +10,6 @@ import alien.api.DispatchSSLClient;
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
-import alien.shell.commands.JAliEnCOMMander;
 
 /**
  * @author sweisz
@@ -27,8 +26,6 @@ public class JobRunner extends JobAgent {
 	 * ML monitor object
 	 */
 	static final Monitor monitor = MonitorFactory.getMonitor(JobRunner.class.getCanonicalName());
-
-	private final JAliEnCOMMander commander = JAliEnCOMMander.getInstance();
 
 	static {
 		monitor.addMonitoring("resource_status", (names, values) -> {
@@ -131,7 +128,7 @@ public class JobRunner extends JobAgent {
 		sortByComparator(slotMem, jobSorter3, reason, parsedSlotLimit);
 	}
 
-	private static void sortByComparator(double slotMem, Comparator jobSorter, String reason, double parsedSlotLimit) {
+	private static void sortByComparator(double slotMem, Comparator<JobAgent> jobSorter, String reason, double parsedSlotLimit) {
 		ArrayList<JobAgent> sortedJA = new ArrayList<JobAgent>(MemoryController.activeJAInstances.values());
 		for (JobAgent ja : sortedJA)
 			ja.checkProcessResources();

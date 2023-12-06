@@ -69,14 +69,14 @@ public class MemoryController implements Runnable {
 	final static double DEFAULT_CGROUP_NOT_CONFIG = 9007199254740988d; // Default set to PAGE_COUNTER_MAX,which is LONG_MAX/PAGE_SIZE on 64-bit platform. In MB
 	final static int EVALUATION_FREQUENCY = 5; // Seconds between iterations
 
-	public MemoryController(long slotCPUs) {
+	public MemoryController(long cpus) {
 		cgroupRootPath = "";
 		memPastPerJob = new HashMap<>();
 		memCurrentPerJob = new HashMap<>();
 		derivativePerJob = new HashMap<>();
 		activeJAInstances = new HashMap<>();
 		memHardLimit = 0;
-		this.slotCPUs = slotCPUs;
+		slotCPUs = cpus;
 		swapUsageAllowed = true;
 		preemptionRound = 0;
 		registerCgroupPath();
