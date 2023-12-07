@@ -3,6 +3,7 @@ package alien.optimizers.priority;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
+import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
 import alien.priority.PriorityDto;
 import alien.taskQueue.TaskQueueUtils;
@@ -25,13 +26,13 @@ public class CalculateComputedPriority extends Optimizer {
 
     @Override
     public void run() {
-        this.setSleepPeriod(3600 * 1000);// 1 h
+        this.setSleepPeriod(3600 * 1000); // 1 h
+        int frequency = (int) this.getSleepPeriod();
 
 
         while (true) {
             try {
-//                final boolean updated = DBSyncUtils.updatePeriodic(frequency, PriorityReconciliationService.class.getCanonicalName());
-                boolean updated = true;
+                final boolean updated = DBSyncUtils.updatePeriodic(frequency, PriorityReconciliationService.class.getCanonicalName());
                 if (updated) {
                     //Run
                     updateComputedPriority();

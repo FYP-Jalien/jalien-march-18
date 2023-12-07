@@ -4,6 +4,7 @@ import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
+import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
 import alien.priority.PriorityRegister;
 import alien.taskQueue.TaskQueueUtils;
@@ -31,13 +32,20 @@ public class PriorityRapidUpdater extends Optimizer {
 
     @Override
     public void run() {
+        this.setSleepPeriod(60 * 1000); // 1m
+        int frequency = (int) this.getSleepPeriod();
+
         while (true) {
-            try {
-                updatePriority();
-                logger.log(Level.INFO, "PriorityRapidUpdater sleeping for " + this.getSleepPeriod() + " ms");
-                sleep(this.getSleepPeriod());
-            } catch (InterruptedException e) {
-                logger.log(Level.WARNING, "PriorityRapidUpdater interrupted", e);
+            final boolean updated = DBSyncUtils.updatePeriodic(frequency, PriorityReconciliationService.class.getCanonicalName());
+            if (updated) {
+                try {
+                    updatePriority();
+                    logger.log(Level.INFO, "PriorityRapidUpdater sleeping for " + this.getSleepPeriod() + " ms");
+                    sleep(this.getSleepPeriod());
+                } catch (InterruptedException e) {
+                    logger.log(Level.WARNING, "PriorityRapidUpdater interrupted", e);
+                }
+
             }
         }
     }
@@ -63,7 +71,6 @@ public class PriorityRapidUpdater extends Optimizer {
             dbdev.setQueryTimeout(60);
 
 
-
             logger.log(Level.INFO, "DB Connections established");
             logger.log(Level.INFO, "PriorityRegister.JobCounter.getRegistry().size(): " + PriorityRegister.JobCounter.getRegistry().size());
 
@@ -71,7 +78,7 @@ public class PriorityRapidUpdater extends Optimizer {
             boolean[] isFirst = {true};
 
             try (Timing t = new Timing(monitor, "TQ_updatePriority_ms")) {
-                if(!PriorityRegister.JobCounter.getRegistry().isEmpty()) {
+                if (!PriorityRegister.JobCounter.getRegistry().isEmpty()) {
                     t.startTiming();
 
                     PriorityRegister.JobCounter.getRegistry().forEach((userId, v) -> {

@@ -4,6 +4,7 @@ import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
+import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
 import alien.priority.QueueProcessingDto;
 import alien.taskQueue.TaskQueueUtils;
@@ -35,16 +36,14 @@ public class PriorityReconciliationService extends Optimizer {
     @Override
     public void run() {
         this.setSleepPeriod(3600 * 1000); // 1h
+        int frequency = (int) this.getSleepPeriod();
 
         while (true) {
+                final boolean updated = DBSyncUtils.updatePeriodic(frequency, PriorityReconciliationService.class.getCanonicalName());
             try {
-//                final boolean updated = DBSyncUtils.updatePeriodic(frequency, PriorityReconciliationService.class.getCanonicalName());
-                boolean updated = true;
                 if (updated) {
-                    //Run
                     reconcilePriority();
                 } else {
-                    // do not run
                     sleep(this.getSleepPeriod());
 
                 }
