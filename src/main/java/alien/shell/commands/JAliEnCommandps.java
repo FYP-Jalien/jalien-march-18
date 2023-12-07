@@ -580,7 +580,8 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 								" Start time should be a number.");
 						setArgumentsOk(false);
 					}
-					if (st.countTokens() == 2) {
+					// If there is one more token, use it as the end time
+					if (st.countTokens() == 1) {
 						try {
 							endTime = Integer.parseInt(st.nextToken());
 						} catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
@@ -600,7 +601,6 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 						startTime = endTime;
 						endTime = tempTime;
 					}
-
 					ArrayList<Object> mtimeFilter = new ArrayList<>();
 					mtimeFilter.add(startTime);
 					mtimeFilter.add(endTime);
