@@ -52,6 +52,7 @@ import alien.io.IOUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
+import alien.priority.PriorityRegister;
 import alien.quotas.FileQuota;
 import alien.quotas.QuotaUtilities;
 import alien.shell.ErrNo;
@@ -143,6 +144,14 @@ public class TaskQueueUtils {
 	 */
 	public static DBFunctions getQueueDB() {
 		final DBFunctions db = ConfigUtils.getDB("processes");
+		return db;
+	}
+
+	/**
+	 * @return the database connection to 'processesdev'
+	 */
+	public static DBFunctions getProcessesDevDB() {
+		final DBFunctions db = ConfigUtils.getDB("processesdev");
 		return db;
 	}
 
@@ -838,6 +847,24 @@ public class TaskQueueUtils {
 
 			putJobLog(job, "state", "Job state transition from " + oldStatus.name() + " to " + newStatus.name(), null);
 
+			String userIdQuery = "select userId, cpucores from QUEUE where queueId=?";
+			try {
+				db.query(userIdQuery, false, job);
+			} catch (Exception e) {
+				logger.log(Level.WARNING, "Could not get userId for queueId: " + job, e);
+				return false;
+			}
+
+			int userId = db.geti("userId");
+			int activeCores = db.geti("cpucores");
+
+			if (JobStatus.finalStates().contains(newStatus) || newStatus == JobStatus.SAVED_WARN || newStatus == JobStatus.SAVED) {
+				deleteJobToken(job);
+				PriorityRegister.JobCounter.getCounterForUser(userId).decRunning(activeCores);
+				PriorityRegister.JobCounter.getCounterForUser(userId).addCputime((Integer) extrafields.get("cputime"));
+				PriorityRegister.JobCounter.getCounterForUser(userId).addCost((Integer) extrafields.get("cost"));
+			}
+
 			if (JobStatus.finalStates().contains(newStatus) || newStatus == JobStatus.SAVED_WARN || newStatus == JobStatus.SAVED)
 				deleteJobToken(job);
 
@@ -886,7 +913,19 @@ public class TaskQueueUtils {
 								map.put(fieldMap.get(key + "_field"), value);
 						}
 
-						map.put("queueId", Long.valueOf(job));
+						Long queueId = Long.valueOf(job);
+						map.put("queueId", queueId);
+
+						Integer userId = getUserId(queueId);
+						if(userId != 0) {
+							if(map.containsKey("cputime") && map.containsKey("cost")) {
+								PriorityRegister.JobCounter.getCounterForUser(userId).addCputime(((Long) extrafields.get("cputime")));
+								PriorityRegister.JobCounter.getCounterForUser(userId).addCost((Double) extrafields.get("cost"));
+							}
+
+						} else {
+							logger.log(Level.WARNING, "Could not get userId for queueId: " + job + " to update cputime and cost");
+						}
 
 						final String query = DBFunctions.composeUpdate(fieldMap.get(key + "_table"), map, QUEUEID);
 						db.query(query);
@@ -898,6 +937,25 @@ public class TaskQueueUtils {
 		}
 
 		return execSite;
+	}
+
+	private static Integer getUserId(long queueId) {
+		DBFunctions db = TaskQueueUtils.getQueueDB();
+		int userId = 0;
+		if (db == null) {
+			logger.log(Level.SEVERE, "JobAgent for getUserId could not get a DB connection");
+			return userId;
+		} else {
+			try {
+				db.query("SELECT userId FROM QUEUE WHERE queueId = ?", false, queueId);
+				while (db.moveNext()) {
+					userId = (db.geti("userId"));
+				}
+			} catch (Exception e) {
+				logger.log(Level.SEVERE, "JobAgent for getUserId threw an exception: " + e.getMessage());
+			}
+		}
+		return userId;
 	}
 
 	private static int getOrInsertType(final String key, final Map<?, ?> values) {
