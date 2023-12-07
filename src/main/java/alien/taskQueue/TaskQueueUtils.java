@@ -299,7 +299,7 @@ public class TaskQueueUtils {
 
 			if (account != null && account.length() > 0)
 				if (dbStructure2_20)
-					q += "AND userId=" + getUserId(account);
+					q += "AND userId=" + getUserId(account, true);
 				else
 					q += "AND submitHost LIKE '" + Format.escSQL(account) + "@%'";
 
@@ -587,12 +587,12 @@ public class TaskQueueUtils {
 						first = false;
 
 					if (dbStructure2_20)
-						whe.append("ifnull(substring(exechost,POSITION('\\@' in exechost)+1),'')='").append(Format.escSQL(s)).append('\'');
+						whe.append("siteid=").append(getSiteId(s));
 					else
-						whe.append("execHostId=").append(getHostId(s));
+						whe.append("ifnull(substring(exechost,POSITION('\\@' in exechost)+1),'')='").append(Format.escSQL(s)).append('\'');
 				}
 
-				where += whe.substring(0, whe.length() - 3) + " ) and ";
+				where += whe + " ) and ";
 			}
 
 			if (dbStructure2_20)
@@ -607,7 +607,7 @@ public class TaskQueueUtils {
 			final String q;
 
 			if (dbStructure2_20)
-				q = "SELECT queueId,statusId,split,execHostId,cpucores FROM QUEUE WHERE " + where + " ORDER BY queueId ASC limit " + lim + ";";
+				q = "SELECT queueId,statusId,split,execHostId,cpucores,siteid FROM QUEUE WHERE " + where + " ORDER BY queueId ASC limit " + lim + ";";
 			else
 				q = "SELECT queueId,status,split,execHost FROM QUEUE WHERE " + where + " ORDER BY queueId ASC limit " + lim + ";";
 
@@ -1113,12 +1113,13 @@ public class TaskQueueUtils {
 	 * @param nodes
 	 * @param mjobs
 	 * @param jobids
+	 * @param filters
 	 * @param orderByKey
 	 * @param limit
 	 * @return the ps listing
 	 */
 	public static List<Job> getPS(final Collection<JobStatus> states, final Collection<String> users, final Collection<String> sites, final Collection<String> nodes, final Collection<Long> mjobs,
-								  final Collection<Long> jobids, final HashMap<GetPS.PsFilters, Collection<Object>> filters, final String orderByKey, final int limit) {
+			final Collection<Long> jobids, final HashMap<GetPS.PsFilters, Collection<Object>> filters, final String orderByKey, final int limit) {
 
 		final List<Job> ret = new ArrayList<>();
 
@@ -1164,12 +1165,12 @@ public class TaskQueueUtils {
 
 			// Iterating time filter
 			for (Map.Entry<GetPS.PsFilters, Collection<Object>> filterEntry : filters.entrySet()) {
-				
+
 				// Filter name
 				GetPS.PsFilters filter = filterEntry.getKey();
 				// List of values for the filter
 				Collection<Object> filterValues = filterEntry.getValue();
-				
+
 				// Custom logic for each filter
 				switch (filter) {
 					case mtime:
@@ -1183,10 +1184,12 @@ public class TaskQueueUtils {
 									where += " (mtime between (NOW() - INTERVAL " + startTime + " HOUR) " +
 											"and (NOW() - INTERVAL " + endTime + " HOUR)) and ";
 									break;
-								} else {
+								}
+								else {
 									// incorrect time intervals
 								}
-							} else {
+							}
+							else {
 								// we cannot accept more than 2 parameters
 							}
 						}
@@ -1209,7 +1212,7 @@ public class TaskQueueUtils {
 						first = false;
 
 					if (dbStructure2_20)
-						whe.append("userId=").append(getUserId(u));
+						whe.append("userId=").append(getUserId(u, true));
 					else
 						whe.append("submitHost like '").append(Format.escSQL(u)).append("@%'");
 				}
@@ -1240,16 +1243,16 @@ public class TaskQueueUtils {
 				boolean first = true;
 
 				for (final String n : nodes) {
-					final Integer nodeId = getHostId(n);
+					final Integer nodeId = getHostId(n, true);
 
-					if (nodeId != null) {
-						if (!first)
-							whe.append(',');
-						else
-							first = false;
+					final int id = nodeId != null ? nodeId.intValue() : -1;
 
-						whe.append(nodeId);
-					}
+					if (!first)
+						whe.append(',');
+					else
+						first = false;
+
+					whe.append(id);
 				}
 
 				if (!first)
@@ -1845,8 +1848,8 @@ public class TaskQueueUtils {
 
 			if (dbStructure2_20) {
 				values.put("statusId", Integer.valueOf(jobStatus.getAliEnLevel()));
-				values.put("userId", getUserId(owner));
-				values.put("submitHostId", getHostId(clientAddress));
+				values.put("userId", getUserId(owner, false));
+				values.put("submitHostId", getHostId(clientAddress, false));
 				values.put("commandId", getCommandId(executable));
 
 				if (notify != null && notify.length() > 0)
@@ -1926,6 +1929,11 @@ public class TaskQueueUtils {
 
 		@Override
 		protected Integer resolve(final String key) {
+			return resolve(key, false);
+		}
+
+		@Override
+		protected Integer resolve(final String key, final boolean readOnly) {
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return null;
@@ -1971,14 +1979,16 @@ public class TaskQueueUtils {
 								+ " because of it. Will generate a new userid for this guy, but the consistency with LDAP is lost now!");
 					}
 
-					if (db.query("INSERT INTO QUEUE_USER (user) VALUES (?);", true, key))
-						return db.getLastGeneratedKey();
+					if (!readOnly) {
+						if (db.query("INSERT INTO QUEUE_USER (user) VALUES (?);", true, key))
+							return db.getLastGeneratedKey();
 
-					// somebody probably has inserted the same entry concurrently
-					db.query("SELECT userId FROM QUEUE_USER where user=?", false, key);
+						// somebody probably has inserted the same entry concurrently
+						db.query("SELECT userId FROM QUEUE_USER where user=?", false, key);
 
-					if (db.moveNext())
-						return Integer.valueOf(db.geti(1));
+						if (db.moveNext())
+							return Integer.valueOf(db.geti(1));
+					}
 				}
 				else
 					return Integer.valueOf(db.geti(1));
@@ -1994,11 +2004,11 @@ public class TaskQueueUtils {
 	 * @param owner
 	 * @return user ID
 	 */
-	static synchronized Integer getUserId(final String owner) {
+	static synchronized Integer getUserId(final String owner, final boolean readOnly) {
 		if (owner == null || owner.length() == 0)
 			return null;
 
-		return userIdCache.get(owner);
+		return userIdCache.get(owner, readOnly);
 	}
 
 	private static final GenericLastValuesCache<String, Integer> commandIdCache = new GenericLastValuesCache<>() {
@@ -2011,6 +2021,11 @@ public class TaskQueueUtils {
 
 		@Override
 		protected Integer resolve(final String key) {
+			return resolve(key, false);
+		}
+
+		@Override
+		protected Integer resolve(final String key, final boolean readOnly) {
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return null;
@@ -2022,17 +2037,19 @@ public class TaskQueueUtils {
 				db.setReadOnly(false);
 
 				if (!db.moveNext()) {
-					db.setLastGeneratedKey(true);
+					if (!readOnly) {
+						db.setLastGeneratedKey(true);
 
-					if (db.query("INSERT INTO QUEUE_COMMAND (command) VALUES (?);", true, key))
-						return db.getLastGeneratedKey();
+						if (db.query("INSERT INTO QUEUE_COMMAND (command) VALUES (?);", true, key))
+							return db.getLastGeneratedKey();
 
-					// somebody probably has inserted the same entry
-					// concurrently
-					db.query("SELECT commandId FROM QUEUE_COMMAND where command=?;", false, key);
+						// somebody probably has inserted the same entry
+						// concurrently
+						db.query("SELECT commandId FROM QUEUE_COMMAND where command=?;", false, key);
 
-					if (db.moveNext())
-						return Integer.valueOf(db.geti(1));
+						if (db.moveNext())
+							return Integer.valueOf(db.geti(1));
+					}
 				}
 				else
 					return Integer.valueOf(db.geti(1));
@@ -2059,6 +2076,11 @@ public class TaskQueueUtils {
 
 		@Override
 		protected Integer resolve(final String key) {
+			return resolve(key, false);
+		}
+
+		@Override
+		protected Integer resolve(final String key, final boolean readOnly) {
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return null;
@@ -2070,17 +2092,19 @@ public class TaskQueueUtils {
 				db.setReadOnly(false);
 
 				if (!db.moveNext()) {
-					db.setLastGeneratedKey(true);
+					if (!readOnly) {
+						db.setLastGeneratedKey(true);
 
-					if (db.query("INSERT INTO QUEUE_HOST (host) VALUES (?);", true, key))
-						return db.getLastGeneratedKey();
+						if (db.query("INSERT INTO QUEUE_HOST (host) VALUES (?);", true, key))
+							return db.getLastGeneratedKey();
 
-					// somebody probably has inserted the same entry
-					// concurrently
-					db.query("SELECT hostId FROM QUEUE_HOST where host=?", false, key);
+						// somebody probably has inserted the same entry
+						// concurrently
+						db.query("SELECT hostId FROM QUEUE_HOST where host=?", false, key);
 
-					if (db.moveNext())
-						return Integer.valueOf(db.geti(1));
+						if (db.moveNext())
+							return Integer.valueOf(db.geti(1));
+					}
 				}
 				else
 					return Integer.valueOf(db.geti(1));
@@ -2090,11 +2114,11 @@ public class TaskQueueUtils {
 		}
 	};
 
-	private static synchronized Integer getHostId(final String host) {
+	private static synchronized Integer getHostId(final String host, final boolean readOnly) {
 		if (host == null || host.length() == 0)
 			return null;
 
-		return hostIdCache.get(host);
+		return hostIdCache.get(host, readOnly);
 	}
 
 	private static final GenericLastValuesCache<String, Integer> notifyIdCache = new GenericLastValuesCache<>() {
@@ -2107,6 +2131,11 @@ public class TaskQueueUtils {
 
 		@Override
 		protected Integer resolve(final String key) {
+			return resolve(key, false);
+		}
+
+		@Override
+		protected Integer resolve(final String key, final boolean readOnly) {
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return null;
@@ -2118,17 +2147,19 @@ public class TaskQueueUtils {
 				db.setReadOnly(false);
 
 				if (!db.moveNext()) {
-					db.setLastGeneratedKey(true);
+					if (!readOnly) {
+						db.setLastGeneratedKey(true);
 
-					if (db.query("INSERT INTO QUEUE_NOTIFY (notify) VALUES (?);", true, key))
-						return db.getLastGeneratedKey();
+						if (db.query("INSERT INTO QUEUE_NOTIFY (notify) VALUES (?);", true, key))
+							return db.getLastGeneratedKey();
 
-					// somebody probably has inserted the same entry
-					// concurrently
-					db.query("SELECT notifyId FROM QUEUE_NOTIFY where notify=?;", false, key);
+						// somebody probably has inserted the same entry
+						// concurrently
+						db.query("SELECT notifyId FROM QUEUE_NOTIFY where notify=?;", false, key);
 
-					if (db.moveNext())
-						return Integer.valueOf(db.geti(1));
+						if (db.moveNext())
+							return Integer.valueOf(db.geti(1));
+					}
 				}
 				else
 					return Integer.valueOf(db.geti(1));
@@ -3039,6 +3070,11 @@ public class TaskQueueUtils {
 
 		@Override
 		protected Integer resolve(final String key) {
+			return resolve(key, false);
+		}
+
+		@Override
+		protected Integer resolve(final String key, final boolean readOnly) {
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return null;
@@ -3052,13 +3088,17 @@ public class TaskQueueUtils {
 				if (db.moveNext())
 					return Integer.valueOf(db.geti(1));
 
-				db.setReadOnly(false);
-				db.setLastGeneratedKey(true);
+				if (!readOnly) {
+					db.setReadOnly(false);
+					db.setLastGeneratedKey(true);
 
-				if (!db.query(insert, false, key))
-					return null;
+					if (!db.query(insert, false, key))
+						return null;
 
-				return db.getLastGeneratedKey();
+					return db.getLastGeneratedKey();
+				}
+
+				return null;
 			}
 		}
 	}
@@ -3970,7 +4010,7 @@ public class TaskQueueUtils {
 			// get user
 			final String user = jdl.getUser();
 			if (user != null)
-				params.put("userid", getUserId(user));
+				params.put("userid", getUserId(user, false));
 
 			// parse partition
 			m = patPartitions.matcher(reqs);
@@ -4155,7 +4195,9 @@ public class TaskQueueUtils {
 	 * @param memswHardLimit
 	 * @return <code>true</code> if the recording could be done
 	 */
-	public static boolean recordPreemption(final long queueId, final long preemptionTs, final long killingTs, final double preemptionSlotMemory, final double preemptionJobMemory, final int numConcurrentJobs, final int resubmissionCounter, final String hostName, final String siteName, final double memoryPerCore, final double growthDerivative, final double timeElapsed, final String username, final int preemptionRound, final long wouldPreempt, UUID vmUID, double memHardLimit, double memswHardLimit) {
+	public static boolean recordPreemption(final long queueId, final long preemptionTs, final long killingTs, final double preemptionSlotMemory, final double preemptionJobMemory,
+			final int numConcurrentJobs, final int resubmissionCounter, final String hostName, final String siteName, final double memoryPerCore, final double growthDerivative,
+			final double timeElapsed, final String username, final int preemptionRound, final long wouldPreempt, UUID vmUID, double memHardLimit, double memswHardLimit) {
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
 				return false;
@@ -4168,23 +4210,30 @@ public class TaskQueueUtils {
 
 			logger.log(Level.INFO, "Recording preemption for job " + queueId);
 			int siteId = getSiteId(siteName);
-			Integer hostId = getHostId(hostName);
-			Integer userId = getUserId(username);
+			Integer hostId = getHostId(hostName, false);
+			Integer userId = getUserId(username, true);
 			if (preemptionTs != 0) {
 				logger.log(Level.INFO, "Job was preempted at ts " + preemptionTs);
-				String q = "INSERT INTO oom_preemptions (queueId, preemptionTs,preemptionSlotMemory,preemptionJobMemory,numConcurrentJobs,resubmissionCounter,hostId,siteId,memoryPerCore,growthDerivative,timeElapsed,userId,preemptionRound,wouldPreempt,uuid,memHardLimit,memswHardLimit) VALUES ("+queueId+","+preemptionTs+","+preemptionSlotMemory+","+preemptionJobMemory+","+numConcurrentJobs+","+ resubmissionCounter + "," + hostId + "," + siteId + "," + memoryPerCore + "," + growthDerivative + "," + timeElapsed + "," + userId + "," + preemptionRound + "," + wouldPreempt + ",string2binary('" + vmUID + "')," + memHardLimit + "," + memswHardLimit + ");";
+				String q = "INSERT INTO oom_preemptions (queueId, preemptionTs,preemptionSlotMemory,preemptionJobMemory,numConcurrentJobs,resubmissionCounter,hostId,siteId,memoryPerCore,growthDerivative,timeElapsed,userId,preemptionRound,wouldPreempt,uuid,memHardLimit,memswHardLimit) VALUES ("
+						+ queueId + "," + preemptionTs + "," + preemptionSlotMemory + "," + preemptionJobMemory + "," + numConcurrentJobs + "," + resubmissionCounter + "," + hostId + "," + siteId
+						+ "," + memoryPerCore + "," + growthDerivative + "," + timeElapsed + "," + userId + "," + preemptionRound + "," + wouldPreempt + ",string2binary('" + vmUID + "'),"
+						+ memHardLimit + "," + memswHardLimit + ");";
 				if (!db.query(q))
 					return false;
-			} else if (killingTs != 0) {
+			}
+			else if (killingTs != 0) {
 				logger.log(Level.INFO, "Job was killed at ts " + killingTs);
 				String q = "SELECT queueId FROM oom_preemptions where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId=" + siteId + ";";
 				db.query(q);
 				if (db.moveNext()) {
-					q = "UPDATE oom_preemptions set systemKillTs=" + killingTs + " where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId=" + siteId + " and systemKillTs is null;";
+					q = "UPDATE oom_preemptions set systemKillTs=" + killingTs + " where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId
+							+ " and siteId=" + siteId + " and systemKillTs is null;";
 					if (!db.query(q))
 						return false;
-				} else {
-					q = "INSERT INTO oom_preemptions (queueId,systemKillTs,resubmissionCounter,hostId,siteId) VALUES (" + queueId + "," + killingTs + "," + resubmissionCounter + "," + hostId + "," + siteId + ");";
+				}
+				else {
+					q = "INSERT INTO oom_preemptions (queueId,systemKillTs,resubmissionCounter,hostId,siteId) VALUES (" + queueId + "," + killingTs + "," + resubmissionCounter + "," + hostId + ","
+							+ siteId + ");";
 					if (!db.query(q))
 						return false;
 				}
@@ -4215,13 +4264,14 @@ public class TaskQueueUtils {
 
 			db.setQueryTimeout(60);
 			int siteId = getSiteId(siteName);
-			Integer hostId = getHostId(hostName);
+			Integer hostId = getHostId(hostName, false);
 			int statusId = finalStatus.getAliEnLevel();
-			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId=" + siteId + ";";
+			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId="
+					+ siteId + ";";
 			if (!db.query(q))
 				return false;
 			if (db.getUpdateCount() == 0)
-				logger.log(Level.INFO, "Updating status but not in oom db (" + queueId + " - " + finalStatus.toString() +")");
+				logger.log(Level.INFO, "Updating status but not in oom db (" + queueId + " - " + finalStatus.toString() + ")");
 		}
 		return true;
 	}

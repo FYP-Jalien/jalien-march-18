@@ -700,7 +700,7 @@ public class JobBroker {
 				final ArrayList<String> users = (ArrayList<String>) matchRequest.get("Users");
 				String orconcat = " and (";
 				for (final String user : users) {
-					final Integer userId = TaskQueueUtils.getUserId(user);
+					final Integer userId = TaskQueueUtils.getUserId(user, true);
 
 					if (userId != null) {
 						where += orconcat + "userId = ?";
@@ -715,7 +715,7 @@ public class JobBroker {
 			if (matchRequest.get("NoUsers") != null && !((ArrayList<String>) matchRequest.get("NoUsers")).isEmpty()) {
 				final ArrayList<String> users = (ArrayList<String>) matchRequest.get("NoUsers");
 				for (final String user : users) {
-					final Integer userId = TaskQueueUtils.getUserId(user);
+					final Integer userId = TaskQueueUtils.getUserId(user, true);
 
 					if (userId != null) {
 						where += " and userId != ? ";
