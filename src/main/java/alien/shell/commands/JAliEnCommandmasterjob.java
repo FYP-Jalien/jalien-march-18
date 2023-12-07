@@ -7,7 +7,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.StringTokenizer;
 
-import alien.api.taskQueue.CE;
 import alien.shell.ErrNo;
 import alien.taskQueue.Job;
 import alien.taskQueue.JobStatus;
@@ -37,8 +36,6 @@ public class JAliEnCommandmasterjob extends JAliEnBaseCommand {
 	private Set<JobStatus> status = new HashSet<>();
 
 	private final List<String> sites = new ArrayList<>();
-
-	private List<CE> ces = null;
 
 	@Override
 	public void run() {
@@ -74,10 +71,12 @@ public class JAliEnCommandmasterjob extends JAliEnBaseCommand {
 
 				String key = sj.status().toString();
 
-				if (bPrintSite) {
-					final String site = sj.execHost != null && !sj.execHost.isBlank() ? sj.execHost : "";
+				System.err.println("Site of " + sj.queueId + " : " + sj.site);
 
-					key += "/" + sj.execHost;
+				if (bPrintSite) {
+					final String site = sj.site != null && !sj.site.isBlank() ? sj.site : "";
+
+					key += "/" + sj.site;
 
 					if (sitesIn.size() <= 0)
 						if (!allSites.contains(site))
@@ -114,26 +113,10 @@ public class JAliEnCommandmasterjob extends JAliEnBaseCommand {
 		}
 	}
 
-	private String getCEName(final String hostname) {
-		if (ces == null) {
-			ces = commander.c_api.getCEs(null);
-
-			if (ces == null)
-				ces = new ArrayList<>(0);
-		}
-
-		for (final CE ce : ces) {
-			if (ce.host.equals(hostname))
-				return ce.ceName;
-		}
-
-		return hostname;
-	}
-
 	private void printSubJobs(final HashMap<String, List<Job>> stateCount, final List<JobStatus> showStatus, final String site) {
 		String key = "";
 
-		if (site != null && site.length() > 0)
+		if (site != null)
 			key = "/" + site;
 
 		for (final JobStatus state : showStatus) {
@@ -144,7 +127,7 @@ public class JAliEnCommandmasterjob extends JAliEnBaseCommand {
 
 				ret.append(padSpace(16)).append("Subjobs in ").append(state);
 				if (bPrintSite)
-					ret.append(" (").append(getCEName(site)).append(")");
+					ret.append(" (").append(site).append(")");
 
 				ret.append(": ").append(subjobs.size());
 
