@@ -22,22 +22,19 @@ public class PriorityRapidUpdater extends Optimizer {
     /**
      * Logger
      */
-    static final Logger logger = ConfigUtils.getLogger(TaskQueueUtils.class.getCanonicalName());
+    static final Logger logger = ConfigUtils.getLogger(PriorityRapidUpdater.class.getCanonicalName());
 
     /**
      * Monitoring component
      */
-    static final Monitor monitor = MonitorFactory.getMonitor(TaskQueueUtils.class.getCanonicalName());
+    static final Monitor monitor = MonitorFactory.getMonitor(PriorityRapidUpdater.class.getCanonicalName());
 
 
     @Override
     public void run() {
-        this.setSleepPeriod(60 * 1000); // 1m
-        int frequency = (int) this.getSleepPeriod();
+        this.setSleepPeriod(60 * 5 * 1000); // 5m
 
         while (true) {
-            final boolean updated = DBSyncUtils.updatePeriodic(frequency, PriorityReconciliationService.class.getCanonicalName());
-            if (updated) {
                 try {
                     updatePriority();
                     logger.log(Level.INFO, "PriorityRapidUpdater sleeping for " + this.getSleepPeriod() + " ms");
@@ -45,8 +42,6 @@ public class PriorityRapidUpdater extends Optimizer {
                 } catch (InterruptedException e) {
                     logger.log(Level.WARNING, "PriorityRapidUpdater interrupted", e);
                 }
-
-            }
         }
     }
 
@@ -117,6 +112,8 @@ public class PriorityRapidUpdater extends Optimizer {
 
                     t.endTiming();
                     logger.log(Level.INFO, "PriorityRapidUpdater used: " + t.getSeconds() + " seconds");
+
+                    CalculateComputedPriority.updateComputedPriority();
                 } else {
                     logger.log(Level.INFO, "Counter registry is empty - nothing to update");
                 }

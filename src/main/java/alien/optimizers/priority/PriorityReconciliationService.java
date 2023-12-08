@@ -25,12 +25,12 @@ public class PriorityReconciliationService extends Optimizer {
     /**
      * Logger
      */
-    static final Logger logger = ConfigUtils.getLogger(TaskQueueUtils.class.getCanonicalName());
+    static final Logger logger = ConfigUtils.getLogger(PriorityReconciliationService.class.getCanonicalName());
 
     /**
      * Monitoring component
      */
-    static final Monitor monitor = MonitorFactory.getMonitor(TaskQueueUtils.class.getCanonicalName());
+    static final Monitor monitor = MonitorFactory.getMonitor(PriorityReconciliationService.class.getCanonicalName());
 
 
     @Override
@@ -43,6 +43,9 @@ public class PriorityReconciliationService extends Optimizer {
             try {
                 if (updated) {
                     reconcilePriority();
+
+                    logger.log(Level.INFO, "ReconcilePriority sleeps " + this.getSleepPeriod() + " ms");
+                    sleep(this.getSleepPeriod());
                 } else {
                     sleep(this.getSleepPeriod());
 
@@ -175,11 +178,8 @@ public class PriorityReconciliationService extends Optimizer {
             t.endTiming();
             logger.log(Level.INFO, "ReconcilePriority finished after running for " + t.getMillis() + " ms");
 
-            logger.log(Level.INFO, "ReconcilePriority sleeps " + this.getSleepPeriod() + " ms");
-            sleep(this.getSleepPeriod());
+            CalculateComputedPriority.updateComputedPriority();
 
-        } catch (InterruptedException ie) {
-            logger.log(Level.WARNING, "ReconcilePriority interrupted", ie);
         } finally {
             db.close();
             dbdev.close();

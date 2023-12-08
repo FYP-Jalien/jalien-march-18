@@ -1,5 +1,6 @@
 package alien.optimizers.priority;
 
+import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
@@ -18,37 +19,18 @@ import java.util.logging.Logger;
  * @author Jørn-Are Flaten
  * @since 2023-12-04
  */
-public class CalculateComputedPriority extends Optimizer {
+public class CalculateComputedPriority {
+    /**
+     * Logger
+     */
+    static final Logger logger = ConfigUtils.getLogger(PriorityRapidUpdater.class.getCanonicalName());
 
-    Logger logger = Logger.getLogger(CalculateComputedPriority.class.getCanonicalName());
+    /**
+     * Monitoring component
+     */
+    static final Monitor monitor = MonitorFactory.getMonitor(PriorityRapidUpdater.class.getCanonicalName());
 
-    Monitor monitor = MonitorFactory.getMonitor(CalculateComputedPriority.class.getCanonicalName());
-
-    @Override
-    public void run() {
-        this.setSleepPeriod(3600 * 1000); // 1 h
-        int frequency = (int) this.getSleepPeriod();
-
-
-        while (true) {
-            try {
-                final boolean updated = DBSyncUtils.updatePeriodic(frequency, PriorityReconciliationService.class.getCanonicalName());
-                if (updated) {
-                    //Run
-                    updateComputedPriority();
-                } else {
-                    // do not run
-                    sleep(this.getSleepPeriod());
-
-                }
-            } catch (InterruptedException e) {
-                logger.log(Level.WARNING, "PriorityReconciliationService interrupted", e);
-            }
-        }
-
-    }
-
-    private void updateComputedPriority() {
+    public static void updateComputedPriority() {
         DBFunctions db = TaskQueueUtils.getQueueDB();
         if (db == null) {
             logger.log(Level.SEVERE, "CalculatePriority could not get a DB connection");
@@ -82,7 +64,7 @@ public class CalculateComputedPriority extends Optimizer {
 
             logger.log(Level.INFO, "Finished calculating, updating PRIORITY table");
             StringBuilder sb = new StringBuilder("INSERT INTO PRIORITY (userId, userload, computedPriority) VALUES ");
-            logger.log(Level.INFO,"Elements in DTO map: " + dtos.size());
+            logger.log(Level.INFO, "Elements in DTO map: " + dtos.size());
 
             boolean first = true;
             for (PriorityDto dto : dtos.values()) {
@@ -107,14 +89,12 @@ public class CalculateComputedPriority extends Optimizer {
             dbdev.query(sb.toString());
             t.endTiming();
             logger.log(Level.INFO, "Finished updating PRIORITY table, took " + t.getMillis() + " ms");
-            sleep(this.getSleepPeriod());
-            logger.log(Level.INFO, "Sleeping for " + this.getSleepPeriod() + " ms");
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Exception thrown while calculating computedPriority", e);
         }
     }
 
-    private void updateComputedPriority(PriorityDto dto) {
+    private static void updateComputedPriority(PriorityDto dto) {
         int activeCpuCores = dto.getRunning();
         int maxCpuCores = dto.getMaxParallelJobs();
         long historicalUsage = dto.getTotalRunningTimeLast24h() / dto.getMaxTotalRunningTime();
