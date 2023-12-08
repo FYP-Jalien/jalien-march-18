@@ -252,7 +252,7 @@ public class CVMFS extends PackMan {
 	 * @return path to job container
 	 */
 	public static String getContainerPath() {
-		return CVMFS_BASE_DIR + "/containers/fs/singularity/el9";
+		return CVMFS_BASE_DIR + "/containers/fs/singularity/default";
 	}
 
 	/**
