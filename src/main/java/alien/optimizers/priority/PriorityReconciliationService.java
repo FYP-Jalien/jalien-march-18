@@ -69,6 +69,7 @@ public class PriorityReconciliationService extends Optimizer {
             return;
         }
 
+        String dirtyRead = "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;";
         String findActiveUsersQuery = "SELECT q.userId, p.cost, p.cputime FROM QUEUE q " +
                 "join QUEUEPROC p on q.queueId = p.queueId " +
                 "WHERE q.statusId IN (15, -12, -13, -14, -1, -3, -18, -2, -4, -5, -17, -7, -8, -9, -10, -11, -16, -19) " +
@@ -76,6 +77,7 @@ public class PriorityReconciliationService extends Optimizer {
 
         try (Timing t = new Timing(monitor, "TQ_reconcilePriority_ms")) {
             t.startTiming();
+            db.query(dirtyRead);
             logger.log(Level.INFO, "Retrieving active users");
             Timing t2 = new Timing(monitor, "TQ_reconcilePriority_db_ms");
             t2.startTiming();
@@ -95,27 +97,32 @@ public class PriorityReconciliationService extends Optimizer {
                         .addAccounting(cost, cputime);
             }
 
-            logger.log(Level.INFO, "Updating priority for active users: " + activeUsersGroupedById.size());
-            Timing t5 = new Timing(monitor, "TQ_update_active_ms");
-            t5.startTiming();
-
-            StringBuilder updateActiveUsersQuery = getUpdatePriorityQuery();
             boolean first = true;
-            for (QueueProcessingDto dto : activeUsersGroupedById.values()) {
-                if (first) {
-                    first = false;
-                } else {
-                    updateActiveUsersQuery.append(", ");
+            if (!activeUsersGroupedById.isEmpty()) {
+                logger.log(Level.INFO, "Updating priority for active users: " + activeUsersGroupedById.size());
+                Timing t5 = new Timing(monitor, "TQ_update_active_ms");
+                t5.startTiming();
+
+                StringBuilder updateActiveUsersQuery = getUpdatePriorityQuery();
+                for (QueueProcessingDto dto : activeUsersGroupedById.values()) {
+                    if (first) {
+                        first = false;
+                    } else {
+                        updateActiveUsersQuery.append(", ");
+                    }
+                    updateActiveUsersQuery.append("(").append(dto.getUserId()).append(", ").append(dto.getCost()).append(", ").append(dto.getCputime()).append(")");
                 }
-                updateActiveUsersQuery.append("(").append(dto.getUserId()).append(", ").append(dto.getCost()).append(", ").append(dto.getCputime()).append(")");
+
+                final String onDuplicateKey = " ON DUPLICATE KEY UPDATE totalCpuCostLast24h = VALUES(totalCpuCostLast24h), totalRunningTimeLast24h = VALUES(totalRunningTimeLast24h)";
+                updateActiveUsersQuery.append(onDuplicateKey);
+                dbdev.query(updateActiveUsersQuery.toString(), false);
+
+                t5.endTiming();
+                logger.log(Level.INFO, "Updating priority for active users took " + t5.getMillis() + " ms");
+
+            } else {
+                logger.log(Level.INFO, "No active users to update");
             }
-
-            final String onDuplicateKey = " ON DUPLICATE KEY UPDATE totalCpuCostLast24h = VALUES(totalCpuCostLast24h), totalRunningTimeLast24h = VALUES(totalRunningTimeLast24h)";
-            updateActiveUsersQuery.append(onDuplicateKey);
-            dbdev.query(updateActiveUsersQuery.toString(), false);
-
-            t5.endTiming();
-            logger.log(Level.INFO, "Updating priority for active users took " + t5.getMillis() + " ms");
 
             String selectPriorityQuery = "select userid from PRIORITY where totalCpuCostLast24h > 0 OR totalRunningTimeLast24h > 0";
 
