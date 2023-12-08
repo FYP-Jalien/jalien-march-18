@@ -12,10 +12,13 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.TreeSet;
 import java.util.Vector;
 import java.util.logging.Level;
@@ -624,10 +627,28 @@ public final class ComputingElement extends Thread {
 		if (config.containsKey("ce_partition"))
 			smenv.put("partition", config.get("ce_partition").toString());
 
-		if (config.containsKey("host_closese"))
-			smenv.put("closeSE", config.get("host_closese").toString());
-		else if (config.containsKey("site_closese"))
-			smenv.put("closeSE", config.get("site_closese").toString());
+		final Set<String> closeSEs = new HashSet<>();
+
+		for (final String key : new String[] { "host_closese", "site_closese" }) {
+			if (config.containsKey(key)) {
+				final Object o = config.get(key);
+
+				if (o == null)
+					continue;
+
+				if (o instanceof Collection<?>)
+					closeSEs.addAll((Collection<String>) o);
+				else if (o instanceof String) {
+					StringTokenizer st = new StringTokenizer((String) o, ",; \r\t\n");
+
+					while (st.hasMoreTokens())
+						closeSEs.add(st.nextToken());
+				}
+			}
+		}
+
+		if (closeSEs.size() > 0)
+			smenv.put("closeSE", String.join(",", closeSEs));
 
 		if (config.containsKey("host_environment"))
 			host_environment = getValuesFromLDAPField(config.get("host_environment"));
