@@ -9,6 +9,7 @@ import alien.optimizers.Optimizer;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
 
+import java.sql.Connection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -67,18 +68,17 @@ public class JobAgentUpdater extends Optimizer {
             return;
         }
         dbdev.setQueryTimeout(60);
-        String dirtyRead = "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED";
         String pQuery = "SELECT userId, computedpriority from PRIORITY";
         String jQuery = "SELECT entryId, userId from JOBAGENT";
 
 
         try (Timing t = new Timing(monitor, "JobAgentUpdater")) {
             logger.log(Level.INFO, "JobAgentUpdater starting to update priority in JOBAGENT table");
-            db.query(dirtyRead);
             t.startTiming();
             StringBuilder sb = new StringBuilder("INSERT INTO JOBAGENT (entryId, userId, priority) VALUES ");
             Map<Integer, Double> priorityMap = new HashMap<>();
 
+            db.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
             db.query(pQuery);
             while (db.moveNext()) {
                 int userId = db.geti("userId");

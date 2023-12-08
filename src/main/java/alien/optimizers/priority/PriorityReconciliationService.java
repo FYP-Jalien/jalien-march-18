@@ -11,6 +11,7 @@ import alien.priority.QueueProcessingDto;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
 
+import java.sql.Connection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -73,7 +74,6 @@ public class PriorityReconciliationService extends Optimizer {
             return;
         }
 
-        String dirtyRead = "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;";
         String findActiveUsersQuery = "SELECT q.userId, p.cost, p.cputime FROM QUEUE q " +
                 "join QUEUEPROC p on q.queueId = p.queueId " +
                 "WHERE q.statusId IN (15, -12, -13, -14, -1, -3, -18, -2, -4, -5, -17, -7, -8, -9, -10, -11, -16, -19) " +
@@ -81,10 +81,10 @@ public class PriorityReconciliationService extends Optimizer {
 
         try (Timing t = new Timing(monitor, "TQ_reconcilePriority_ms")) {
             t.startTiming();
-            db.query(dirtyRead);
             logger.log(Level.INFO, "Retrieving active users");
             Timing t2 = new Timing(monitor, "TQ_reconcilePriority_db_ms");
             t2.startTiming();
+            db.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
             db.query(findActiveUsersQuery);
             t2.endTiming();
             logger.log(Level.INFO, "Retrieving active users took " + t2.getMillis() + " ms");

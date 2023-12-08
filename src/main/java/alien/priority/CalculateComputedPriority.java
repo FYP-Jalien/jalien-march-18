@@ -11,6 +11,7 @@ import alien.priority.PriorityDto;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
 
+import java.sql.Connection;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.logging.Level;
@@ -52,7 +53,9 @@ public class CalculateComputedPriority {
         try (Timing t = new Timing(monitor, "calculateComputedPriority")) {
             t.startTiming();
             logger.log(Level.INFO, "Calculating computed priority");
+            db.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
             db.query(q);
+
             while (db.moveNext()) {
                 int userId = db.geti("userId");
                 dtos.computeIfAbsent(
