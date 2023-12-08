@@ -1,4 +1,4 @@
-package alien.optimizers.priority;
+package alien.priority;
 
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
@@ -6,6 +6,7 @@ import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
 import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
+import alien.optimizers.priority.PriorityRapidUpdater;
 import alien.priority.PriorityDto;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;

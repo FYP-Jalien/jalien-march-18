@@ -6,6 +6,7 @@ import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
 import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
+import alien.priority.CalculateComputedPriority;
 import alien.priority.QueueProcessingDto;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
