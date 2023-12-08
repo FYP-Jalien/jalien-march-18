@@ -1628,11 +1628,11 @@ public class JobAgent implements Runnable {
 				cgroupPIDs = CgroupUtils.getCurrentCgroup(childPID) + "/cgroup.procs";
 			if (MemoryController.debugMemoryController)
 				logger.log(Level.INFO, "Sorting processes by consumed memory from source " + cgroupPIDs);
-			List<String> processTree = MemoryController.getCgroupProcessTree(cgroupPIDs);
-			putJobTrace("Appending cgroup processes memory consumption for dbg (PSS --> process cmd) -- Please ignore colors\n -------------");
-			for (String p : processTree)
-				putJobTrace(p);
-			putJobTrace("------------");
+		//	List<String> processTree = MemoryController.getCgroupProcessTree(cgroupPIDs);
+		//	putJobTrace("Appending cgroup processes memory consumption for dbg (PSS --> process cmd) -- Please ignore colors\n -------------");
+		//	for (String p : processTree)
+		//		putJobTrace(p);
+		//	putJobTrace("------------");
 		}
 		//}
 		//	jobOOMPreempted = true;
