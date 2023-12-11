@@ -3742,8 +3742,7 @@ public class TaskQueueUtils {
 						+ "agentuuid=null,cpuId=null where queueId=?", false, Long.valueOf(queueId))) {
 					logger.severe("Resubmit: cannot update QUEUEPROC for job: " + queueId);
 				} else {
-					db.query("SELECT cpucores from QUEUE where queueId=?", false, Long.valueOf(queueId));
-					PriorityRegister.JobCounter.getCounterForUser(Integer.valueOf(j.user)).incRunningAndDecWaiting(db.geti("cpucores"));
+					PriorityRegister.JobCounter.getCounterForUser(Integer.valueOf(j.user)).incWaiting();
 				}
 
 				// if the job was attached to a node, we tell him to hara-kiri
