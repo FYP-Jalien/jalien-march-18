@@ -3741,6 +3741,9 @@ public class TaskQueueUtils {
 						+ "spyurl=null,runtime=null,mem=null,si2k=null,cpuspeed=null,vsize=null,runtimes=null,procinfotime=null,maxvsize=null,"
 						+ "agentuuid=null,cpuId=null where queueId=?", false, Long.valueOf(queueId))) {
 					logger.severe("Resubmit: cannot update QUEUEPROC for job: " + queueId);
+				} else {
+					db.query("SELECT cpucores from QUEUE where queueId=?", false, Long.valueOf(queueId));
+					PriorityRegister.JobCounter.getCounterForUser(Integer.valueOf(j.user)).incRunningAndDecWaiting(db.geti("cpucores"));
 				}
 
 				// if the job was attached to a node, we tell him to hara-kiri
