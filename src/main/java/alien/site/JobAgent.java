@@ -562,7 +562,6 @@ public class JobAgent implements Runnable {
 
 				// Verify environment if there are no containers, before matching
 				if (containerizer == null) {
-					putJobTrace("Warning: this host has no support for containers and will soon be blocked. Please enable user namespaces on the system, or install an alternative locally");
 					if (env.getOrDefault("ALIENV_ERRORS", "").contains("TRUE") || env.getOrDefault("XRDCP_ERRORS", "").contains("TRUE")) {
 						logger.log(Level.SEVERE, "The environment on this node appears to be broken. Please do \"" + CVMFS.getAlienvPrint() + "\" for more debug info.");
 						throw new EOFException("Job matching aborted due to potentially misconfigured environment");
@@ -621,7 +620,8 @@ public class JobAgent implements Runnable {
 						if (containerizer != null && !env.containsKey("JOB_CONTAINER_PATH")) {
 							containerizer.setContainerPath(CVMFS.getCompatContainerPath());
 							putJobTrace("Compatibility mode available: an older container will be used. Be warned this feature may be removed soon!");
-						}
+						} else
+							putJobTrace("Warning: this host has no support for containers and will soon be blocked. Please enable user namespaces on the system, or install an alternative locally");
 					}
 					else {
 						putJobTrace("This has requested packages from the following platforms: " + platforms + ".");
