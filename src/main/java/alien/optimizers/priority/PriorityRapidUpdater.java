@@ -4,12 +4,14 @@ import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
+import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
 import alien.priority.CalculateComputedPriority;
 import alien.priority.PriorityRegister;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -35,13 +37,13 @@ public class PriorityRapidUpdater extends Optimizer {
         this.setSleepPeriod(60 * 5 * 1000); // 5m
 
         while (true) {
-                try {
-                    updatePriority();
-                    logger.log(Level.INFO, "PriorityRapidUpdater sleeping for " + this.getSleepPeriod() + " ms");
-                    sleep(this.getSleepPeriod());
-                } catch (InterruptedException e) {
-                    logger.log(Level.WARNING, "PriorityRapidUpdater interrupted", e);
-                }
+            try {
+                updatePriority();
+                logger.log(Level.INFO, "PriorityRapidUpdater sleeping for " + this.getSleepPeriod() + " ms");
+                sleep(this.getSleepPeriod());
+            } catch (InterruptedException e) {
+                logger.log(Level.WARNING, "PriorityRapidUpdater interrupted", e);
+            }
         }
     }
 
@@ -73,9 +75,10 @@ public class PriorityRapidUpdater extends Optimizer {
             boolean[] isFirst = {true};
 
             try (Timing t = new Timing(monitor, "TQ_updatePriority_ms")) {
+                StringBuilder registerLog = new StringBuilder("PriorityRegister.JobCounter.getRegistry() size: " + PriorityRegister.JobCounter.getRegistry().size() + "\n");
                 if (!PriorityRegister.JobCounter.getRegistry().isEmpty()) {
                     t.startTiming();
-
+                    AtomicInteger count = new AtomicInteger();
                     PriorityRegister.JobCounter.getRegistry().forEach((userId, v) -> {
                         if (v.getWaiting() != 0 || v.getRunning() != 0 || v.getCputime() != 0 || v.getCost() != 0) {
                             if (!isFirst[0]) {
@@ -92,9 +95,15 @@ public class PriorityRapidUpdater extends Optimizer {
                                     .append(")");
                         } else {
                             logger.log(Level.INFO, "Removing inactive user from registry: " + userId);
+                            count.getAndIncrement();
                             PriorityRegister.JobCounter.getRegistry().remove(userId);
                         }
                     });
+                    if (count.get() > 0) {
+                        registerLog.append("Removed ")
+                                .append(count.get())
+                                .append(" inactive users from registry.\n");
+                    }
 
                     sb.append(" ON DUPLICATE KEY UPDATE ")
                             .append("waiting = VALUES(waiting), ")
@@ -103,6 +112,9 @@ public class PriorityRapidUpdater extends Optimizer {
                             .append("totalCpuCostLast24h = VALUES(totalCpuCostLast24h)");
 
                     logger.log(Level.INFO, "Updating priority for active users: " + PriorityRegister.JobCounter.getRegistry().size());
+                    registerLog.append("Updating PRIORITY table for active users: ")
+                            .append(PriorityRegister.JobCounter.getRegistry().size())
+                            .append("\n");
                     dbdev.query(sb.toString(), false);
 
                     // Reset counters after successful update
@@ -112,11 +124,17 @@ public class PriorityRapidUpdater extends Optimizer {
 
                     t.endTiming();
                     logger.log(Level.INFO, "PriorityRapidUpdater used: " + t.getSeconds() + " seconds");
+                    registerLog.append("PriorityRapidUpdater used: ")
+                            .append(t.getSeconds())
+                            .append(" seconds\n");
 
                     CalculateComputedPriority.updateComputedPriority();
                 } else {
                     logger.log(Level.INFO, "Counter registry is empty - nothing to update");
+                    registerLog.append(" Counter registry is empty - nothing to update\n");
                 }
+
+                DBSyncUtils.registerLog(PriorityRapidUpdater.class.getCanonicalName(), registerLog.toString());
             }
 
         } catch (Exception e) {

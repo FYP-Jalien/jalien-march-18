@@ -41,7 +41,7 @@ public class PriorityReconciliationService extends Optimizer {
         int frequency = (int) this.getSleepPeriod();
 
         while (true) {
-                final boolean updated = DBSyncUtils.updatePeriodic(frequency, PriorityReconciliationService.class.getCanonicalName());
+            final boolean updated = DBSyncUtils.updatePeriodic(frequency, PriorityReconciliationService.class.getCanonicalName());
             try {
                 if (updated) {
                     reconcilePriority();
@@ -88,6 +88,9 @@ public class PriorityReconciliationService extends Optimizer {
             db.query(findActiveUsersQuery);
             t2.endTiming();
             logger.log(Level.INFO, "Retrieving active users took " + t2.getMillis() + " ms");
+            StringBuilder registerLog = new StringBuilder("Retrieving active users in ").append(t2.getMillis()).append(" ms\n");
+
+
             Map<Integer, QueueProcessingDto> activeUsersGroupedById = new HashMap<>();
             while (db.moveNext()) {
                 int userId = db.geti("userId");
@@ -122,6 +125,11 @@ public class PriorityReconciliationService extends Optimizer {
                 dbdev.query(updateActiveUsersQuery.toString(), false);
 
                 t5.endTiming();
+                registerLog.append("Updating priority for ")
+                        .append(activeUsersGroupedById.size())
+                        .append(" active users took ")
+                        .append(t5.getMillis())
+                        .append(" ms\n");
                 logger.log(Level.INFO, "Updating priority for active users took " + t5.getMillis() + " ms");
 
             } else {
@@ -155,10 +163,10 @@ public class PriorityReconciliationService extends Optimizer {
             Timing t4 = new Timing(monitor, "TQ_update_non_active_ms");
             t4.startTiming();
             if (!nonActiveUsersLast24H.isEmpty()) {
-            logger.log(Level.INFO, "Updating priority for non active users " + nonActiveUsersLast24H.size());
+                logger.log(Level.INFO, "Updating priority for non active users " + nonActiveUsersLast24H.size());
                 StringBuilder updateNonActiveUsersQuery = getUpdatePriorityQuery();
                 first = true;
-                for ( Integer userId : nonActiveUsersLast24H ) {
+                for (Integer userId : nonActiveUsersLast24H) {
                     if (first) {
                         first = false;
                     } else {
@@ -170,6 +178,11 @@ public class PriorityReconciliationService extends Optimizer {
                 updateNonActiveUsersQuery.append(" ON DUPLICATE KEY UPDATE totalCpuCostLast24h = VALUES(totalCpuCostLast24h), totalRunningTimeLast24h = VALUES(totalRunningTimeLast24h)");
                 dbdev.query(updateNonActiveUsersQuery.toString(), false);
 
+                registerLog.append(" Updating priority for ")
+                        .append(nonActiveUsersLast24H.size())
+                        .append(" non active users took ")
+                        .append(t4.getMillis())
+                        .append(" ms\n");
                 logger.log(Level.INFO, "Updating priority for non active users took " + t4.getMillis() + " ms");
             } else {
                 logger.log(Level.INFO, "No non active users to update");
@@ -178,6 +191,8 @@ public class PriorityReconciliationService extends Optimizer {
             t4.endTiming();
             t.endTiming();
             logger.log(Level.INFO, "ReconcilePriority finished after running for " + t.getMillis() + " ms");
+            registerLog.append(" ReconcilePriority finished after running for ").append(t.getMillis()).append(" ms\n");
+            DBSyncUtils.registerLog(PriorityReconciliationService.class.getCanonicalName(), registerLog.toString());
 
             CalculateComputedPriority.updateComputedPriority();
 

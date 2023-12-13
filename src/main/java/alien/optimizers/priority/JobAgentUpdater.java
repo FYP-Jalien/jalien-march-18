@@ -15,8 +15,6 @@ import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import static java.lang.Thread.*;
-
 /**
  * @author Jørn-Are Flaten
  * @since 2023-12-08
@@ -64,7 +62,7 @@ public class JobAgentUpdater extends Optimizer {
 
         DBFunctions dbdev = TaskQueueUtils.getProcessesDevDB();
         if (dbdev == null) {
-            logger.log(Level.INFO ,"JobAgentUpdater(processesDev) could not get a DB connection");
+            logger.log(Level.INFO, "JobAgentUpdater(processesDev) could not get a DB connection");
             return;
         }
         dbdev.setQueryTimeout(60);
@@ -108,6 +106,8 @@ public class JobAgentUpdater extends Optimizer {
 
             t.endTiming();
             logger.log(Level.INFO, "JobAgentUpdater finished updating JOBAGENT table, took " + t.getMillis() + " ms");
+            String registerLog = "Finished updating JOBAGENT table priority values, in " + t.getMillis() + " ms\n";
+            DBSyncUtils.registerLog(JobAgentUpdater.class.getCanonicalName(), registerLog);
         }
     }
 

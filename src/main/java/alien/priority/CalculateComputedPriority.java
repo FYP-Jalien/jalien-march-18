@@ -5,9 +5,7 @@ import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
 import alien.optimizers.DBSyncUtils;
-import alien.optimizers.Optimizer;
 import alien.optimizers.priority.PriorityRapidUpdater;
-import alien.priority.PriorityDto;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
 
@@ -33,6 +31,7 @@ public class CalculateComputedPriority {
     static final Monitor monitor = MonitorFactory.getMonitor(PriorityRapidUpdater.class.getCanonicalName());
 
     public static void updateComputedPriority() {
+        StringBuilder registerLog = new StringBuilder();
         DBFunctions db = TaskQueueUtils.getQueueDB();
         if (db == null) {
             logger.log(Level.SEVERE, "CalculatePriority could not get a DB connection");
@@ -65,6 +64,10 @@ public class CalculateComputedPriority {
 
                 updateComputedPriority(dtos.get(userId));
             }
+            registerLog.append("Calculating computed priority for ")
+                    .append(dtos.size())
+                    .append(" users.\n")
+                    .append(" Updated userload and computedPriority values written to PRIORITY table in processesdev DB.\n ");
 
             logger.log(Level.INFO, "Finished calculating, updating PRIORITY table");
             StringBuilder sb = new StringBuilder("INSERT INTO PRIORITY (userId, userload, computedPriority) VALUES ");
@@ -93,6 +96,9 @@ public class CalculateComputedPriority {
             dbdev.query(sb.toString());
             t.endTiming();
             logger.log(Level.INFO, "Finished updating PRIORITY table, took " + t.getMillis() + " ms");
+
+            registerLog.append("Procedure finished in ").append(t.getMillis()).append(" ms");
+            DBSyncUtils.registerLog(CalculateComputedPriority.class.getCanonicalName(), registerLog.toString());
         } catch (Exception e) {
             logger.log(Level.SEVERE, "Exception thrown while calculating computedPriority", e);
         }
