@@ -88,7 +88,6 @@ public class CalculateComputedPriority {
                         .append(")");
             }
 
-
             sb.append(" ON DUPLICATE KEY UPDATE ")
                     .append("userload = VALUES(userload), ")
                     .append("computedPriority = VALUES(computedPriority)");
