@@ -854,7 +854,7 @@ public class JobBroker {
 				return code_and_slots;
 			}
 
-			if (!TaskQueueUtils.updateHost(host, "CONNECTED", Integer.valueOf(1), port, version, ceName)) {
+			if (!TaskQueueUtils.updateHost(host, "ACTIVE", Integer.valueOf(1), port, version, ceName)) {
 				logger.severe("Error: getNumberFreeSlots, failed updateHost: " + host);
 				code_and_slots.set(0, Integer.valueOf(2));
 				return code_and_slots;
