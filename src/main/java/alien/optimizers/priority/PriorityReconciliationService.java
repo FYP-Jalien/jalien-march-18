@@ -8,6 +8,7 @@ import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
 import alien.priority.CalculateComputedPriority;
 import alien.priority.QueueProcessingDto;
+import alien.taskQueue.JobStatus;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
 
@@ -18,6 +19,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 /**
  * @author Jørn-Are Flaten
@@ -74,9 +77,16 @@ public class PriorityReconciliationService extends Optimizer {
             return;
         }
 
+        Set<String> uniqueStates = Stream.of(JobStatus.runningStates(), JobStatus.errorneousStates(), JobStatus.finalStates())
+                .flatMap(Set::stream)
+                .map(JobStatus::getAliEnLevel)
+                .map(String::valueOf)
+                .collect(Collectors.toSet());
+        String states = String.join(", ", uniqueStates);
+
         String findActiveUsersQuery = "SELECT q.userId, p.cost, p.cputime FROM QUEUE q " +
                 "join QUEUEPROC p on q.queueId = p.queueId " +
-                "WHERE q.statusId IN (15, -12, -13, -14, -1, -3, -18, -2, -4, -5, -17, -7, -8, -9, -10, -11, -16, -19) " +
+                "WHERE q.statusId IN (" + states + ") " +
                 "AND p.lastupdate > NOW() - INTERVAL 1 DAY;";
 
         try (Timing t = new Timing(monitor, "TQ_reconcilePriority_ms")) {
