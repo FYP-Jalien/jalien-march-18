@@ -3438,6 +3438,8 @@ public class TaskQueueUtils {
 		return 1;
 	}
 
+	private static final ExpirationCache<String, String> connectedHosts = new ExpirationCache<>(1024);
+
 	/**
 	 * @param host
 	 * @param status
@@ -3457,8 +3459,17 @@ public class TaskQueueUtils {
 			if (logger.isLoggable(Level.FINER))
 				logger.log(Level.FINER, "Going to updateHost for: " + host + " status: " + status);
 
-			if (!db.query("update HOSTS set status=?,connected=?,hostPort=?,version=?,cename=? where hostName=?", false, status, connected, Integer.valueOf(port), version, ceName, host))
+			String oldCE = connectedHosts.get(host);
+
+			if (ceName.equals(oldCE))
+				return true;
+
+			if (!db.query("update HOSTS set status=?,connected=?,hostPort=?,version=?,cename=?,date=UNIX_TIMESTAMP(NOW())  where hostName=?", false, status, connected, Integer.valueOf(port), version,
+					ceName, host))
 				return false;
+
+			hostsStatus.overwrite(host, status, 1000 * 60);
+			connectedHosts.overwrite(host, ceName, 1000 * 60);
 
 			return db.getUpdateCount() > 0;
 		}
