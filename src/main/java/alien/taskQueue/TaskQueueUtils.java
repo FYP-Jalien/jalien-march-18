@@ -2685,6 +2685,25 @@ public class TaskQueueUtils {
 		return true;
 	}
 
+	private static long lastEmptyAgentsCleanup = 0;
+
+	private static void deleteEmptyAgents() {
+		if (System.currentTimeMillis() - lastEmptyAgentsCleanup > 1000 * 60) {
+			lastEmptyAgentsCleanup = System.currentTimeMillis();
+
+			try (DBFunctions db = getQueueDB()) {
+				if (db == null)
+					return;
+
+				db.setQueryTimeout(60);
+
+				db.query("delete from JOBAGENT where counter<1");
+			}
+
+			lastEmptyAgentsCleanup = System.currentTimeMillis();
+		}
+	}
+
 	private static boolean deleteJobAgent(final int jobagentId) {
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
@@ -2698,7 +2717,7 @@ public class TaskQueueUtils {
 
 			final int updated = db.getUpdateCount();
 
-			db.query("delete from JOBAGENT where counter<1");
+			deleteEmptyAgents();
 
 			return updated > 0;
 		}
@@ -3432,7 +3451,7 @@ public class TaskQueueUtils {
 
 			db.query("update JOBAGENT set counter=counter-1 " + oldestQueueIdQ + " where entryId=?", false, bindValues.toArray(new Object[0]));
 
-			db.query("delete from JOBAGENT where counter<1", false);
+			deleteEmptyAgents();
 		}
 
 		return 1;
