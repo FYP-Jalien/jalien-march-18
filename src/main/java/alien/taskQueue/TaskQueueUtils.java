@@ -1,52 +1,10 @@
 package alien.taskQueue;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.StringTokenizer;
-import java.util.TreeMap;
-import java.util.UUID;
-import java.util.Vector;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
 import alien.api.Dispatcher;
 import alien.api.ServerException;
 import alien.api.catalogue.LFNfromString;
 import alien.api.taskQueue.GetPS;
-import alien.catalogue.BookingTable;
-import alien.catalogue.CatalogueUtils;
-import alien.catalogue.LFN;
-import alien.catalogue.LFNUtils;
-import alien.catalogue.PackageUtils;
+import alien.catalogue.*;
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
 import alien.monitoring.Monitor;
@@ -68,6 +26,22 @@ import lazyj.Utils;
 import lazyj.cache.ExpirationCache;
 import lazyj.cache.GenericLastValuesCache;
 import utils.JobTraceCollector.TraceMessage;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.nio.file.*;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * @author ron
@@ -861,8 +835,10 @@ public class TaskQueueUtils {
 			if (JobStatus.finalStates().contains(newStatus) || newStatus == JobStatus.SAVED_WARN || newStatus == JobStatus.SAVED) {
 				deleteJobToken(job);
 				PriorityRegister.JobCounter.getCounterForUser(userId).decRunning(activeCores);
-				PriorityRegister.JobCounter.getCounterForUser(userId).addCputime((Integer) extrafields.get("cputime"));
-				PriorityRegister.JobCounter.getCounterForUser(userId).addCost((Integer) extrafields.get("cost"));
+				if(extrafields != null) {
+				    PriorityRegister.JobCounter.getCounterForUser(userId).addCputime((Integer) extrafields.get("cputime"));
+				    PriorityRegister.JobCounter.getCounterForUser(userId).addCost((Integer) extrafields.get("cost"));
+				}
 			}
 
 			if (JobStatus.finalStates().contains(newStatus) || newStatus == JobStatus.SAVED_WARN || newStatus == JobStatus.SAVED)
