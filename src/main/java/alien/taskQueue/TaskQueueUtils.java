@@ -869,53 +869,52 @@ public class TaskQueueUtils {
 
 			try (DBFunctions db = getQueueDB()) {
 				for (final Map.Entry<String, Object> entry : extrafields.entrySet()) {
-					final String key = entry.getKey();
-					final Object value = entry.getValue();
+                    final String key = entry.getKey();
+                    final Object value = entry.getValue();
 
-					if (fieldMap.containsKey(entry.getKey() + "_table")) {
-						final HashMap<String, Object> map = new HashMap<>();
+                    if (fieldMap.containsKey(entry.getKey() + "_table")) {
+                        final HashMap<String, Object> map = new HashMap<>();
 
-						if (value instanceof Map) {
-							final int id = getOrInsertType(entry.getKey(), (Map<?, ?>) value);
-							if (id > 0)
-								map.put(fieldMap.get(key + "_field") + "Id", Integer.valueOf(id));
-						}
-						else {
-							if (key.contains("node") || key.contains("exechost")) {
-								final int hostId = getOrInsertFromLookupTable("host", value.toString());
-								map.put(fieldMap.get(key + "_field"), Integer.valueOf(hostId));
-							}
-							else
-								map.put(fieldMap.get(key + "_field"), value);
-						}
+                        if (value instanceof Map) {
+                            final int id = getOrInsertType(entry.getKey(), (Map<?, ?>) value);
+                            if (id > 0)
+                                map.put(fieldMap.get(key + "_field") + "Id", Integer.valueOf(id));
+                        } else {
+                            if (key.contains("node") || key.contains("exechost")) {
+                                final int hostId = getOrInsertFromLookupTable("host", value.toString());
+                                map.put(fieldMap.get(key + "_field"), Integer.valueOf(hostId));
+                            } else
+                                map.put(fieldMap.get(key + "_field"), value);
+                        }
 
-						Long queueId = Long.valueOf(job);
-						map.put("queueId", queueId);
-
-						Integer userId = getUserId(queueId);
-						if(userId != 0) {
-							if(map.containsKey("cputime") && map.containsKey("cost")) {
-								PriorityRegister.JobCounter.getCounterForUser(userId).addCputime(((Long) extrafields.get("cputime")));
-								PriorityRegister.JobCounter.getCounterForUser(userId).addCost((Double) extrafields.get("cost"));
-							}
-
-						} else {
-							logger.log(Level.WARNING, "Could not get userId for queueId: " + job + " to update cputime and cost");
-						}
-
-						final String query = DBFunctions.composeUpdate(fieldMap.get(key + "_table"), map, QUEUEID);
-						db.query(query);
-					}
-				}
-			}
-
-			execSite = extrafields.getOrDefault("exechost", execSite).toString();
-		}
+                        Long queueId = Long.valueOf(job);
+                        map.put("queueId", queueId);
+                        if (map.containsKey("cputime") && map.containsKey("cost")) {
+                            if (map.containsKey("userId")) {
+                                Integer userId = (Integer) map.get("userId");
+                                addCputimeAndCostToRegister(extrafields, userId);
+                            } else {
+                                Integer userId = getUserId(queueId);
+                                addCputimeAndCostToRegister(extrafields, userId);
+                            }
+                        }
+                        final String query = DBFunctions.composeUpdate(fieldMap.get(key + "_table"), map, QUEUEID);
+                        db.query(query);
+                    }
+                }
+            }
+            execSite = extrafields.getOrDefault("exechost", execSite).toString();
+        }
 
 		return execSite;
 	}
 
-	private static Integer getUserId(long queueId) {
+    private static void addCputimeAndCostToRegister(Map<String, Object> extrafields, Integer userId) {
+        PriorityRegister.JobCounter.getCounterForUser(userId).addCputime(((Long) extrafields.get("cputime")));
+        PriorityRegister.JobCounter.getCounterForUser(userId).addCost((Double) extrafields.get("cost"));
+    }
+
+    private static Integer getUserId(long queueId) {
 		DBFunctions db = TaskQueueUtils.getQueueDB();
 		int userId = 0;
 		if (db == null) {
