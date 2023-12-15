@@ -3015,6 +3015,9 @@ public class TaskQueueUtils {
 		return jobStatuses;
 	}
 
+	// CE active status
+	private static final ExpirationCache<String, String> hostsStatus = new ExpirationCache<>(1024);
+
 	/**
 	 * @param host
 	 * @param status
@@ -3035,10 +3038,19 @@ public class TaskQueueUtils {
 			if (logger.isLoggable(Level.FINE))
 				logger.log(Level.FINE, "Updating host " + host + " to status " + status);
 
+			String oldStatus = hostsStatus.get(host);
+
+			if (status.equals(oldStatus)) {
+				// was recently enough updated to the same status
+				return true;
+			}
+
 			if (!db.query("update HOSTS set status=?,date=UNIX_TIMESTAMP(NOW()) where hostName=?", false, status, host)) {
 				logger.log(Level.WARNING, "Update HOSTS failed: " + host + " and " + status);
 				return false;
 			}
+
+			hostsStatus.overwrite(host, status, 1000 * 60);
 
 			return db.getUpdateCount() != 0;
 		}
