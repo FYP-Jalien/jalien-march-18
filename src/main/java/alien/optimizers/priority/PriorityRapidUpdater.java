@@ -106,10 +106,10 @@ public class PriorityRapidUpdater extends Optimizer {
                     }
 
                     sb.append(" ON DUPLICATE KEY UPDATE ")
-                            .append("waiting = VALUES(waiting), ")
-                            .append("running = VALUES(running), ")
-                            .append("totalRunningTimeLast24h = VALUES(totalRunningTimeLast24h), ")
-                            .append("totalCpuCostLast24h = VALUES(totalCpuCostLast24h)");
+                            .append("waiting = waiting + VALUES(waiting), ")
+                            .append("running = running + VALUES(running), ")
+                            .append("totalRunningTimeLast24h = totalRunningTimeLast24h + VALUES(totalRunningTimeLast24h), ")
+                            .append("totalCpuCostLast24h = totalCpuCostLast24h + VALUES(totalCpuCostLast24h)");
 
                     logger.log(Level.INFO, "Updating priority for active users: " + PriorityRegister.JobCounter.getRegistry().size());
                     registerLog.append("Updating PRIORITY table for active users: ")
