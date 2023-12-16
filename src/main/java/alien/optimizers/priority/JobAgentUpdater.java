@@ -9,9 +9,6 @@ import alien.optimizers.Optimizer;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
 
-import java.sql.Connection;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,8 +34,8 @@ public class JobAgentUpdater extends Optimizer {
         int frequency = (int) this.getSleepPeriod();
 
         while (true) {
-            final boolean updated = DBSyncUtils.updatePeriodic(frequency, JobAgentUpdater.class.getCanonicalName());
-            if (updated) {
+//            final boolean updated = DBSyncUtils.updatePeriodic(frequency, JobAgentUpdater.class.getCanonicalName());
+//            if (updated) {
                 try {
                     updateComputedPriority();
                     logger.log(Level.INFO, "JobAgentUpdater sleeping for " + this.getSleepPeriod() + " ms");
@@ -47,7 +44,7 @@ public class JobAgentUpdater extends Optimizer {
                     logger.log(Level.SEVERE, "JobAgentUpdater interrupted", e);
                 }
 
-            }
+//            }
         }
     }
 
@@ -66,46 +63,15 @@ public class JobAgentUpdater extends Optimizer {
             return;
         }
         dbdev.setQueryTimeout(60);
-        String pQuery = "SELECT userId, computedpriority from PRIORITY";
-        String jQuery = "SELECT entryId, userId from JOBAGENT";
 
-
+        String s = "UPDATE JOBAGENT INNER JOIN PRIORITY USING(userId) SET JOBAGENT.priority = PRIORITY.computedPriority";
         try (Timing t = new Timing(monitor, "JobAgentUpdater")) {
-            logger.log(Level.INFO, "JobAgentUpdater starting to update priority in JOBAGENT table");
+            logger.log(Level.INFO, "2-JobAgentUpdater starting to update priority in JOBAGENT table");
             t.startTiming();
-            StringBuilder sb = new StringBuilder("INSERT INTO JOBAGENT (entryId, userId, priority) VALUES ");
-            Map<Integer, Double> priorityMap = new HashMap<>();
-
-            db.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
-            db.query(pQuery);
-            while (db.moveNext()) {
-                int userId = db.geti("userId");
-                double computedPriority = db.getd("computedpriority");
-                priorityMap.put(userId, computedPriority);
-            }
-
-            boolean first = true;
-            db.query(jQuery);
-            while (db.moveNext()) {
-                int entryId = db.geti("entryId");
-                int userId = db.geti("userId");
-
-                if (first) {
-                    first = false;
-                } else {
-                    sb.append(", ");
-                }
-                sb.append("(")
-                        .append(entryId).append(", ")
-                        .append(userId).append(", ")
-                        .append(priorityMap.get(userId)).append(")");
-            }
-
-            sb.append(" ON DUPLICATE KEY UPDATE userId = VALUES(userId), priority = VALUES(priority)");
-            dbdev.query(sb.toString());
-
+            dbdev.query(s);
             t.endTiming();
             logger.log(Level.INFO, "JobAgentUpdater finished updating JOBAGENT table, took " + t.getMillis() + " ms");
+
             String registerLog = "Finished updating JOBAGENT table priority values, in " + t.getMillis() + " ms\n";
             DBSyncUtils.registerLog(JobAgentUpdater.class.getCanonicalName(), registerLog);
         }
