@@ -2656,6 +2656,15 @@ public class TaskQueueUtils {
 					t2.send();
 				}
 
+			// TODO remove this when jobs send again heartbeat monitoring data
+			try (DBFunctions db = getQueueDB()) {
+				if (db == null)
+					return false;
+
+				db.setQueryTimeout(60);
+
+				db.query("UPDATE QUEUEPROC SET lastupdate=NOW() WHERE queueId=?", false, Long.valueOf(queueId));
+			}
 			return true;
 		}
 
