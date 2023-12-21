@@ -133,6 +133,7 @@ public class PriorityRapidUpdater extends Optimizer {
                             }
 
                         });
+                        registerLog.append("Flushing values to database completed successfully.\n");
                     }
 
                     t.endTiming();
