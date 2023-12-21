@@ -18,6 +18,15 @@ public class PriorityRegister {
         private AtomicLong cputime = new AtomicLong(0);
         private AtomicDouble cost = new AtomicDouble(0);
 
+        public JobCounter(AtomicInteger waiting, AtomicInteger running, AtomicLong cputime, AtomicDouble cost) {
+            this.waiting = waiting;
+            this.running = running;
+            this.cputime = cputime;
+            this.cost = cost;
+        }
+
+        public JobCounter() {
+        }
 
         public void incWaiting() {
             waiting.incrementAndGet();
@@ -70,6 +79,43 @@ public class PriorityRegister {
             running.getAndSet(0);
             cputime.getAndSet(0);
             cost.getAndSet(0);
+        }
+
+        public void subtractWaiting(int n) {
+            this.waiting.addAndGet(-n);
+        }
+
+        public void subtractRunning(int n) {
+            this.running.addAndGet(-n);
+        }
+
+        public void subtractCputime(long n) {
+            this.cputime.addAndGet(-n);
+        }
+
+        public void subtractCost(double n) {
+            this.cost.addAndGet(-n);
+        }
+
+        public void subtractValues(int waiting, int running, long cputime, double cost) {
+            subtractWaiting(waiting);
+            subtractRunning(running);
+            subtractCputime(cputime);
+            subtractCost(cost);
+        }
+
+        // Creating a deep copy of the registry with new atomic values to ensure that the snapshot has a
+        // separate memory location from the global registry
+        public static Map<Integer, JobCounter> getRegistrySnapshot() {
+            Map<Integer, JobCounter> snapshot = new ConcurrentHashMap<>();
+            for (Map.Entry<Integer, JobCounter> entry : registry.entrySet()) {
+                snapshot.put(entry.getKey(), new JobCounter(
+                        new AtomicInteger(entry.getValue().waiting.get()),
+                        new AtomicInteger(entry.getValue().running.get()),
+                        new AtomicLong(entry.getValue().cputime.get()),
+                        new AtomicDouble(entry.getValue().cost.get())));
+            }
+            return snapshot;
         }
 
         // Global registry map

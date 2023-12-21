@@ -53,7 +53,6 @@ public class PriorityReconciliationService extends Optimizer {
                     sleep(this.getSleepPeriod());
                 } else {
                     sleep(this.getSleepPeriod());
-
                 }
             } catch (InterruptedException e) {
                 logger.log(Level.WARNING, "PriorityReconciliationService interrupted", e);

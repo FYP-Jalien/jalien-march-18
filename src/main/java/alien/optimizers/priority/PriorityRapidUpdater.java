@@ -11,6 +11,7 @@ import alien.priority.PriorityRegister;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
 
+import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -66,16 +67,14 @@ public class PriorityRapidUpdater extends Optimizer {
                 return;
             }
             dbdev.setQueryTimeout(60);
-
-
             logger.log(Level.INFO, "DB Connections established");
-            logger.log(Level.INFO, "PriorityRegister.JobCounter.getRegistry().size(): " + PriorityRegister.JobCounter.getRegistry().size());
 
+            Map<Integer, PriorityRegister.JobCounter> registrySnapshot = PriorityRegister.JobCounter.getRegistrySnapshot();
             StringBuilder sb = new StringBuilder("INSERT INTO PRIORITY (userId, waiting, running, totalRunningTimeLast24h, totalCpuCostLast24h) VALUES ");
             boolean[] isFirst = {true};
 
             try (Timing t = new Timing(monitor, "TQ_updatePriority_ms")) {
-                StringBuilder registerLog = new StringBuilder("PriorityRegister.JobCounter.getRegistry() size: " + PriorityRegister.JobCounter.getRegistry().size() + "\n");
+                StringBuilder registerLog = new StringBuilder("PriorityRegister.JobCounter.getRegistry() size: " + registrySnapshot.size() + "\n");
                 if (!PriorityRegister.JobCounter.getRegistry().isEmpty()) {
                     t.startTiming();
                     AtomicInteger count = new AtomicInteger();
@@ -115,12 +114,26 @@ public class PriorityRapidUpdater extends Optimizer {
                     registerLog.append("Updating PRIORITY table for active users: ")
                             .append(PriorityRegister.JobCounter.getRegistry().size())
                             .append("\n");
-                    dbdev.query(sb.toString(), false);
+                    boolean query = dbdev.query(sb.toString(), false);
 
-                    // Reset counters after successful update
-                    PriorityRegister.JobCounter.getRegistry().forEach((userId, v) -> {
-                        PriorityRegister.JobCounter.resetUserCounters(userId);
-                    });
+                    // Subtract the flushed values from the registry
+                    if (query) {
+                        PriorityRegister.JobCounter.getRegistry().forEach((userId, v) -> {
+                            PriorityRegister.JobCounter userCounter = registrySnapshot.get(userId);
+                            if (userCounter != null) {
+                                logger.log(Level.INFO, "Registry values for user: " + userId + ", waiting: " + v.getWaiting()
+                                        + ", running: " + v.getRunning() + ", cputime: " + v.getCputime() + ", cost: " + v.getCost());
+
+                                v.subtractValues(userCounter.getWaiting(), userCounter.getRunning(), userCounter.getCputime(), userCounter.getCost());
+
+                                logger.log(Level.INFO, "Subtracting snapshotted values for user: " + userId + ", waiting: " + userCounter.getWaiting()
+                                        + ", running: " + userCounter.getRunning() + ", cputime: " + userCounter.getCputime() + ", cost: " + userCounter.getCost());
+                                logger.log(Level.INFO, "values after subtraction for " + userId + ", waiting: " + v.getWaiting()
+                                        + ", running: " + v.getRunning() + ", cputime: " + v.getCputime() + ", cost: " + v.getCost());
+                            }
+
+                        });
+                    }
 
                     t.endTiming();
                     logger.log(Level.INFO, "PriorityRapidUpdater used: " + t.getSeconds() + " seconds");
