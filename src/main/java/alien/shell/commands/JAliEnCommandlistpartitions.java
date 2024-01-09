@@ -8,7 +8,7 @@ import java.util.TreeMap;
 import java.util.logging.Level;
 
 import alien.config.ConfigUtils;
-import alien.user.LDAPHelper;
+import alien.user.LDAPHelperRemote;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
 import joptsimple.OptionSet;
@@ -49,7 +49,7 @@ public class JAliEnCommandlistpartitions extends JAliEnBaseCommand {
 	}
 
 	private static String getCEListFromPartition(final String partition) {
-		final Set<String> ceList = LDAPHelper.checkLdapInformation("name=" + partition, "ou=Partitions,", "CEname");
+		final Set<String> ceList = LDAPHelperRemote.checkLdapInformation("name=" + partition, "ou=Partitions,", "CEname");
 		return String.join(",", ceList);
 	}
 

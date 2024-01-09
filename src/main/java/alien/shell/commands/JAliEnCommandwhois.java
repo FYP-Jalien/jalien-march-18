@@ -8,7 +8,7 @@ import java.util.TreeSet;
 
 import alien.shell.ErrNo;
 import alien.user.AliEnPrincipal;
-import alien.user.LDAPHelper;
+import alien.user.LDAPHelperRemote;
 import alien.user.UserFactory;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
@@ -57,7 +57,7 @@ public class JAliEnCommandwhois extends JAliEnBaseCommand {
 					else
 						searchQuery = "(|" + searchQuery + "(subject=*" + s + "*))";
 
-				final Set<String> uids = LDAPHelper.checkLdapInformation(searchQuery, "ou=People,", "uid");
+				final Set<String> uids = LDAPHelperRemote.checkLdapInformation(searchQuery, "ou=People,", "uid");
 
 				if (uids != null)
 					usernames.addAll(uids);
@@ -80,18 +80,18 @@ public class JAliEnCommandwhois extends JAliEnBaseCommand {
 		commander.printOutln("Username: " + principal.getName());
 		commander.printOut("username", principal.getName());
 
-		Set<String> names = LDAPHelper.checkLdapInformation("uid=" + principal.getName(), "ou=People,", "gecos");
+		Set<String> names = LDAPHelperRemote.checkLdapInformation("uid=" + principal.getName(), "ou=People,", "gecos");
 
 		if (names == null)
-			names = LDAPHelper.checkLdapInformation("uid=" + principal.getName(), "ou=People,", "cn");
+			names = LDAPHelperRemote.checkLdapInformation("uid=" + principal.getName(), "ou=People,", "cn");
 
 		printCollection("Full name", names, false);
 
 		printCollection("Roles", principal.getRoles(), false);
 
-		printCollection("Email", LDAPHelper.getEmails(principal.getName()), true);
+		printCollection("Email", LDAPHelperRemote.getEmails(principal.getName()), true);
 
-		printCollection("Subject", LDAPHelper.checkLdapInformation("uid=" + principal.getName(), "ou=People,", "subject"), true);
+		printCollection("Subject", LDAPHelperRemote.checkLdapInformation("uid=" + principal.getName(), "ou=People,", "subject"), true);
 
 		commander.printOutln();
 		commander.outNextResult();

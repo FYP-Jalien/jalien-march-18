@@ -120,7 +120,7 @@ public class LdapCertificateRealm extends RealmBase {
 			return true;
 
 		for (final String sUsername : sUsernames) {
-			final Set<String> sRoles = LDAPHelper.checkLdapInformation("users=" + sUsername, "ou=Roles,", "uid");
+			final Set<String> sRoles = LDAPHelperRemote.checkLdapInformation("users=" + sUsername, "ou=Roles,", "uid");
 
 			if (logger.isLoggable(Level.FINER))
 				logger.finer("Roles for '" + sUsername + "' : " + sRoles);

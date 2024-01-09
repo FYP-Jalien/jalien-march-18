@@ -58,6 +58,7 @@ import alien.shell.ErrNo;
 import alien.user.AliEnPrincipal;
 import alien.user.AuthorizationChecker;
 import alien.user.LDAPHelper;
+import alien.user.LDAPHelperRemote;
 import alien.user.UsersHelper;
 import apmon.ApMon;
 import lazyj.DBFunctions;
@@ -1442,7 +1443,7 @@ public class TaskQueueUtils {
 			ret.put(entry.getKey(), Integer.valueOf(entry.getValue().intValue() + addToAll));
 
 		if (addToAll > 0) {
-			final Set<String> sites = LDAPHelper.checkLdapInformation("(objectClass=organizationalUnit)", "ou=Sites,", "ou", false);
+			final Set<String> sites = LDAPHelperRemote.checkLdapInformation("(objectClass=organizationalUnit)", "ou=Sites,", "ou", false);
 
 			if (sites != null)
 				for (final String site : sites)
@@ -1947,7 +1948,7 @@ public class TaskQueueUtils {
 
 					db.setLastGeneratedKey(true);
 
-					final Set<String> ids = LDAPHelper.checkLdapInformation("uid=" + key, "ou=People,", "CCID");
+					final Set<String> ids = LDAPHelperRemote.checkLdapInformation("uid=" + key, "ou=People,", "CCID");
 
 					int id = 0;
 
@@ -3248,7 +3249,7 @@ public class TaskQueueUtils {
 			if (db == null)
 				return 0;
 
-			final HashMap<String, Object> domainInfo = LDAPHelper.getInfoDomain(domain);
+			final Map<String, Object> domainInfo = LDAPHelperRemote.getInfoDomain(domain);
 
 			if (domainInfo == null || domainInfo.size() == 0) {
 				logger.severe("Error: cannot find site root configuration in LDAP for domain: " + domain);
@@ -3937,7 +3938,7 @@ public class TaskQueueUtils {
 	private static Set<String> getSiteCloseToSE(final String seName) {
 		final Set<String> ret = new HashSet<>();
 
-		for (final String s : LDAPHelper.checkLdapInformation("(&(closese=" + seName + "))", "ou=Sites,", "ou"))
+		for (final String s : LDAPHelperRemote.checkLdapInformation("(&(closese=" + seName + "))", "ou=Sites,", "ou"))
 			ret.add(s.toUpperCase());
 
 		ret.add(seName.substring(seName.indexOf("::") + 2, seName.lastIndexOf("::")).toUpperCase());

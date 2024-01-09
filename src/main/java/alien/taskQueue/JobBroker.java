@@ -890,7 +890,7 @@ public class JobBroker {
 	private static void updateWithValuesInLDAP(final HashMap<String, Object> matchRequest) {
 		if (!matchRequest.containsKey("CheckedLDAP")) {
 			if (matchRequest.containsKey("CE")) {
-				HashMap<String, Object> CeConfig = null;
+				Map<String, Object> CeConfig = null;
 				if (matchRequest.containsKey("Site") && matchRequest.get("Site") != null) // careful, could contain key that's there but null
 					CeConfig = ConfigUtils.getCEConfigFromLdap(false, matchRequest.get("Site").toString(), matchRequest.get("CE").toString().split("::")[2]);
 

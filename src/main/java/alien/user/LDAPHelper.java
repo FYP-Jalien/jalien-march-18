@@ -361,6 +361,7 @@ public class LDAPHelper {
 	/**
 	 * @param account
 	 * @return the set of emails associated to the given account
+	 * @deprecated
 	 */
 	public static Set<String> getEmails(final String account) {
 		if (account == null || account.length() == 0)
@@ -409,6 +410,7 @@ public class LDAPHelper {
 	/**
 	 * @param domain
 	 * @return the tree for this domain
+	 * @deprecated
 	 */
 	public static HashMap<String, Object> getInfoDomain(final String domain) {
 		// Get the root site config based on domain
@@ -417,6 +419,7 @@ public class LDAPHelper {
 
 	/**
 	 * @return the tree for the VO
+	 * @deprecated
 	 */
 	public static HashMap<String, Object> getVOConfig() {
 		return LDAPHelper.checkLdapTree("(&(objectClass=AliEnVOConfig))", "ou=Config,");

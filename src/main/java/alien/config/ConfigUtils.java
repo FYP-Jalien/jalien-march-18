@@ -37,7 +37,7 @@ import alien.catalogue.access.AuthorizationFactory;
 import alien.monitoring.MonitorFactory;
 import alien.site.Functions;
 import alien.user.AliEnPrincipal;
-import alien.user.LDAPHelper;
+import alien.user.LDAPHelperRemote;
 import alien.user.UserFactory;
 import alien.user.UsersHelper;
 import lazyj.DBFunctions;
@@ -606,19 +606,19 @@ public class ConfigUtils {
 	public static HashMap<String, Object> getConfigFromLdap(final boolean checkContent, final String hostName) {
 		final HashMap<String, Object> configuration = new HashMap<>();
 
-		final HashMap<String, Object> voConfig = LDAPHelper.getVOConfig();
+		final Map<String, Object> voConfig = LDAPHelperRemote.getVOConfig();
 		if (voConfig == null || voConfig.size() == 0)
 			return null;
 
 		// Check if the hostname is used anywhere at a site
-		final Set<String> siteDNsForHostname = LDAPHelper.checkLdapInformation("host=" + hostName, "ou=Sites,", "dn");
+		final Set<String> siteDNsForHostname = LDAPHelperRemote.checkLdapInformation("host=" + hostName, "ou=Sites,", "dn");
 
 		if (checkContent && (siteDNsForHostname == null || siteDNsForHostname.size() == 0)) {
 			logger.severe("Error: " + (siteDNsForHostname == null ? "null" : String.valueOf(siteDNsForHostname.size())) + " entries across all sites for the hostname: " + hostName);
 			return null;
 		}
 
-		HashMap<String, Object> hostConfig = null;
+		Map<String, Object> hostConfig = null;
 		String site = null;
 
 		// siteDNsForHostname might contain more than one site. Let's see if one of them has the configuration
@@ -629,7 +629,7 @@ public class ConfigUtils {
 				site = dn.substring(dn.lastIndexOf('=') + 1);
 
 				// Get the hostConfig from LDAP based on the site and hostname
-				hostConfig = LDAPHelper.checkLdapTree("(&(host=" + hostName + "))", "ou=Config,ou=" + site + ",ou=Sites,", "host");
+				hostConfig = LDAPHelperRemote.checkLdapTree("(&(host=" + hostName + "))", "ou=Config,ou=" + site + ",ou=Sites,", "host");
 
 				if (hostConfig.size() != 0)
 					break;
@@ -657,7 +657,7 @@ public class ConfigUtils {
 		}
 
 		if (hostConfig.containsKey("host_ce")) {
-			final HashMap<String, Object> ceConfig = getCEConfigFromLdap(checkContent, site, hostName);
+			final Map<String, Object> ceConfig = getCEConfigFromLdap(checkContent, site, hostName);
 
 			final String partitions = getPartitions("ALICE::" + site + "::" + hostConfig.get("host_ce"));
 
@@ -668,17 +668,17 @@ public class ConfigUtils {
 			// TODO: check to which partitions it belongs
 		}
 
-		HashMap<String, Object> monaLisaConfig = null;
+		Map<String, Object> monaLisaConfig = null;
 		String MLName = null;
 		if (hostConfig.containsKey("host_monalisa")) {
 			MLName = (String) hostConfig.get("host_monalisa");
 			logger.log(Level.INFO, "MLName: " + MLName);
-			monaLisaConfig = LDAPHelper.checkLdapTree("(&(name=" + MLName + "))", "ou=MonaLisa,ou=Services,ou=" + site + ",ou=Sites,", "monalisa");
+			monaLisaConfig = LDAPHelperRemote.checkLdapTree("(&(name=" + MLName + "))", "ou=MonaLisa,ou=Services,ou=" + site + ",ou=Sites,", "monalisa");
 			logger.log(Level.INFO, "MLConfig: " + monaLisaConfig);
 			configuration.putAll(monaLisaConfig);
 		}
 
-		final HashMap<String, Object> siteConfig = getSiteConfigFromLdap(checkContent, site);
+		final Map<String, Object> siteConfig = getSiteConfigFromLdap(checkContent, site);
 		if (siteConfig == null || siteConfig.size() == 0)
 			return null;
 
@@ -740,8 +740,8 @@ public class ConfigUtils {
 	 * @param site
 	 * @return // root site config based on site name
 	 */
-	public static HashMap<String, Object> getSiteConfigFromLdap(final boolean checkContent, final String site) {
-		final HashMap<String, Object> siteConfig = LDAPHelper.checkLdapTree("(&(ou=" + site + ")(objectClass=AliEnSite))", "ou=Sites,", "site");
+	public static Map<String, Object> getSiteConfigFromLdap(final boolean checkContent, final String site) {
+		final Map<String, Object> siteConfig = LDAPHelperRemote.checkLdapTree("(&(ou=" + site + ")(objectClass=AliEnSite))", "ou=Sites,", "site");
 
 		if (checkContent && siteConfig.size() == 0) {
 			logger.severe("Error: cannot find site root configuration in LDAP for site: " + site);
@@ -756,10 +756,10 @@ public class ConfigUtils {
 	 * @param hostname
 	 * @return CE information based on the site and ce name for the host
 	 */
-	public static HashMap<String, Object> getCEConfigFromLdap(final boolean checkContent, final String site, final String hostname) {
-		final HashMap<String, Object> ceConfig = LDAPHelper.checkLdapTree("(&(host=" + hostname + "))", "ou=CE,ou=Services,ou=" + site + ",ou=Sites,", "ce");
+	public static Map<String, Object> getCEConfigFromLdap(final boolean checkContent, final String site, final String hostname) {
+		final Map<String, Object> ceConfig = LDAPHelperRemote.checkLdapTree("(&(host=" + hostname + "))", "ou=CE,ou=Services,ou=" + site + ",ou=Sites,", "ce");
 
-		if (checkContent && ceConfig.size() == 0) {
+		if (checkContent && (ceConfig == null || ceConfig.size() == 0)) {
 			logger.severe("Error: cannot find ce configuration in LDAP for CE: " + hostname);
 			return null;
 		}
@@ -772,7 +772,7 @@ public class ConfigUtils {
 	 * @return partitions for cename
 	 */
 	public static String getPartitions(final String cename) {
-		final Set<String> partitions = LDAPHelper.checkLdapInformation("(&(CEname=" + cename + "))", "ou=Partitions,", "name");
+		final Set<String> partitions = LDAPHelperRemote.checkLdapInformation("(&(CEname=" + cename + "))", "ou=Partitions,", "name");
 
 		final StringBuilder sb = new StringBuilder(",");
 

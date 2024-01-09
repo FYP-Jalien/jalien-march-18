@@ -9,7 +9,7 @@ import java.util.logging.Logger;
 
 import alien.config.ConfigUtils;
 import alien.site.SiteMap;
-import alien.user.LDAPHelper;
+import alien.user.LDAPHelperRemote;
 import lazyj.DBFunctions;
 
 /**
@@ -167,7 +167,7 @@ public class CE implements Serializable, Comparable<CE> {
 	 * @return value of the field
 	 */
 	private static String getLdapContentCE(final String ouCE, final String ce, final String parameter, final String defaultString) {
-		final Set<String> param = LDAPHelper.checkLdapInformation("name=" + ce, ouCE, parameter);
+		final Set<String> param = LDAPHelperRemote.checkLdapInformation("name=" + ce, ouCE, parameter);
 		String joined = "";
 		if (param.size() == 0)
 			joined = defaultString;

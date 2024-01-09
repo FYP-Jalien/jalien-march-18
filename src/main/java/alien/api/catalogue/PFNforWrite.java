@@ -20,6 +20,7 @@ import alien.se.SE;
 import alien.se.SEUtils;
 import alien.user.AliEnPrincipal;
 import alien.user.LDAPHelper;
+import alien.user.LDAPHelperRemote;
 
 /**
  *
@@ -94,7 +95,7 @@ public class PFNforWrite extends Request {
 		}
 
 		if ((this.ses == null || this.ses.size() == 0) && (this.qos == null || this.qos.size() < 1)) {
-			Set<String> defaultQos = LDAPHelper.checkLdapInformation("(objectClass=AliEnVOConfig)", "ou=Config,", "sedefaultQosandCount");
+			Set<String> defaultQos = LDAPHelperRemote.checkLdapInformation("(objectClass=AliEnVOConfig)", "ou=Config,", "sedefaultQosandCount");
 
 			if (defaultQos == null || defaultQos.isEmpty()) {
 				logger.log(Level.WARNING, "No specification of storages and no default LDAP entry found, using the default disk=2 value");
