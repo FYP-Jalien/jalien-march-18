@@ -63,6 +63,7 @@ import lazyj.Format;
 import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
 import lia.util.process.ExternalProcesses;
+import utils.Signals;
 
 /**
  * Job execution wrapper, running an embedded Tomcat server for in/out-bound communications
@@ -529,13 +530,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		try {
-			sun.misc.Signal.handle(new sun.misc.Signal("INT"), sig -> {
+			Signals.addHandler("INT", () -> {
 				killSigReceived = true;
 				logger.log(Level.SEVERE, "JobWrapper: SIGINT received. Shutting down NOW!"); // Handled by JA
 				putJobTrace("JobWrapper: SIGINT received. Shutting down NOW!");
 			});
 
-			sun.misc.Signal.handle(new sun.misc.Signal("TERM"), sig -> {
+			Signals.addHandler("TERM", () -> {
 				killSigReceived = true;
 				System.err.println("SIGTERM received. Killing payload and proceeding to upload.");
 				putJobTrace("JobWrapper: SIGTERM received. Killing payload and proceeding to upload.");
@@ -588,8 +589,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (!commander.q_api.recordPreemption(queueId, 0, System.currentTimeMillis(), 0, 0, 0, resubmission, hostName, ce, 0, 0, 0, username, 0, 0, 0, 0)) {
 			return false;
 		}
-		//To be taken out when not killing
-		//changeStatus(JobStatus.ERROR_E);
+		// To be taken out when not killing
+		// changeStatus(JobStatus.ERROR_E);
 		return true;
 	}
 
@@ -611,7 +612,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (elapsedTime < 5 * 60) { // We check if it is from less than five minutes ago
 				return recordKilling();
 			}
-		} else
+		}
+		else
 			logger.log(Level.INFO, "Did not get any OOM error from dmesg");
 		return false;
 	}
@@ -900,8 +902,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			for (final Map.Entry<String, String> entry : packs.entrySet())
 				packages.append(voalice + entry.getKey() + "::" + entry.getValue() + ",");
 
-//			if (!packs.containsKey("APISCONFIG"))
-//				packages.append(voalice + "APISCONFIG,");
+			// if (!packs.containsKey("APISCONFIG"))
+			// packages.append(voalice + "APISCONFIG,");
 
 			final String packagestring = packages.substring(0, packages.length() - 1);
 

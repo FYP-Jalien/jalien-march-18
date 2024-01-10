@@ -24,6 +24,7 @@ import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
 import lia.util.process.ExternalProcess.ExitStatus;
 import utils.ProcessWithTimeout;
+import utils.Signals;
 
 /**
  * @author ron
@@ -78,7 +79,7 @@ public class JSh {
 		osName = getOsName();
 
 		try {
-			sun.misc.Signal.handle(new sun.misc.Signal("INT"), sig -> {
+			Signals.addHandler("INT", () -> {
 				if (boombox != null)
 					boombox.callJBoxGetString("SIGINT");
 			});
