@@ -33,9 +33,9 @@ public class InactiveJobHandler extends Optimizer {
         int frequency = (int) this.getSleepPeriod();
 
         while (true) {
-//            final boolean updated = DBSyncUtils.updatePeriodic(frequency, InactiveJobHandler.class.getCanonicalName());
+            final boolean updated = DBSyncUtils.updatePeriodic(frequency, InactiveJobHandler.class.getCanonicalName());
             try {
-                if (true) {
+                if (updated) {
                     moveInactiveJobStates();
                     logger.log(Level.INFO, "InactiveJobHandler sleeping for " + this.getSleepPeriod() + " ms");
                     sleep(this.getSleepPeriod());
