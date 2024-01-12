@@ -24,7 +24,6 @@ import alien.api.Request;
 import alien.catalogue.access.AuthorizationFactory;
 import alien.config.ConfigUtils;
 import alien.user.AliEnPrincipal;
-import alien.user.LDAPHelper;
 import alien.user.LDAPHelperRemote;
 import alien.user.UserFactory;
 import io.github.olivierlemasle.ca.CA;
