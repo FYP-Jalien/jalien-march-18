@@ -6,15 +6,15 @@ import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
 import alien.optimizers.Optimizer;
 import alien.priority.JobDto;
+import alien.taskQueue.JobStatus;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
 
 import java.sql.Connection;
 import java.time.Duration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.Map;
-import java.util.Set;
+import java.util.Objects;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -23,6 +23,8 @@ public class CheckJobStatus extends Optimizer {
     static final Logger logger = ConfigUtils.getLogger(PriorityReconciliationService.class.getCanonicalName());
 
     static final Monitor monitor = MonitorFactory.getMonitor(PriorityReconciliationService.class.getCanonicalName());
+
+    static int counter = 0;
 
     @Override
     public void run() {
@@ -61,34 +63,103 @@ public class CheckJobStatus extends Optimizer {
 
         try (Timing t = new Timing(monitor, "CheckJobStatus")) {
             t.startTiming();
-            getMasterAndSubjobs(db);
+            StringBuilder query = synchronizeMasterJobStatusWithSubjobs(getMasterAndSubjobs(db));
+            logger.log(Level.INFO, "After synchronizeMasterJobStatusWithSubjobs, before DB write ");
+            boolean result = writeToDb(query, db, dbdev);
             t.endTiming();
-            logger.log(Level.INFO, "CheckJobStatus timing: " + t.getMillis());
+            logger.log(Level.INFO, "CheckJobStatus executed in: " + t.getMillis());
 
         }
 
     }
-    // subjob is set to active, master is set to SPLIT
-    private void activeMasterJob(){}
-    private Map<Integer, Map<Integer, JobDto>> getMasterAndSubjobs(DBFunctions db) {
 
+    private boolean writeToDb(StringBuilder query, DBFunctions db, DBFunctions dbdev) {
+        //TODO
+        return false;
+    }
+
+    private StringBuilder synchronizeMasterJobStatusWithSubjobs(Map<Long, Map<Long, JobDto>> masterAndSubJobs) {
+        logger.log(Level.INFO, "synchronizing master and subjobs... ");
+        StringBuilder updateQuery = new StringBuilder("INSERT INTO QUEUE (queueId, statusId) VALUES ");
+
+        for (Map.Entry<Long, Map<Long, JobDto>> entry : masterAndSubJobs.entrySet()) {
+            Long masterJobId = entry.getKey();
+            logger.log(Level.INFO, "masterJobId: " + masterJobId);
+            Map<Long, JobDto> jobs = entry.getValue();
+            JobDto jobDto = jobs.get(masterJobId);
+            if(jobDto == null){
+                logger.log(Level.INFO, "jobDto is null");
+                continue;
+            }
+            int masterStatusId = jobDto.getStatusId();
+            boolean allSubjobsFinal = isSubjobsFinal(jobs, masterJobId);
+
+            if (masterStatusId == JobStatus.SPLIT.getAliEnLevel()) {
+                logger.log(Level.INFO, "first IF. Master = SPLIT: " + masterStatusId);
+                if (allSubjobsFinal) {
+                    jobDto.setStatusId(JobStatus.DONE.getAliEnLevel());
+                    appendUpdateQuery(updateQuery, masterJobId, JobStatus.DONE.getAliEnLevel());
+
+                }
+            } else if (masterStatusId == JobStatus.DONE.getAliEnLevel() || masterStatusId == JobStatus.KILLED.getAliEnLevel()) {
+                if (!allSubjobsFinal) {
+                    logger.log(Level.INFO, "master is final, but subjobs are not. moving to split: " + masterStatusId);
+                    jobDto.setStatusId(JobStatus.SPLIT.getAliEnLevel());
+                    appendUpdateQuery(updateQuery, masterJobId, JobStatus.SPLIT.getAliEnLevel());
+                }
+                // Subjobs and master are final - Nothing happens
+            } else {
+                if (allSubjobsFinal) {
+                    logger.log(Level.INFO, "subjobs are all final: " + masterStatusId);
+                    jobDto.setStatusId(JobStatus.DONE.getAliEnLevel());
+                    appendUpdateQuery(updateQuery, masterJobId, JobStatus.DONE.getAliEnLevel());
+                } else {
+                    logger.log(Level.INFO, "subjobs have running, moving master to split: " + masterStatusId);
+                    jobDto.setStatusId(JobStatus.SPLIT.getAliEnLevel());
+                    appendUpdateQuery(updateQuery, masterJobId, JobStatus.SPLIT.getAliEnLevel());
+                }
+            }
+        }
+
+        updateQuery.deleteCharAt(updateQuery.length() - 2).append("ON DUPLICATE KEY UPDATE statusId = VALUES(statusId)");
+
+        logger.log(Level.INFO, "updateQuery: " + updateQuery);
+        logger.log(Level.INFO, "counter: " + counter);
+        logger.log(Level.INFO, "masterAndSubJobs size: " + masterAndSubJobs.size());
+        return updateQuery;
+    }
+
+    private void appendUpdateQuery(StringBuilder updateQuery, Long masterJobId, int statusId) {
+        updateQuery
+                .append("(")
+                .append(masterJobId)
+                .append(", ")
+                .append(statusId)
+                .append("), ");
+        counter++;
+    }
+
+    private boolean isSubjobsFinal(Map<Long, JobDto> jobs, long masterJobId) {
+        return jobs.entrySet().parallelStream()
+                .filter(s -> !Objects.equals(s.getKey(), masterJobId) && s.getValue().getSplit() > 0)
+                .allMatch(s -> s.getValue().getStatusId() == JobStatus.DONE.getAliEnLevel() || s.getValue().getStatusId() == JobStatus.KILLED.getAliEnLevel());
+    }
+
+    private Map<Long, Map<Long, JobDto>> getMasterAndSubjobs(DBFunctions db) {
         db.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
-        Map<Integer, Map<Integer, JobDto>> relatedMasterAndSubjobs = new HashMap<>();
+        Map<Long, Map<Long, JobDto>> relatedMasterAndSubjobs = new HashMap<>();
         db.query("select split, queueId, statusId from QUEUE where masterjob = 1 or split > 0");
-        Set<Integer> test = new HashSet<>();
         while (db.moveNext()) {
-            int split = db.geti("split");
-            int queueId = db.geti("queueId");
+            long split = db.getl("split");
+            long queueId = db.getl("queueId");
             int statusId = db.geti("statusId");
-            JobDto jobDto = new JobDto(queueId, split, statusId);
 
-            test.add(split);
-            relatedMasterAndSubjobs.computeIfAbsent(split, k -> new HashMap<>()).putIfAbsent(queueId, jobDto);
+            JobDto jobDto = new JobDto(queueId, split, statusId);
+            long key = (split == 0) ? queueId : split;
+            relatedMasterAndSubjobs.computeIfAbsent(key, k -> new HashMap<>()).putIfAbsent(queueId, jobDto);
 
         }
-        logger.log(Level.INFO, "relatedMasterAndSubjobs: " + relatedMasterAndSubjobs.keySet());
         logger.log(Level.INFO, "relatedMasterAndSubjobs map size: " + relatedMasterAndSubjobs.keySet().size());
-        logger.log(Level.INFO, "test: " + test.size());
         return relatedMasterAndSubjobs;
     }
 

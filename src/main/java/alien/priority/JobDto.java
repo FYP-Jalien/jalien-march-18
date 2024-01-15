@@ -2,12 +2,12 @@ package alien.priority;
 
 public class JobDto {
 
-    private int queueId;
-    private int split;
+    private long queueId;
+    private long split;
 
     private int statusId;
 
-    public JobDto(int queueId, int split, int statusId) {
+    public JobDto(long queueId, long split, int statusId) {
         this.queueId = queueId;
         this.split = split;
         this.statusId = statusId;
@@ -16,19 +16,19 @@ public class JobDto {
     public JobDto() {
     }
 
-    public int getQueueId() {
+    public long getQueueId() {
         return queueId;
     }
 
-    public void setQueueId(int queueId) {
+    public void setQueueId(long queueId) {
         this.queueId = queueId;
     }
 
-    public int getSplit() {
+    public long getSplit() {
         return split;
     }
 
-    public void setSplit(int split) {
+    public void setSplit(long split) {
         this.split = split;
     }
 
