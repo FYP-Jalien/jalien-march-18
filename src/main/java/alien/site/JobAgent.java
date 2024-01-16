@@ -79,8 +79,6 @@ import apmon.MonitoredJob;
 import lazyj.ExtProperties;
 import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
-import lia.util.process.ExternalProcess.ExecutorFinishStatus;
-import lia.util.process.ExternalProcess.ExitStatus;
 import lia.util.process.ExternalProcesses;
 import utils.ProcessWithTimeout;
 import utils.Signals;
@@ -561,16 +559,9 @@ public class JobAgent implements Runnable {
 				}
 
 				// Verify environment if there are no containers, before matching
-				if (containerizer == null) {
-					if (env.getOrDefault("ALIENV_ERRORS", "").contains("TRUE") || env.getOrDefault("XRDCP_ERRORS", "").contains("TRUE")) {
-						logger.log(Level.SEVERE, "The environment on this node appears to be broken. Please do \"" + CVMFS.getAlienvPrint() + "\" for more debug info.");
-						throw new EOFException("Job matching aborted due to potentially misconfigured environment");
-					}
-					final ExitStatus sanityCheck = ProcessWithTimeout.executeCommand(List.of("ps", "--version"), false, true, 1, TimeUnit.MINUTES);
-					if (sanityCheck.getExecutorFinishStatus() != ExecutorFinishStatus.NORMAL || sanityCheck.getExtProcExitStatus() != 0 || !sanityCheck.getStdErr().isBlank()) {
-						logger.log(Level.SEVERE, "Possibly broken environment or process limit reached: " + sanityCheck);
-						throw new EOFException("Job matching aborted due to failed sanity check");
-					}
+				if (containerizer == null && !env.getOrDefault("DISABLE_CONTAINER_ENFORCE", "").toLowerCase().contains("true")) {
+					logger.log(Level.SEVERE, "This host does not appear to support containers. Please verify that user namespaces are enabled, or disable this check in container.properties");
+					throw new EOFException("Job matching aborted due to missing containers");
 				}
 
 				setStatus(jaStatus.REQUESTING_JOB);
@@ -746,8 +737,8 @@ public class JobAgent implements Runnable {
 
 			logger.log(Level.INFO, "Started JA with: " + jdl);
 
-			final String version = !Version.getTagFromEnv().isEmpty() ? Version.getTagFromEnv() : "/Git: " + Version.getGitHash() + ". Builddate: " + Version.getCompilationTimestamp();
-			putJobTrace("Running JAliEn JobAgent" + version + " on " + hostName);
+			final String version = !Version.getTag().isEmpty() ? Version.getTag() : "/Git: " + Version.getGitHash() + ". Builddate: " + Version.getCompilationTimestamp();
+			putJobTrace("Running JAliEn JobAgent " + version + " on " + hostName);
 
 			if (env.getOrDefault("UNAME_M", "").contains("aarch64"))
 				putJobTrace("Warning: this job will be executed on an aarch64 worker");

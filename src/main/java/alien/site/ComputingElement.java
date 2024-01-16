@@ -461,6 +461,8 @@ public final class ComputingElement extends Thread {
 				before += "export META_VARIABLES='" + containerConfig.gets("meta.variables") + "'\n";
 			if (!containerConfig.gets("job.container.path").isBlank())
 				before += "export JOB_CONTAINER_PATH='" + containerConfig.gets("job.container.path") + "'\n";
+			if (!containerConfig.gets("disable.enforce").isBlank())
+				before += "export DISABLE_CONTAINER_ENFORCE='" + containerConfig.gets("disable.enforce") + "'\n";
 		}
 
 		//
@@ -469,13 +471,13 @@ public final class ComputingElement extends Thread {
 
 		before += startup_customization(0);
 
-		before += "export ALIENV=\"$( (" + CVMFS.getAlienvPrint() + ") 2> >(if grep -q 'ERROR'; then echo 'export ALIENV_ERRORS=TRUE;'; fi;) )" + "\"\n";
+//		before += "export ALIENV=\"$( (" + CVMFS.getAlienvPrint() + ") 2> >(if grep -q 'ERROR'; then echo 'export ALIENV_ERRORS=TRUE;'; fi;) )" + "\"\n";
 
 		before += startup_customization(1);
 
-		before += "source <( echo $ALIENV ); " + "\n";
+//		before += "source <( echo $ALIENV ); " + "\n";
 
-		before += "export XRDCP_ERRORS=$(xrdcp 2> >(if grep -q 'error\\|not found' ; then echo 'TRUE'; fi;) ) " + "\n";
+//		before += "export XRDCP_ERRORS=$(xrdcp 2> >(if grep -q 'error\\|not found' ; then echo 'TRUE'; fi;) ) " + "\n";
 
 		before += "export JALIEN_JOBAGENT_CMD=\"" + getStartup() + "\"\n";
 
@@ -540,7 +542,7 @@ public final class ComputingElement extends Thread {
 			javaDir = CVMFS.getJava64Dir() + "/";
 
 		final String javaCmd = "java -client -Xms16M -Xmx128M -Djdk.lang.Process.launchMechanism=vfork -XX:+UseSerialGC -cp";
-		final String jarPath = "$(dirname $(which jalien))/../lib/alien-users.jar";
+		final String jarPath = CVMFS.getJarPath();
 		final String jarClass = "alien.site.JobRunner";
 
 		final String jarPathCustom = ConfigUtils.getConfiguration("version").gets("custom.jobagent.jar");
