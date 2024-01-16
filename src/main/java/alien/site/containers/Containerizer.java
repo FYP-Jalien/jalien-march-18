@@ -195,7 +195,7 @@ public abstract class Containerizer {
 	 */
 	protected static final String sourceEnvCmd(){
 		final String containerImgPathExport = " && echo export JOB_CONTAINER_PATH=" + containerImgPath;
-		return "source <( " + CVMFS.getAlienvPrint() + apmonConfig + alienSite + cudaDevices + rocrDevices + containerImgPathExport + " ); ";
+		return "source <( " + apmonConfig + alienSite + cudaDevices + rocrDevices + containerImgPathExport + " ); ";
 	}
 
 	/**
