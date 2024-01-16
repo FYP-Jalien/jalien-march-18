@@ -604,6 +604,7 @@ public final class ComputingElement extends Thread {
 	/**
 	 * Prepares a hash to create the sitemap
 	 */
+	@SuppressWarnings("unchecked")
 	void getSiteMap() {
 		final HashMap<String, String> smenv = new HashMap<>();
 

@@ -57,7 +57,6 @@ import alien.quotas.QuotaUtilities;
 import alien.shell.ErrNo;
 import alien.user.AliEnPrincipal;
 import alien.user.AuthorizationChecker;
-import alien.user.LDAPHelper;
 import alien.user.LDAPHelperRemote;
 import alien.user.UsersHelper;
 import apmon.ApMon;
