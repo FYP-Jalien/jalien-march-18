@@ -74,7 +74,7 @@ public class CheckJobStatus extends Optimizer {
     }
 
     private boolean writeToDb(StringBuilder query, DBFunctions db, DBFunctions dbdev) {
-        //TODO
+        dbdev.query(query.toString());
         return false;
     }
 
@@ -95,8 +95,9 @@ public class CheckJobStatus extends Optimizer {
             boolean allSubjobsFinal = isSubjobsFinal(jobs, masterJobId);
 
             if (masterStatusId == JobStatus.SPLIT.getAliEnLevel()) {
-                logger.log(Level.INFO, "first IF. Master = SPLIT: " + masterStatusId);
+                logger.log(Level.INFO, "Master = SPLIT: " + masterStatusId);
                 if (allSubjobsFinal) {
+                    logger.log(Level.INFO, "Master = SPLIT, but all subjobs final. Moving master to final" + masterStatusId);
                     jobDto.setStatusId(JobStatus.DONE.getAliEnLevel());
                     appendUpdateQuery(updateQuery, masterJobId, JobStatus.DONE.getAliEnLevel());
 
