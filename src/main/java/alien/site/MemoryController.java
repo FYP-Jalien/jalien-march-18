@@ -23,8 +23,15 @@ import alien.shell.commands.JAliEnCOMMander;
 import lia.util.process.ExternalProcess.ExitStatus;
 import utils.ProcessWithTimeout;
 
+import org.json.simple.JSONObject;
+import org.nfunk.jep.JEP;
+import java.lang.module.ModuleDescriptor.Version;
+import java.net.URL;
+import java.net.URLEncoder;
 import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.io.StringReader;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 
 /**
@@ -61,13 +68,21 @@ public class MemoryController implements Runnable {
 
 	protected static int preemptionRound;
 
+	private final String memoryControllerUrl = "http://alimonitor.cern.ch/memorycontroller/";
+
+	protected static String htCondorLimitParser;
+	protected static double htCondorJobMemoryLimit;
+	private static boolean coherentVersions;
+
 	protected static boolean debugMemoryController = false;
 
-	final static long SLOT_MEMORY_MARGIN = 50000; // Margin left to the slot before taking the preemption decision. 50MB * NCORES
-	final static long SLOT_SWAP_MARGIN = 1000000; // Margin left to the machine swap before taking the preemption decision. 1GB
-	final static long MACHINE_MEMORY_MARGIN = 1000000; // Margin left to the whole machine before taking the preemption decision. 1GB
+	static long SLOT_MEMORY_MARGIN = 50000; // Margin left to the slot before taking the preemption decision. 50MB * NCORES
+	static long SLOT_SWAP_MARGIN = 1000000; // Margin left to the machine swap before taking the preemption decision. 1GB
+	static long MACHINE_MEMORY_MARGIN = 1000000; // Margin left to the whole machine before taking the preemption decision. 1GB
 	final static double DEFAULT_CGROUP_NOT_CONFIG = 9007199254740988d; // Default set to PAGE_COUNTER_MAX,which is LONG_MAX/PAGE_SIZE on 64-bit platform. In MB
 	final static int EVALUATION_FREQUENCY = 5; // Seconds between iterations
+
+	static int MIN_MEMORY_PER_CORE = 2000000; // 2GB guaranteed memory per core
 
 	public MemoryController(long cpus) {
 		cgroupRootPath = "";
@@ -79,39 +94,174 @@ public class MemoryController implements Runnable {
 		slotCPUs = cpus;
 		swapUsageAllowed = true;
 		preemptionRound = 0;
+		coherentVersions = true;
+		setMargins();
 		registerCgroupPath();
 		registerHTCondorPeriodicRemove();
+		registerUlimitHard();
 		logger.log(Level.INFO, "Parsed global memory limit of " + memHardLimit);
 	}
 
 	/**
-	 * HTCondor can kill our jobs through the defined periodic remove policies in the job classad or in the submitted macro
+	 * Crawls the dynamically configured margins in monalisa for the slot and the whole machine
+	 */
+	private void setMargins() {
+		String nodeHostName = JobAgent.siteMap.getOrDefault("Localhost", "UNKNOWN").toString();
+		String alienSiteName = JobAgent.siteMap.getOrDefault("Site", "UNKNOWN").toString();
+		try {
+			final URL url = new URL(memoryControllerUrl + "limits.jsp?hostname=" + URLEncoder.encode(nodeHostName, StandardCharsets.UTF_8) +
+					"&ce_name=" + URLEncoder.encode(alienSiteName, StandardCharsets.UTF_8));
+			logger.log(Level.INFO, "Crawling limits in monalisa " + url);
+			JSONObject limits = JobAgent.makeRequest(url, nodeHostName, alienSiteName, logger);
+			if (limits != null && limits.keySet().size() > 0) {
+				for (Object limit_key : limits.keySet()) {
+					switch (limit_key.toString()) {
+						case "slot_memory_margin":
+							SLOT_MEMORY_MARGIN = Long.parseLong(limits.get(limit_key).toString());
+							logger.log(Level.INFO, "Setting SLOT_MEMORY_MARGIN to " + SLOT_MEMORY_MARGIN);
+							break;
+						case "slot_swap_margin":
+							SLOT_SWAP_MARGIN = Long.parseLong(limits.get(limit_key).toString());
+							logger.log(Level.INFO, "Setting SLOT_SWAP_MARGIN to " + SLOT_SWAP_MARGIN);
+							break;
+						case "machine_memory_margin":
+							MACHINE_MEMORY_MARGIN = Long.parseLong(limits.get(limit_key).toString());
+							logger.log(Level.INFO, "Setting MACHINE_MEMORY_MARGIN to " + MACHINE_MEMORY_MARGIN);
+							break;
+						case "min_memory_per_core":
+							MIN_MEMORY_PER_CORE = Integer.parseInt(limits.get(limit_key).toString());
+							logger.log(Level.INFO, "Setting MIN_MEMORY_PER_CORE to " + MIN_MEMORY_PER_CORE);
+							break;
+						case "debug_memory_controller":
+							int debugAux = Integer.parseInt(limits.get(limit_key).toString());
+							debugMemoryController = (debugAux != 0);
+							logger.log(Level.INFO, "Setting debugMemoryControler to " + debugMemoryController);
+							break;
+						default:
+							break;
+					}
+				}
+			}
+
+		}
+		catch (final IOException e) {
+			logger.log(Level.SEVERE, "Failed to get Memory Controller constraints list for node " + nodeHostName + " in " +
+					alienSiteName, e);
+		}
+	}
+
+	/*
+	 * Executes and parses the ulimit hard limits for sites in which no limit is defined using cgroups or HTCondor classad expressions
+	 */
+	// We have seen how some ARC sites do only have as their definition for slot memory the ulimit definition
+	private static void registerUlimitHard() {
+		try {
+			if (memHardLimit == 0) {
+				String limitContents = Files.readString(Path.of("/proc/" + MonitorFactory.getSelfProcessID() + "/limits"));
+				try (BufferedReader brLimits = new BufferedReader(new StringReader(limitContents))) {
+					String s;
+					while ((s = brLimits.readLine()) != null) {
+						if (s.startsWith("Max resident set")) {
+							s = s.substring(s.indexOf("et") + 3);
+							String[] columns = s.split("\\s+");
+							if (!columns[2].equals("unlimited")) {
+								memHardLimit = Double.parseDouble(columns[2]);
+								memHardLimit = memHardLimit / 1024;
+								if (debugMemoryController)
+									logger.log(Level.INFO, "Set new memory hard limit from proc limits file to " + memHardLimit);
+							}
+							else {
+								if (debugMemoryController)
+									logger.log(Level.INFO, "No limit imposed in memory from proc limits file");
+							}
+						}
+					}
+				}
+			}
+		}
+		catch (NumberFormatException | IOException nfe) {
+			logger.log(Level.INFO, "Could not parse memory limit from proc file", nfe);
+		}
+	}
+
+	/**
+	 * HTCondor can kill our jobs through the defined periodic remove policies in the job classad or in the SYSTEM_PERIODIC_REMOVE macro (This is set in master, so we can not access). Parsing of PeriodicRemove.
 	 */
 	private void registerHTCondorPeriodicRemove() {
 		// Parse environment SYSTEM_PERIODIC_REMOVE
 
 		// Parse job classad periodic_remove
-		String jobClassad = (String) JobAgent.siteMap.get("CONDOR_JOB_CLASSAD_CONTENTS");
-		if (jobClassad != null && !jobClassad.isBlank() && !jobClassad.isEmpty()) {
-			String s;
-			try (BufferedReader br = new BufferedReader(new StringReader(jobClassad))) {
-				while ((s = br.readLine()) != null) {
-					if (s.startsWith("JobMemoryLimit"))
-						break;
+		try {
+			String jobAd = System.getenv().getOrDefault("_CONDOR_JOB_AD", "");
+			if (!jobAd.isBlank() && !jobAd.isEmpty()) {
+				final List<String> adLines = Files.readAllLines(Paths.get(jobAd));
+				for (final String line : adLines) {
+					if (line.startsWith("JobMemoryLimit")) {
+						htCondorJobMemoryLimit = Double.valueOf(line.split("=")[1]).doubleValue();
+						swapUsageAllowed = false;
+					}
+
+					if (line.startsWith("PeriodicRemove") && line.contains("ResidentSetSize")) {
+						String substring = line.substring(line.indexOf("ResidentSetSize"));
+						if (substring.contains("||"))
+							substring = substring.substring(substring.indexOf(">"), substring.indexOf("||"));
+						else
+							substring = substring.substring(substring.indexOf(">"));
+						substring = substring.replace("(", "").replace(")", "");
+						substring = "ResidentSetSize " + substring + "-" + SLOT_MEMORY_MARGIN * slotCPUs;
+						htCondorLimitParser = substring;
+						logger.log(Level.INFO, "Parsed PeriodicRemove expression from HTCondor classad: " + htCondorLimitParser);
+					}
 				}
-				if (s != null)
-					logger.log(Level.INFO, "Parsed memory limit for periodic_remove in classad is " + s + " kB");
-				if (s != null && !s.isBlank() && !s.isEmpty()) {
-					double tmpMemHardLimit = Double.valueOf(s.split("=")[1]).doubleValue();
-					if (memHardLimit == 0 || tmpMemHardLimit < memHardLimit)
-						memHardLimit = tmpMemHardLimit;
-					swapUsageAllowed = false;
+				if (CgroupUtils.haveCgroupsv2()) {
+					String machineAd = System.getenv().getOrDefault("_CONDOR_MACHINE_AD", "");
+					final List<String> machineAdLines = Files.readAllLines(Paths.get(machineAd));
+					for (final String line : machineAdLines) {
+						if (line.startsWith("CondorVersion")) {
+							String versionStr = line.substring(line.indexOf(":") + 2);
+							int idx = versionStr.indexOf(" ");
+							String parsedVersion = versionStr.substring(0, idx);
+							logger.log(Level.INFO, "Running HTCondor version " + parsedVersion);
+							Version condorVersion = Version.parse(parsedVersion);
+							Version minimalVersion = Version.parse("23.1.0");
+							if (condorVersion.compareTo(minimalVersion) >= 0) {
+								if (debugMemoryController)
+									logger.log(Level.INFO, "Versions ok. Can use HTCondor parsing");
+							}
+							else {
+								coherentVersions = false;
+								if (debugMemoryController)
+									logger.log(Level.INFO, "Version mismatch. Unable to use HTCondor parsing");
+							}
+						}
+					}
 				}
-			}
-			catch (final IOException | IllegalArgumentException e) {
-				logger.log(Level.WARNING, "Found exception while processing job classad exploration ", e);
 			}
 		}
+		catch (final IOException | IllegalArgumentException e) {
+			logger.log(Level.WARNING, "Found exception while processing job classad exploration ", e);
+		}
+
+	}
+
+	/*
+	 * Evaluates the expression set in the classad
+	 *
+	 * @return Wether the condition evaluates to true
+	 */
+	protected static double parseClassAdLimitExpr(Double ResidentSetSize) {
+		final JEP jep = new JEP();
+
+		jep.addStandardFunctions();
+		jep.addStandardConstants();
+
+		jep.setAllowAssignment(true);
+		jep.addVariable("ResidentSetSize", ResidentSetSize);
+		jep.addVariable("JobMemoryLimit", Double.valueOf(htCondorJobMemoryLimit));
+		jep.parseExpression(htCondorLimitParser);
+		if (debugMemoryController)
+			logger.log(Level.INFO, "Evaluating HTCondor PeriodicRemove expression. RSS=" + ResidentSetSize + " JobMemoryLimit=" + htCondorJobMemoryLimit + " RESULT=" + jep.getValueAsObject());
+		return jep.getValue();
 	}
 
 	/**
@@ -170,6 +320,9 @@ public class MemoryController implements Runnable {
 		}
 	}
 
+	/*
+	 * Parses cgroupv2 memory limits
+	 */
 	private static double getCgroupV2Limits(String constraint) throws IOException {
 		double tmpMemHardLimit;
 		String memLimitContents = Files.readString(Path.of(cgroupRootPath + constraint));
@@ -187,6 +340,9 @@ public class MemoryController implements Runnable {
 
 	}
 
+	/*
+	 * Parses cgroup path from /proc files
+	 */
 	protected static String parseCgroupsPath(boolean usingCgroupsv2) {
 		try {
 			String cgroupContents = Files.readString(Path.of("/proc/" + MonitorFactory.getSelfProcessID() + "/cgroup"));
@@ -222,22 +378,28 @@ public class MemoryController implements Runnable {
 		return cgroupId;
 	}
 
+	/*
+	 * Gets process tree of processes in cgroup. For each it gets PID, consumed PSS and process name
+	 *
+	 * @return list of process descriptions
+	 */
 	public static ArrayList<String> getCgroupProcessTree(String procsFile) {
 		ArrayList<Integer> processPids = new ArrayList<>();
 		try {
-			Scanner scan = new Scanner (new File (procsFile));
+			Scanner scan = new Scanner(new File(procsFile));
 			while (scan.hasNextInt()) {
 				int procPid = scan.nextInt();
 				processPids.add(Integer.valueOf(procPid));
 			}
-		} catch (IOException e) {
-			logger.log(Level.WARNING, "Exception while processing " + procsFile,e);
+		}
+		catch (IOException e) {
+			logger.log(Level.WARNING, "Exception while processing " + procsFile, e);
 		}
 		ArrayList<String> processInfo = new ArrayList<>();
-		HashMap<Integer,String> processCmd = getProcessesCmd(processPids);
+		HashMap<Integer, String> processCmd = getProcessesCmd(processPids);
 		HashMap<Integer, Long> processPss = getProcessesPSS(processPids);
 		LinkedHashMap<Integer, Long> sortedPSSMap = processPss.entrySet().stream().sorted(Map.Entry.comparingByValue(Comparator.reverseOrder()))
-				.collect(Collectors.toMap(Map.Entry::getKey,Map.Entry::getValue,(oldValue, newValue) -> oldValue, LinkedHashMap::new));
+				.collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue, (oldValue, newValue) -> oldValue, LinkedHashMap::new));
 		for (Integer pid : sortedPSSMap.keySet()) {
 			if (processCmd.containsKey(pid))
 				processInfo.add(sortedPSSMap.get(pid) + " MB --> " + String.join(" ", processCmd.get(pid)));
@@ -251,8 +413,13 @@ public class MemoryController implements Runnable {
 		return processInfo;
 	}
 
-	private static HashMap<Integer,String> getProcessesCmd(ArrayList<Integer> processPids) {
-		HashMap<Integer,String> processCmd = new HashMap<>();
+	/*
+	 * Gets process names for list of given processes PIDs
+	 *
+	 * @return mapping of PID - process name
+	 */
+	private static HashMap<Integer, String> getProcessesCmd(ArrayList<Integer> processPids) {
+		HashMap<Integer, String> processCmd = new HashMap<>();
 		try {
 			ExitStatus exitStatus = ProcessWithTimeout.executeCommand(Arrays.asList("ps", "-eo", "pid,command", "--sort", "-rss"), false, true, 60, TimeUnit.SECONDS);
 			String[] psOutput = exitStatus.getStdOut().split("\n");
@@ -274,7 +441,12 @@ public class MemoryController implements Runnable {
 		return processCmd;
 	}
 
-	private static HashMap<Integer,Long> getProcessesPSS(ArrayList<Integer> processPids) {
+	/*
+	 * Gets PSS of list for given processes PIDs
+	 *
+	 * @return mapping of PID - PSS
+	 */
+	private static HashMap<Integer, Long> getProcessesPSS(ArrayList<Integer> processPids) {
 		HashMap<Integer, Long> processPss = new HashMap<>();
 		for (Integer child : processPids) {
 			long pssKB = 0;
@@ -335,13 +507,13 @@ public class MemoryController implements Runnable {
 			try {
 				String s;
 				if (cgroupsv2 == false) {
-					String[] memTypesSimpl = {"total_rss", "total_cache"};
+					String[] memTypesSimpl = { "total_rss", "total_cache" };
 					slotMem = computeSlotMemory(memTypesSimpl);
 					if (debugMemoryController)
 						logger.log(Level.INFO, "Current mem usage (total_rss + total_cache) is " + slotMem);
 					File f = new File(cgroupRootPath + "/memory.memsw.usage_in_bytes");
 					if (f.exists()) {
-						String [] memTypesSwap = {"total_rss", "total_cache", "total_swap"};
+						String[] memTypesSwap = { "total_rss", "total_cache", "total_swap" };
 						slotMemsw = computeSlotMemory(memTypesSwap);
 						if (debugMemoryController)
 							logger.log(Level.INFO, "Current memsw usage (total_rss + total_cache + swap) is " + slotMemsw);
@@ -368,6 +540,23 @@ public class MemoryController implements Runnable {
 				logger.log(Level.WARNING, "Found exception while checking cgroups consumption", e);
 			}
 		}
+		if (htCondorLimitParser != null) {
+			double evaluated = MemoryController.parseClassAdLimitExpr(Double.valueOf(slotMem));
+			if (debugMemoryController)
+				logger.log(Level.INFO, "HTCondor PeriodicRemove expression evaluated to " + evaluated);
+			if (evaluated == 0d)
+				if (debugMemoryController)
+					logger.log(Level.INFO, "Job consumption under HTCondor threshold");
+			else {
+				logger.log(Level.INFO, "Job consumption above HTCondor threshold");
+				for (Long jobNum : MemoryController.activeJAInstances.keySet()) {
+					MemoryController.activeJAInstances.get(jobNum).putJobTrace("WOULD KILL. Job consumption above HTCondor threshold");
+				}
+				JobRunner.recordHighestConsumer(slotMem * 1024, 0, "HTCondor limit on RSS --> " + MemoryController.htCondorJobMemoryLimit, MemoryController.memHardLimit);
+
+			}
+
+		}
 		for (JobAgent runningJA : activeJAInstances.values()) {
 			Long queueId = Long.valueOf(runningJA.getQueueId());
 
@@ -379,7 +568,7 @@ public class MemoryController implements Runnable {
 				slotMem += runningJA.RES_VMEM.doubleValue();
 		}
 
-		if (activeJAInstances.size() >= 1) {
+		if (activeJAInstances.size() > 1) { // avoid preemption if we have a single job running in the slot
 			String approachingLimit = approachingSlotMemLimit(slotMem, slotMemsw);
 			if (preemptingJob == false && !approachingLimit.isEmpty()) {
 				if (debugMemoryController)
@@ -389,21 +578,27 @@ public class MemoryController implements Runnable {
 					case "hard limit on RSS":
 						boundMem = memHardLimit / 1024;
 						break;
-					case "hard limit including swap":
+					case "hard limit on RAM + swap":
+						boundMem = memswHardLimit / 1024;
+						break;
+					case "hard limit on swap":
 						boundMem = memswHardLimit / 1024;
 						break;
 					case "machine free memory":
-						boundMem = parseSystemMemFree() /1024;
+						boundMem = parseSystemMemFree() / 1024;
 						break;
 					default:
 						boundMem = 0;
 						break;
 				}
-				JobRunner.recordHighestConsumer(slotMem, approachingLimit, boundMem);
+				JobRunner.recordHighestConsumer(slotMem, slotMemsw, approachingLimit, boundMem);
 			}
 		}
 	}
 
+	/*
+	 * Computes updated growth derivative per job according to its recent memory consumption
+	 */
 	private static void updateGrowthDerivative(JobAgent ja, Long queueId) {
 		Double growthDerivativePast = derivativePerJob.get(queueId);
 		if (growthDerivativePast == null) {
@@ -412,10 +607,15 @@ public class MemoryController implements Runnable {
 		double growthCurrent = (memCurrentPerJob.getOrDefault(queueId, Double.valueOf(0)).doubleValue() - memPastPerJob.getOrDefault(queueId, Double.valueOf(0)).doubleValue());
 		double normalizationFactor = 2000 * ja.cpuCores; // lets normalize by 2GB per core
 		growthCurrent = growthCurrent / normalizationFactor;
-		growthCurrent += growthDerivativePast.doubleValue()/3;
+		growthCurrent += growthDerivativePast.doubleValue() / 3;
 		derivativePerJob.put(queueId, Double.valueOf(growthCurrent));
 	}
 
+	/*
+	 * Computes slot memory according to the accounted memory components
+	 *
+	 * @return memory consumed by the slot
+	 */
 	private static double computeSlotMemory(String[] memTypes) {
 		String s;
 		double totalMemory = 0;
@@ -430,7 +630,8 @@ public class MemoryController implements Runnable {
 					}
 				}
 			}
-		}catch (IOException e) {
+		}
+		catch (IOException e) {
 			logger.log(Level.WARNING, "Could not process memory.stat to compute slot memory " + e);
 			return 0;
 		}
@@ -482,7 +683,7 @@ public class MemoryController implements Runnable {
 				if (cgroupsv2) {
 					if (debugMemoryController)
 						logger.log(Level.INFO, "Still have " + (memswHardLimit - slotMemsw) + " kB swap left");
-						return "hard limit on swap";
+					return "hard limit on swap";
 				}
 				if (debugMemoryController)
 					logger.log(Level.INFO, "Still have " + (memswHardLimit - slotMemsw) + " kB RAM + swap left");
@@ -491,8 +692,9 @@ public class MemoryController implements Runnable {
 		}
 		if (memHardLimit == 0 && memswHardLimit == 0) {
 			double machineMemFree = parseSystemMemFree();
-			logger.log(Level.INFO, "We dont have a memHard limit. MachineMemfree= " + machineMemFree + " kB and right now we have slotMem " + slotMem + " kB");
-			if (machineMemFree < MACHINE_MEMORY_MARGIN) // Leaving margin for the system
+			if (debugMemoryController)
+				logger.log(Level.INFO, "We dont have a memHard limit. MachineMemfree= " + machineMemFree + " kB and right now we have slotMem " + slotMem + " kB");
+			if (machineMemFree < MACHINE_MEMORY_MARGIN && parseSystemSwapFree() < SLOT_SWAP_MARGIN) // Leaving margin for the system
 				return "machine free memory";
 		}
 		return "";
@@ -526,6 +728,7 @@ public class MemoryController implements Runnable {
 		}
 		return memFree;
 	}
+
 	/**
 	 * Parses /proc/meminfo to get free swap on the machine in kB
 	 *
@@ -582,12 +785,14 @@ public class MemoryController implements Runnable {
 	@Override
 	public void run() {
 		while (true) {
-			checkMemoryConsumption();
-			try {
-				Thread.sleep(EVALUATION_FREQUENCY * 1000);
-			}
-			catch (InterruptedException e) {
-				logger.log(Level.SEVERE, "Detected issue running MemoryController thread ", e);
+			if (coherentVersions) {
+				checkMemoryConsumption();
+				try {
+					Thread.sleep(EVALUATION_FREQUENCY * 1000);
+				}
+				catch (InterruptedException e) {
+					logger.log(Level.SEVERE, "Detected issue running MemoryController thread ", e);
+				}
 			}
 		}
 	}
@@ -645,10 +850,12 @@ class SorterByTemporalGrowth implements Comparator<JobAgent> {
 
 	@Override
 	public int compare(JobAgent ja1, JobAgent ja2) {
-		/*double memGrowthJA1 = MemoryController.memCurrentPerJob.getOrDefault(Long.valueOf(ja1.getQueueId()), Double.valueOf(0)).doubleValue()
-				- MemoryController.memPastPerJob.getOrDefault(Long.valueOf(ja1.getQueueId()), Double.valueOf(0)).doubleValue();
-		double memGrowthJA2 = MemoryController.memCurrentPerJob.getOrDefault(Long.valueOf(ja2.getQueueId()), Double.valueOf(0)).doubleValue()
-				- MemoryController.memPastPerJob.getOrDefault(Long.valueOf(ja2.getQueueId()), Double.valueOf(0)).doubleValue();*/
+		/*
+		 * double memGrowthJA1 = MemoryController.memCurrentPerJob.getOrDefault(Long.valueOf(ja1.getQueueId()), Double.valueOf(0)).doubleValue()
+		 * - MemoryController.memPastPerJob.getOrDefault(Long.valueOf(ja1.getQueueId()), Double.valueOf(0)).doubleValue();
+		 * double memGrowthJA2 = MemoryController.memCurrentPerJob.getOrDefault(Long.valueOf(ja2.getQueueId()), Double.valueOf(0)).doubleValue()
+		 * - MemoryController.memPastPerJob.getOrDefault(Long.valueOf(ja2.getQueueId()), Double.valueOf(0)).doubleValue();
+		 */
 		double memGrowthJA1 = MemoryController.derivativePerJob.getOrDefault(Long.valueOf(ja1.getQueueId()), Double.valueOf(0d)).doubleValue();
 		double memGrowthJA2 = MemoryController.derivativePerJob.getOrDefault(Long.valueOf(ja2.getQueueId()), Double.valueOf(0d)).doubleValue();
 		if (MemoryController.debugMemoryController)

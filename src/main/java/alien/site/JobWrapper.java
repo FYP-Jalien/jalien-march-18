@@ -554,10 +554,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				putJobTrace("JobWrapper: Payload process destroyed by timeout in wrapper!");
 			}
 
-			boolean detectedOOM = checkOOMEvents();
+			if (payload.exitValue() != 0) {
+				boolean detectedOOM = checkOOMEvents();
 
-			if (detectedOOM)
-				logger.log(Level.SEVERE, "An OOM Error has been detected running the job " + queueId);
+				if (detectedOOM)
+					logger.log(Level.SEVERE, "An OOM Error has been detected running the job " + queueId);
+			}
 
 			logger.log(Level.SEVERE, "Payload has finished execution.");
 		}
@@ -583,10 +585,11 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 *
 	 * @return <code>true</code> if the recording could be done
 	 */
-	protected boolean recordKilling() {
+	protected boolean recordKilling(double usedMemory, double limitMemory, double usedSwap, double limitSwap, String killedProcessCmd, String cgroupId) {
 		logger.log(Level.INFO, "Recording system kill of job " + queueId + " (site: " + ce + " - host: " + hostName + ")");
-		putJobTrace("System killed job due to OOM");
-		if (!commander.q_api.recordPreemption(queueId, 0, System.currentTimeMillis(), 0, 0, 0, resubmission, hostName, ce, 0, 0, 0, username, 0, 0, 0, 0)) {
+		putJobTrace("System might have killed job due to OOM");
+		if (!commander.q_api.recordPreemption(0l, 0l, System.currentTimeMillis(), 0d, 0d, 0d, 0, resubmission, hostName, ce, 0d, 0d, 0d, username, 0, queueId, limitMemory, limitSwap, killedProcessCmd, cgroupId,usedMemory, usedSwap)) {
+			logger.log(Level.SEVERE, "System oom kill could not be recorded in the database");
 			return false;
 		}
 		// To be taken out when not killing
@@ -602,7 +605,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	private boolean checkOOMEvents() {
 		boolean usingCgroupsv2 = new File("/sys/fs/cgroup/cgroup.controllers").isFile();
 		String cgroupId = MemoryController.parseCgroupsPath(usingCgroupsv2);
-		String lastLog = getDmesgOutput("dmesg | egrep -i " + cgroupId + " | egrep -Ei 'oom-kill|Memory cgroup stats'");
+		String output = getDmesgOutput("dmesg | egrep -i " + cgroupId + " | egrep -Ei 'oom-kill|Memory cgroup stats'");
+		String lastLog = output.split("\n")[output.split("\n").length - 1];
 		if (!lastLog.isEmpty()) {
 			Double timing = Double.valueOf(lastLog.substring(lastLog.indexOf("[") + 1, lastLog.indexOf("]")));
 			double uptime = MemoryController.parseUptime();
@@ -610,7 +614,39 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (MemoryController.debugMemoryController)
 				logger.log(Level.INFO, "Parsed time from boot in dmesg is " + timing + ", with a system uptime of " + uptime + ". From hast dmesg log, " + elapsedTime + "s elapsed");
 			if (elapsedTime < 5 * 60) { // We check if it is from less than five minutes ago
-				return recordKilling();
+				double usedMemory = 0d, limitMemory = 0d, usedSwap = 0d, limitSwap = 0d;
+				String memoryOutput = getDmesgOutput("dmesg | egrep -i 'memory: usage|swap: usage' | tail -n 2");
+				String[] memoryComponents = memoryOutput.split("\n");
+				for (String component : memoryComponents) {
+					String patternStr = "^.*?usage (\\d+)kB, limit (\\d+)kB, failcnt (\\d+).*?";
+					Pattern pattern = Pattern.compile(patternStr);
+					Matcher matcher = pattern.matcher(component);
+					if (matcher.matches()) {
+						if (component.contains("memory") && !component.contains("swap")) {
+							usedMemory = Double.parseDouble(matcher.group(1));
+							if (Double.parseDouble(matcher.group(2)) != MemoryController.DEFAULT_CGROUP_NOT_CONFIG)
+								limitMemory = Double.parseDouble(matcher.group(2));
+							else
+								limitMemory = 0;
+						} else if (component.contains("swap")) {
+							usedSwap = Double.parseDouble(matcher.group(1));
+							if (Double.parseDouble(matcher.group(2)) != MemoryController.DEFAULT_CGROUP_NOT_CONFIG) {
+								limitSwap = Double.parseDouble(matcher.group(2));
+							} else
+								limitSwap = 0;
+						}
+					}
+				}
+				String killedProcessLine = getDmesgOutput("dmesg | egrep -i 'out of memory: Killed process' | tail -n 1");
+				String killedProcessCmd = "";
+				String patternStr = "^.*? out of memory: Killed process (\\d+) \\((.+)\\).*?";
+				Pattern pattern = Pattern.compile(patternStr);
+				Matcher matcher = pattern.matcher(killedProcessLine);
+				if (matcher.matches()) {
+					killedProcessCmd = matcher.group(2);
+				}
+
+				return recordKilling(usedMemory/1024, limitMemory/1024, usedSwap/1024, limitSwap/1024, killedProcessCmd, cgroupId);
 			}
 		}
 		else
@@ -626,8 +662,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			logger.log(Level.WARNING, "Could not execute dmesg on the host to parse OOM");
 		if (MemoryController.debugMemoryController)
 			logger.log(Level.INFO, "Dmesg output " + co);
-		String lastLog = co.stdout.split("\n")[co.stdout.split("\n").length - 1];
-		return lastLog;
+
+		return co.stdout;
 	}
 
 	private String saveToFile(final String content) {

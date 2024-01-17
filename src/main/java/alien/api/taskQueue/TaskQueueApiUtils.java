@@ -521,6 +521,7 @@ public class TaskQueueApiUtils {
 	 * @param preemptionTs
 	 * @param killingTs
 	 * @param preemptionSlotMemory
+	 * @param preemptionSlotSwMemory
 	 * @param preemptionJobMemory
 	 * @param numConcurrentJobs
 	 * @param resubmission
@@ -532,16 +533,22 @@ public class TaskQueueApiUtils {
 	 * @param wouldPreempt
 	 * @param memHardLimit
 	 * @param memswHardLimit
+	 * @param killedProcess
+	 * @param cgroupPath
+	 * @param killingSlotMemory
+	 * @param killingSlotSwMemory
 	 * @return
 	 */
-	public boolean recordPreemption(long queueId, long preemptionTs, long killingTs, double preemptionSlotMemory, double preemptionJobMemory, int numConcurrentJobs, int resubmission, String hostName, String siteName, double memoryPerCore, double growthDerivative, double timeElapsed, String username, int preemptionRound, long wouldPreempt, double memHardLimit, double memswHardLimit) {
+	public boolean recordPreemption(long queueId, long preemptionTs, long killingTs, double preemptionSlotMemory, double preemptionSlotSwMemory,  double preemptionJobMemory, int numConcurrentJobs, int resubmission, String hostName, String siteName, double memoryPerCore, double growthDerivative, double timeElapsed, String username, int preemptionRound, long wouldPreempt, double memHardLimit, double memswHardLimit, String killedProcessCmd, String cgroupPath, double killingSlotMemory, double killingSlotSwMemory) {
+		final boolean recordingSuccess;
 		try {
-			Dispatcher.execute(new RecordPreemption(queueId, preemptionTs, killingTs, preemptionSlotMemory, preemptionJobMemory, numConcurrentJobs, resubmission, hostName, siteName, memoryPerCore, growthDerivative, timeElapsed, username, preemptionRound, wouldPreempt, memHardLimit, memswHardLimit));
+			final RecordPreemption recording = Dispatcher.execute(new RecordPreemption(queueId, preemptionTs, killingTs, preemptionSlotMemory, preemptionSlotSwMemory, preemptionJobMemory, numConcurrentJobs, resubmission, hostName, siteName, memoryPerCore, growthDerivative, timeElapsed, username, preemptionRound, wouldPreempt, memHardLimit, memswHardLimit, killedProcessCmd, cgroupPath,killingSlotMemory,killingSlotSwMemory));
+			recordingSuccess = recording.getRecordingSuccess();
 		}
 		catch (final ServerException e) {
 			System.out.println("Could not record preemption of job " + queueId + e.getMessage());
 			return false;
 		}
-		return true;
+		return recordingSuccess;
 	}
 }

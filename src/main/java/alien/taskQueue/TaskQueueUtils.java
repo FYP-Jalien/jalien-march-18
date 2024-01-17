@@ -4230,6 +4230,7 @@ public class TaskQueueUtils {
 	 * @param preemptionTs
 	 * @param killingTs
 	 * @param preemptionSlotMemory
+	 * @param preemptionSlotMemory
 	 * @param preemptionJobMemory
 	 * @param numConcurrentJobs
 	 * @param resubmissionCounter
@@ -4244,17 +4245,18 @@ public class TaskQueueUtils {
 	 * @param vmUID
 	 * @param memHardLimit
 	 * @param memswHardLimit
+	 * @param killedProcess
+	 * @param cgroupPath
+	 * @param killingSlotMemory
+	 * @param killingSlotSwMemory
 	 * @return <code>true</code> if the recording could be done
 	 */
-	public static boolean recordPreemption(final long queueId, final long preemptionTs, final long killingTs, final double preemptionSlotMemory, final double preemptionJobMemory,
+	public static boolean recordPreemption(final long queueId, final long preemptionTs, final long killingTs, final double preemptionSlotMemory, final double preemptionSlotSwMemory, final double preemptionJobMemory,
 			final int numConcurrentJobs, final int resubmissionCounter, final String hostName, final String siteName, final double memoryPerCore, final double growthDerivative,
-			final double timeElapsed, final String username, final int preemptionRound, final long wouldPreempt, UUID vmUID, double memHardLimit, double memswHardLimit) {
+			final double timeElapsed, final String username, final int preemptionRound, final long wouldPreempt, UUID vmUID, double memHardLimit, double memswHardLimit, final String killedProcess, final String cgroupPath, final double killingSlotMemory, final double killingSlotSwMemory) {
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
 				return false;
-
-			if (logger.isLoggable(Level.FINE))
-				logger.log(Level.FINE, "Going to record preemption for job " + queueId);
 
 			db.setReadOnly(false);
 			db.setQueryTimeout(60);
@@ -4263,28 +4265,61 @@ public class TaskQueueUtils {
 			int siteId = getSiteId(siteName);
 			Integer hostId = getHostId(hostName, false);
 			Integer userId = getUserId(username, true);
+
+			Map<String, Object> values = new HashMap<>();
+			values.put("queueId", Long.valueOf(queueId));
+			values.put("preemptionTs",Long.valueOf(preemptionTs));
+			values.put("preemptionSlotMemory",Double.valueOf(preemptionSlotMemory));
+			values.put("preemptionSlotSwMemory",Double.valueOf(preemptionSlotSwMemory));
+			values.put("preemptionJobMemory",Double.valueOf(preemptionJobMemory));
+			values.put("numConcurrentJobs",Integer.valueOf(numConcurrentJobs));
+			values.put("resubmissionCounter",Integer.valueOf(resubmissionCounter));
+			values.put("hostId",hostId);
+			values.put("siteId",Integer.valueOf(siteId));
+			values.put("memoryPerCore",Double.valueOf(memoryPerCore));
+			values.put("growthDerivative",Double.valueOf(growthDerivative));
+			values.put("timeElapsed",Double.valueOf(timeElapsed));
+			values.put("userId",userId);
+			values.put("preemptionRound",Integer.valueOf(preemptionRound));
+			values.put("wouldPreempt",Long.valueOf(wouldPreempt));
+			values.put("uuid","string2binary(?)");
+			values.put("memHardLimit",Double.valueOf(memHardLimit));
+			values.put("memswHardLimit",Double.valueOf(memswHardLimit));
+			values.put("killedProcess",killedProcess);
+			values.put("cgroupPath",cgroupPath);
+			values.put("systemKillTs",Long.valueOf(killingTs));
+			values.put("killingSlotMemory", Double.valueOf(killingSlotMemory));
+			values.put("killingSlotSwMemory", Double.valueOf(killingSlotSwMemory));
+
+
 			if (preemptionTs != 0) {
 				logger.log(Level.INFO, "Job was preempted at ts " + preemptionTs);
-				String q = "INSERT INTO oom_preemptions (queueId, preemptionTs,preemptionSlotMemory,preemptionJobMemory,numConcurrentJobs,resubmissionCounter,hostId,siteId,memoryPerCore,growthDerivative,timeElapsed,userId,preemptionRound,wouldPreempt,uuid,memHardLimit,memswHardLimit) VALUES ("
-						+ queueId + "," + preemptionTs + "," + preemptionSlotMemory + "," + preemptionJobMemory + "," + numConcurrentJobs + "," + resubmissionCounter + "," + hostId + "," + siteId
-						+ "," + memoryPerCore + "," + growthDerivative + "," + timeElapsed + "," + userId + "," + preemptionRound + "," + wouldPreempt + ",string2binary('" + vmUID + "'),"
-						+ memHardLimit + "," + memswHardLimit + ");";
-				if (!db.query(q))
+				String q = DBFunctions.composeInsert("oom_preemptions", values);
+				q = Format.replace(q, "'string2binary(?)'", "string2binary(?)");
+				if (!db.query(q, false, vmUID.toString()))
 					return false;
 			}
 			else if (killingTs != 0) {
-				logger.log(Level.INFO, "Job was killed at ts " + killingTs);
-				String q = "SELECT queueId FROM oom_preemptions where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId=" + siteId + ";";
+				values.remove("uuid");
+				logger.log(Level.INFO, "Job " + wouldPreempt + " was killed at ts " + killingTs);
+				String q = "SELECT wouldKill FROM oom_preemptions where wouldPreempt=" + wouldPreempt + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId=" + siteId + ";";
 				db.query(q);
 				if (db.moveNext()) {
-					q = "UPDATE oom_preemptions set systemKillTs=" + killingTs + " where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId
-							+ " and siteId=" + siteId + " and systemKillTs is null;";
+					values.clear();
+					values.put("systemKillTs",Long.valueOf(killingTs));
+					values.put("resubmissionCounter",Integer.valueOf(resubmissionCounter));
+					values.put("wouldPreempt",Long.valueOf(wouldPreempt));
+					values.put("hostId",hostId);
+					values.put("siteId",Integer.valueOf(siteId));
+					values.put("killingSlotMemory", Double.valueOf(killingSlotMemory));
+					values.put("killingSlotSwMemory", Double.valueOf(killingSlotSwMemory));
+
+					q = DBFunctions.composeUpdate("oom_preemptions", values, Arrays.asList("wouldPreempt", "resubmissionCounter", "hostId", "siteId"));
 					if (!db.query(q))
 						return false;
 				}
 				else {
-					q = "INSERT INTO oom_preemptions (queueId,systemKillTs,resubmissionCounter,hostId,siteId) VALUES (" + queueId + "," + killingTs + "," + resubmissionCounter + "," + hostId + ","
-							+ siteId + ");";
+					q = DBFunctions.composeInsert("oom_preemptions", values);
 					if (!db.query(q))
 						return false;
 				}
@@ -4317,7 +4352,7 @@ public class TaskQueueUtils {
 			int siteId = getSiteId(siteName);
 			Integer hostId = getHostId(hostName, false);
 			int statusId = finalStatus.getAliEnLevel();
-			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId="
+			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where wouldPreempt=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId="
 					+ siteId + ";";
 			if (!db.query(q))
 				return false;

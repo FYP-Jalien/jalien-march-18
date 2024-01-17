@@ -77,6 +77,7 @@ import apmon.ApMonMonitoringConstants;
 import apmon.BkThread;
 import apmon.MonitoredJob;
 import lazyj.ExtProperties;
+import lazyj.Format;
 import lazyj.commands.CommandOutput;
 import lazyj.commands.SystemCommand;
 import lia.util.process.ExternalProcesses;
@@ -310,6 +311,7 @@ public class JobAgent implements Runnable {
 	// Memory management
 	private static MemoryController memoryController;
 	protected boolean alreadyPreempted = false;
+	private long jobAgentThreadStartTime = System.currentTimeMillis();
 
 	protected static final Object workDirSizeSync = new Object();
 	private static HashMap<Long, Integer> slotWorkdirsMaxSize;
@@ -1605,31 +1607,31 @@ public class JobAgent implements Runnable {
 	 * @param wouldPreempt
 	 * @return
 	 */
-	protected boolean recordPreemption(final long preemptionTs, final double preemptionSlotMemory, final double preemptionJobMemory, final String reason, final double parsedSlotLimit,
-			final int numConcurrentJobs, long wouldPreempt) {
-		/*
-		 * synchronized(MemoryController.lockMemoryController) {
-		 * logger.log(Level.INFO, "Preemption of job " + queueId + " (site: " + ce + " - host: " + hostName + ") starts - going to be killed EVENTUALLY");
-		 * MemoryController.preemptingJob = true;
-		 * }
-		 */
-		// if (!alreadyPreempted) {
+	protected boolean recordPreemption(final long preemptionTs, final double preemptionSlotMemory, final double PreemptionSlotMemsw, final double preemptionJobMemory, final String reason, final double parsedSlotLimit, final int numConcurrentJobs, long wouldPreempt) {
+		/*synchronized(MemoryController.lockMemoryController) {
+			logger.log(Level.INFO, "Preemption of job " + queueId + " (site: " + ce + " - host: " + hostName + ") starts - going to be killed EVENTUALLY");
+			MemoryController.preemptingJob = true;
+		}*/
+		//if (!alreadyPreempted) {
 		logger.log(Level.INFO, "Recording preemption of job " + wouldPreempt + " (data from co-executor " + queueId + ")");
 		double memoryPerCore = Math.round(preemptionJobMemory / cpuCores * 100.0) / 100.0;
 		double memHardLimitRounded = Math.round(MemoryController.memHardLimit / 1024 * 100.0) / 100.0;
 		double memswHardLimitRounded = Math.round(MemoryController.memswHardLimit / 1024 * 100.0) / 100.0;
 		Double growthDerivative = MemoryController.derivativePerJob.get(Long.valueOf(queueId));
-		double elapsedTime = (System.currentTimeMillis() - jobAgentStartTime) / 1000.; // convert to seconds
+
+		double elapsedTime = (System.currentTimeMillis() - jobAgentThreadStartTime) /1000.; // convert to seconds
 		double timePortion = elapsedTime / ttl;
 		if (MemoryController.debugMemoryController)
-			logger.log(Level.INFO, "DBG: Have a time elapsed of " + elapsedTime + ". With ttl of " + ttl + ", time portion is " + timePortion);
-		if (!commander.q_api.recordPreemption(queueId, preemptionTs, 0, preemptionSlotMemory / 1024, preemptionJobMemory, numConcurrentJobs, resubmission, hostName, ce, memoryPerCore,
-				growthDerivative.doubleValue(), timePortion, username, MemoryController.preemptionRound, wouldPreempt, memHardLimitRounded, memswHardLimitRounded)) {
+			logger.log(Level.INFO, "Have a time elapsed of " + elapsedTime + ". With ttl of " + ttl + ", time portion is " + timePortion);
+		String cgroupPath = memoryController.cgroupId;
+		if (CgroupUtils.haveCgroupsv2())
+			cgroupPath = CgroupUtils.getCurrentCgroup(getWrapperPid());
+		if (!commander.q_api.recordPreemption(queueId, preemptionTs, 0, preemptionSlotMemory/1024, PreemptionSlotMemsw/1024, preemptionJobMemory, numConcurrentJobs, resubmission, hostName, ce, memoryPerCore, growthDerivative.doubleValue(), timePortion, username, MemoryController.preemptionRound, wouldPreempt, memHardLimitRounded, memswHardLimitRounded, "", cgroupPath,0d,0d)) {
+			logger.log(Level.SEVERE, "Preemption could not be recorded in the database");
 			return false;
 		}
 		if (queueId == wouldPreempt) {
-			putJobTrace("Preemption starts. Job consuming " + preemptionJobMemory + " MB (slot has a total usage of " + preemptionSlotMemory / 1024 + " MB, parsed limit of " + parsedSlotLimit
-					+ " MB due to " + reason + ").");
+			putJobTrace("Preemption starts. Job consuming " + Format.point(preemptionJobMemory) + " MB (slot has a total usage of " + Format.point(preemptionSlotMemory/1024) + " MB, parsed limit of " + parsedSlotLimit + " MB due to " + reason + ").");
 			alreadyPreempted = true;
 			String cgroupPIDs = "/sys/fs/cgroup/memory" + MemoryController.cgroupId + "/tasks";
 			if (CgroupUtils.haveCgroupsv2())
@@ -1659,7 +1661,7 @@ public class JobAgent implements Runnable {
 		return true;
 	}
 
-	private boolean putJobTrace(final String value) {
+	protected boolean putJobTrace(final String value) {
 		return putJobLog("trace", value);
 	}
 
@@ -2291,9 +2293,9 @@ public class JobAgent implements Runnable {
 	 * @param alienSite
 	 * @return Request output
 	 */
-	private JSONObject makeRequest(URL url, String nodeName, String alienSite) {
+	protected static JSONObject makeRequest(URL url, String nodeName, String alienSite, Logger logg) {
 		try {
-			logger.log(Level.FINE, "Making HTTP call to " + url + " from " + nodeName + " in " +
+			logg.log(Level.FINE, "Making HTTP call to " + url + " from " + nodeName + " in " +
 					alienSite);
 			final HttpURLConnection conn = (HttpURLConnection) url.openConnection();
 			conn.setConnectTimeout(5000);
@@ -2307,12 +2309,12 @@ public class JobAgent implements Runnable {
 				}
 			}
 			catch (final ParseException e) {
-				logger.log(Level.SEVERE, "Failed to parse AliMonitor response for node " + nodeName + " in " +
+				logg.log(Level.SEVERE, "Failed to parse AliMonitor response for node " + nodeName + " in " +
 						alienSite, e);
 			}
 		}
 		catch (final IOException e) {
-			logger.log(Level.SEVERE, "IO Error in calling the url " + url + " for node " + nodeName + " in " +
+			logg.log(Level.SEVERE, "IO Error in calling the url " + url + " for node " + nodeName + " in " +
 					alienSite, e);
 		}
 		return new JSONObject();
@@ -2331,7 +2333,7 @@ public class JobAgent implements Runnable {
 					"&ce_name=" + URLEncoder.encode(alienSite, charSet) + "&test_name=" + URLEncoder.encode(testName, charSet) +
 					"&test_message=" + URLEncoder.encode(siteSonarOutput.toString(), StandardCharsets.UTF_8));
 			logger.log(Level.INFO, ("Uploading Site Sonar results of " + nodeName + " to AliMonitor"));
-			makeRequest(url, nodeName, alienSite);
+			makeRequest(url, nodeName, alienSite, logger);
 		}
 		catch (final IOException e) {
 			logger.log(Level.SEVERE, "Failed to upload Site sonar probe output for node " + nodeName + " in " +
@@ -2351,7 +2353,7 @@ public class JobAgent implements Runnable {
 
 			final URL url = new URL(siteSonarUrl + "constraints-marta.jsp?hostname=" + URLEncoder.encode(nodeName, charSet) +
 					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
-			JSONObject constraints = makeRequest(url, nodeName, alienSite);
+			JSONObject constraints = makeRequest(url, nodeName, alienSite, logger);
 			if (constraints != null && constraints.keySet().size() > 0) {
 				constraints.keySet().forEach(key -> {
 					Object value = constraints.get(key);
@@ -2380,7 +2382,7 @@ public class JobAgent implements Runnable {
 		try {
 			final URL url = new URL(siteSonarUrl + "queryProbes.jsp?hostname=" + URLEncoder.encode(nodeName, charSet) +
 					"&ce_name=" + URLEncoder.encode(alienSite, charSet));
-			return makeRequest(url, nodeName, alienSite);
+			return makeRequest(url, nodeName, alienSite, logger);
 		}
 		catch (final IOException e) {
 			logger.log(Level.SEVERE, "Failed to get Site sonar probe list for node " + nodeName + " in " +
