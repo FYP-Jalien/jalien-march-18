@@ -51,6 +51,8 @@ public class MemoryController implements Runnable {
 	protected static String limitParser;
 	private boolean swapUsageAllowed;
 	private static long slotCPUs;
+	private static boolean linuxProc;
+	private static boolean condorSlotAlreadyPreempted;
 
 	protected static String cgroupRootPath;
 	protected static String cgroupId;
@@ -96,6 +98,8 @@ public class MemoryController implements Runnable {
 		swapUsageAllowed = true;
 		preemptionRound = 0;
 		coherentVersions = true;
+		linuxProc = false;
+		condorSlotAlreadyPreempted = false;
 		limitParser = "";
 		setMargins();
 		registerCgroupPath();
@@ -158,7 +162,7 @@ public class MemoryController implements Runnable {
 	// We have seen how some ARC sites do only have as their definition for slot memory the ulimit definition
 	private static void registerUlimitHard() {
 		try {
-			if (memHardLimit == 0) {
+			if (memHardLimit == 0 && memswHardLimit == 0) {
 				String limitContents = Files.readString(Path.of("/proc/" + MonitorFactory.getSelfProcessID() + "/limits"));
 				try (BufferedReader brLimits = new BufferedReader(new StringReader(limitContents))) {
 					String s;
@@ -169,6 +173,7 @@ public class MemoryController implements Runnable {
 							if (!columns[2].equals("unlimited")) {
 								memHardLimit = Double.parseDouble(columns[2]);
 								memHardLimit = memHardLimit / 1024;
+								linuxProc = true;
 								limitParser = "Slot memory hard limit set to " + memHardLimit + " memsw hard limit set to " + memswHardLimit + " by /proc limits parsing.";
 								if (debugMemoryController)
 									logger.log(Level.INFO, "Set new memory hard limit from proc limits file to " + memHardLimit);
@@ -516,59 +521,66 @@ public class MemoryController implements Runnable {
 	 */
 	private void checkMemoryConsumption() {
 		double slotMem = 0, slotMemsw = 0;
-		if (!cgroupRootPath.isEmpty()) {
-			try {
-				String s;
-				if (cgroupsv2 == false) {
-					String[] memTypesSimpl = { "total_rss", "total_cache" };
-					slotMem = computeSlotMemory(memTypesSimpl);
-					if (debugMemoryController)
-						logger.log(Level.INFO, "Current mem usage (total_rss + total_cache) is " + slotMem);
-					File f = new File(cgroupRootPath + "/memory.memsw.usage_in_bytes");
-					if (f.exists()) {
-						String[] memTypesSwap = { "total_rss", "total_cache", "total_swap" };
-						slotMemsw = computeSlotMemory(memTypesSwap);
+		if (!linuxProc) {
+			if (!cgroupRootPath.isEmpty()) {
+				try {
+					String s;
+					if (cgroupsv2 == false) {
+						String[] memTypesSimpl = { "total_rss", "total_cache" };
+						slotMem = computeSlotMemory(memTypesSimpl);
 						if (debugMemoryController)
-							logger.log(Level.INFO, "Current memsw usage (total_rss + total_cache + swap) is " + slotMemsw);
+							logger.log(Level.INFO, "Current mem usage (total_rss + total_cache) is " + slotMem);
+						File f = new File(cgroupRootPath + "/memory.memsw.usage_in_bytes");
+						if (f.exists()) {
+							String[] memTypesSwap = { "total_rss", "total_cache", "total_swap" };
+							slotMemsw = computeSlotMemory(memTypesSwap);
+							if (debugMemoryController)
+								logger.log(Level.INFO, "Current memsw usage (total_rss + total_cache + swap) is " + slotMemsw);
+						}
+					}
+					else {
+						String memCurrentUsageContents = Files.readString(Path.of(cgroupRootPath + "/memory.current"));
+						try (BufferedReader br = new BufferedReader(new StringReader(memCurrentUsageContents))) {
+							if ((s = br.readLine()) != null)
+								slotMem = Double.parseDouble(s) / 1024; // Convert to KB
+							if (debugMemoryController)
+								logger.log(Level.INFO, "Current RAM usage is " + slotMem + " kB");
+						}
+						String memswCurrentUsageContents = Files.readString(Path.of(cgroupRootPath + "/memory.swap.current"));
+						try (BufferedReader br = new BufferedReader(new StringReader(memswCurrentUsageContents))) {
+							if ((s = br.readLine()) != null)
+								slotMemsw = Double.parseDouble(s) / 1024; // Convert to KB
+							if (debugMemoryController)
+								logger.log(Level.INFO, "Current swap usage is " + slotMemsw + " kB");
+						}
 					}
 				}
-				else {
-					String memCurrentUsageContents = Files.readString(Path.of(cgroupRootPath + "/memory.current"));
-					try (BufferedReader br = new BufferedReader(new StringReader(memCurrentUsageContents))) {
-						if ((s = br.readLine()) != null)
-							slotMem = Double.parseDouble(s) / 1024; // Convert to KB
-						if (debugMemoryController)
-							logger.log(Level.INFO, "Current RAM usage is " + slotMem + " kB");
-					}
-					String memswCurrentUsageContents = Files.readString(Path.of(cgroupRootPath + "/memory.swap.current"));
-					try (BufferedReader br = new BufferedReader(new StringReader(memswCurrentUsageContents))) {
-						if ((s = br.readLine()) != null)
-							slotMemsw = Double.parseDouble(s) / 1024; // Convert to KB
-						if (debugMemoryController)
-							logger.log(Level.INFO, "Current swap usage is " + slotMemsw + " kB");
-					}
+				catch (final IOException | IllegalArgumentException e) {
+					logger.log(Level.WARNING, "Found exception while checking cgroups consumption", e);
 				}
 			}
-			catch (final IOException | IllegalArgumentException e) {
-				logger.log(Level.WARNING, "Found exception while checking cgroups consumption", e);
-			}
-		}
-		if (htCondorLimitParser != null) {
-			double evaluated = MemoryController.parseClassAdLimitExpr(Double.valueOf(slotMem));
-			if (debugMemoryController)
-				logger.log(Level.INFO, "HTCondor PeriodicRemove expression evaluated to " + evaluated);
-			if (evaluated == 0d)
+			if (htCondorLimitParser != null) {
+				double evaluated = MemoryController.parseClassAdLimitExpr(Double.valueOf(slotMem));
 				if (debugMemoryController)
-					logger.log(Level.INFO, "Job consumption under HTCondor threshold");
-			else {
-				logger.log(Level.INFO, "Job consumption above HTCondor threshold");
-				for (Long jobNum : MemoryController.activeJAInstances.keySet()) {
-					MemoryController.activeJAInstances.get(jobNum).putJobTrace("WOULD KILL. Job consumption above HTCondor threshold");
+					logger.log(Level.INFO, "HTCondor PeriodicRemove expression evaluated to " + evaluated);
+				if (evaluated == 0d)
+					if (debugMemoryController)
+						logger.log(Level.INFO, "Job consumption under HTCondor threshold");
+				else {
+					logger.log(Level.INFO, "Job consumption above HTCondor threshold");
+					if (!condorSlotAlreadyPreempted) {
+						for (Long jobNum : MemoryController.activeJAInstances.keySet()) {
+							MemoryController.activeJAInstances.get(jobNum).putJobTrace("WOULD KILL. Job consumption above HTCondor threshold");
+						}
+						condorSlotAlreadyPreempted = true;
+					}
+					JobRunner.recordHighestConsumer(slotMem * 1024, 0, "HTCondor limit on RSS --> " + MemoryController.htCondorJobMemoryLimit, MemoryController.memHardLimit);
 				}
-				JobRunner.recordHighestConsumer(slotMem * 1024, 0, "HTCondor limit on RSS --> " + MemoryController.htCondorJobMemoryLimit, MemoryController.memHardLimit);
-
 			}
-
+		} else {
+			for (JobAgent runningJA : activeJAInstances.values()) {
+				slotMem += runningJA.RES_RMEM.doubleValue();
+			}
 		}
 		for (JobAgent runningJA : activeJAInstances.values()) {
 			Long queueId = Long.valueOf(runningJA.getQueueId());
@@ -577,7 +589,7 @@ public class MemoryController implements Runnable {
 				memPastPerJob.put(queueId, memCurrentPerJob.get(queueId));
 			memCurrentPerJob.put(queueId, runningJA.RES_VMEM);
 			updateGrowthDerivative(runningJA, queueId);
-			if (cgroupRootPath.isEmpty())
+			if (cgroupRootPath.isEmpty() && !linuxProc)
 				slotMem += runningJA.RES_VMEM.doubleValue();
 		}
 
