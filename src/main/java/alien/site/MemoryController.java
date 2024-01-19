@@ -48,6 +48,7 @@ public class MemoryController implements Runnable {
 
 	protected static double memHardLimit;
 	protected static double memswHardLimit;
+	protected static String limitParser;
 	private boolean swapUsageAllowed;
 	private static long slotCPUs;
 
@@ -95,6 +96,7 @@ public class MemoryController implements Runnable {
 		swapUsageAllowed = true;
 		preemptionRound = 0;
 		coherentVersions = true;
+		limitParser = "";
 		setMargins();
 		registerCgroupPath();
 		registerHTCondorPeriodicRemove();
@@ -167,6 +169,7 @@ public class MemoryController implements Runnable {
 							if (!columns[2].equals("unlimited")) {
 								memHardLimit = Double.parseDouble(columns[2]);
 								memHardLimit = memHardLimit / 1024;
+								limitParser = "Slot memory hard limit set to " + memHardLimit + " memsw hard limit set to " + memswHardLimit + " by /proc limits parsing.";
 								if (debugMemoryController)
 									logger.log(Level.INFO, "Set new memory hard limit from proc limits file to " + memHardLimit);
 							}
@@ -210,7 +213,8 @@ public class MemoryController implements Runnable {
 						substring = substring.replace("(", "").replace(")", "");
 						substring = "ResidentSetSize " + substring + "-" + SLOT_MEMORY_MARGIN * slotCPUs;
 						htCondorLimitParser = substring;
-						logger.log(Level.INFO, "Parsed PeriodicRemove expression from HTCondor classad: " + htCondorLimitParser);
+						limitParser = "Parsed PeriodicRemove expression from HTCondor classad. Going to evaluate expression " + htCondorLimitParser + ".";
+						logger.log(Level.INFO, limitParser);
 					}
 				}
 				if (CgroupUtils.haveCgroupsv2()) {
@@ -230,6 +234,7 @@ public class MemoryController implements Runnable {
 							}
 							else {
 								coherentVersions = false;
+								limitParser += " Detected HTCondor version is too old to use cgroupsv2 parsing. Skipping";
 								if (debugMemoryController)
 									logger.log(Level.INFO, "Version mismatch. Unable to use HTCondor parsing");
 							}
@@ -313,6 +318,14 @@ public class MemoryController implements Runnable {
 				tmpMemHardLimit = getCgroupV2Limits("/memory.swap.max");
 				if (memswHardLimit == 0 || tmpMemHardLimit < memswHardLimit)
 					memswHardLimit = tmpMemHardLimit;
+			}
+
+			if (memswHardLimit > 0 || memHardLimit > 0) {
+				limitParser = "Slot memory hard limit set to " + memHardLimit + " memsw hard limit set to " + memswHardLimit + " by cgroup configuration.";
+				if (cgroupsv2 == false)
+					 limitParser += " Parsed cgroup: " + cgroupId;
+				else
+					limitParser += " Parsed cgroup: " + CgroupUtils.getCurrentCgroup(MonitorFactory.getSelfProcessID());
 			}
 		}
 		catch (final IOException | IllegalArgumentException e) {

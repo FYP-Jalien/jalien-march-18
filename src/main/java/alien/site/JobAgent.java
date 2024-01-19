@@ -622,6 +622,10 @@ public class JobAgent implements Runnable {
 					}
 				}
 
+
+				if (!MemoryController.limitParser.isEmpty())
+					putJobTrace(MemoryController.limitParser);
+
 				logger.log(Level.INFO, jdl.getExecutable());
 				logger.log(Level.INFO, username);
 				logger.log(Level.INFO, Long.toString(queueId));
