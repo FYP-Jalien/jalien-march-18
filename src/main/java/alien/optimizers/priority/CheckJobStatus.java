@@ -4,21 +4,19 @@ import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
+import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
-import alien.priority.JobDto;
 import alien.taskQueue.JobStatus;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
 
 import java.sql.Connection;
 import java.time.Duration;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Objects;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-//TODO rename
 public class CheckJobStatus extends Optimizer {
     static final Logger logger = ConfigUtils.getLogger(PriorityReconciliationService.class.getCanonicalName());
 
@@ -29,18 +27,19 @@ public class CheckJobStatus extends Optimizer {
     @Override
     public void run() {
         logger.log(Level.INFO, "CheckJobStatus starting");
-        this.setSleepPeriod(Duration.ofMinutes(30).toMillis());
+        this.setSleepPeriod(Duration.ofMinutes(10).toMillis());
+        int frequency = (int) this.getSleepPeriod();
 
         while (true) {
-            try {
-                startCron();
-                logger.log(Level.INFO, "CheckJobStatus sleeping for " + this.getSleepPeriod() + " ms");
-                // TODO: check job status - move subjob to done if siblings are done and update master
-                // TODO: check job status - move master to SPLIT status if subjob is reactivated
-
-                sleep(this.getSleepPeriod());
-            } catch (InterruptedException e) {
-                logger.log(Level.SEVERE, "CheckJobStatus interrupted", e);
+            boolean updated = DBSyncUtils.updatePeriodic(frequency, JobAgentUpdater.class.getCanonicalName());
+            if (updated) {
+                try {
+                    startCron();
+                    logger.log(Level.INFO, "CheckJobStatus sleeping for " + this.getSleepPeriod() + " ms");
+                    sleep(this.getSleepPeriod());
+                } catch (InterruptedException e) {
+                    logger.log(Level.SEVERE, "CheckJobStatus interrupted", e);
+                }
             }
         }
     }
@@ -63,72 +62,70 @@ public class CheckJobStatus extends Optimizer {
 
         try (Timing t = new Timing(monitor, "CheckJobStatus")) {
             t.startTiming();
-            StringBuilder query = synchronizeMasterJobStatusWithSubjobs(getMasterAndSubjobs(db));
-            logger.log(Level.INFO, "After synchronizeMasterJobStatusWithSubjobs, before DB write ");
-            boolean result = writeToDb(query, db, dbdev);
+            db.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
+            Set<Long> masterJobInRunningState = getMasterJobIds(db, getQueryToFindMasterjobsInRunningState());
+            Set<Long> masterJobInFinalState = getMasterJobIds(db, getQueryToFindMasterjobsInFinalState());
+            StringBuilder registerLog = new StringBuilder("Number of masterJobs in runningstate: " + masterJobInRunningState.size() + "\n");
+            registerLog.append("Number of masterJobs in finalstate: " + masterJobInFinalState.size() + "\n");
+            String query = synchronizeMasterJobStatusWithSubjobs(masterJobInRunningState, masterJobInFinalState);
+
+            logger.log(Level.INFO, "After synchronizeMasterJobStatusWithSubjobs, before DB write " + query);
+            if (!query.isEmpty()) {
+                boolean result = writeToDb(query, db, dbdev);
+                logger.log(Level.INFO, "Writing masterjob status update to DB result: " + result);
+                if (result) {
+                    registerLog.append("Master job status changes written to database for ")
+                            .append(counter)
+                            .append(" masterjobs\n");
+                }
+            } else {
+                logger.log(Level.INFO, "No masterjobs to update");
+            }
             t.endTiming();
             logger.log(Level.INFO, "CheckJobStatus executed in: " + t.getMillis());
-
+            registerLog.append("CheckJobStatus executed in: ")
+                    .append(t.getMillis())
+                    .append("\n");
+            DBSyncUtils.registerLog(CheckJobStatus.class.getCanonicalName(), registerLog.toString());
         }
 
     }
 
-    private boolean writeToDb(StringBuilder query, DBFunctions db, DBFunctions dbdev) {
-        dbdev.query(query.toString());
-        return false;
+    private boolean writeToDb(String query, DBFunctions db, DBFunctions dbdev) {
+        return dbdev.query(query);
     }
 
-    private StringBuilder synchronizeMasterJobStatusWithSubjobs(Map<Long, Map<Long, JobDto>> masterAndSubJobs) {
+
+    private String synchronizeMasterJobStatusWithSubjobs(Set<Long> runningMasterjobs, Set<Long> finalMasterJobs) {
         logger.log(Level.INFO, "synchronizing master and subjobs... ");
         StringBuilder updateQuery = new StringBuilder("INSERT INTO QUEUE (queueId, statusId) VALUES ");
 
-        for (Map.Entry<Long, Map<Long, JobDto>> entry : masterAndSubJobs.entrySet()) {
-            Long masterJobId = entry.getKey();
-            logger.log(Level.INFO, "masterJobId: " + masterJobId);
-            Map<Long, JobDto> jobs = entry.getValue();
-            JobDto jobDto = jobs.get(masterJobId);
-            if(jobDto == null){
-                logger.log(Level.INFO, "jobDto is null");
-                continue;
+
+        if (runningMasterjobs.isEmpty() && finalMasterJobs.isEmpty()) {
+            logger.log(Level.INFO, "No masterjobs in running or final state");
+            return "";
+        }
+
+        if (!runningMasterjobs.isEmpty()) {
+            for (Long masterjobId : runningMasterjobs) {
+                appendUpdateQuery(updateQuery, masterjobId, JobStatus.DONE.getAliEnLevel());
             }
-            int masterStatusId = jobDto.getStatusId();
-            boolean allSubjobsFinal = isSubjobsFinal(jobs, masterJobId);
+        }
 
-            if (masterStatusId == JobStatus.SPLIT.getAliEnLevel()) {
-                logger.log(Level.INFO, "Master = SPLIT: " + masterStatusId);
-                if (allSubjobsFinal) {
-                    logger.log(Level.INFO, "Master = SPLIT, but all subjobs final. Moving master to final" + masterStatusId);
-                    jobDto.setStatusId(JobStatus.DONE.getAliEnLevel());
-                    appendUpdateQuery(updateQuery, masterJobId, JobStatus.DONE.getAliEnLevel());
-
-                }
-            } else if (masterStatusId == JobStatus.DONE.getAliEnLevel() || masterStatusId == JobStatus.KILLED.getAliEnLevel()) {
-                if (!allSubjobsFinal) {
-                    logger.log(Level.INFO, "master is final, but subjobs are not. moving to split: " + masterStatusId);
-                    jobDto.setStatusId(JobStatus.SPLIT.getAliEnLevel());
-                    appendUpdateQuery(updateQuery, masterJobId, JobStatus.SPLIT.getAliEnLevel());
-                }
-                // Subjobs and master are final - Nothing happens
-            } else {
-                if (allSubjobsFinal) {
-                    logger.log(Level.INFO, "subjobs are all final: " + masterStatusId);
-                    jobDto.setStatusId(JobStatus.DONE.getAliEnLevel());
-                    appendUpdateQuery(updateQuery, masterJobId, JobStatus.DONE.getAliEnLevel());
-                } else {
-                    logger.log(Level.INFO, "subjobs have running, moving master to split: " + masterStatusId);
-                    jobDto.setStatusId(JobStatus.SPLIT.getAliEnLevel());
-                    appendUpdateQuery(updateQuery, masterJobId, JobStatus.SPLIT.getAliEnLevel());
-                }
+        if (!finalMasterJobs.isEmpty()) {
+            for (Long masterjobId : finalMasterJobs) {
+                appendUpdateQuery(updateQuery, masterjobId, JobStatus.SPLIT.getAliEnLevel());
             }
         }
 
         updateQuery.deleteCharAt(updateQuery.length() - 2).append("ON DUPLICATE KEY UPDATE statusId = VALUES(statusId)");
 
-        logger.log(Level.INFO, "updateQuery: " + updateQuery);
-        logger.log(Level.INFO, "counter: " + counter);
-        logger.log(Level.INFO, "masterAndSubJobs size: " + masterAndSubJobs.size());
-        return updateQuery;
+        logger.log(Level.INFO, "job status updates prepared: " + counter);
+        logger.log(Level.INFO, "runningMasterJobs size: " + runningMasterjobs.size());
+        logger.log(Level.INFO, "finalMasterJobs size: " + finalMasterJobs.size());
+        return updateQuery.toString();
     }
+
 
     private void appendUpdateQuery(StringBuilder updateQuery, Long masterJobId, int statusId) {
         updateQuery
@@ -140,29 +137,41 @@ public class CheckJobStatus extends Optimizer {
         counter++;
     }
 
-    private boolean isSubjobsFinal(Map<Long, JobDto> jobs, long masterJobId) {
-        return jobs.entrySet().parallelStream()
-                .filter(s -> !Objects.equals(s.getKey(), masterJobId) && s.getValue().getSplit() > 0)
-                .allMatch(s -> s.getValue().getStatusId() == JobStatus.DONE.getAliEnLevel() || s.getValue().getStatusId() == JobStatus.KILLED.getAliEnLevel());
-    }
-
-    private Map<Long, Map<Long, JobDto>> getMasterAndSubjobs(DBFunctions db) {
-        db.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
-        Map<Long, Map<Long, JobDto>> relatedMasterAndSubjobs = new HashMap<>();
-        db.query("select split, queueId, statusId from QUEUE where masterjob = 1 or split > 0");
+    private Set<Long> getMasterJobIds(DBFunctions db, String query) {
+        Set<Long> masterJobIds = new HashSet<>();
+        db.query(query);
         while (db.moveNext()) {
-            long split = db.getl("split");
-            long queueId = db.getl("queueId");
-            int statusId = db.geti("statusId");
-
-            JobDto jobDto = new JobDto(queueId, split, statusId);
-            long key = (split == 0) ? queueId : split;
-            relatedMasterAndSubjobs.computeIfAbsent(key, k -> new HashMap<>()).putIfAbsent(queueId, jobDto);
-
+            masterJobIds.add(db.getl("masterjobid"));
         }
-        logger.log(Level.INFO, "relatedMasterAndSubjobs map size: " + relatedMasterAndSubjobs.keySet().size());
-        return relatedMasterAndSubjobs;
+
+        return masterJobIds;
     }
 
+    private String getQueryToFindMasterjobsInRunningState() {
+        return "SELECT masterjobid FROM\n" +
+                "    (SELECT\n" +
+                "         qmaster.queueId AS masterjobid,\n" +
+                "         count(NULLIF(NULLIF(qsubjob.statusId," + JobStatus.DONE.getAliEnLevel() + "), " + JobStatus.DONE_WARN.getAliEnLevel() + ")) AS active_subjobs\n" +
+                "     FROM\n" +
+                "         QUEUE qmaster JOIN QUEUE qsubjob ON qsubjob.split=qmaster.queueId\n" +
+                "     WHERE\n" +
+                "         qmaster.statusId=3\n" +
+                "     GROUP BY qmaster.queueId) x\n" +
+                "WHERE active_subjobs=0;";
+    }
 
+    private String getQueryToFindMasterjobsInFinalState() {
+        String runningStates = JobStatus.INSERTING.getAliEnLevel() + ","
+                + JobStatus.WAITING.getAliEnLevel() + ","
+                + JobStatus.ASSIGNED.getAliEnLevel() + ","
+                + JobStatus.STARTED.getAliEnLevel() + ","
+                + JobStatus.RUNNING.getAliEnLevel() + ","
+                + JobStatus.SAVING.getAliEnLevel() + ","
+                + JobStatus.SAVED.getAliEnLevel();
+        return "SELECT qmaster.queueId AS masterjobid FROM\n" +
+                " QUEUE qmaster JOIN QUEUE qsubjob ON qsubjob.split=qmaster.queueId\n" +
+                " WHERE qmaster.statusId in (" + JobStatus.DONE.getAliEnLevel() + "," + JobStatus.DONE_WARN.getAliEnLevel() + ") AND\n" +
+                " qsubjob.statusId IN (" + runningStates + ")\n" +
+                "GROUP BY qmaster.queueId;";
+    }
 }
