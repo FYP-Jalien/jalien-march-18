@@ -520,7 +520,7 @@ public class MemoryController implements Runnable {
 	 * Checks memory consumption of the slot
 	 */
 	private void checkMemoryConsumption() {
-		double slotMem = 0, slotMemsw = 0;
+		double slotMem = 0, slotMemsw = 0; // In kB
 		if (!linuxProc) {
 			if (!cgroupRootPath.isEmpty()) {
 				try {
@@ -529,13 +529,13 @@ public class MemoryController implements Runnable {
 						String[] memTypesSimpl = { "total_rss", "total_cache" };
 						slotMem = computeSlotMemory(memTypesSimpl);
 						if (debugMemoryController)
-							logger.log(Level.INFO, "Current mem usage (total_rss + total_cache) is " + slotMem);
+							logger.log(Level.INFO, "Current mem usage (total_rss + total_cache) is " + slotMem + " kB");
 						File f = new File(cgroupRootPath + "/memory.memsw.usage_in_bytes");
 						if (f.exists()) {
 							String[] memTypesSwap = { "total_rss", "total_cache", "total_swap" };
 							slotMemsw = computeSlotMemory(memTypesSwap);
 							if (debugMemoryController)
-								logger.log(Level.INFO, "Current memsw usage (total_rss + total_cache + swap) is " + slotMemsw);
+								logger.log(Level.INFO, "Current memsw usage (total_rss + total_cache + swap) is " + slotMemsw  + " kB");
 						}
 					}
 					else {
@@ -559,14 +559,14 @@ public class MemoryController implements Runnable {
 					logger.log(Level.WARNING, "Found exception while checking cgroups consumption", e);
 				}
 			}
-			if (htCondorLimitParser != null) {
+			if (htCondorLimitParser != null && activeJAInstances.size() > 1) {
 				double evaluated = MemoryController.parseClassAdLimitExpr(Double.valueOf(slotMem));
 				if (debugMemoryController)
 					logger.log(Level.INFO, "HTCondor PeriodicRemove expression evaluated to " + evaluated);
-				if (evaluated == 0d)
+				if (evaluated == 0d) {
 					if (debugMemoryController)
 						logger.log(Level.INFO, "Job consumption under HTCondor threshold");
-				else {
+				} else {
 					logger.log(Level.INFO, "Job consumption above HTCondor threshold");
 					if (!condorSlotAlreadyPreempted) {
 						for (Long jobNum : MemoryController.activeJAInstances.keySet()) {
@@ -574,12 +574,12 @@ public class MemoryController implements Runnable {
 						}
 						condorSlotAlreadyPreempted = true;
 					}
-					JobRunner.recordHighestConsumer(slotMem * 1024, 0, "HTCondor limit on RSS --> " + MemoryController.htCondorJobMemoryLimit, MemoryController.memHardLimit);
+					JobRunner.recordHighestConsumer(slotMem, 0, "HTCondor limit on RSS --> " + MemoryController.htCondorLimitParser, MemoryController.htCondorJobMemoryLimit / 1024);
 				}
 			}
 		} else {
 			for (JobAgent runningJA : activeJAInstances.values()) {
-				slotMem += runningJA.RES_RMEM.doubleValue();
+				slotMem += runningJA.RES_RMEM.doubleValue() / 1024; // slotMem is in kB
 			}
 		}
 		for (JobAgent runningJA : activeJAInstances.values()) {
@@ -590,7 +590,7 @@ public class MemoryController implements Runnable {
 			memCurrentPerJob.put(queueId, runningJA.RES_VMEM);
 			updateGrowthDerivative(runningJA, queueId);
 			if (cgroupRootPath.isEmpty() && !linuxProc)
-				slotMem += runningJA.RES_VMEM.doubleValue();
+				slotMem += runningJA.RES_VMEM.doubleValue() / 1024; //slotMem in kB
 		}
 
 		if (activeJAInstances.size() > 1) { // avoid preemption if we have a single job running in the slot
@@ -678,8 +678,8 @@ public class MemoryController implements Runnable {
 	/**
 	 * Checks whether the total slot memory is approaching the configured limit
 	 *
-	 * @param slotMem RMEM
-	 * @param slotMemsw VMEM (Including swap)
+	 * @param slotMem RMEM in kB
+	 * @param slotMemsw VMEM (Including swap) in kB
 	 * @return Whether we are close to the configured memory limit
 	 */
 	private String approachingSlotMemLimit(double slotMem, double slotMemsw) {
