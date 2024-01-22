@@ -361,7 +361,9 @@ public class LDAPHelper {
 	/**
 	 * @param account
 	 * @return the set of emails associated to the given account
+	 * @deprecated replaced by {@link LDAPHelperRemote#getEmails(String)}
 	 */
+	@Deprecated
 	public static Set<String> getEmails(final String account) {
 		if (account == null || account.length() == 0)
 			return null;
@@ -409,7 +411,9 @@ public class LDAPHelper {
 	/**
 	 * @param domain
 	 * @return the tree for this domain
+	 * @deprecated replaced by {@link LDAPHelperRemote#getInfoDomain(String)}
 	 */
+	@Deprecated
 	public static HashMap<String, Object> getInfoDomain(final String domain) {
 		// Get the root site config based on domain
 		return LDAPHelper.checkLdapTree("(&(domain=" + domain + ")(objectClass=AliEnSite))", "ou=Sites,");
@@ -417,7 +421,9 @@ public class LDAPHelper {
 
 	/**
 	 * @return the tree for the VO
+	 * @deprecated replaced by {@link LDAPHelperRemote#getVOConfig()}
 	 */
+	@Deprecated
 	public static HashMap<String, Object> getVOConfig() {
 		return LDAPHelper.checkLdapTree("(&(objectClass=AliEnVOConfig))", "ou=Config,");
 	}

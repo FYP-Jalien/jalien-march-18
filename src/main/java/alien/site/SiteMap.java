@@ -109,6 +109,8 @@ public class SiteMap {
 				st = st.split("::")[1];
 				extrasites.add(st);
 			}
+
+			siteMap.put("closeSE", env.get("closeSE"));
 		}
 
 		// Get users from cerequirements field

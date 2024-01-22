@@ -69,15 +69,15 @@ public class GetMasterjob extends Request {
 	@Override
 	public void run() {
 
-		System.out.println("running with GetMasterJob");
+		// System.out.println("running with GetMasterJob");
 
 		subJobs = TaskQueueUtils.getMasterJobStat(jobId, status, id, site, TaskQueueUtils.job_limit);
 
-		System.out.println("got subjosb, in GetMasterJob");
+		// System.out.println("got subjobs, in GetMasterJob");
 
 		masterJob = TaskQueueUtils.getJob(jobId);
 
-		System.out.println("done with GetMasterJob");
+		// System.out.println("done with GetMasterJob");
 
 	}
 

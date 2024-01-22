@@ -1,5 +1,7 @@
 package alien.shell.commands;
 
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashSet;
@@ -8,6 +10,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.StringTokenizer;
 
+import alien.api.taskQueue.GetPS;
 import alien.shell.ErrNo;
 import alien.shell.ShellColor;
 import alien.taskQueue.Job;
@@ -48,6 +51,8 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 	private final Set<Long> mjobs = new LinkedHashSet<>();
 
 	private final Set<Long> jobid = new LinkedHashSet<>();
+
+	private final HashMap<GetPS.PsFilters, Collection<Object>> filters = new HashMap<>();
 
 	private String orderByKey = "queueId";
 
@@ -108,7 +113,7 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 		if (users.size() == 0)
 			users.add(commander.getUsername());
 
-		final List<Job> ps = commander.q_api.getPS(states, users, sites, nodes, mjobs, jobid, orderByKey, limit);
+		final List<Job> ps = commander.q_api.getPS(states, users, sites, nodes, mjobs, jobid, filters, orderByKey, limit);
 
 		if (ps != null)
 			for (final Job j : ps) {
@@ -451,6 +456,8 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 		commander.printOutln(helpOption("-o <sortkey>"));
 		commander.printOutln(helpOption("-j <jobidlist>"));
 		commander.printOutln(helpOption("-l <query-limit>"));
+		commander.printOutln(helpOption("-t <time-limit-start, time-limit-end>", "modified time between " +
+				"time-limit-start and time-limit-end in 'hours'. eg: -t 12,6 will output the jobs that were modified between last 12h to last 6h"));
 
 		commander.printOutln();
 		commander.printOutln(helpOption("-M", "show only masterjobs"));
@@ -505,6 +512,7 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 			parser.accepts("j").withRequiredArg();
 			parser.accepts("l").withRequiredArg().ofType(Integer.class);
 			parser.accepts("q").withOptionalArg();
+			parser.accepts("t").withOptionalArg();
 
 			parser.accepts("M");
 			parser.accepts("X");
@@ -557,6 +565,50 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 					catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
 						// ignore
 					}
+			}
+
+			if (options.has("t") && options.hasArgument("t")) {
+				final StringTokenizer st = new StringTokenizer((String) options.valueOf("t"), ",");
+				int startTime = 0;
+				int endTime = 0;
+				// Only start time and end time(optional) should be passed
+				if (st.countTokens() == 1 || st.countTokens() == 2) {
+					try {
+						startTime = Integer.parseInt(st.nextToken());
+					} catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
+						commander.setReturnCode(ErrNo.EINVAL, "Invalid argument provided as the start time." +
+								" Start time should be a number.");
+						setArgumentsOk(false);
+					}
+					// If there is one more token, use it as the end time
+					if (st.countTokens() == 1) {
+						try {
+							endTime = Integer.parseInt(st.nextToken());
+						} catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
+							commander.setReturnCode(ErrNo.EINVAL, "Invalid argument provided for the end time." +
+									" End time should be a number.");
+							setArgumentsOk(false);
+						}
+					}
+					// Ensure the provided numbers are positive
+					if (!(startTime >= 0) || !(endTime >= 0)) {
+						commander.setReturnCode(ErrNo.EINVAL, "Invalid argument for time interval" + options.valueOf("t"));
+						setArgumentsOk(false);
+					}
+					// If the time interval is provided in the wrong order, swap them
+					if (startTime < endTime) {
+						int tempTime = startTime;
+						startTime = endTime;
+						endTime = tempTime;
+					}
+					ArrayList<Object> mtimeFilter = new ArrayList<>();
+					mtimeFilter.add(startTime);
+					mtimeFilter.add(endTime);
+					filters.put(GetPS.PsFilters.mtime, mtimeFilter);
+				} else {
+					commander.setReturnCode(ErrNo.EINVAL, "Invalid number of arguments for time interval" + options.valueOf("t"));
+					setArgumentsOk(false);
+				}
 			}
 
 			if (options.has("X")) {

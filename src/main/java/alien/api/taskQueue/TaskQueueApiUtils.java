@@ -62,10 +62,10 @@ public class TaskQueueApiUtils {
 	 * @return a PS listing
 	 */
 	public List<Job> getPS(final Collection<JobStatus> states, final Collection<String> users, final Collection<String> sites, final Collection<String> nodes, final Collection<Long> mjobs,
-			final Collection<Long> jobid, final String orderByKey, final int limit) {
+						   final Collection<Long> jobid, final HashMap<GetPS.PsFilters, Collection<Object>> filters, final String orderByKey, final int limit) {
 
 		try {
-			final GetPS ps = Dispatcher.execute(new GetPS(commander.getUser(), states, users, sites, nodes, mjobs, jobid, orderByKey, limit));
+			final GetPS ps = Dispatcher.execute(new GetPS(commander.getUser(), states, users, sites, nodes, mjobs, jobid, filters, orderByKey, limit));
 
 			return ps.returnPS();
 		}
@@ -521,21 +521,34 @@ public class TaskQueueApiUtils {
 	 * @param preemptionTs
 	 * @param killingTs
 	 * @param preemptionSlotMemory
+	 * @param preemptionSlotSwMemory
 	 * @param preemptionJobMemory
 	 * @param numConcurrentJobs
-	 * @param preemptionTechnique
 	 * @param resubmission
 	 * @param hostName
+	 * @param memoryPerCore
+	 * @param growthDerivative
+	 * @param timeElapsed
+	 * @param preemptionRound
+	 * @param wouldPreempt
+	 * @param memHardLimit
+	 * @param memswHardLimit
+	 * @param killedProcess
+	 * @param cgroupPath
+	 * @param killingSlotMemory
+	 * @param killingSlotSwMemory
 	 * @return
 	 */
-	public boolean recordPreemption(long queueId, long preemptionTs, long killingTs, double preemptionSlotMemory, double preemptionJobMemory, int numConcurrentJobs, String preemptionTechnique, int resubmission, String hostName, String siteName) {
+	public boolean recordPreemption(long queueId, long preemptionTs, long killingTs, double preemptionSlotMemory, double preemptionSlotSwMemory,  double preemptionJobMemory, int numConcurrentJobs, int resubmission, String hostName, String siteName, double memoryPerCore, double growthDerivative, double timeElapsed, String username, int preemptionRound, long wouldPreempt, double memHardLimit, double memswHardLimit, String killedProcessCmd, String cgroupPath, double killingSlotMemory, double killingSlotSwMemory) {
+		final boolean recordingSuccess;
 		try {
-			Dispatcher.execute(new RecordPreemption(queueId, preemptionTs, killingTs, preemptionSlotMemory, preemptionJobMemory, numConcurrentJobs, preemptionTechnique, resubmission, hostName, siteName));
+			final RecordPreemption recording = Dispatcher.execute(new RecordPreemption(queueId, preemptionTs, killingTs, preemptionSlotMemory, preemptionSlotSwMemory, preemptionJobMemory, numConcurrentJobs, resubmission, hostName, siteName, memoryPerCore, growthDerivative, timeElapsed, username, preemptionRound, wouldPreempt, memHardLimit, memswHardLimit, killedProcessCmd, cgroupPath,killingSlotMemory,killingSlotSwMemory));
+			recordingSuccess = recording.getRecordingSuccess();
 		}
 		catch (final ServerException e) {
 			System.out.println("Could not record preemption of job " + queueId + e.getMessage());
 			return false;
 		}
-		return true;
+		return recordingSuccess;
 	}
 }

@@ -3,7 +3,7 @@ package utils.crawler;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-import alien.user.LDAPHelper;
+import alien.user.LDAPHelperRemote;
 
 /**
  * @author costing
@@ -48,7 +48,7 @@ public class GetCEs {
 	 * @return a list of sites extracted from LDAP that are closest to a storage element
 	 */
 	private static Set<String> getCloseSites(final String storageName) {
-		final Set<String> dns = LDAPHelper.checkLdapInformation("closese=" + storageName, "ou=Sites,", "dn");
+		final Set<String> dns = LDAPHelperRemote.checkLdapInformation("closese=" + storageName, "ou=Sites,", "dn");
 
 		final Set<String> ret = new LinkedHashSet<>();
 
@@ -65,7 +65,7 @@ public class GetCEs {
 		if (idx > 0 && idx2 > idx) {
 			final String siteFromStorage = storageName.substring(idx + 2, idx2);
 
-			ret.addAll(LDAPHelper.checkLdapInformation("ou=" + siteFromStorage + "*", "ou=Sites,", "ou", false));
+			ret.addAll(LDAPHelperRemote.checkLdapInformation("ou=" + siteFromStorage + "*", "ou=Sites,", "ou", false));
 		}
 
 		return ret;
@@ -76,12 +76,12 @@ public class GetCEs {
 	 * @return JDL requirement for closest site to storage element
 	 */
 	public static StringBuilder getSiteJDLRequirement(final String se) {
-		final Set<String> siteNames = GetCEs.getCloseSites(se);
+		final Set<String> siteNames = getCloseSites(se);
 
 		final Set<String> matchingCEs = new LinkedHashSet<>();
 
 		for (final String siteName : siteNames)
-			for (final String ce : GetCEs.getCEs(siteName))
+			for (final String ce : getCEs(siteName))
 				matchingCEs.add(siteName + "::" + ce);
 
 		final StringBuilder requirements = new StringBuilder();
@@ -104,6 +104,6 @@ public class GetCEs {
 	 * @return a set of computing elements from a specific site, extracted from LDAP
 	 */
 	private static Set<String> getCEs(final String siteName) {
-		return LDAPHelper.checkLdapInformation("(objectClass=AliEnCE)", "ou=CE,ou=Services,ou=" + siteName + ",ou=Sites,", "name");
+		return LDAPHelperRemote.checkLdapInformation("(objectClass=AliEnCE)", "ou=CE,ou=Services,ou=" + siteName + ",ou=Sites,", "name");
 	}
 }

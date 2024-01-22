@@ -4,6 +4,7 @@ import java.security.GeneralSecurityException;
 import java.security.KeyStoreException;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
+import java.time.ZoneId;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,6 +41,22 @@ public final class AuthorizationFactory {
 		defaultAccount = account;
 	}
 
+	private static AliEnPrincipal loadUserFromKeyStore() {
+		AliEnPrincipal user = null;
+
+		Certificate[] cert;
+		try {
+			cert = JAKeyStore.getKeyStore().getCertificateChain("User.cert");
+			if (cert != null)
+				user = UserFactory.getByCertificate((X509Certificate[]) cert);
+		}
+		catch (final KeyStoreException e) {
+			e.printStackTrace();
+		}
+
+		return user;
+	}
+
 	/**
 	 * @return default account for
 	 */
@@ -49,23 +66,34 @@ public final class AuthorizationFactory {
 				setDefaultUser(UserFactory.getByUsername("admin"));
 			}
 			else {
-				AliEnPrincipal user = null;
-
-				Certificate[] cert;
-				try {
-					cert = JAKeyStore.getKeyStore().getCertificateChain("User.cert");
-					if (cert != null)
-						user = UserFactory.getByCertificate((X509Certificate[]) cert);
-				}
-				catch (KeyStoreException e) {
-					e.printStackTrace();
-				}
-
-				setDefaultUser(user);
+				setDefaultUser(loadUserFromKeyStore());
 			}
 		}
 
 		return defaultAccount;
+	}
+
+	/**
+	 * @return <code>true</code> if the default identity was updated
+	 */
+	public static final boolean checkIdentityReload() {
+		final AliEnPrincipal updatedUser = loadUserFromKeyStore();
+
+		if (defaultAccount == null || !defaultAccount.equals(updatedUser)) {
+			logger.log(Level.INFO, "Replacing default identity with " + updatedUser);
+			setDefaultUser(updatedUser);
+			return true;
+		}
+
+		if (updatedUser.getUserCert() != null) {
+			final X509Certificate cert = updatedUser.getUserCert()[0];
+
+			logger.log(Level.INFO, "Updating " + defaultAccount + "'s certificate with " + cert.getSubjectDN() + " / " + cert.getNotAfter().toInstant().atZone(ZoneId.systemDefault()));
+			defaultAccount.setUserCert(updatedUser.getUserCert());
+			return true;
+		}
+
+		return false;
 	}
 
 	/**
@@ -189,7 +217,7 @@ public final class AuthorizationFactory {
 			if (access == AccessType.DELETE) {
 				if (user.isJob() || user.isJobAgent())
 					return "A job is not allowed this operation";
-				
+
 				if (!AuthorizationChecker.canWrite(guid, user))
 					return "User is not allowed to delete this entry";
 			}

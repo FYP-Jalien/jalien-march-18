@@ -24,7 +24,7 @@ import alien.api.Request;
 import alien.catalogue.access.AuthorizationFactory;
 import alien.config.ConfigUtils;
 import alien.user.AliEnPrincipal;
-import alien.user.LDAPHelper;
+import alien.user.LDAPHelperRemote;
 import alien.user.UserFactory;
 import io.github.olivierlemasle.ca.CA;
 import io.github.olivierlemasle.ca.Certificate;
@@ -197,7 +197,7 @@ public class GetTokenCertificate extends Request {
 				 * X509v3 Subject Alternative Name:
 				 * othername:<unsupported>, email:Costin.Grigoras@cern.ch
 				 */
-				final Set<String> emailAddresses = LDAPHelper.getEmails(requested);
+				final Set<String> emailAddresses = LDAPHelperRemote.getEmails(requested);
 
 				final GeneralName[] nameArray = new GeneralName[4 + (emailAddresses != null ? emailAddresses.size() : 0)];
 

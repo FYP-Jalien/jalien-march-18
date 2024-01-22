@@ -8,7 +8,7 @@ import java.util.Set;
 
 import alien.shell.ErrNo;
 import alien.user.AliEnPrincipal;
-import alien.user.LDAPHelper;
+import alien.user.LDAPHelperRemote;
 import alien.user.UsersHelper;
 import joptsimple.OptionException;
 import joptsimple.OptionParser;
@@ -52,10 +52,10 @@ public class JAliEnCommandwhoami extends JAliEnBaseCommand {
 			// simple shell printout
 			commander.printOutln(user.getName());
 
-		Set<String> names = LDAPHelper.checkLdapInformation("uid=" + user.getName(), "ou=People,", "gecos");
+		Set<String> names = LDAPHelperRemote.checkLdapInformation("uid=" + user.getName(), "ou=People,", "gecos");
 
 		if (names == null)
-			names = LDAPHelper.checkLdapInformation("uid=" + user.getName(), "ou=People,", "cn");
+			names = LDAPHelperRemote.checkLdapInformation("uid=" + user.getName(), "ou=People,", "cn");
 
 		if (names != null && names.size() > 0) {
 			if (verbose)
@@ -64,7 +64,7 @@ public class JAliEnCommandwhoami extends JAliEnBaseCommand {
 			commander.printOut("fullname", String.join(",", names));
 		}
 
-		final Set<String> emails = LDAPHelper.getEmails(user.getName());
+		final Set<String> emails = LDAPHelperRemote.getEmails(user.getName());
 
 		if (emails != null && emails.size() > 0) {
 			if (verbose)

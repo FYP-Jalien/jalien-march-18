@@ -700,7 +700,7 @@ public class JobBroker {
 				final ArrayList<String> users = (ArrayList<String>) matchRequest.get("Users");
 				String orconcat = " and (";
 				for (final String user : users) {
-					final Integer userId = TaskQueueUtils.getUserId(user);
+					final Integer userId = TaskQueueUtils.getUserId(user, true);
 
 					if (userId != null) {
 						where += orconcat + "userId = ?";
@@ -715,7 +715,7 @@ public class JobBroker {
 			if (matchRequest.get("NoUsers") != null && !((ArrayList<String>) matchRequest.get("NoUsers")).isEmpty()) {
 				final ArrayList<String> users = (ArrayList<String>) matchRequest.get("NoUsers");
 				for (final String user : users) {
-					final Integer userId = TaskQueueUtils.getUserId(user);
+					final Integer userId = TaskQueueUtils.getUserId(user, true);
 
 					if (userId != null) {
 						where += " and userId != ? ";
@@ -854,7 +854,7 @@ public class JobBroker {
 				return code_and_slots;
 			}
 
-			if (!TaskQueueUtils.updateHost(host, "CONNECTED", Integer.valueOf(1), port, version, ceName)) {
+			if (!TaskQueueUtils.updateHost(host, "ACTIVE", Integer.valueOf(1), port, version, ceName)) {
 				logger.severe("Error: getNumberFreeSlots, failed updateHost: " + host);
 				code_and_slots.set(0, Integer.valueOf(2));
 				return code_and_slots;
@@ -890,7 +890,7 @@ public class JobBroker {
 	private static void updateWithValuesInLDAP(final HashMap<String, Object> matchRequest) {
 		if (!matchRequest.containsKey("CheckedLDAP")) {
 			if (matchRequest.containsKey("CE")) {
-				HashMap<String, Object> CeConfig = null;
+				Map<String, Object> CeConfig = null;
 				if (matchRequest.containsKey("Site") && matchRequest.get("Site") != null) // careful, could contain key that's there but null
 					CeConfig = ConfigUtils.getCEConfigFromLdap(false, matchRequest.get("Site").toString(), matchRequest.get("CE").toString().split("::")[2]);
 

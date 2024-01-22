@@ -66,6 +66,7 @@ import alien.api.Dispatcher;
 import alien.api.token.GetTokenCertificate;
 import alien.api.token.TokenCertificateType;
 import alien.catalogue.CatalogueUtils;
+import alien.catalogue.access.AuthorizationFactory;
 import alien.config.ConfigUtils;
 import lazyj.ExtProperties;
 import lazyj.Format;
@@ -1097,6 +1098,9 @@ public class JAKeyStore {
 		// the certificate was renewed, next check as we get closer to the expiration time
 		certificateNextCheck = newExpirationTime - SOON_EXPIRATION_LIMIT;
 
+		// update in place or completely reload the default user identity ?
+		AuthorizationFactory.checkIdentityReload();
+		
 		return certificateCheckCode = 0;
 	}
 }

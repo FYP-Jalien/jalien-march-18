@@ -194,8 +194,8 @@ public abstract class Containerizer {
 	 * @return Command to set the environment for container as string
 	 */
 	protected static final String sourceEnvCmd(){
-		final String containerImgPathExport = " && echo export JOB_CONTAINER_PATH=" + containerImgPath;
-		return "source <( " + CVMFS.getAlienvPrint() + apmonConfig + alienSite + cudaDevices + rocrDevices + containerImgPathExport + " ); ";
+		final String containerImgPathExport = "echo export JOB_CONTAINER_PATH=" + containerImgPath;
+		return "source <( " + containerImgPathExport + apmonConfig + alienSite + cudaDevices + rocrDevices + " ); ";
 	}
 
 	/**

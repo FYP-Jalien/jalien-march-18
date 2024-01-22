@@ -27,6 +27,7 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.TreeMap;
+import java.util.UUID;
 import java.util.Vector;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
@@ -40,6 +41,7 @@ import java.util.stream.Collectors;
 import alien.api.Dispatcher;
 import alien.api.ServerException;
 import alien.api.catalogue.LFNfromString;
+import alien.api.taskQueue.GetPS;
 import alien.catalogue.BookingTable;
 import alien.catalogue.CatalogueUtils;
 import alien.catalogue.LFN;
@@ -55,7 +57,7 @@ import alien.quotas.QuotaUtilities;
 import alien.shell.ErrNo;
 import alien.user.AliEnPrincipal;
 import alien.user.AuthorizationChecker;
-import alien.user.LDAPHelper;
+import alien.user.LDAPHelperRemote;
 import alien.user.UsersHelper;
 import apmon.ApMon;
 import lazyj.DBFunctions;
@@ -297,7 +299,7 @@ public class TaskQueueUtils {
 
 			if (account != null && account.length() > 0)
 				if (dbStructure2_20)
-					q += "AND userId=" + getUserId(account);
+					q += "AND userId=" + getUserId(account, true);
 				else
 					q += "AND submitHost LIKE '" + Format.escSQL(account) + "@%'";
 
@@ -585,12 +587,12 @@ public class TaskQueueUtils {
 						first = false;
 
 					if (dbStructure2_20)
-						whe.append("ifnull(substring(exechost,POSITION('\\@' in exechost)+1),'')='").append(Format.escSQL(s)).append('\'');
+						whe.append("siteid=").append(getSiteId(s));
 					else
-						whe.append("execHostId=").append(getHostId(s));
+						whe.append("ifnull(substring(exechost,POSITION('\\@' in exechost)+1),'')='").append(Format.escSQL(s)).append('\'');
 				}
 
-				where += whe.substring(0, whe.length() - 3) + " ) and ";
+				where += whe + " ) and ";
 			}
 
 			if (dbStructure2_20)
@@ -605,7 +607,7 @@ public class TaskQueueUtils {
 			final String q;
 
 			if (dbStructure2_20)
-				q = "SELECT queueId,statusId,split,execHostId,cpucores FROM QUEUE WHERE " + where + " ORDER BY queueId ASC limit " + lim + ";";
+				q = "SELECT queueId,statusId,split,execHostId,cpucores,siteid FROM QUEUE WHERE " + where + " ORDER BY queueId ASC limit " + lim + ";";
 			else
 				q = "SELECT queueId,status,split,execHost FROM QUEUE WHERE " + where + " ORDER BY queueId ASC limit " + lim + ";";
 
@@ -1111,12 +1113,13 @@ public class TaskQueueUtils {
 	 * @param nodes
 	 * @param mjobs
 	 * @param jobids
+	 * @param filters
 	 * @param orderByKey
 	 * @param limit
 	 * @return the ps listing
 	 */
 	public static List<Job> getPS(final Collection<JobStatus> states, final Collection<String> users, final Collection<String> sites, final Collection<String> nodes, final Collection<Long> mjobs,
-			final Collection<Long> jobids, final String orderByKey, final int limit) {
+			final Collection<Long> jobids, final HashMap<GetPS.PsFilters, Collection<Object>> filters, final String orderByKey, final int limit) {
 
 		final List<Job> ret = new ArrayList<>();
 
@@ -1160,6 +1163,43 @@ public class TaskQueueUtils {
 					where += whe + ") ) and ";
 			}
 
+			// Iterating time filter
+			for (Map.Entry<GetPS.PsFilters, Collection<Object>> filterEntry : filters.entrySet()) {
+
+				// Filter name
+				GetPS.PsFilters filter = filterEntry.getKey();
+				// List of values for the filter
+				Collection<Object> filterValues = filterEntry.getValue();
+
+				// Custom logic for each filter
+				switch (filter) {
+					case mtime:
+						if (filterValues != null) {
+							ArrayList<Object> filterValuesList = new ArrayList<>(filterValues);
+							// mtime filter must have two elements. If the endTime is not defined, 0 is added from the parser.
+							if (filterValuesList.size() == 2) {
+								String startTime = String.valueOf(filterValuesList.get(0));
+								String endTime = String.valueOf(filterValuesList.get(1));
+								if (Integer.parseInt(startTime) >= Integer.parseInt(endTime)) {
+									where += " (mtime between (NOW() - INTERVAL " + startTime + " HOUR) " +
+											"and (NOW() - INTERVAL " + endTime + " HOUR)) and ";
+									break;
+								}
+								else {
+									// incorrect time intervals
+								}
+							}
+							else {
+								// we cannot accept more than 2 parameters
+							}
+						}
+						break;
+					// add more filters...
+					default:
+						break;
+				}
+			}
+
 			if (users != null && users.size() > 0 && !users.contains("%")) {
 				final StringBuilder whe = new StringBuilder(" ( ");
 
@@ -1172,7 +1212,7 @@ public class TaskQueueUtils {
 						first = false;
 
 					if (dbStructure2_20)
-						whe.append("userId=").append(getUserId(u));
+						whe.append("userId=").append(getUserId(u, true));
 					else
 						whe.append("submitHost like '").append(Format.escSQL(u)).append("@%'");
 				}
@@ -1203,16 +1243,16 @@ public class TaskQueueUtils {
 				boolean first = true;
 
 				for (final String n : nodes) {
-					final Integer nodeId = getHostId(n);
+					final Integer nodeId = getHostId(n, true);
 
-					if (nodeId != null) {
-						if (!first)
-							whe.append(',');
-						else
-							first = false;
+					final int id = nodeId != null ? nodeId.intValue() : -1;
 
-						whe.append(nodeId);
-					}
+					if (!first)
+						whe.append(',');
+					else
+						first = false;
+
+					whe.append(id);
 				}
 
 				if (!first)
@@ -1402,7 +1442,7 @@ public class TaskQueueUtils {
 			ret.put(entry.getKey(), Integer.valueOf(entry.getValue().intValue() + addToAll));
 
 		if (addToAll > 0) {
-			final Set<String> sites = LDAPHelper.checkLdapInformation("(objectClass=organizationalUnit)", "ou=Sites,", "ou", false);
+			final Set<String> sites = LDAPHelperRemote.checkLdapInformation("(objectClass=organizationalUnit)", "ou=Sites,", "ou", false);
 
 			if (sites != null)
 				for (final String site : sites)
@@ -1808,8 +1848,8 @@ public class TaskQueueUtils {
 
 			if (dbStructure2_20) {
 				values.put("statusId", Integer.valueOf(jobStatus.getAliEnLevel()));
-				values.put("userId", getUserId(owner));
-				values.put("submitHostId", getHostId(clientAddress));
+				values.put("userId", getUserId(owner, false));
+				values.put("submitHostId", getHostId(clientAddress, false));
 				values.put("commandId", getCommandId(executable));
 
 				if (notify != null && notify.length() > 0)
@@ -1889,6 +1929,11 @@ public class TaskQueueUtils {
 
 		@Override
 		protected Integer resolve(final String key) {
+			return resolve(key, false);
+		}
+
+		@Override
+		protected Integer resolve(final String key, final boolean readOnly) {
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return null;
@@ -1902,7 +1947,7 @@ public class TaskQueueUtils {
 
 					db.setLastGeneratedKey(true);
 
-					final Set<String> ids = LDAPHelper.checkLdapInformation("uid=" + key, "ou=People,", "CCID");
+					final Set<String> ids = LDAPHelperRemote.checkLdapInformation("uid=" + key, "ou=People,", "CCID");
 
 					int id = 0;
 
@@ -1934,14 +1979,16 @@ public class TaskQueueUtils {
 								+ " because of it. Will generate a new userid for this guy, but the consistency with LDAP is lost now!");
 					}
 
-					if (db.query("INSERT INTO QUEUE_USER (user) VALUES (?);", true, key))
-						return db.getLastGeneratedKey();
+					if (!readOnly) {
+						if (db.query("INSERT INTO QUEUE_USER (user) VALUES (?);", true, key))
+							return db.getLastGeneratedKey();
 
-					// somebody probably has inserted the same entry concurrently
-					db.query("SELECT userId FROM QUEUE_USER where user=?", false, key);
+						// somebody probably has inserted the same entry concurrently
+						db.query("SELECT userId FROM QUEUE_USER where user=?", false, key);
 
-					if (db.moveNext())
-						return Integer.valueOf(db.geti(1));
+						if (db.moveNext())
+							return Integer.valueOf(db.geti(1));
+					}
 				}
 				else
 					return Integer.valueOf(db.geti(1));
@@ -1957,11 +2004,11 @@ public class TaskQueueUtils {
 	 * @param owner
 	 * @return user ID
 	 */
-	static synchronized Integer getUserId(final String owner) {
+	static synchronized Integer getUserId(final String owner, final boolean readOnly) {
 		if (owner == null || owner.length() == 0)
 			return null;
 
-		return userIdCache.get(owner);
+		return userIdCache.get(owner, readOnly);
 	}
 
 	private static final GenericLastValuesCache<String, Integer> commandIdCache = new GenericLastValuesCache<>() {
@@ -1974,6 +2021,11 @@ public class TaskQueueUtils {
 
 		@Override
 		protected Integer resolve(final String key) {
+			return resolve(key, false);
+		}
+
+		@Override
+		protected Integer resolve(final String key, final boolean readOnly) {
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return null;
@@ -1985,17 +2037,19 @@ public class TaskQueueUtils {
 				db.setReadOnly(false);
 
 				if (!db.moveNext()) {
-					db.setLastGeneratedKey(true);
+					if (!readOnly) {
+						db.setLastGeneratedKey(true);
 
-					if (db.query("INSERT INTO QUEUE_COMMAND (command) VALUES (?);", true, key))
-						return db.getLastGeneratedKey();
+						if (db.query("INSERT INTO QUEUE_COMMAND (command) VALUES (?);", true, key))
+							return db.getLastGeneratedKey();
 
-					// somebody probably has inserted the same entry
-					// concurrently
-					db.query("SELECT commandId FROM QUEUE_COMMAND where command=?;", false, key);
+						// somebody probably has inserted the same entry
+						// concurrently
+						db.query("SELECT commandId FROM QUEUE_COMMAND where command=?;", false, key);
 
-					if (db.moveNext())
-						return Integer.valueOf(db.geti(1));
+						if (db.moveNext())
+							return Integer.valueOf(db.geti(1));
+					}
 				}
 				else
 					return Integer.valueOf(db.geti(1));
@@ -2022,6 +2076,11 @@ public class TaskQueueUtils {
 
 		@Override
 		protected Integer resolve(final String key) {
+			return resolve(key, false);
+		}
+
+		@Override
+		protected Integer resolve(final String key, final boolean readOnly) {
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return null;
@@ -2033,17 +2092,19 @@ public class TaskQueueUtils {
 				db.setReadOnly(false);
 
 				if (!db.moveNext()) {
-					db.setLastGeneratedKey(true);
+					if (!readOnly) {
+						db.setLastGeneratedKey(true);
 
-					if (db.query("INSERT INTO QUEUE_HOST (host) VALUES (?);", true, key))
-						return db.getLastGeneratedKey();
+						if (db.query("INSERT INTO QUEUE_HOST (host) VALUES (?);", true, key))
+							return db.getLastGeneratedKey();
 
-					// somebody probably has inserted the same entry
-					// concurrently
-					db.query("SELECT hostId FROM QUEUE_HOST where host=?", false, key);
+						// somebody probably has inserted the same entry
+						// concurrently
+						db.query("SELECT hostId FROM QUEUE_HOST where host=?", false, key);
 
-					if (db.moveNext())
-						return Integer.valueOf(db.geti(1));
+						if (db.moveNext())
+							return Integer.valueOf(db.geti(1));
+					}
 				}
 				else
 					return Integer.valueOf(db.geti(1));
@@ -2053,11 +2114,11 @@ public class TaskQueueUtils {
 		}
 	};
 
-	private static synchronized Integer getHostId(final String host) {
+	private static synchronized Integer getHostId(final String host, final boolean readOnly) {
 		if (host == null || host.length() == 0)
 			return null;
 
-		return hostIdCache.get(host);
+		return hostIdCache.get(host, readOnly);
 	}
 
 	private static final GenericLastValuesCache<String, Integer> notifyIdCache = new GenericLastValuesCache<>() {
@@ -2070,6 +2131,11 @@ public class TaskQueueUtils {
 
 		@Override
 		protected Integer resolve(final String key) {
+			return resolve(key, false);
+		}
+
+		@Override
+		protected Integer resolve(final String key, final boolean readOnly) {
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return null;
@@ -2081,17 +2147,19 @@ public class TaskQueueUtils {
 				db.setReadOnly(false);
 
 				if (!db.moveNext()) {
-					db.setLastGeneratedKey(true);
+					if (!readOnly) {
+						db.setLastGeneratedKey(true);
 
-					if (db.query("INSERT INTO QUEUE_NOTIFY (notify) VALUES (?);", true, key))
-						return db.getLastGeneratedKey();
+						if (db.query("INSERT INTO QUEUE_NOTIFY (notify) VALUES (?);", true, key))
+							return db.getLastGeneratedKey();
 
-					// somebody probably has inserted the same entry
-					// concurrently
-					db.query("SELECT notifyId FROM QUEUE_NOTIFY where notify=?;", false, key);
+						// somebody probably has inserted the same entry
+						// concurrently
+						db.query("SELECT notifyId FROM QUEUE_NOTIFY where notify=?;", false, key);
 
-					if (db.moveNext())
-						return Integer.valueOf(db.geti(1));
+						if (db.moveNext())
+							return Integer.valueOf(db.geti(1));
+					}
 				}
 				else
 					return Integer.valueOf(db.geti(1));
@@ -2588,6 +2656,15 @@ public class TaskQueueUtils {
 					t2.send();
 				}
 
+			// TODO remove this when jobs send again heartbeat monitoring data
+			try (DBFunctions db = getQueueDB()) {
+				if (db == null)
+					return false;
+
+				db.setQueryTimeout(60);
+
+				db.query("UPDATE QUEUEPROC SET lastupdate=NOW() WHERE queueId=?", false, Long.valueOf(queueId));
+			}
 			return true;
 		}
 
@@ -2617,6 +2694,25 @@ public class TaskQueueUtils {
 		return true;
 	}
 
+	private static long lastEmptyAgentsCleanup = 0;
+
+	private static void deleteEmptyAgents() {
+		if (System.currentTimeMillis() - lastEmptyAgentsCleanup > 1000 * 60) {
+			lastEmptyAgentsCleanup = System.currentTimeMillis();
+
+			try (DBFunctions db = getQueueDB()) {
+				if (db == null)
+					return;
+
+				db.setQueryTimeout(60);
+
+				db.query("delete from JOBAGENT where counter<1");
+			}
+
+			lastEmptyAgentsCleanup = System.currentTimeMillis();
+		}
+	}
+
 	private static boolean deleteJobAgent(final int jobagentId) {
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
@@ -2630,7 +2726,7 @@ public class TaskQueueUtils {
 
 			final int updated = db.getUpdateCount();
 
-			db.query("delete from JOBAGENT where counter<1");
+			deleteEmptyAgents();
 
 			return updated > 0;
 		}
@@ -2947,6 +3043,9 @@ public class TaskQueueUtils {
 		return jobStatuses;
 	}
 
+	// CE active status
+	private static final ExpirationCache<String, String> hostsStatus = new ExpirationCache<>(1024);
+
 	/**
 	 * @param host
 	 * @param status
@@ -2967,10 +3066,19 @@ public class TaskQueueUtils {
 			if (logger.isLoggable(Level.FINE))
 				logger.log(Level.FINE, "Updating host " + host + " to status " + status);
 
+			String oldStatus = hostsStatus.get(host);
+
+			if (status.equals(oldStatus)) {
+				// was recently enough updated to the same status
+				return true;
+			}
+
 			if (!db.query("update HOSTS set status=?,date=UNIX_TIMESTAMP(NOW()) where hostName=?", false, status, host)) {
 				logger.log(Level.WARNING, "Update HOSTS failed: " + host + " and " + status);
 				return false;
 			}
+
+			hostsStatus.overwrite(host, status, 1000 * 60);
 
 			return db.getUpdateCount() != 0;
 		}
@@ -3002,6 +3110,11 @@ public class TaskQueueUtils {
 
 		@Override
 		protected Integer resolve(final String key) {
+			return resolve(key, false);
+		}
+
+		@Override
+		protected Integer resolve(final String key, final boolean readOnly) {
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return null;
@@ -3015,13 +3128,17 @@ public class TaskQueueUtils {
 				if (db.moveNext())
 					return Integer.valueOf(db.geti(1));
 
-				db.setReadOnly(false);
-				db.setLastGeneratedKey(true);
+				if (!readOnly) {
+					db.setReadOnly(false);
+					db.setLastGeneratedKey(true);
 
-				if (!db.query(insert, false, key))
-					return null;
+					if (!db.query(insert, false, key))
+						return null;
 
-				return db.getLastGeneratedKey();
+					return db.getLastGeneratedKey();
+				}
+
+				return null;
 			}
 		}
 	}
@@ -3131,7 +3248,7 @@ public class TaskQueueUtils {
 			if (db == null)
 				return 0;
 
-			final HashMap<String, Object> domainInfo = LDAPHelper.getInfoDomain(domain);
+			final Map<String, Object> domainInfo = LDAPHelperRemote.getInfoDomain(domain);
 
 			if (domainInfo == null || domainInfo.size() == 0) {
 				logger.severe("Error: cannot find site root configuration in LDAP for domain: " + domain);
@@ -3343,11 +3460,13 @@ public class TaskQueueUtils {
 
 			db.query("update JOBAGENT set counter=counter-1 " + oldestQueueIdQ + " where entryId=?", false, bindValues.toArray(new Object[0]));
 
-			db.query("delete from JOBAGENT where counter<1", false);
+			deleteEmptyAgents();
 		}
 
 		return 1;
 	}
+
+	private static final ExpirationCache<String, String> connectedHosts = new ExpirationCache<>(1024);
 
 	/**
 	 * @param host
@@ -3368,8 +3487,17 @@ public class TaskQueueUtils {
 			if (logger.isLoggable(Level.FINER))
 				logger.log(Level.FINER, "Going to updateHost for: " + host + " status: " + status);
 
-			if (!db.query("update HOSTS set status=?,connected=?,hostPort=?,version=?,cename=? where hostName=?", false, status, connected, Integer.valueOf(port), version, ceName, host))
+			String oldCE = connectedHosts.get(host);
+
+			if (ceName.equals(oldCE))
+				return true;
+
+			if (!db.query("update HOSTS set status=?,connected=?,hostPort=?,version=?,cename=?,date=UNIX_TIMESTAMP(NOW())  where hostName=?", false, status, connected, Integer.valueOf(port), version,
+					ceName, host))
 				return false;
+
+			hostsStatus.overwrite(host, status, 1000 * 60);
+			connectedHosts.overwrite(host, ceName, 1000 * 60);
 
 			return db.getUpdateCount() > 0;
 		}
@@ -3809,7 +3937,7 @@ public class TaskQueueUtils {
 	private static Set<String> getSiteCloseToSE(final String seName) {
 		final Set<String> ret = new HashSet<>();
 
-		for (final String s : LDAPHelper.checkLdapInformation("(&(closese=" + seName + "))", "ou=Sites,", "ou"))
+		for (final String s : LDAPHelperRemote.checkLdapInformation("(&(closese=" + seName + "))", "ou=Sites,", "ou"))
 			ret.add(s.toUpperCase());
 
 		ret.add(seName.substring(seName.indexOf("::") + 2, seName.lastIndexOf("::")).toUpperCase());
@@ -3933,7 +4061,7 @@ public class TaskQueueUtils {
 			// get user
 			final String user = jdl.getUser();
 			if (user != null)
-				params.put("userid", getUserId(user));
+				params.put("userid", getUserId(user, false));
 
 			// parse partition
 			m = patPartitions.matcher(reqs);
@@ -4102,43 +4230,96 @@ public class TaskQueueUtils {
 	 * @param preemptionTs
 	 * @param killingTs
 	 * @param preemptionSlotMemory
+	 * @param preemptionSlotMemory
 	 * @param preemptionJobMemory
 	 * @param numConcurrentJobs
-	 * @param preemptionTechnique
 	 * @param resubmissionCounter
 	 * @param hostName
 	 * @param siteName
+	 * @param memoryPerCore
+	 * @param growthDerivative
+	 * @param timeElapsed
+	 * @param username
+	 * @param preemptionRound
+	 * @param wouldPreempt
+	 * @param vmUID
+	 * @param memHardLimit
+	 * @param memswHardLimit
+	 * @param killedProcess
+	 * @param cgroupPath
+	 * @param killingSlotMemory
+	 * @param killingSlotSwMemory
 	 * @return <code>true</code> if the recording could be done
 	 */
-	public static boolean recordPreemption(final long queueId, final long preemptionTs, final long killingTs, final double preemptionSlotMemory, final double preemptionJobMemory, final int numConcurrentJobs, final String preemptionTechnique, final int resubmissionCounter, final String hostName, final String siteName) {
+	public static boolean recordPreemption(final long queueId, final long preemptionTs, final long killingTs, final double preemptionSlotMemory, final double preemptionSlotSwMemory, final double preemptionJobMemory,
+			final int numConcurrentJobs, final int resubmissionCounter, final String hostName, final String siteName, final double memoryPerCore, final double growthDerivative,
+			final double timeElapsed, final String username, final int preemptionRound, final long wouldPreempt, UUID vmUID, double memHardLimit, double memswHardLimit, final String killedProcess, final String cgroupPath, final double killingSlotMemory, final double killingSlotSwMemory) {
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
 				return false;
-
-			if (logger.isLoggable(Level.FINE))
-				logger.log(Level.FINE, "Going to record preemption for job " + queueId);
 
 			db.setReadOnly(false);
 			db.setQueryTimeout(60);
 
 			logger.log(Level.INFO, "Recording preemption for job " + queueId);
 			int siteId = getSiteId(siteName);
-			Integer hostId = getHostId(hostName);
+			Integer hostId = getHostId(hostName, false);
+			Integer userId = getUserId(username, true);
+
+			Map<String, Object> values = new HashMap<>();
+			values.put("queueId", Long.valueOf(queueId));
+			values.put("preemptionTs",Long.valueOf(preemptionTs));
+			values.put("preemptionSlotMemory",Double.valueOf(preemptionSlotMemory));
+			values.put("preemptionSlotSwMemory",Double.valueOf(preemptionSlotSwMemory));
+			values.put("preemptionJobMemory",Double.valueOf(preemptionJobMemory));
+			values.put("numConcurrentJobs",Integer.valueOf(numConcurrentJobs));
+			values.put("resubmissionCounter",Integer.valueOf(resubmissionCounter));
+			values.put("hostId",hostId);
+			values.put("siteId",Integer.valueOf(siteId));
+			values.put("memoryPerCore",Double.valueOf(memoryPerCore));
+			values.put("growthDerivative",Double.valueOf(growthDerivative));
+			values.put("timeElapsed",Double.valueOf(timeElapsed));
+			values.put("userId",userId);
+			values.put("preemptionRound",Integer.valueOf(preemptionRound));
+			values.put("wouldPreempt",Long.valueOf(wouldPreempt));
+			values.put("uuid","string2binary(?)");
+			values.put("memHardLimit",Double.valueOf(memHardLimit));
+			values.put("memswHardLimit",Double.valueOf(memswHardLimit));
+			values.put("killedProcess",killedProcess);
+			values.put("cgroupPath",cgroupPath);
+			values.put("systemKillTs",Long.valueOf(killingTs));
+			values.put("killingSlotMemory", Double.valueOf(killingSlotMemory));
+			values.put("killingSlotSwMemory", Double.valueOf(killingSlotSwMemory));
+
+
 			if (preemptionTs != 0) {
 				logger.log(Level.INFO, "Job was preempted at ts " + preemptionTs);
-				String q = "INSERT INTO oom_preemptions (queueId, preemptionTs,preemptionSlotMemory,preemptionJobMemory,numConcurrentJobs,preemptionTechnique,resubmissionCounter,hostId,siteId) VALUES ("+queueId+","+preemptionTs+","+preemptionSlotMemory+","+preemptionJobMemory+","+numConcurrentJobs+",'"+preemptionTechnique+"',"+ resubmissionCounter + "," + hostId + "," + siteId + ");";
-				if (!db.query(q))
+				String q = DBFunctions.composeInsert("oom_preemptions", values);
+				q = Format.replace(q, "'string2binary(?)'", "string2binary(?)");
+				if (!db.query(q, false, vmUID.toString()))
 					return false;
-			} else if (killingTs != 0) {
-				logger.log(Level.INFO, "Job was killed at ts " + killingTs);
-				String q = "SELECT queueId FROM oom_preemptions where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId=" + siteId + ";";
+			}
+			else if (killingTs != 0) {
+				values.remove("uuid");
+				logger.log(Level.INFO, "Job " + wouldPreempt + " was killed at ts " + killingTs);
+				String q = "SELECT wouldKill FROM oom_preemptions where wouldPreempt=" + wouldPreempt + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId=" + siteId + ";";
 				db.query(q);
 				if (db.moveNext()) {
-					q = "UPDATE oom_preemptions set systemKillTs=" + killingTs + " where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId=" + siteId + " and systemKillTs is null;";
+					values.clear();
+					values.put("systemKillTs",Long.valueOf(killingTs));
+					values.put("resubmissionCounter",Integer.valueOf(resubmissionCounter));
+					values.put("wouldPreempt",Long.valueOf(wouldPreempt));
+					values.put("hostId",hostId);
+					values.put("siteId",Integer.valueOf(siteId));
+					values.put("killingSlotMemory", Double.valueOf(killingSlotMemory));
+					values.put("killingSlotSwMemory", Double.valueOf(killingSlotSwMemory));
+
+					q = DBFunctions.composeUpdate("oom_preemptions", values, Arrays.asList("wouldPreempt", "resubmissionCounter", "hostId", "siteId"));
 					if (!db.query(q))
 						return false;
-				} else {
-					q = "INSERT INTO oom_preemptions (queueId,systemKillTs,resubmissionCounter,hostId,siteId) VALUES (" + queueId + "," + killingTs + "," + resubmissionCounter + "," + hostId + "," + siteId + ");";
+				}
+				else {
+					q = DBFunctions.composeInsert("oom_preemptions", values);
 					if (!db.query(q))
 						return false;
 				}
@@ -4169,13 +4350,14 @@ public class TaskQueueUtils {
 
 			db.setQueryTimeout(60);
 			int siteId = getSiteId(siteName);
-			Integer hostId = getHostId(hostName);
+			Integer hostId = getHostId(hostName, false);
 			int statusId = finalStatus.getAliEnLevel();
-			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId=" + siteId + ";";
+			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where wouldPreempt=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId="
+					+ siteId + ";";
 			if (!db.query(q))
 				return false;
 			if (db.getUpdateCount() == 0)
-				logger.log(Level.INFO, "Updating status but not in oom db (" + queueId + " - " + finalStatus.toString() +")");
+				logger.log(Level.INFO, "Updating status but not in oom db (" + queueId + " - " + finalStatus.toString() + ")");
 		}
 		return true;
 	}

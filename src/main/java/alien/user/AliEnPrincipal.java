@@ -451,7 +451,7 @@ public class AliEnPrincipal implements Principal, Serializable {
 		if (role == null || role.isBlank())
 			return null;
 
-		final Set<String> sUsers = LDAPHelper.checkLdapInformation("uid=" + role, "ou=Roles,", "users");
+		final Set<String> sUsers = LDAPHelperRemote.checkLdapInformation("uid=" + role, "ou=Roles,", "users");
 		return sUsers;
 	}
 }

@@ -12,10 +12,13 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.Collection;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.StringTokenizer;
 import java.util.TreeSet;
 import java.util.Vector;
 import java.util.logging.Level;
@@ -458,6 +461,8 @@ public final class ComputingElement extends Thread {
 				before += "export META_VARIABLES='" + containerConfig.gets("meta.variables") + "'\n";
 			if (!containerConfig.gets("job.container.path").isBlank())
 				before += "export JOB_CONTAINER_PATH='" + containerConfig.gets("job.container.path") + "'\n";
+			if (!containerConfig.gets("disable.enforce").isBlank())
+				before += "export DISABLE_CONTAINER_ENFORCE='" + containerConfig.gets("disable.enforce") + "'\n";
 		}
 
 		//
@@ -466,13 +471,13 @@ public final class ComputingElement extends Thread {
 
 		before += startup_customization(0);
 
-		before += "export ALIENV=\"$( (" + CVMFS.getAlienvPrint() + ") 2> >(if grep -q 'ERROR'; then echo 'export ALIENV_ERRORS=TRUE;'; fi;) )" + "\"\n";
+//		before += "export ALIENV=\"$( (" + CVMFS.getAlienvPrint() + ") 2> >(if grep -q 'ERROR'; then echo 'export ALIENV_ERRORS=TRUE;'; fi;) )" + "\"\n";
 
 		before += startup_customization(1);
 
-		before += "source <( echo $ALIENV ); " + "\n";
+//		before += "source <( echo $ALIENV ); " + "\n";
 
-		before += "export XRDCP_ERRORS=$(xrdcp 2> >(if grep -q 'error\\|not found' ; then echo 'TRUE'; fi;) ) " + "\n";
+//		before += "export XRDCP_ERRORS=$(xrdcp 2> >(if grep -q 'error\\|not found' ; then echo 'TRUE'; fi;) ) " + "\n";
 
 		before += "export JALIEN_JOBAGENT_CMD=\"" + getStartup() + "\"\n";
 
@@ -537,7 +542,7 @@ public final class ComputingElement extends Thread {
 			javaDir = CVMFS.getJava64Dir() + "/";
 
 		final String javaCmd = "java -client -Xms16M -Xmx128M -Djdk.lang.Process.launchMechanism=vfork -XX:+UseSerialGC -cp";
-		final String jarPath = "$(dirname $(which jalien))/../lib/alien-users.jar";
+		final String jarPath = CVMFS.getJarPath();
 		final String jarClass = "alien.site.JobRunner";
 
 		final String jarPathCustom = ConfigUtils.getConfiguration("version").gets("custom.jobagent.jar");
@@ -599,6 +604,7 @@ public final class ComputingElement extends Thread {
 	/**
 	 * Prepares a hash to create the sitemap
 	 */
+	@SuppressWarnings("unchecked")
 	void getSiteMap() {
 		final HashMap<String, String> smenv = new HashMap<>();
 
@@ -624,10 +630,28 @@ public final class ComputingElement extends Thread {
 		if (config.containsKey("ce_partition"))
 			smenv.put("partition", config.get("ce_partition").toString());
 
-		if (config.containsKey("host_closese"))
-			smenv.put("closeSE", config.get("host_closese").toString());
-		else if (config.containsKey("site_closese"))
-			smenv.put("closeSE", config.get("site_closese").toString());
+		final Set<String> closeSEs = new HashSet<>();
+
+		for (final String key : new String[] { "host_closese", "site_closese" }) {
+			if (config.containsKey(key)) {
+				final Object o = config.get(key);
+
+				if (o == null)
+					continue;
+
+				if (o instanceof Collection<?>)
+					closeSEs.addAll((Collection<String>) o);
+				else if (o instanceof String) {
+					StringTokenizer st = new StringTokenizer((String) o, ",; \r\t\n");
+
+					while (st.hasMoreTokens())
+						closeSEs.add(st.nextToken());
+				}
+			}
+		}
+
+		if (closeSEs.size() > 0)
+			smenv.put("closeSE", String.join(",", closeSEs));
 
 		if (config.containsKey("host_environment"))
 			host_environment = getValuesFromLDAPField(config.get("host_environment"));

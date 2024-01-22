@@ -23,7 +23,7 @@ import alien.config.ConfigUtils;
 import alien.io.protocols.Factory;
 import alien.io.protocols.SpaceInfo;
 import alien.user.AliEnPrincipal;
-import alien.user.LDAPHelper;
+import alien.user.LDAPHelperRemote;
 import lazyj.DBFunctions;
 import lazyj.StringFactory;
 
@@ -406,7 +406,7 @@ public class SE implements Serializable, Comparable<SE> {
 		final String site = seName.substring(idx + 2, idx2);
 		final String name = seName.substring(idx2 + 2);
 
-		final Set<String> ldapinfo = LDAPHelper.checkLdapInformation("name=" + name, "ou=SE,ou=Services,ou=" + site + ",ou=Sites,", "options");
+		final Set<String> ldapinfo = LDAPHelperRemote.checkLdapInformation("name=" + name, "ou=SE,ou=Services,ou=" + site + ",ou=Sites,", "options");
 
 		if (ldapinfo == null || ldapinfo.size() == 0)
 			return Collections.emptyMap();
@@ -440,10 +440,10 @@ public class SE implements Serializable, Comparable<SE> {
 		final String site = seName.substring(idx + 2, idx2);
 		final String name = seName.substring(idx2 + 2);
 
-		Set<String> ldapinfo = LDAPHelper.checkLdapInformation("name=" + name, "ou=SE,ou=Services,ou=" + site + ",ou=Sites,", "savedir");
+		Set<String> ldapinfo = LDAPHelperRemote.checkLdapInformation("name=" + name, "ou=SE,ou=Services,ou=" + site + ",ou=Sites,", "savedir");
 
 		if (ldapinfo == null || ldapinfo.size() == 0) {
-			ldapinfo = LDAPHelper.checkLdapInformation("name=" + name, "ou=SE,ou=Services,ou=" + site + ",ou=Sites,", "name");
+			ldapinfo = LDAPHelperRemote.checkLdapInformation("name=" + name, "ou=SE,ou=Services,ou=" + site + ",ou=Sites,", "name");
 
 			if (ldapinfo == null || ldapinfo.size() == 0)
 				return -1;
