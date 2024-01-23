@@ -53,7 +53,12 @@ public class Package implements Comparable<Package>, Serializable {
 	 */
 	private final Map<String, String> platforms = new HashMap<>(2);
 
-	private Map<String, Set<String>> deps = new HashMap<>(2);
+	private final Map<String, Set<String>> deps = new HashMap<>(2);
+
+	/**
+	 * Comment extracted from the metadata JSON file. Can be <code>null</code> if not defined. Keeping any one comment from all defined platforms.
+	 */
+	public String packageComment;
 
 	/**
 	 * @param db
@@ -79,6 +84,8 @@ public class Package implements Comparable<Package>, Serializable {
 		packageName = StringFactory.get(db.gets("packageName"));
 
 		user = StringFactory.get(db.gets("username"));
+
+		packageComment = db.gets("packageComment", null);
 	}
 
 	@Override
@@ -112,6 +119,13 @@ public class Package implements Comparable<Package>, Serializable {
 	 */
 	public String getUser() {
 		return user;
+	}
+
+	/**
+	 * @return comment propagated from the user via the build system and a JSON file in CVMFS
+	 */
+	public String getComment() {
+		return packageComment;
 	}
 
 	/**
@@ -176,7 +190,7 @@ public class Package implements Comparable<Package>, Serializable {
 
 	/**
 	 * Get the package names that are required by this package.
-	 * 
+	 *
 	 * @param desiredPlatform from the available plaforms for this package, use this one if available. If not (or <code>null</code>) the first available value would be used.
 	 *
 	 * @return the set of packages, if possible for the indicated platform, otherwise an arbitrary one from the available ones
@@ -209,7 +223,7 @@ public class Package implements Comparable<Package>, Serializable {
 			dbDeps.setQueryTimeout(60);
 
 			for (final Map.Entry<String, String> entry : files) {
-				String dir = entry.getValue();
+				final String dir = entry.getValue();
 
 				for (final String tableName : LFNUtils.getTagTableNames(dir, "PackageDef", true)) {
 					dbDeps.query("SELECT dependencies FROM " + tableName + " WHERE ? like concat(file,'%')", false, dir);

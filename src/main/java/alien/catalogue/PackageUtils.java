@@ -15,6 +15,9 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.json.simple.JSONObject;
+import org.json.simple.parser.JSONParser;
+
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
 import alien.monitoring.Monitor;
@@ -95,7 +98,7 @@ public class PackageUtils {
 					if (monitor != null)
 						monitor.incrementCounter("Package_db_lookup");
 
-					final String q = "SELECT DISTINCT packageVersion, packageName, username, platform, lfn FROM PACKAGES ORDER BY 3,2,1,4,5;";
+					final String q = "SELECT DISTINCT packageVersion, packageName, username, platform, lfn, packageComment FROM PACKAGES ORDER BY 3,2,1,4,5;";
 
 					db.setReadOnly(true);
 					db.setQueryTimeout(60);
@@ -108,8 +111,12 @@ public class PackageUtils {
 					while (db.moveNext()) {
 						final Package next = new Package(db);
 
-						if (prev != null && next.equals(prev))
+						if (prev != null && next.equals(prev)) {
 							prev.setLFN(db.gets("platform"), db.gets("lfn"));
+
+							if (next.packageComment != null)
+								prev.packageComment = next.packageComment;
+						}
 						else {
 							next.setLFN(db.gets("platform"), db.gets("lfn"));
 							prev = next;
@@ -286,6 +293,22 @@ public class PackageUtils {
 	 * @throws IOException in case the new package cannot be defined
 	 */
 	public static Package definePackage(final String user, final String name, final String version, final String platform, final String dependencies, final String tarballURL) throws IOException {
+		return definePackage(user, name, version, platform, dependencies, tarballURL, null);
+	}
+
+	/**
+	 * @param user <code>null</code> to use the default, "VO_ALICE", or pass it explicitly
+	 * @param name package name
+	 * @param version package version
+	 * @param platform reference platform
+	 * @param dependencies comma-separated list of direct dependencies
+	 * @param tarballURL where to take the package tarball from. Optional, can be <code>null</code> as we take everything from CVMFS
+	 * @param metadataFile path to JSON file with other metadata about the installed package
+	 * @return the new (or existing) package
+	 * @throws IOException in case the new package cannot be defined
+	 */
+	public static Package definePackage(final String user, final String name, final String version, final String platform, final String dependencies, final String tarballURL,
+			final String metadataFile) throws IOException {
 		final String packageBaseDir = "/alice/packages/" + name;
 
 		final String packageWithVersionDir = packageBaseDir + "/" + version;
@@ -359,7 +382,8 @@ public class PackageUtils {
 			// file exists, let's take it into account
 			try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
 				if (db != null) {
-					if (db.query("INSERT INTO PACKAGES (packageVersion, packageName, username, platform, lfn) VALUES (?, ?, ?, ?, ?);", false, version, name, packageUser, platform, platformArchive)) {
+					if (db.query("INSERT INTO PACKAGES (packageVersion, packageName, username, platform, lfn, metadataFile) VALUES (?, ?, ?, ?, ?, ?);", false, version, name, packageUser, platform,
+							platformArchive, metadataFile)) {
 						existing = getUncached(packageUser, name, version);
 
 						if (existing == null) {
@@ -398,6 +422,44 @@ public class PackageUtils {
 			packages.put(existing.getFullName(), existing);
 
 		return existing;
+	}
+
+	/**
+	 * Iterate through the package metadata files that were not yet processed and
+	 */
+	public static void populatePackageComments() {
+		try (DBFunctions db = ConfigUtils.getDB("alice_users"); DBFunctions db2 = ConfigUtils.getDB("alice_users")) {
+			if (db != null) {
+				final String q = "SELECT lfn, metadataFile FROM PACKAGES WHERE metadataFile IS NOT NULL AND packageComment IS NULL";
+
+				db.query(q);
+
+				while (db.moveNext()) {
+					final String lfn = db.gets(1);
+					final String mdFile = db.gets(2);
+
+					final File f = new File(mdFile);
+
+					if (f.exists() && f.canRead()) {
+						try {
+							final String content = Utils.readFile(mdFile);
+
+							final JSONParser parser = new JSONParser();
+							final Object o = parser.parse(content);
+
+							final Object c = ((JSONObject) o).get("comment");
+
+							final String comment = c != null ? c.toString() : "";
+
+							db2.query("UPDATE PACKAGES SET packageComment=? WHERE lfn=?;", false, comment, lfn);
+						}
+						catch (final Exception e) {
+							logger.log(Level.WARNING, "Cannot read package metadata file " + mdFile, e);
+						}
+					}
+				}
+			}
+		}
 	}
 
 	private static Package getUncached(final String user, final String name, final String version) {
@@ -469,5 +531,14 @@ public class PackageUtils {
 			}
 
 		return LFNUtils.getLFN(lfn);
+	}
+
+	/**
+	 * Entry point to the cron job that would periodically evaluate the metadata files and populate the comment field from them
+	 *
+	 * @param args
+	 */
+	public static void main(final String[] args) {
+		populatePackageComments();
 	}
 }
