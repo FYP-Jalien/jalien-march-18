@@ -76,7 +76,7 @@ public class PriorityReconciliationService extends Optimizer {
 				return;
 			}
 
-			Set<String> uniqueStates = Stream.of(JobStatus.runningStates(), JobStatus.errorneousStates(), JobStatus.finalStates())
+			Set<String> uniqueStates = Stream.of(JobStatus.runningStates(), JobStatus.finalStates())
 					.flatMap(Set::stream)
 					.map(JobStatus::getAliEnLevel)
 					.map(String::valueOf)
