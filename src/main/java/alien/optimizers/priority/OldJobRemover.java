@@ -6,14 +6,14 @@ import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
 import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
-import alien.priority.JobDto;
 import alien.taskQueue.JobStatus;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
 
 import java.sql.Connection;
 import java.time.Duration;
-import java.util.*;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -24,7 +24,7 @@ public class OldJobRemover extends Optimizer {
 
     @Override
     public void run() {
-        this.setSleepPeriod(Duration.ofMinutes(10).toMillis()); //10m
+        this.setSleepPeriod(Duration.ofMinutes(120).toMillis()); //120 minutes
         int frequency = (int) this.getSleepPeriod();
 
 
@@ -69,7 +69,7 @@ public class OldJobRemover extends Optimizer {
 
             Timing t1 = new Timing(monitor, "OldJobRemover select");
             t1.startTiming();
-            Map<Long, Map<Long, JobDto>> oldJobs = getOldJobs(db, getOldJobsQuery());
+            Set<Long> oldJobs = getOldJobs(db, getOldJobsQuery());
             logger.log(Level.INFO, "OldJobs size: " + oldJobs.size());
             registerLog.append("Number of old master or single jobs: ")
                     .append(oldJobs.size())
@@ -77,26 +77,28 @@ public class OldJobRemover extends Optimizer {
             t1.endTiming();
             logger.log(Level.INFO, "OldJobRemover select done in: " + t1.getMillis() + " ms");
 
-            Timing t2 = new Timing(monitor, "OldJobRemover findMasterAndSubJobsInFinalState");
-            t2.startTiming();
-            Set<Long> finalStateJobs = findMasterAndSubJobsInFinalState(oldJobs);
-            logger.log(Level.INFO, "FinalStateJobs size: " + finalStateJobs.size());
-            t2.endTiming();
-            logger.log(Level.INFO, "OldJobRemover findMasterAndSubJobsInFinalState done in: " + t2.getMillis() + " ms");
 
-            Timing t3 = new Timing(monitor, "OldJobRemover removeOldJobs");
+            Timing t2 = new Timing(monitor, "OldJobRemover getDeleteQuery");
+            t2.startTiming();
+            String deleteQuery = getDeleteQuery(oldJobs);
+            t2.endTiming();
+            logger.log(Level.INFO, "OldJobRemover getDeleteQuery done in: " + t2.getMillis() + " ms");
+
+            Timing t3 = new Timing(monitor, "OldJobRemover deleteOldJobs");
             t3.startTiming();
-            if (removeOldJobs(dbdev, getRemoveQuery(finalStateJobs))) {
-                logger.log(Level.INFO, "Removed " + finalStateJobs.size() + " old jobs");
-                registerLog.append("Removed ")
-                        .append(finalStateJobs.size())
+            boolean res = db.query(deleteQuery);
+            if (res) {
+                int deleted = db.getUpdateCount();
+                logger.log(Level.INFO, "Deleted " + deleted + " old jobs");
+                registerLog.append("Deleted ")
+                        .append(deleted)
                         .append(" old jobs\n");
             } else {
                 logger.log(Level.INFO, "Old jobs not removed");
             }
             t3.endTiming();
-            logger.log(Level.INFO, "OldJobRemover removeOldJobs done in: " + t3.getMillis() + " ms");
-            registerLog.append("OldJobRemover removeOldJobs done in: ")
+            logger.log(Level.INFO, "OldJobRemover deleted old jobs in: " + t3.getMillis() + " ms");
+            registerLog.append("OldJobRemover deleted old jobs in: ")
                     .append(t3.getMillis())
                     .append(" ms\n");
 
@@ -111,80 +113,44 @@ public class OldJobRemover extends Optimizer {
 
     }
 
-
-    private boolean removeOldJobs(DBFunctions db, String query) {
-        return db.query(query);
-//        return false;
-    }
-
-    private String getRemoveQuery(Set<Long> finalJobs) {
-        StringBuilder q = new StringBuilder("DELETE FROM QUEUE WHERE queueId IN (");
+    private String getDeleteQuery(Set<Long> finalJobs) {
+         StringBuilder queueIds = new StringBuilder();
         for (Long id : finalJobs) {
-            q.append(id).append(",");
+            queueIds.append(id)
+                    .append(",");
         }
-        q.deleteCharAt(q.length() - 1);
-        q.append(");");
+        if(queueIds.length() > 0)
+            queueIds.deleteCharAt(queueIds.length() - 1);
 
-        return q.toString();
+        String query = "DELETE FROM QUEUE WHERE queueId IN (" + queueIds + ") OR split IN (" + queueIds + ")";
+        logger.log(Level.INFO, "OldJobRemover query: " + query);
+        return query;
     }
 
-    private Set<Long> findMasterAndSubJobsInFinalState(Map<Long, Map<Long, JobDto>> oldJobs) {
-        Set<Long> jobsInFinalState = new HashSet<>();
-
-        for (Map.Entry<Long, Map<Long, JobDto>> entry : oldJobs.entrySet()) {
-            Map<Long, JobDto> jobsMap = entry.getValue();
-
-            if (isJobFinal(jobsMap, entry.getKey())) {
-                jobsInFinalState.addAll(jobsMap.keySet());
-            }
-        }
-
-        return jobsInFinalState;
-    }
-
-    private boolean isJobFinal(Map<Long, JobDto> jobs, long masterJobId) {
-        if (isSingleJob(jobs, masterJobId)) {
-            JobDto masterJob = jobs.get(masterJobId);
-            return masterJob != null && (masterJob.getStatusId() == JobStatus.DONE.getAliEnLevel()
-                    || masterJob.getStatusId() == JobStatus.DONE_WARN.getAliEnLevel());
-        }
-
-        return jobs.entrySet().parallelStream()
-                .filter(s -> !Objects.equals(s.getKey(), masterJobId) && s.getValue().getSplit() > 0)
-                .allMatch(s -> s.getValue().getStatusId() == JobStatus.DONE.getAliEnLevel()
-                        || s.getValue().getStatusId() == JobStatus.DONE_WARN.getAliEnLevel());
-    }
-
-    private boolean isSingleJob(Map<Long, JobDto> jobs, long masterJobId) {
-        return jobs.entrySet().parallelStream()
-                .noneMatch(s -> s.getValue().getSplit() == masterJobId);
-    }
-
-    private Map<Long, Map<Long, JobDto>> getOldJobs(DBFunctions db, String query) {
-        Map<Long, Map<Long, JobDto>> oldJobs = new HashMap<>();
+    private Set<Long> getOldJobs(DBFunctions db, String query) {
+        Set<Long> oldJobs = new HashSet<>();
         boolean result = db.query(query);
         if (result) {
             while (db.moveNext()) {
-                long split = db.getl("split");
-                long queueId = db.getl("queueId");
-                int statusId = db.geti("statusId");
-
-                JobDto jobDto = new JobDto(queueId, split, statusId);
-                long key = (split == 0) ? queueId : split;
-                oldJobs.computeIfAbsent(key, k -> new HashMap<>()).putIfAbsent(queueId, jobDto);
+                oldJobs.add(db.getl(1));
             }
         }
         return oldJobs;
     }
 
     private String getOldJobsQuery() {
-        return "select qs.queueId, qs.split, qs.statusId "
-                + "FROM QUEUE qs "
-                + "left outer join QUEUE qm on qs.split = qm.queueId "
-                + "WHERE qs.received < unix_timestamp() - 60 * 60 * 24 * 5 "
-                + "and greatest(qs.mtime, coalesce(qm.mtime, qs.mtime)) < date_sub(now(), interval 5 day) "
-                + "and (qm.statusId is null or qm.statusId != 3) "
-                + "and (qs.split != 0 or qs.statusId != 3) "
-                + "limit 100000;";
+        StringBuilder finalstates = new StringBuilder();
+        JobStatus.finalStates().stream().map(JobStatus::getAliEnLevel).forEach(s -> finalstates.append(s).append(","));
+        finalstates.deleteCharAt(finalstates.length() - 1);
+
+        StringBuilder q = new StringBuilder("SELECT qs.queueId FROM QUEUE qs\n" +
+                "WHERE qs.split = 0\n" +
+                "  AND qs.mtime < date_sub(now(), interval 5 day)\n" +
+                "  AND qs.statusId IN (")
+                .append(finalstates)
+                .append(")");
+
+        logger.log(Level.INFO, "OldJobRemover query: " + q);
+        return q.toString();
     }
 }
