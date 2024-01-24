@@ -102,8 +102,9 @@ public class JobBroker {
 			}
 
 			if (oldCVMFSRevision) {
-				logger.log(Level.WARNING, "The node has an outdated CVMFS revision, server has " + serverCVMFSRevision + " for " + Format.toInterval(System.currentTimeMillis() - lastCVMFSRevisionModified)
-						+ ":\n" + matchRequest);
+				logger.log(Level.WARNING,
+						"The node has an outdated CVMFS revision, server has " + serverCVMFSRevision + " for " + Format.toInterval(System.currentTimeMillis() - lastCVMFSRevisionModified)
+								+ ":\n" + matchRequest);
 
 				final HashMap<String, Object> matchAnswer = new HashMap<>(2);
 				matchAnswer.put("Error", "CVMFS revision is outdated " + wnCVMFSRevision + " vs " + serverCVMFSRevision);
@@ -482,8 +483,9 @@ public class JobBroker {
 
 			// we got something to run
 			String jdl, user;
+			int userId, cpucores;
 
-			db.query("select origjdl jdl, user, resubmission from QUEUEJDL join QUEUE using (queueid) join QUEUE_USER using (userId) where queueId=?", false, Long.valueOf(queueId));
+			db.query("select origjdl jdl, user, resubmission, userId, cpucores from QUEUEJDL join QUEUE using (queueid) join QUEUE_USER using (userId) where queueId=?", false, Long.valueOf(queueId));
 
 			int resubmission = -1;
 
@@ -492,6 +494,8 @@ public class JobBroker {
 				jdl = db.gets(1);
 				user = db.gets(2);
 				resubmission = db.geti(3);
+				userId = db.geti(4);
+				cpucores = db.geti(5);
 			}
 			else {
 				logger.log(Level.INFO, "Couldn't get the queueId, jdl and user for the agentId: " + agentId);
@@ -548,10 +552,7 @@ public class JobBroker {
 			if (logger.isLoggable(Level.FINE))
 				logger.log(Level.FINE, "Going to return " + queueId + " and " + user + " and " + jdl);
 
-			db.query("select userId, cpucores from QUEUE where queueId=?", false, queueId);
-			int userId = db.geti("userId");
-			int activeCores = db.geti("cpucores");
-			PriorityRegister.JobCounter.getCounterForUser(userId).incRunningAndDecWaiting(activeCores);
+			PriorityRegister.JobCounter.getCounterForUser(Integer.valueOf(userId)).incRunningAndDecWaiting(cpucores);
 
 			return job;
 		}
@@ -746,7 +747,7 @@ public class JobBroker {
 
 			if (constraintCache != null && constraintCache.size() > 0) {
 				// Constraint name is the constraint key
-				for ( Map.Entry<String, String> entry : constraintCache.entrySet()) {
+				for (Map.Entry<String, String> entry : constraintCache.entrySet()) {
 					String constraintName = entry.getKey();
 					String constraintType = entry.getValue();
 					logger.log(Level.FINE, "Enforcing additional constraints for " + matchRequest.get("Localhost"));
@@ -765,11 +766,13 @@ public class JobBroker {
 								// eg:- SELECT * FROM JOB_AGENT WHERE... AND ((? = containsAVX) OR (containsAVX is null))
 								// SELECT * FROM JOB_AGENT WHERE... ((1 = containsAVX) OR (containsAVX is null))
 								where += " and (( ? = " + constraintName + ") or (" + constraintName + " is null))";
-							} else if (constraintType.equals("regex")) {
+							}
+							else if (constraintType.equals("regex")) {
 								// SELECT * FROM JOB_AGENT WHERE... AND ((? LIKE CPU_FLAGS) OR (CPU_FLAGS is null))
 								// SELECT * FROM JOB_AGENT WHERE... AND ((flag1 flag2 avx LIKE %avx%) OR (CPU_FLAGS is null))
 								where += " and (( ? LIKE " + constraintName + ") or (" + constraintName + " is null))";
-							} else {
+							}
+							else {
 								// stop matching because the constraint type is not supported
 								logger.log(Level.SEVERE, "Incorrect expression type provided: " + constraintType);
 								return matchAnswer;
@@ -778,7 +781,8 @@ public class JobBroker {
 							// because the value comparison is done at runtime with type "Object"
 							bindValues.add(constraintValue);
 						}
-					} else {
+					}
+					else {
 						logger.log(Level.FINE, "Site map does not contain a value for : " + constraintName +
 								". Setting the constraint value to null");
 						// Avoid accepting jobs that require the constraint value to be not present
