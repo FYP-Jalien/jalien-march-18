@@ -12,129 +12,168 @@ import java.util.concurrent.atomic.AtomicLong;
  * @since 2023-11-23
  */
 public class PriorityRegister {
-    public static class JobCounter {
-        private AtomicInteger waiting = new AtomicInteger(0);
-        private AtomicInteger running = new AtomicInteger(0);
-        private AtomicLong cputime = new AtomicLong(0);
-        private AtomicDouble cost = new AtomicDouble(0);
+	/**
+	 * @author Jørn-Are Flaten
+	 * @since 2023-11-23
+	 */
+	public static class JobCounter {
+		private AtomicInteger waiting;
+		private AtomicInteger running;
+		private AtomicLong cputime;
+		private AtomicDouble cost;
 
-        public JobCounter(AtomicInteger waiting, AtomicInteger running, AtomicLong cputime, AtomicDouble cost) {
-            this.waiting = waiting;
-            this.running = running;
-            this.cputime = cputime;
-            this.cost = cost;
-        }
+		/**
+		 * Default constructor
+		 */
+		public JobCounter() {
+			waiting = new AtomicInteger(0);
+			running = new AtomicInteger(0);
+			cputime = new AtomicLong(0);
+			cost = new AtomicDouble(0);
+		}
 
-        public JobCounter() {
-        }
+		/**
+		 * Copy constructor
+		 * 
+		 * @param other
+		 */
+		public JobCounter(final JobCounter other) {
+			this.waiting = new AtomicInteger(other.getWaiting());
+			this.running = new AtomicInteger(other.getRunning());
+			this.cputime = new AtomicLong(other.getCputime());
+			this.cost = new AtomicDouble(other.getCost());
+		}
 
-        public void incWaiting() {
-            waiting.incrementAndGet();
-        }
+		/**
+		 * Increment the number of waiting jobs for this user
+		 */
+		public void incWaiting() {
+			waiting.incrementAndGet();
+		}
 
-        public void decWaiting() {
-            waiting.decrementAndGet();
-        }
+		/**
+		 * Decrement the number of waiting jobs for this user
+		 */
+		public void decWaiting() {
+			waiting.decrementAndGet();
+		}
 
-        public void addWaiting(int n) {
-            waiting.addAndGet(n);
-        }
+		/**
+		 * Bulk insert of new jobs for a user
+		 * 
+		 * @param n
+		 */
+		public void addWaiting(final int n) {
+			waiting.addAndGet(n);
+		}
 
-        public void incRunningAndDecWaiting(int n) {
-            running.addAndGet(n);
-            decWaiting();
-        }
+		/**
+		 * Assigning a job with a given number of CPU cores to a site
+		 * 
+		 * @param n
+		 */
+		public void incRunningAndDecWaiting(int n) {
+			running.addAndGet(n);
+			decWaiting();
+		}
 
-        // Decrease the number of running active cpu cores by n
-        public void decRunning(int n) {
-            running.addAndGet(-n);
-        }
+		/**
+		 * Decrease the number of running active cpu cores by n
+		 * 
+		 * @param n
+		 */
+		public void decRunning(int n) {
+			running.addAndGet(-n);
+		}
 
-        public int getWaiting() {
-            return waiting.get();
-        }
+		/**
+		 * @return delta waiting jobs
+		 */
+		public int getWaiting() {
+			return waiting.get();
+		}
 
-        public int getRunning() {
-            return running.get();
-        }
+		/**
+		 * @return delta running CPU cores
+		 */
+		public int getRunning() {
+			return running.get();
+		}
 
-        public long getCputime() {
-            return cputime.get();
-        }
+		/**
+		 * @return delta CPU time
+		 */
+		public long getCputime() {
+			return cputime.get();
+		}
 
-        public double getCost() {
-            return cost.get();
-        }
+		/**
+		 * @return delta cost
+		 */
+		public double getCost() {
+			return cost.get();
+		}
 
-        public void addCputime(long n) {
-            cputime.addAndGet(n);
-        }
+		/**
+		 * Accounting data from the job about the consumed resources
+		 * 
+		 * @param n
+		 */
+		public void addCputime(long n) {
+			cputime.addAndGet(n);
+		}
 
-        public void addCost(double n) {
-            cost.addAndGet(n);
-        }
+		/**
+		 * Accounting data from the job about the consumed resources
+		 * 
+		 * @param n
+		 */
+		public void addCost(double n) {
+			cost.addAndGet(n);
+		}
 
-        public void resetCounters() {
-            waiting.getAndSet(0);
-            running.getAndSet(0);
-            cputime.getAndSet(0);
-            cost.getAndSet(0);
-        }
+		/**
+		 * After flushing the values to the database, apply the changes to the in-memory counters
+		 * 
+		 * @param other
+		 */
+		public void subtractValues(JobCounter other) {
+			this.waiting.addAndGet(-other.waiting.intValue());
+			this.running.addAndGet(-other.running.intValue());
+			this.cputime.addAndGet(-other.getCputime());
+			this.cost.addAndGet(-other.getCost());
+		}
 
-        public void subtractWaiting(int n) {
-            this.waiting.addAndGet(-n);
-        }
+		/**
+		 * Creating a deep copy of the registry with new atomic values to ensure that the snapshot has a separate memory location from the global registry
+		 * 
+		 * @return registry clone
+		 */
+		public static Map<Integer, JobCounter> getRegistrySnapshot() {
+			Map<Integer, JobCounter> snapshot = new ConcurrentHashMap<>();
+			for (Map.Entry<Integer, JobCounter> entry : registry.entrySet()) {
+				snapshot.put(entry.getKey(), new JobCounter(entry.getValue()));
+			}
+			return snapshot;
+		}
 
-        public void subtractRunning(int n) {
-            this.running.addAndGet(-n);
-        }
+		// Global registry map
+		private static final Map<Integer, JobCounter> registry = new ConcurrentHashMap<>();
 
-        public void subtractCputime(long n) {
-            this.cputime.addAndGet(-n);
-        }
+		/**
+		 * @param userId
+		 * @return the object corresponding to the given userId
+		 */
+		public static JobCounter getCounterForUser(Integer userId) {
+			// Lazily initialize the counters for a user if they don't exist
+			return registry.computeIfAbsent(userId, k -> new JobCounter());
+		}
 
-        public void subtractCost(double n) {
-            this.cost.addAndGet(-n);
-        }
-
-        public void subtractValues(int waiting, int running, long cputime, double cost) {
-            subtractWaiting(waiting);
-            subtractRunning(running);
-            subtractCputime(cputime);
-            subtractCost(cost);
-        }
-
-        // Creating a deep copy of the registry with new atomic values to ensure that the snapshot has a
-        // separate memory location from the global registry
-        public static Map<Integer, JobCounter> getRegistrySnapshot() {
-            Map<Integer, JobCounter> snapshot = new ConcurrentHashMap<>();
-            for (Map.Entry<Integer, JobCounter> entry : registry.entrySet()) {
-                snapshot.put(entry.getKey(), new JobCounter(
-                        new AtomicInteger(entry.getValue().waiting.get()),
-                        new AtomicInteger(entry.getValue().running.get()),
-                        new AtomicLong(entry.getValue().cputime.get()),
-                        new AtomicDouble(entry.getValue().cost.get())));
-            }
-            return snapshot;
-        }
-
-        // Global registry map
-        private static final Map<Integer, JobCounter> registry = new ConcurrentHashMap<>();
-
-        public static JobCounter getCounterForUser(Integer userId) {
-            // Lazily initialize the counters for a user if they don't exist
-            return registry.computeIfAbsent(userId, k -> new JobCounter());
-        }
-
-        public static Map<Integer, JobCounter> getRegistry() {
-            return registry;
-        }
-
-        public static void resetUserCounters(Integer userId) {
-            JobCounter counter = registry.get(userId);
-            if (counter != null) {
-                counter.resetCounters();
-            }
-        }
-    }
+		/**
+		 * @return the pointer to the entire registry
+		 */
+		public static Map<Integer, JobCounter> getRegistry() {
+			return registry;
+		}
+	}
 }
