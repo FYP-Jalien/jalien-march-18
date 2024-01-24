@@ -272,8 +272,8 @@ public class CVMFS extends PackMan {
 	 * @return path to job container compatible with given platforms
 	 */
 	public static String getContainerPath(final String platforms) {
-		String osArch = System.getProperty("os.arch").contains("amd64") ? "x86_64" : System.getProperty("os.arch");
-		String[] identified_platforms = Pattern.compile("(el|SLC)([0-9]{1,2}-(" + osArch + ")|[0-9]{1,2}$)").matcher(platforms).results().map(MatchResult::group).toArray(String[]::new);
+		final String osArch = System.getProperty("os.arch").contains("amd64") ? "x86_64" : System.getProperty("os.arch");
+		final String[] identified_platforms = Pattern.compile("(el|SLC)([0-9]{1,2}-(" + osArch + ")|[0-9]{1,2}$)").matcher(platforms).results().map(MatchResult::group).toArray(String[]::new);
 
 		if (identified_platforms.length > 0) {
 			Arrays.sort(identified_platforms, new Comparator<String>() {

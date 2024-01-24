@@ -732,7 +732,7 @@ public class JobAgent implements Runnable {
 				logger.log(Level.INFO, "Error. Workdir for job could not be created");
 				putJobTrace("Error. Workdir for job could not be created");
 				return -1;
-			}
+			}	
 
 			logger.log(Level.INFO, "Started JA with: " + jdl);
 
@@ -1063,16 +1063,15 @@ public class JobAgent implements Runnable {
 							discoveredPid = true;
 						}
 
-						// Check if the wrapper has exited without us knowing
+						// Check if the wrapper has finished without us knowing
 						if ("DONE".equals(wrapperStatus) || wrapperStatus.contains("ERROR")) {
 
 							// In case the wrapper was just about to exit normally, wait a few seconds
 							if (!p.waitFor(15, TimeUnit.SECONDS)) {
-								putJobTrace("Warning: The JobWrapper has terminated without the JobAgent noticing. Killing leftover processes...");
+								putJobTrace("Warning: The JobWrapper appears to be finished, but not fully exited. Killing remaining processes...");
 								p.destroyForcibly();
 							}
 						}
-
 					}
 				}
 				try {
@@ -1620,7 +1619,7 @@ public class JobAgent implements Runnable {
 		double timePortion = elapsedTime / ttl;
 		if (MemoryController.debugMemoryController)
 			logger.log(Level.INFO, "Have a time elapsed of " + elapsedTime + ". With ttl of " + ttl + ", time portion is " + timePortion);
-		String cgroupPath = memoryController.cgroupId;
+		String cgroupPath = MemoryController.cgroupId;
 		if (CgroupUtils.haveCgroupsv2())
 			cgroupPath = CgroupUtils.getCurrentCgroup(getWrapperPid());
 		if (!commander.q_api.recordPreemption(queueId, preemptionTs, 0, preemptionSlotMemory/1024, PreemptionSlotMemsw/1024, preemptionJobMemory, numConcurrentJobs, resubmission, hostName, ce, memoryPerCore, growthDerivative.doubleValue(), timePortion, username, MemoryController.preemptionRound, wouldPreempt, memHardLimitRounded, memswHardLimitRounded, "", cgroupPath,0d,0d)) {
