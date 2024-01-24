@@ -20,7 +20,7 @@ public class Optimizer extends Thread {
 
 	private static String[] catalogue_optimizers = { "alien.optimizers.catalogue.LTables", "alien.optimizers.catalogue.GuidTable", "alien.optimizers.catalogue.ResyncLDAP",
 			"utils.lfncrawler.LFNCrawler", "alien.optimizers.priority.PriorityRapidUpdater", "alien.optimizers.priority.PriorityReconciliationService", "alien.optimizers.priority.JobAgentUpdater",
-			"alien.optimizers.priority.InactiveJobHandler", "alien.optimizers.priority.CheckJobStatus"};
+			"alien.optimizers.priority.InactiveJobHandler", "alien.optimizers.priority.CheckJobStatus", "alien.optimizers.priority.OldJobRemover"};
 
 	@Override
 	public void run() {
