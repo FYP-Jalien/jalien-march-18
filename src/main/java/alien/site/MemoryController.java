@@ -101,11 +101,12 @@ public class MemoryController implements Runnable {
 		linuxProc = false;
 		condorSlotAlreadyPreempted = false;
 		limitParser = "";
+		htCondorJobMemoryLimit = 0;
 		setMargins();
 		registerCgroupPath();
 		registerHTCondorPeriodicRemove();
 		registerUlimitHard();
-		logger.log(Level.INFO, "Parsed global memory limit of " + memHardLimit);
+		logger.log(Level.INFO, "Parsed global memory limit of " + memHardLimit + " kB");
 	}
 
 	/**
@@ -174,7 +175,7 @@ public class MemoryController implements Runnable {
 								memHardLimit = Double.parseDouble(columns[2]);
 								memHardLimit = memHardLimit / 1024;
 								linuxProc = true;
-								limitParser = "Slot memory hard limit set to " + memHardLimit + " memsw hard limit set to " + memswHardLimit + " by /proc limits parsing.";
+								limitParser = "Slot memory hard limit set to " + memHardLimit + " kB memsw hard limit set to " + memswHardLimit + " kB by /proc limits parsing.";
 								if (debugMemoryController)
 									logger.log(Level.INFO, "Set new memory hard limit from proc limits file to " + memHardLimit);
 							}
@@ -216,12 +217,12 @@ public class MemoryController implements Runnable {
 						else
 							substring = substring.substring(substring.indexOf(">"));
 						substring = substring.replace("(", "").replace(")", "");
-						substring = "ResidentSetSize " + substring + "-" + SLOT_MEMORY_MARGIN * slotCPUs;
+						substring = "ResidentSetSize " + substring + " - " + SLOT_MEMORY_MARGIN * slotCPUs;
 						htCondorLimitParser = substring;
 						limitParser = "Parsed PeriodicRemove expression from HTCondor classad. Going to evaluate expression " + htCondorLimitParser + ".";
-						logger.log(Level.INFO, limitParser);
 					}
 				}
+				logger.log(Level.INFO, limitParser + "(HTCondor JobMemoryLimit = " + htCondorJobMemoryLimit + ")");
 				if (CgroupUtils.haveCgroupsv2()) {
 					String machineAd = System.getenv().getOrDefault("_CONDOR_MACHINE_AD", "");
 					final List<String> machineAdLines = Files.readAllLines(Paths.get(machineAd));
@@ -326,7 +327,7 @@ public class MemoryController implements Runnable {
 			}
 
 			if (memswHardLimit > 0 || memHardLimit > 0) {
-				limitParser = "Slot memory hard limit set to " + memHardLimit + " memsw hard limit set to " + memswHardLimit + " by cgroup configuration.";
+				limitParser = "Slot memory hard limit set to " + memHardLimit + " kB memsw hard limit set to " + memswHardLimit + " kB by cgroup configuration.";
 				if (cgroupsv2 == false)
 					 limitParser += " Parsed cgroup: " + cgroupId;
 				else
@@ -521,6 +522,17 @@ public class MemoryController implements Runnable {
 	 */
 	private void checkMemoryConsumption() {
 		double slotMem = 0, slotMemsw = 0; // In kB
+		for (JobAgent runningJA : activeJAInstances.values()) {
+			Long queueId = Long.valueOf(runningJA.getQueueId());
+
+			if (memCurrentPerJob.get(queueId) != null)
+				memPastPerJob.put(queueId, memCurrentPerJob.get(queueId));
+			memCurrentPerJob.put(queueId, runningJA.RES_VMEM);
+			updateGrowthDerivative(runningJA, queueId);
+			if (cgroupRootPath.isEmpty() && !linuxProc)
+				slotMem += runningJA.RES_VMEM.doubleValue() / 1024; //slotMem in kB
+		}
+
 		if (!linuxProc) {
 			if (!cgroupRootPath.isEmpty()) {
 				try {
@@ -559,7 +571,7 @@ public class MemoryController implements Runnable {
 					logger.log(Level.WARNING, "Found exception while checking cgroups consumption", e);
 				}
 			}
-			if (htCondorLimitParser != null && activeJAInstances.size() > 1) {
+			if (htCondorLimitParser != null && htCondorJobMemoryLimit > 0 && activeJAInstances.size() > 1) {
 				double evaluated = MemoryController.parseClassAdLimitExpr(Double.valueOf(slotMem));
 				if (debugMemoryController)
 					logger.log(Level.INFO, "HTCondor PeriodicRemove expression evaluated to " + evaluated);
@@ -567,8 +579,8 @@ public class MemoryController implements Runnable {
 					if (debugMemoryController)
 						logger.log(Level.INFO, "Job consumption under HTCondor threshold");
 				} else {
-					logger.log(Level.INFO, "Job consumption above HTCondor threshold");
-					if (!condorSlotAlreadyPreempted) {
+					logger.log(Level.INFO, "Job consumption above HTCondor threshold (" + slotMem + " kB)");
+					if (MemoryController.activeJAInstances.size() > 0 && !condorSlotAlreadyPreempted) {
 						for (Long jobNum : MemoryController.activeJAInstances.keySet()) {
 							MemoryController.activeJAInstances.get(jobNum).putJobTrace("WOULD KILL. Job consumption above HTCondor threshold");
 						}
@@ -581,16 +593,6 @@ public class MemoryController implements Runnable {
 			for (JobAgent runningJA : activeJAInstances.values()) {
 				slotMem += runningJA.RES_RMEM.doubleValue() / 1024; // slotMem is in kB
 			}
-		}
-		for (JobAgent runningJA : activeJAInstances.values()) {
-			Long queueId = Long.valueOf(runningJA.getQueueId());
-
-			if (memCurrentPerJob.get(queueId) != null)
-				memPastPerJob.put(queueId, memCurrentPerJob.get(queueId));
-			memCurrentPerJob.put(queueId, runningJA.RES_VMEM);
-			updateGrowthDerivative(runningJA, queueId);
-			if (cgroupRootPath.isEmpty() && !linuxProc)
-				slotMem += runningJA.RES_VMEM.doubleValue() / 1024; //slotMem in kB
 		}
 
 		if (activeJAInstances.size() > 1) { // avoid preemption if we have a single job running in the slot
@@ -625,10 +627,7 @@ public class MemoryController implements Runnable {
 	 * Computes updated growth derivative per job according to its recent memory consumption
 	 */
 	private static void updateGrowthDerivative(JobAgent ja, Long queueId) {
-		Double growthDerivativePast = derivativePerJob.get(queueId);
-		if (growthDerivativePast == null) {
-			growthDerivativePast = Double.valueOf(0d);
-		}
+		Double growthDerivativePast = derivativePerJob.getOrDefault(queueId,Double.valueOf(0d));
 		double growthCurrent = (memCurrentPerJob.getOrDefault(queueId, Double.valueOf(0)).doubleValue() - memPastPerJob.getOrDefault(queueId, Double.valueOf(0)).doubleValue());
 		double normalizationFactor = 2000 * ja.cpuCores; // lets normalize by 2GB per core
 		growthCurrent = growthCurrent / normalizationFactor;

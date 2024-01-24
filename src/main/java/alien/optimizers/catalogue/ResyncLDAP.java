@@ -128,7 +128,7 @@ public class ResyncLDAP extends Optimizer {
 	 */
 	private static void resyncLDAP() {
 		LDAPHelper.invalidateCache();
-		
+
 		final int frequency = 3600 * 1000; // 1 hour default
 		logOutput = "";
 
@@ -526,52 +526,60 @@ public class ResyncLDAP extends Optimizer {
 
 					final String maxqueuedjobs = getLdapContentSE(ouCE, ce, "maxqueuedjobs", null);
 
-					try (DBUtils dbu = new DBUtils(db.getConnection())) {
-						dbu.lockTables("SITEQUEUES WRITE");
-						try {
-							int siteId = -1;
-							String selectQuery = "SELECT * from `SITEQUEUES` WHERE site='" + Format.escSQL(ceName) + "'";
-							if (!dbu.executeQuery(selectQuery)) {
-								logger.log(Level.SEVERE, "Error getting CEs from DB");
-								return;
-							}
-
-							try (ResultSet rs = dbu.getResultSet()) {
-								if (rs.next()) {
-									siteId = rs.getInt("siteId");
-									originalCEs = populateCERegistry(rs.getString("site"), rs.getString("maxrunning"), rs.getString("maxqueued"));
-								}
-							}
-
-							logger.log(Level.INFO, "Inserting or updating database entry for CE " + ceName);
-							if (siteId != -1) {
-								String updateQuery = "UPDATE SITEQUEUES SET maxrunning=" + Integer.valueOf(maxjobs) + ", maxqueued=" + Integer.valueOf(maxqueuedjobs) + " WHERE site='"
-										+ Format.escSQL(ceName) + "'";
-								if (!dbu.executeQuery(updateQuery)) {
-									logger.log(Level.SEVERE, "Error updating CEs to DB");
+					boolean valid = true;
+					if (maxjobs == null || maxqueuedjobs == null) {
+						logger.log(Level.SEVERE, "Error on getting maxjobs / maxqueuedjobs from CE " + ceName);
+						addEntityLog(modifications,ceName);
+						modifications.put(ceName,"Error on getting maxjobs / maxqueuedjobs from CE " + ceName);
+						valid = false;
+					}
+					if (valid) {
+						try (DBUtils dbu = new DBUtils(db.getConnection())) {
+							dbu.lockTables("SITEQUEUES WRITE");
+							try {
+								int siteId = -1;
+								String selectQuery = "SELECT * from `SITEQUEUES` WHERE site='" + Format.escSQL(ceName) + "'";
+								if (!dbu.executeQuery(selectQuery)) {
+									logger.log(Level.SEVERE, "Error getting CEs from DB");
 									return;
 								}
-							}
-							else {
-								String insertQuery = "INSERT INTO SITEQUEUES(site,maxrunning,maxqueued) values ('" + Format.escSQL(ceName) + "'," + Integer.valueOf(maxjobs) + ","
-										+ Integer.valueOf(maxqueuedjobs) + ")";
-								if (!dbu.executeQuery(insertQuery)) {
-									logger.log(Level.SEVERE, "Error inserting CE " + ceName + " to DB");
-									return;
+
+								try (ResultSet rs = dbu.getResultSet()) {
+									if (rs.next()) {
+										siteId = rs.getInt("siteId");
+										originalCEs = populateCERegistry(rs.getString("site"), rs.getString("maxrunning"), rs.getString("maxqueued"));
+									}
+								}
+
+								logger.log(Level.INFO, "Inserting or updating database entry for CE " + ceName);
+								if (siteId != -1) {
+									String updateQuery = "UPDATE SITEQUEUES SET maxrunning=" + Integer.valueOf(maxjobs) + ", maxqueued=" + Integer.valueOf(maxqueuedjobs) + " WHERE site='"
+											+ Format.escSQL(ceName) + "'";
+									if (!dbu.executeQuery(updateQuery)) {
+										logger.log(Level.SEVERE, "Error updating CEs to DB");
+										return;
+									}
+								}
+								else {
+									String insertQuery = "INSERT INTO SITEQUEUES(site,maxrunning,maxqueued) values ('" + Format.escSQL(ceName) + "'," + Integer.valueOf(maxjobs) + ","
+											+ Integer.valueOf(maxqueuedjobs) + ")";
+									if (!dbu.executeQuery(insertQuery)) {
+										logger.log(Level.SEVERE, "Error inserting CE " + ceName + " to DB");
+										return;
+									}
 								}
 							}
+							finally {
+								dbu.unlockTables();
+							}
 						}
-						finally {
-							dbu.unlockTables();
+						catch (SQLException e) {
+							logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP CEs: " + e.getMessage());
+						}
+						catch (IOException e1) {
+							logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP CEs: " + e1.getMessage());
 						}
 					}
-					catch (SQLException e) {
-						logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP CEs: " + e.getMessage());
-					}
-					catch (IOException e1) {
-						logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP CEs: " + e1.getMessage());
-					}
-
 					final HashMap<String, String> currentCEs = populateCERegistry(ceName, maxjobs, maxqueuedjobs);
 					printModifications(modifications, originalCEs, currentCEs, ceName, "CEs");
 
@@ -896,6 +904,7 @@ public class ResyncLDAP extends Optimizer {
 
 				if (updatedProtocolsNTransfers.size() > 1) {
 					try (DBUtils dbu = new DBUtils(dbTransfers.getConnection())) {
+						dbTransfers.setReadOnly(false);
 						// lock tables in order to update the protocols table
 						dbu.lockTables("PROTOCOLS WRITE");
 						try {

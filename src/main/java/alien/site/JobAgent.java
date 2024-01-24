@@ -1613,7 +1613,7 @@ public class JobAgent implements Runnable {
 		double memoryPerCore = Math.round(preemptionJobMemory / cpuCores * 100.0) / 100.0;
 		double memHardLimitRounded = Math.round(MemoryController.memHardLimit / 1024 * 100.0) / 100.0;
 		double memswHardLimitRounded = Math.round(MemoryController.memswHardLimit / 1024 * 100.0) / 100.0;
-		Double growthDerivative = MemoryController.derivativePerJob.get(Long.valueOf(queueId));
+		Double growthDerivative = MemoryController.derivativePerJob.getOrDefault(Long.valueOf(queueId),Double.valueOf(0d));
 
 		double elapsedTime = (System.currentTimeMillis() - jobAgentThreadStartTime) /1000.; // convert to seconds
 		double timePortion = elapsedTime / ttl;
