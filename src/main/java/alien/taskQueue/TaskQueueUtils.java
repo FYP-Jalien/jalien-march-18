@@ -1,57 +1,16 @@
 package alien.taskQueue;
 
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.IOException;
-import java.net.InetAddress;
-import java.nio.file.FileSystem;
-import java.nio.file.FileSystems;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
-import java.util.AbstractMap;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collection;
-import java.util.Collections;
-import java.util.Date;
-import java.util.EnumSet;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
-import java.util.LinkedHashSet;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Map;
-import java.util.Map.Entry;
-import java.util.Set;
-import java.util.StringTokenizer;
-import java.util.TreeMap;
-import java.util.UUID;
-import java.util.Vector;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.atomic.AtomicInteger;
-import java.util.logging.Level;
-import java.util.logging.Logger;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.util.stream.Collectors;
-
 import alien.api.Dispatcher;
 import alien.api.ServerException;
 import alien.api.catalogue.LFNfromString;
 import alien.api.taskQueue.GetPS;
-import alien.catalogue.BookingTable;
-import alien.catalogue.CatalogueUtils;
-import alien.catalogue.LFN;
-import alien.catalogue.LFNUtils;
-import alien.catalogue.PackageUtils;
+import alien.catalogue.*;
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
+import alien.priority.PriorityRegister;
 import alien.quotas.FileQuota;
 import alien.quotas.QuotaUtilities;
 import alien.shell.ErrNo;
@@ -67,6 +26,22 @@ import lazyj.Utils;
 import lazyj.cache.ExpirationCache;
 import lazyj.cache.GenericLastValuesCache;
 import utils.JobTraceCollector.TraceMessage;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.net.InetAddress;
+import java.nio.file.*;
+import java.util.*;
+import java.util.Map.Entry;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+import java.util.stream.Collectors;
 
 /**
  * @author ron
@@ -143,6 +118,14 @@ public class TaskQueueUtils {
 	 */
 	public static DBFunctions getQueueDB() {
 		final DBFunctions db = ConfigUtils.getDB("processes");
+		return db;
+	}
+
+	/**
+	 * @return the database connection to 'processesdev'
+	 */
+	public static DBFunctions getProcessesDevDB() {
+		final DBFunctions db = ConfigUtils.getDB("processesdev");
 		return db;
 	}
 
@@ -838,6 +821,26 @@ public class TaskQueueUtils {
 
 			putJobLog(job, "state", "Job state transition from " + oldStatus.name() + " to " + newStatus.name(), null);
 
+			String userIdQuery = "select userId, cpucores from QUEUE where queueId=?";
+			try {
+				db.query(userIdQuery, false, job);
+			} catch (Exception e) {
+				logger.log(Level.WARNING, "Could not get userId for queueId: " + job, e);
+				return false;
+			}
+
+			int userId = db.geti("userId");
+			int activeCores = db.geti("cpucores");
+
+			if (JobStatus.finalStates().contains(newStatus) || newStatus == JobStatus.SAVED_WARN || newStatus == JobStatus.SAVED) {
+				deleteJobToken(job);
+				PriorityRegister.JobCounter.getCounterForUser(userId).decRunning(activeCores);
+				if(extrafields != null) {
+				    PriorityRegister.JobCounter.getCounterForUser(userId).addCputime((Integer) extrafields.get("cputime"));
+				    PriorityRegister.JobCounter.getCounterForUser(userId).addCost((Integer) extrafields.get("cost"));
+				}
+			}
+
 			if (JobStatus.finalStates().contains(newStatus) || newStatus == JobStatus.SAVED_WARN || newStatus == JobStatus.SAVED)
 				deleteJobToken(job);
 
@@ -866,38 +869,68 @@ public class TaskQueueUtils {
 
 			try (DBFunctions db = getQueueDB()) {
 				for (final Map.Entry<String, Object> entry : extrafields.entrySet()) {
-					final String key = entry.getKey();
-					final Object value = entry.getValue();
+                    final String key = entry.getKey();
+                    final Object value = entry.getValue();
 
-					if (fieldMap.containsKey(entry.getKey() + "_table")) {
-						final HashMap<String, Object> map = new HashMap<>();
+                    if (fieldMap.containsKey(entry.getKey() + "_table")) {
+                        final HashMap<String, Object> map = new HashMap<>();
 
-						if (value instanceof Map) {
-							final int id = getOrInsertType(entry.getKey(), (Map<?, ?>) value);
-							if (id > 0)
-								map.put(fieldMap.get(key + "_field") + "Id", Integer.valueOf(id));
-						}
-						else {
-							if (key.contains("node") || key.contains("exechost")) {
-								final int hostId = getOrInsertFromLookupTable("host", value.toString());
-								map.put(fieldMap.get(key + "_field"), Integer.valueOf(hostId));
-							}
-							else
-								map.put(fieldMap.get(key + "_field"), value);
-						}
+                        if (value instanceof Map) {
+                            final int id = getOrInsertType(entry.getKey(), (Map<?, ?>) value);
+                            if (id > 0)
+                                map.put(fieldMap.get(key + "_field") + "Id", Integer.valueOf(id));
+                        } else {
+                            if (key.contains("node") || key.contains("exechost")) {
+                                final int hostId = getOrInsertFromLookupTable("host", value.toString());
+                                map.put(fieldMap.get(key + "_field"), Integer.valueOf(hostId));
+                            } else
+                                map.put(fieldMap.get(key + "_field"), value);
+                        }
 
-						map.put("queueId", Long.valueOf(job));
-
-						final String query = DBFunctions.composeUpdate(fieldMap.get(key + "_table"), map, QUEUEID);
-						db.query(query);
-					}
-				}
-			}
-
-			execSite = extrafields.getOrDefault("exechost", execSite).toString();
-		}
+                        Long queueId = Long.valueOf(job);
+                        map.put("queueId", queueId);
+                        if (map.containsKey("cputime") && map.containsKey("cost")) {
+                            if (map.containsKey("userId")) {
+                                Integer userId = (Integer) map.get("userId");
+                                addCputimeAndCostToRegister(extrafields, userId);
+                            } else {
+                                Integer userId = getUserId(queueId);
+                                addCputimeAndCostToRegister(extrafields, userId);
+                            }
+                        }
+                        final String query = DBFunctions.composeUpdate(fieldMap.get(key + "_table"), map, QUEUEID);
+                        db.query(query);
+                    }
+                }
+            }
+            execSite = extrafields.getOrDefault("exechost", execSite).toString();
+        }
 
 		return execSite;
+	}
+
+    private static void addCputimeAndCostToRegister(Map<String, Object> extrafields, Integer userId) {
+        PriorityRegister.JobCounter.getCounterForUser(userId).addCputime(((Long) extrafields.get("cputime")));
+        PriorityRegister.JobCounter.getCounterForUser(userId).addCost((Double) extrafields.get("cost"));
+    }
+
+    private static Integer getUserId(long queueId) {
+		DBFunctions db = TaskQueueUtils.getQueueDB();
+		int userId = 0;
+		if (db == null) {
+			logger.log(Level.SEVERE, "JobAgent for getUserId could not get a DB connection");
+			return userId;
+		} else {
+			try {
+				db.query("SELECT userId FROM QUEUE WHERE queueId = ?", false, queueId);
+				while (db.moveNext()) {
+					userId = (db.geti("userId"));
+				}
+			} catch (Exception e) {
+				logger.log(Level.SEVERE, "JobAgent for getUserId threw an exception: " + e.getMessage());
+			}
+		}
+		return userId;
 	}
 
 	private static int getOrInsertType(final String key, final Map<?, ?> values) {
@@ -3685,6 +3718,8 @@ public class TaskQueueUtils {
 						+ "spyurl=null,runtime=null,mem=null,si2k=null,cpuspeed=null,vsize=null,runtimes=null,procinfotime=null,maxvsize=null,"
 						+ "agentuuid=null,cpuId=null where queueId=?", false, Long.valueOf(queueId))) {
 					logger.severe("Resubmit: cannot update QUEUEPROC for job: " + queueId);
+				} else {
+					PriorityRegister.JobCounter.getCounterForUser(Integer.valueOf(j.user)).incWaiting();
 				}
 
 				// if the job was attached to a node, we tell him to hara-kiri

@@ -19,6 +19,7 @@ import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import alien.priority.PriorityRegister;
 import org.nfunk.jep.JEP;
 
 import alien.api.Dispatcher;
@@ -546,6 +547,11 @@ public class JobBroker {
 
 			if (logger.isLoggable(Level.FINE))
 				logger.log(Level.FINE, "Going to return " + queueId + " and " + user + " and " + jdl);
+
+			db.query("select userId, cpucores from QUEUE where queueId=?", false, queueId);
+			int userId = db.geti("userId");
+			int activeCores = db.geti("cpucores");
+			PriorityRegister.JobCounter.getCounterForUser(userId).incRunningAndDecWaiting(activeCores);
 
 			return job;
 		}
