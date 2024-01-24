@@ -50,7 +50,7 @@ public class OldJobRemover extends Optimizer {
 
             DBFunctions db = TaskQueueUtils.getQueueDB();
             if (db == null) {
-                logger.log(Level.SEVERE, "PriorityRapidUpdater could not get a DB connection");
+                logger.log(Level.SEVERE, "OldJobRemover could not get a DB connection");
                 return;
             }
             db.setQueryTimeout(60);
@@ -58,7 +58,7 @@ public class OldJobRemover extends Optimizer {
             // development DB
             DBFunctions dbdev = TaskQueueUtils.getProcessesDevDB();
             if (dbdev == null) {
-                logger.log(Level.SEVERE, "PriorityRapidUpdater(processesDev) could not get a DB connection");
+                logger.log(Level.SEVERE, "OldJobRemover(processesDev) could not get a DB connection");
                 return;
             }
             dbdev.setQueryTimeout(60);
