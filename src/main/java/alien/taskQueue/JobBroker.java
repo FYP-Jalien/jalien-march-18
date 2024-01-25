@@ -86,6 +86,17 @@ public class JobBroker {
 	 *         JDL...)
 	 */
 	public static HashMap<String, Object> getMatchJob(final HashMap<String, Object> matchRequest) {
+		if (!ConfigUtils.getConfig().getb("alien.taskQueue.JobBroker.enabled", true)) {
+			final HashMap<String, Object> matchAnswer = new HashMap<>();
+			
+			matchAnswer.put("Error", "JobBroker is disabled, draining the Grid of jobs");
+			matchAnswer.put("Code", Integer.valueOf(-2));
+			
+			logger.log(Level.FINE, "JobBroker is disabled, draining the Grid of jobs");
+			
+			return matchAnswer;
+		}
+		
 		updateWithValuesInLDAP(matchRequest);
 
 		final Object workerNodeCVMFSRevision = matchRequest.get("CVMFS_revision");
@@ -610,6 +621,14 @@ public class JobBroker {
 	 */
 	@SuppressWarnings("unchecked")
 	public static HashMap<String, Object> getNumberWaitingForSite(final HashMap<String, Object> matchRequest) {
+		final HashMap<String, Object> matchAnswer = new HashMap<>();
+		matchAnswer.put("Code", Integer.valueOf(0));
+
+		if (!ConfigUtils.getConfig().getb("alien.taskQueue.JobBroker.enabled", true)) {
+			logger.log(Level.FINE, "JobBroker is disabled, draining the Grid of jobs");
+			return matchAnswer;
+		}
+
 		updateWithValuesInLDAP(matchRequest);
 
 		boolean isRemoteAccessAllowed = false;
@@ -624,9 +643,6 @@ public class JobBroker {
 				return null;
 
 			db.setQueryTimeout(60);
-
-			final HashMap<String, Object> matchAnswer = new HashMap<>();
-			matchAnswer.put("Code", Integer.valueOf(0));
 
 			String where = "";
 			String ret = "sum(counter) as counter";
