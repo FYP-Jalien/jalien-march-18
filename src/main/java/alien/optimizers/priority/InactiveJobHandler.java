@@ -63,14 +63,11 @@ public class InactiveJobHandler extends Optimizer {
 			db.setQueryTimeout(60);
 
 			db.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
-			String activeJobWithoutHeartbeatQuery = "SELECT q.queueId, q.statusId FROM QUEUE q JOIN QUEUEPROC qp\n" +
-					"                                            WHERE q.queueId = qp.queueId\n" +
-					"                                              AND  q.statusId IN (10, 7, 11)\n" + // RUNNING, STARTED, SAVING
-					"                                              AND qp.lastupdate < NOW() - INTERVAL 1 HOUR";
+			String activeJobWithoutHeartbeatQuery = getActiveJobQuery();
 
-			String inactiveJobsWithoutHeartbeatQuery = "SELECT q.queueId, q.statusId FROM QUEUE q JOIN  QUEUEPROC qp\n" +
+			String inactiveJobsWithoutHeartbeatQuery = "SELECT q.queueId, q.statusId FROM QUEUE q JOIN QUEUEPROC qp\n" +
 					"                                           WHERE q.queueId = qp.queueId\n" +
-					"                                               AND  q.statusId IN (-15)\n" + // ZOMBIE
+					"                                               AND  q.statusId IN (" + JobStatus.ZOMBIE.getAliEnLevel() + ")\n" +
 					"                                               AND qp.lastupdate < NOW() - INTERVAL 2 HOUR";
 
 			try (Timing t = new Timing(monitor, "InactiveJobHandler")) {
@@ -92,6 +89,17 @@ public class InactiveJobHandler extends Optimizer {
 				logger.log(Level.SEVERE, "InactiveJobHandler: Exception", e);
 			}
 		}
+	}
+
+	private static String getActiveJobQuery() {
+		String activeStates = JobStatus.RUNNING.getAliEnLevel() + ","
+                + JobStatus.STARTED.getAliEnLevel() + ","
+                + JobStatus.SAVING.getAliEnLevel() + ","
+                + JobStatus.ASSIGNED.getAliEnLevel();
+        return "SELECT q.queueId, q.statusId FROM QUEUE q JOIN QUEUEPROC qp\n" +
+				"                                            WHERE q.queueId = qp.queueId\n" +
+				"                                              AND  q.statusId IN (" + activeStates + ")\n" +
+				"                                              AND qp.lastupdate < NOW() - INTERVAL 1 HOUR";
 	}
 
 	private static void moveState(final DBFunctions db, final String query, final JobStatus status, final StringBuilder log) {
