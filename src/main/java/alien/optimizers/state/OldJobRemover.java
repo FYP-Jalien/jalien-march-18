@@ -1,4 +1,4 @@
-package alien.optimizers.priority;
+package alien.optimizers.state;
 
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
@@ -6,6 +6,7 @@ import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
 import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
+import alien.optimizers.priority.PriorityRapidUpdater;
 import alien.taskQueue.JobStatus;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
@@ -17,6 +18,10 @@ import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+/**
+ * @author Jørn-Are Flaten
+ * @since 2024-01-22
+ */
 public class OldJobRemover extends Optimizer {
     static final Logger logger = ConfigUtils.getLogger(PriorityRapidUpdater.class.getCanonicalName());
 
@@ -29,7 +34,7 @@ public class OldJobRemover extends Optimizer {
 
 
         while (true) {
-//            boolean updated = DBSyncUtils.updatePeriodic(frequency, JobAgentUpdater.class.getCanonicalName());
+//            boolean updated = DBSyncUtils.updatePeriodic(frequency, OldJobRemover.class.getCanonicalName());
             boolean updated = true;
             if (updated) {
                 try {

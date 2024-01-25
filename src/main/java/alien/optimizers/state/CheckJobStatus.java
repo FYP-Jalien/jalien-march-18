@@ -1,4 +1,4 @@
-package alien.optimizers.priority;
+package alien.optimizers.state;
 
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
@@ -6,6 +6,8 @@ import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
 import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
+import alien.optimizers.priority.JobAgentUpdater;
+import alien.optimizers.priority.PriorityReconciliationService;
 import alien.taskQueue.JobStatus;
 import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
@@ -16,7 +18,10 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
+/**
+ * @author Jørn-Are Flaten
+ * @since 2024-01-15
+ */
 public class CheckJobStatus extends Optimizer {
     static final Logger logger = ConfigUtils.getLogger(PriorityReconciliationService.class.getCanonicalName());
 
