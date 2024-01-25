@@ -4312,7 +4312,7 @@ public class TaskQueueUtils {
 	 * @param preemptionTs
 	 * @param killingTs
 	 * @param preemptionSlotMemory
-	 * @param preemptionSlotSwMemory 
+	 * @param preemptionSlotSwMemory
 	 * @param preemptionJobMemory
 	 * @param numConcurrentJobs
 	 * @param resubmissionCounter
@@ -4437,12 +4437,15 @@ public class TaskQueueUtils {
 			Integer hostId = getHostId(hostName, false);
 			int statusId = finalStatus.getAliEnLevel();
 			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where wouldPreempt=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId
-					+ " and siteId="
-					+ siteId + ";";
-			if (!db.query(q))
+					+ " and siteId=" + siteId + ";";
+
+			if (!db.query(q)) {
+				logger.log(Level.SEVERE, "Error executing the update query `" + q + "`");
 				return false;
+			}
+
 			if (db.getUpdateCount() == 0)
-				logger.log(Level.INFO, "Updating status but not in oom db (" + queueId + " - " + finalStatus.toString() + ")");
+				logger.log(Level.FINE, "Updating status but not in oom db (" + queueId + " - " + finalStatus.toString() + ")");
 		}
 		return true;
 	}
