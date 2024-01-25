@@ -94,15 +94,23 @@ public class InactiveJobHandler extends Optimizer {
 		}
 	}
 
-	private static void moveState(DBFunctions db, String query, JobStatus status, StringBuilder log) {
-		db.query(query);
-
-		int counter = 0;
-		while (db.moveNext()) {
-			TaskQueueUtils.setJobStatus(db.getl("queueId"), status, JobStatus.getStatus(Integer.valueOf(db.geti("statusId"))));
-			counter++;
+	private static void moveState(final DBFunctions db, final String query, final JobStatus status, final StringBuilder log) {
+		if (!db.query(query)) {
+			logger.log(Level.SEVERE, "Failed to execute selection query `" + query + "`");
+			return;
 		}
-		logger.log(Level.INFO, "Moved " + counter + " jobs to " + status + " state");
-		log.append("Moved ").append(counter).append(" jobs to ").append(status).append(" state\n");
+
+		int okcounter = 0;
+		int failcounter = 0;
+
+		while (db.moveNext()) {
+			if (TaskQueueUtils.setJobStatus(db.getl("queueId"), status, JobStatus.getStatusByAlien(Integer.valueOf(db.geti("statusId")))))
+				okcounter++;
+			else
+				failcounter++;
+		}
+
+		logger.log(Level.INFO, "Moved " + okcounter + " jobs to " + status + " state" + (failcounter > 0 ? ", " + failcounter + " others failed to be moved" : ""));
+		log.append("Moved ").append(okcounter).append(" jobs to ").append(status).append(" state\n").append(" while ").append(failcounter + " others failed to be moved");
 	}
 }
