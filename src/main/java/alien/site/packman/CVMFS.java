@@ -238,6 +238,9 @@ public class CVMFS extends PackMan {
 	 * @return JAR location for current tag
 	 */
 	public static String getJarPath() {
+		if (Version.getTagFromEnv() != null && !Version.getTagFromEnv().isBlank())
+			return "$(dirname $(which jalien))/../lib/alien-users.jar";
+			
 		return CVMFS_BASE_DIR + "/el7-x86_64/Packages/JAliEn/" + Version.getTag() + "-1" + "/lib/alien-users.jar";
 	}
 
