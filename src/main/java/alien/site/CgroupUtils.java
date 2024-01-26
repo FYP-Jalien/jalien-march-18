@@ -43,6 +43,12 @@ public class CgroupUtils {
 					SystemCommand.bash("echo +memory >> " + slotCgroup + "/cgroup.subtree_control");
 					SystemCommand.bash("echo +memory >> " + slotCgroup + "/agents/cgroup.subtree_control");
 
+					SystemCommand.bash("echo +cpu >> " + slotCgroup + "/cgroup.subtree_control");
+					SystemCommand.bash("echo +cpu >> " + slotCgroup + "/agents/cgroup.subtree_control");
+
+					SystemCommand.bash("echo +cpuset >> " + slotCgroup + "/cgroup.subtree_control");
+					SystemCommand.bash("echo +cpuset >> " + slotCgroup + "/agents/cgroup.subtree_control");
+
 					return true;
 				}
 				catch (final Exception e) {

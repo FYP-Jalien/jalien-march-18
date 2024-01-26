@@ -52,6 +52,8 @@ import alien.io.IOUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
+import alien.priority.PriorityRegister;
+import alien.priority.PriorityRegister.JobCounter;
 import alien.quotas.FileQuota;
 import alien.quotas.QuotaUtilities;
 import alien.shell.ErrNo;
@@ -143,6 +145,14 @@ public class TaskQueueUtils {
 	 */
 	public static DBFunctions getQueueDB() {
 		final DBFunctions db = ConfigUtils.getDB("processes");
+		return db;
+	}
+
+	/**
+	 * @return the database connection to 'processesdev'
+	 */
+	public static DBFunctions getProcessesDevDB() {
+		final DBFunctions db = ConfigUtils.getDB("processesdev");
 		return db;
 	}
 
@@ -838,8 +848,30 @@ public class TaskQueueUtils {
 
 			putJobLog(job, "state", "Job state transition from " + oldStatus.name() + " to " + newStatus.name(), null);
 
-			if (JobStatus.finalStates().contains(newStatus) || newStatus == JobStatus.SAVED_WARN || newStatus == JobStatus.SAVED)
+			if (JobStatus.finalStates().contains(newStatus) || newStatus == JobStatus.SAVED_WARN || newStatus == JobStatus.SAVED) {
 				deleteJobToken(job);
+
+				String userIdQuery = "select userId, cpucores from QUEUE where queueId=?";
+				try {
+					db.query(userIdQuery, false, Long.valueOf(job));
+				}
+				catch (Exception e) {
+					logger.log(Level.WARNING, "Could not get userId for queueId: " + job, e);
+					return false;
+				}
+
+				if (db.moveNext()) {
+					final Integer userId = Integer.valueOf(db.geti("userId"));
+					final int activeCores = db.geti("cpucores");
+
+					final JobCounter counter = PriorityRegister.JobCounter.getCounterForUser(userId);
+
+					counter.decRunning(activeCores);
+
+					if (extrafields != null)
+						extrafields.put("userId", userId);
+				}
+			}
 
 			final String execHost = setJobExtraFields(job, extrafields);
 
@@ -895,9 +927,54 @@ public class TaskQueueUtils {
 			}
 
 			execSite = extrafields.getOrDefault("exechost", execSite).toString();
+
+			if (extrafields.containsKey("cputime") || extrafields.containsKey("cost")) {
+				final Integer userId;
+
+				if (extrafields.containsKey("userId"))
+					userId = (Integer) extrafields.get("userId");
+				else
+					userId = getUserId(Long.valueOf(job));
+
+				addCputimeAndCostToRegister(extrafields, userId);
+			}
+
 		}
 
 		return execSite;
+	}
+
+	private static void addCputimeAndCostToRegister(final Map<String, Object> extrafields, final Integer userId) {
+		if (extrafields != null) {
+			final JobCounter counter = PriorityRegister.JobCounter.getCounterForUser(userId);
+
+			final Object cputime = extrafields.get("cputime");
+			if (cputime != null && cputime instanceof Number)
+				counter.addCputime(((Number) cputime).longValue());
+
+			final Object cost = extrafields.get("cost");
+			if (cost != null && cost instanceof Number)
+				counter.addCost(((Number) cost).doubleValue());
+		}
+	}
+
+	private static Integer getUserId(final Long queueId) {
+		try (DBFunctions db = TaskQueueUtils.getQueueDB()) {
+			Integer userId = Integer.valueOf(0);
+
+			if (db == null) {
+				logger.log(Level.SEVERE, "JobAgent for getUserId could not get a DB connection");
+			}
+			else {
+				db.query("SELECT userId FROM QUEUE WHERE queueId = ?", false, queueId);
+				if (db.moveNext())
+					userId = Integer.valueOf(db.geti("userId"));
+				else
+					logger.log(Level.WARNING, "Cannot infer the userId for job ID " + queueId);
+			}
+
+			return userId;
+		}
 	}
 
 	private static int getOrInsertType(final String key, final Map<?, ?> values) {
@@ -3686,6 +3763,9 @@ public class TaskQueueUtils {
 						+ "agentuuid=null,cpuId=null where queueId=?", false, Long.valueOf(queueId))) {
 					logger.severe("Resubmit: cannot update QUEUEPROC for job: " + queueId);
 				}
+				else {
+					PriorityRegister.JobCounter.getCounterForUser(Integer.valueOf(j.user)).incWaiting();
+				}
 
 				// if the job was attached to a node, we tell him to hara-kiri
 				if (j.node != null && (js == JobStatus.STARTED || js == JobStatus.RUNNING || js == JobStatus.ASSIGNED || js == JobStatus.ZOMBIE || js == JobStatus.SAVING)) {
@@ -4232,7 +4312,7 @@ public class TaskQueueUtils {
 	 * @param preemptionTs
 	 * @param killingTs
 	 * @param preemptionSlotMemory
-	 * @param preemptionSlotMemory
+	 * @param preemptionSlotSwMemory
 	 * @param preemptionJobMemory
 	 * @param numConcurrentJobs
 	 * @param resubmissionCounter
@@ -4357,12 +4437,15 @@ public class TaskQueueUtils {
 			Integer hostId = getHostId(hostName, false);
 			int statusId = finalStatus.getAliEnLevel();
 			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where wouldPreempt=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId
-					+ " and siteId="
-					+ siteId + ";";
-			if (!db.query(q))
+					+ " and siteId=" + siteId + ";";
+
+			if (!db.query(q)) {
+				logger.log(Level.SEVERE, "Error executing the update query `" + q + "`");
 				return false;
+			}
+
 			if (db.getUpdateCount() == 0)
-				logger.log(Level.INFO, "Updating status but not in oom db (" + queueId + " - " + finalStatus.toString() + ")");
+				logger.log(Level.FINE, "Updating status but not in oom db (" + queueId + " - " + finalStatus.toString() + ")");
 		}
 		return true;
 	}

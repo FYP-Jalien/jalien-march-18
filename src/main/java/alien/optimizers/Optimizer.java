@@ -1,9 +1,9 @@
 package alien.optimizers;
 
+import alien.config.ConfigUtils;
+
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import alien.config.ConfigUtils;
 
 /**
  * @author Miguel
@@ -19,7 +19,8 @@ public class Optimizer extends Thread {
 	private long sleep_period = 60 * 1000L; // 1min
 
 	private static String[] catalogue_optimizers = { "alien.optimizers.catalogue.LTables", "alien.optimizers.catalogue.GuidTable", "alien.optimizers.catalogue.ResyncLDAP",
-			"utils.lfncrawler.LFNCrawler" };
+			"utils.lfncrawler.LFNCrawler", "alien.optimizers.priority.PriorityRapidUpdater", "alien.optimizers.priority.PriorityReconciliationService", "alien.optimizers.priority.JobAgentUpdater",
+			"alien.optimizers.priority.InactiveJobHandler"};
 
 	@Override
 	public void run() {
