@@ -4385,7 +4385,7 @@ public class TaskQueueUtils {
 			else if (killingTs != 0) {
 				values.remove("uuid");
 				logger.log(Level.INFO, "Job " + wouldPreempt + " was killed at ts " + killingTs);
-				String q = "SELECT wouldKill FROM oom_preemptions where wouldPreempt=" + wouldPreempt + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId="
+				String q = "SELECT 1 FROM oom_preemptions where wouldPreempt=" + wouldPreempt + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId + " and siteId="
 						+ siteId + ";";
 				db.query(q);
 				if (db.moveNext()) {
