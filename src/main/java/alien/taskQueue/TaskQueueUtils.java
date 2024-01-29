@@ -3764,7 +3764,7 @@ public class TaskQueueUtils {
 					logger.severe("Resubmit: cannot update QUEUEPROC for job: " + queueId);
 				}
 				else {
-					PriorityRegister.JobCounter.getCounterForUser(Integer.valueOf(j.user)).incWaiting();
+					PriorityRegister.JobCounter.getCounterForUser(getUserId(j.user, true)).incWaiting();
 				}
 
 				// if the job was attached to a node, we tell him to hara-kiri
