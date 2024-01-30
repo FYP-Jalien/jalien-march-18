@@ -36,15 +36,15 @@ public class JobAgentUpdater extends Optimizer {
 		while (true) {
 			final boolean updated = DBSyncUtils.updatePeriodic(frequency, JobAgentUpdater.class.getCanonicalName());
 			if (updated) {
-				try {
-					updateComputedPriority();
-					logger.log(Level.INFO, "JobAgentUpdater sleeping for " + this.getSleepPeriod() + " ms");
-					sleep(this.getSleepPeriod());
-				}
-				catch (InterruptedException e) {
-					logger.log(Level.SEVERE, "JobAgentUpdater interrupted", e);
-				}
+				updateComputedPriority();
+				logger.log(Level.INFO, "JobAgentUpdater sleeping for " + this.getSleepPeriod() + " ms");
+			}
 
+			try {
+				sleep(this.getSleepPeriod());
+			}
+			catch (InterruptedException e) {
+				logger.log(Level.SEVERE, "JobAgentUpdater interrupted", e);
 			}
 		}
 	}
