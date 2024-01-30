@@ -901,11 +901,11 @@ public class TaskQueueUtils {
 					final String key = entry.getKey();
 					final Object value = entry.getValue();
 
-					if (fieldMap.containsKey(entry.getKey() + "_table")) {
+					if (fieldMap.containsKey(key + "_table")) {
 						final HashMap<String, Object> map = new HashMap<>();
 
 						if (value instanceof Map) {
-							final int id = getOrInsertType(entry.getKey(), (Map<?, ?>) value);
+							final int id = getOrInsertType(key, (Map<?, ?>) value);
 							if (id > 0)
 								map.put(fieldMap.get(key + "_field") + "Id", Integer.valueOf(id));
 						}
@@ -2734,6 +2734,7 @@ public class TaskQueueUtils {
 				}
 
 			// TODO remove this when jobs send again heartbeat monitoring data
+			/*
 			try (DBFunctions db = getQueueDB()) {
 				if (db == null)
 					return false;
@@ -2742,6 +2743,7 @@ public class TaskQueueUtils {
 
 				db.query("UPDATE QUEUEPROC SET lastupdate=NOW() WHERE queueId=?", false, Long.valueOf(queueId));
 			}
+			*/
 			return true;
 		}
 
