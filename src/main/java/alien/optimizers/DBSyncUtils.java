@@ -62,27 +62,24 @@ public class DBSyncUtils {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return false;
 			}
-			db.query("SELECT count(*) from `OPTIMIZERS` WHERE class = ?", false, classname);
-			if (db.moveNext()) {
-				final int valuecounts = db.geti(1);
-				if (valuecounts == 0) {
-					updated = registerClass(initFrequency, classname, timestamp);
-				}
-				else {
-					db.query("SELECT frequency from `OPTIMIZERS` WHERE class = ?", false, classname);
-					if (db.moveNext()) {
-						final int frequency = db.geti("frequency");
-						// If the frequency is set to -1 do not run
-						if (frequency != -1) {
-							final Long lastUpdated = Long.valueOf(System.currentTimeMillis() - frequency);
-							updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ? WHERE class = ? AND lastUpdate < ?",
-									false, timestamp, classname, lastUpdated) && db.getUpdateCount() > 0;
-						}
-					}
+
+			db.query("SELECT frequency from `OPTIMIZERS` WHERE class = ?", false, classname);
+
+			if (!db.moveNext()) {
+				updated = registerClass(initFrequency, classname, timestamp);
+			}
+			else {
+				final int frequency = db.geti(1);
+				// If the frequency is set to -1 do not run
+				if (frequency < 0) {
+					final Long lastUpdated = Long.valueOf(System.currentTimeMillis() - frequency);
+					updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ? WHERE class = ? AND lastUpdate < ?",
+							false, timestamp, classname, lastUpdated) && db.getUpdateCount() > 0;
 				}
 			}
-			return updated;
 		}
+
+		return updated;
 	}
 
 	/**
