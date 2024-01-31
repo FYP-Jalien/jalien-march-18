@@ -3,7 +3,7 @@ package alien.priority;
 import lazyj.DBFunctions;
 
 /**
- * @author Jørn-Are Flaten
+ * @author Jorn-Are Flaten
  * @since 2023-12-04
  */
 class PriorityDto {

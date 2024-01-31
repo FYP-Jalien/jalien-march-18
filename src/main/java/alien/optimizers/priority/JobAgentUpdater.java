@@ -13,7 +13,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * @author Jørn-Are Flaten
+ * @author Jorn-Are Flaten
  * @since 2023-12-08
  */
 public class JobAgentUpdater extends Optimizer {

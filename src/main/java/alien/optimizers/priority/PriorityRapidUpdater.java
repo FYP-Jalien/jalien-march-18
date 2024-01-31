@@ -17,7 +17,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * @author Jørn-Are Flaten
+ * @author Jorn-Are Flaten
  * @since 2023-11-22
  */
 public class PriorityRapidUpdater extends Optimizer {

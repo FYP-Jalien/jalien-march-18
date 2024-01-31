@@ -8,12 +8,12 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
 /**
- * @author Jørn-Are Flaten
+ * @author Jorn-Are Flaten
  * @since 2023-11-23
  */
 public class PriorityRegister {
 	/**
-	 * @author Jørn-Are Flaten
+	 * @author Jorn-Are Flaten
 	 * @since 2023-11-23
 	 */
 	public static class JobCounter {

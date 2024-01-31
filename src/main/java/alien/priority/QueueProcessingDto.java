@@ -1,7 +1,7 @@
 package alien.priority;
 
 /**
- * @author Jørn-Are Flaten
+ * @author Jorn-Are Flaten
  * @since 2023-12-04
  */
 public class QueueProcessingDto {
