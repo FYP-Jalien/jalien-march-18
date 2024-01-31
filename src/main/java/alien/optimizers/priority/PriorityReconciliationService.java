@@ -47,19 +47,26 @@ public class PriorityReconciliationService extends Optimizer {
 			try {
 				if (updated) {
 					reconcilePriority();
+				}
+			}
+			catch (Exception e) {
+				try {
+					logger.log(Level.SEVERE, "Exception executing optimizer", e);
+					DBSyncUtils.registerException(PriorityReconciliationService.class.getCanonicalName(), e);
+				}
+				catch (Exception e2) {
+					logger.log(Level.SEVERE, "Cannot register exception in the database", e2);
+				}
+			}
 
-					logger.log(Level.INFO, "ReconcilePriority sleeps " + this.getSleepPeriod() + " ms");
-					sleep(this.getSleepPeriod());
-				}
-				else {
-					sleep(this.getSleepPeriod());
-				}
+			try {
+				logger.log(Level.INFO, "ReconcilePriority sleeps " + this.getSleepPeriod() + " ms");
+				sleep(this.getSleepPeriod());
 			}
 			catch (InterruptedException e) {
 				logger.log(Level.WARNING, "PriorityReconciliationService interrupted", e);
 			}
 		}
-
 	}
 
 	private static void reconcilePriority() {

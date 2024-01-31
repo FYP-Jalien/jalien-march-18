@@ -36,9 +36,23 @@ public class PriorityRapidUpdater extends Optimizer {
 	public void run() {
 		this.setSleepPeriod(60 * 5 * 1000); // 5m
 
+		DBSyncUtils.updatePeriodic((int) getSleepPeriod(), PriorityRapidUpdater.class.getCanonicalName());
+
 		while (true) {
 			try {
 				updatePriority();
+			}
+			catch (Exception e) {
+				try {
+					logger.log(Level.SEVERE, "Exception executing optimizer", e);
+					DBSyncUtils.registerException(PriorityRapidUpdater.class.getCanonicalName(), e);
+				}
+				catch (Exception e2) {
+					logger.log(Level.SEVERE, "Cannot register exception in the database", e2);
+				}
+			}
+
+			try {
 				logger.log(Level.INFO, "PriorityRapidUpdater sleeping for " + this.getSleepPeriod() + " ms");
 				sleep(this.getSleepPeriod());
 			}
@@ -52,7 +66,7 @@ public class PriorityRapidUpdater extends Optimizer {
 	 * Update PRIORITY table values to keep user information in sync
 	 */
 	public static void updatePriority() {
-		try (DBFunctions db = TaskQueueUtils.getQueueDB(); DBFunctions dbdev = TaskQueueUtils.getProcessesDevDB();) {
+		try (DBFunctions db = TaskQueueUtils.getQueueDB(); DBFunctions dbdev = TaskQueueUtils.getProcessesDevDB()) {
 			if (db == null) {
 				logger.log(Level.SEVERE, "PriorityRapidUpdater could not get a DB connection");
 				return;

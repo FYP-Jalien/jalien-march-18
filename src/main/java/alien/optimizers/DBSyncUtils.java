@@ -1,5 +1,7 @@
 package alien.optimizers;
 
+import java.io.PrintWriter;
+import java.io.StringWriter;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -73,8 +75,8 @@ public class DBSyncUtils {
 				// If the frequency is set to -1 do not run
 				if (frequency < 0) {
 					final Long lastUpdated = Long.valueOf(System.currentTimeMillis() - frequency);
-					updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ? WHERE class = ? AND lastUpdate < ?",
-							false, timestamp, classname, lastUpdated) && db.getUpdateCount() > 0;
+					updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ?, server = ? WHERE class = ? AND lastUpdate < ?",
+							false, timestamp, ConfigUtils.getLocalHostname(), classname, lastUpdated) && db.getUpdateCount() > 0;
 				}
 			}
 		}
@@ -117,8 +119,8 @@ public class DBSyncUtils {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return false;
 			}
-			final boolean updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ?, lastUpdatedLog = ? WHERE class = ?",
-					false, timestamp, log, classname) && db.getUpdateCount() > 0;
+			final boolean updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ?, server = ?, lastUpdatedLog = ? WHERE class = ?",
+					false, timestamp, ConfigUtils.getLocalHostname(), log, classname) && db.getUpdateCount() > 0;
 			return updated;
 		}
 	}
@@ -137,9 +139,23 @@ public class DBSyncUtils {
 				logger.log(Level.INFO, "Could not get DBs!");
 				return false;
 			}
-			final boolean updated = db.query("UPDATE OPTIMIZERS set lastUpdatedLog = ? WHERE class = ?", false, logOutput, classname);
+			final boolean updated = db.query("UPDATE OPTIMIZERS set lastUpdatedLog = ?, server = ? WHERE class = ?", false, logOutput, ConfigUtils.getLocalHostname(), classname);
 			return updated;
 		}
+	}
+
+	/**
+	 * @param classname
+	 * @param e
+	 * @return <code>true</code> if the message was recorded in the database
+	 */
+	public static boolean registerException(final String classname, final Exception e) {
+		final StringWriter sw = new StringWriter();
+		try (PrintWriter pw = new PrintWriter(sw)) {
+			e.printStackTrace(pw);
+		}
+
+		return registerLog(classname, "Exception while executing the last iteration: " + e.getMessage() + "\n" + sw.toString());
 	}
 
 	/**
@@ -175,7 +191,7 @@ public class DBSyncUtils {
 
 			final Date lastRan = new Date(db.getl("lastUpdate"));
 
-			String ret = classname + ", last ran " + Format.showNiceDate(lastRan) + " " + Format.showTime(lastRan);
+			String ret = classname + ", last ran " + Format.showNiceDate(lastRan) + " " + Format.showTime(lastRan) + " by " + db.gets("server");
 
 			if (verbose)
 				ret += " (frequency: " + Format.toInterval(db.getl("frequency")) + ")";
@@ -267,7 +283,7 @@ public class DBSyncUtils {
 				return false;
 			}
 			final Long timestamp = Long.valueOf(System.currentTimeMillis());
-			final boolean updated = db.query("UPDATE OPTIMIZERS set lastUpdate = ? WHERE class = ?", false, timestamp, classname);
+			final boolean updated = db.query("UPDATE OPTIMIZERS set lastUpdate = ?, server = ? WHERE class = ?", false, timestamp, ConfigUtils.getLocalHostname(), classname);
 			return updated;
 		}
 	}

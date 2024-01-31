@@ -34,13 +34,24 @@ public class JobAgentUpdater extends Optimizer {
 		int frequency = (int) this.getSleepPeriod();
 
 		while (true) {
-			final boolean updated = DBSyncUtils.updatePeriodic(frequency, JobAgentUpdater.class.getCanonicalName());
-			if (updated) {
-				updateComputedPriority();
-				logger.log(Level.INFO, "JobAgentUpdater sleeping for " + this.getSleepPeriod() + " ms");
+			try {
+				final boolean updated = DBSyncUtils.updatePeriodic(frequency, JobAgentUpdater.class.getCanonicalName());
+				if (updated) {
+					updateComputedPriority();
+				}
+			}
+			catch (Exception e) {
+				try {
+					logger.log(Level.SEVERE, "Exception executing optimizer", e);
+					DBSyncUtils.registerException(JobAgentUpdater.class.getCanonicalName(), e);
+				}
+				catch (Exception e2) {
+					logger.log(Level.SEVERE, "Cannot register exception in the database", e2);
+				}
 			}
 
 			try {
+				logger.log(Level.INFO, "JobAgentUpdater sleeping for " + this.getSleepPeriod() + " ms");
 				sleep(this.getSleepPeriod());
 			}
 			catch (InterruptedException e) {

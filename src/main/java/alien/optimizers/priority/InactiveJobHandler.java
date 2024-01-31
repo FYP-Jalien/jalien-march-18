@@ -36,21 +36,31 @@ public class InactiveJobHandler extends Optimizer {
 		int frequency = (int) this.getSleepPeriod();
 
 		while (true) {
-			final boolean updated = DBSyncUtils.updatePeriodic(frequency, InactiveJobHandler.class.getCanonicalName());
 			try {
-				if (updated) {
+				if (DBSyncUtils.updatePeriodic(frequency, InactiveJobHandler.class.getCanonicalName())) {
 					moveInactiveJobStates();
 					logger.log(Level.INFO, "InactiveJobHandler sleeping for " + this.getSleepPeriod() + " ms");
 					sleep(this.getSleepPeriod());
 				}
-				else {
-					sleep(this.getSleepPeriod());
+			}
+			catch (Exception e) {
+				try {
+					logger.log(Level.SEVERE, "Exception executing optimizer", e);
+					DBSyncUtils.registerException(InactiveJobHandler.class.getCanonicalName(), e);
 				}
+				catch (Exception e2) {
+					logger.log(Level.SEVERE, "Cannot register exception in the database", e2);
+				}
+			}
+
+			try {
+				sleep(this.getSleepPeriod());
 			}
 			catch (InterruptedException e) {
 				logger.log(Level.SEVERE, "InactiveJobHandler interrupted", e);
 			}
 		}
+
 	}
 
 	private static void moveInactiveJobStates() {
@@ -86,6 +96,7 @@ public class InactiveJobHandler extends Optimizer {
 				DBSyncUtils.registerLog(InactiveJobHandler.class.getCanonicalName(), registerLog.toString());
 			}
 			catch (Exception e) {
+				DBSyncUtils.registerLog(InactiveJobHandler.class.getCanonicalName(), "Exception executing: " + e.getMessage());
 				logger.log(Level.SEVERE, "InactiveJobHandler: Exception", e);
 			}
 		}
@@ -93,10 +104,10 @@ public class InactiveJobHandler extends Optimizer {
 
 	private static String getActiveJobQuery() {
 		String activeStates = JobStatus.RUNNING.getAliEnLevel() + ","
-                + JobStatus.STARTED.getAliEnLevel() + ","
-                + JobStatus.SAVING.getAliEnLevel() + ","
-                + JobStatus.ASSIGNED.getAliEnLevel();
-        return "SELECT q.queueId, q.statusId FROM QUEUE q JOIN QUEUEPROC qp\n" +
+				+ JobStatus.STARTED.getAliEnLevel() + ","
+				+ JobStatus.SAVING.getAliEnLevel() + ","
+				+ JobStatus.ASSIGNED.getAliEnLevel();
+		return "SELECT q.queueId, q.statusId FROM QUEUE q JOIN QUEUEPROC qp\n" +
 				"                                            WHERE q.queueId = qp.queueId\n" +
 				"                                              AND  q.statusId IN (" + activeStates + ")\n" +
 				"                                              AND qp.lastupdate < NOW() - INTERVAL 1 HOUR";
@@ -119,6 +130,6 @@ public class InactiveJobHandler extends Optimizer {
 		}
 
 		logger.log(Level.INFO, "Moved " + okcounter + " jobs to " + status + " state" + (failcounter > 0 ? ", " + failcounter + " others failed to be moved" : ""));
-		log.append("Moved ").append(okcounter).append(" jobs to ").append(status).append(" state\n").append(" while ").append(failcounter + " others failed to be moved");
+		log.append("Moved ").append(okcounter).append(" jobs to ").append(status).append(" state, while ").append(failcounter + " others failed to be moved\n");
 	}
 }
