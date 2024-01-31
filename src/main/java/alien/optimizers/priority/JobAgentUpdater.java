@@ -20,12 +20,12 @@ public class JobAgentUpdater extends Optimizer {
 	/**
 	 * Logger
 	 */
-	static final Logger logger = ConfigUtils.getLogger(PriorityReconciliationService.class.getCanonicalName());
+	static final Logger logger = ConfigUtils.getLogger(JobAgentUpdater.class.getCanonicalName());
 
 	/**
 	 * Monitoring component
 	 */
-	static final Monitor monitor = MonitorFactory.getMonitor(PriorityReconciliationService.class.getCanonicalName());
+	static final Monitor monitor = MonitorFactory.getMonitor(JobAgentUpdater.class.getCanonicalName());
 
 	@Override
 	public void run() {
