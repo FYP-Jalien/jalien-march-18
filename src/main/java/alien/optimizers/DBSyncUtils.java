@@ -73,7 +73,7 @@ public class DBSyncUtils {
 			else {
 				final int frequency = db.geti(1);
 				// If the frequency is set to -1 do not run
-				if (frequency < 0) {
+				if (frequency > 0) {
 					final Long lastUpdated = Long.valueOf(System.currentTimeMillis() - frequency);
 					updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ?, server = ? WHERE class = ? AND lastUpdate < ?",
 							false, timestamp, ConfigUtils.getLocalHostname(), classname, lastUpdated) && db.getUpdateCount() > 0;
