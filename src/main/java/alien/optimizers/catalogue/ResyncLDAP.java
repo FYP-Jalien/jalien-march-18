@@ -65,7 +65,11 @@ public class ResyncLDAP extends Optimizer {
 		DBSyncUtils.checkLdapSyncTable();
 		while (true) {
 			try {
-				resyncLDAP();
+				long newSleepTime = resyncLDAP();
+
+				// minimum across all optimizers
+				if (newSleepTime > 0)
+					this.setSleepPeriod(newSleepTime);
 			}
 			catch (final Exception e) {
 				logger.log(Level.WARNING, "Exception running the LDAP resync", e);
@@ -126,7 +130,7 @@ public class ResyncLDAP extends Optimizer {
 	 * @param usersdb Database instance for SE, SE_VOLUMES and LDAP_SYNC tables
 	 * @param admindb Database instance for USERS_LDAP and USERS_LDAP_ROLE tables
 	 */
-	private static void resyncLDAP() {
+	private static long resyncLDAP() {
 		LDAPHelper.invalidateCache();
 
 		final int frequency = 3600 * 1000; // 1 hour default
@@ -134,9 +138,20 @@ public class ResyncLDAP extends Optimizer {
 
 		logger.log(Level.INFO, "Checking if an LDAP resynchronisation is needed");
 		boolean updated = true;
+
+		final Optimizer stub = new Optimizer() {
+			long sleepPeriod = 0;
+
+			@Override
+			public void setSleepPeriod(long newSleepPeriod) {
+				if (sleepPeriod == 0 || (newSleepPeriod > 0 && newSleepPeriod < sleepPeriod))
+					sleepPeriod = newSleepPeriod;
+			}
+		};
+
 		for (final String classname : classnames) {
 			if (periodic.get())
-				updated = DBSyncUtils.updatePeriodic(frequency, ResyncLDAP.class.getCanonicalName() + "." + classname);
+				updated = DBSyncUtils.updatePeriodic(frequency, ResyncLDAP.class.getCanonicalName() + "." + classname, stub);
 
 			if (updated) {
 				switch (classname) {
@@ -158,6 +173,8 @@ public class ResyncLDAP extends Optimizer {
 				logger.log(Level.INFO, logOutput);
 			}
 		}
+
+		return stub.getSleepPeriod();
 	}
 
 	/**
@@ -529,8 +546,8 @@ public class ResyncLDAP extends Optimizer {
 					boolean valid = true;
 					if (maxjobs == null || maxqueuedjobs == null) {
 						logger.log(Level.SEVERE, "Error on getting maxjobs / maxqueuedjobs from CE " + ceName);
-						addEntityLog(modifications,ceName);
-						modifications.put(ceName,"Error on getting maxjobs / maxqueuedjobs from CE " + ceName);
+						addEntityLog(modifications, ceName);
+						modifications.put(ceName, "Error on getting maxjobs / maxqueuedjobs from CE " + ceName);
 						valid = false;
 					}
 					if (valid) {

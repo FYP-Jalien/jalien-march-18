@@ -61,7 +61,7 @@ public class GuidTable extends Optimizer {
 			while (true) {
 				logger.log(Level.INFO, "GuidTable wakes up!: going to get G tables counts with max: " + maxCount);
 
-				final boolean updated = DBSyncUtils.updatePeriodic(frequency, GuidTable.class.getCanonicalName());
+				final boolean updated = DBSyncUtils.updatePeriodic(frequency, GuidTable.class.getCanonicalName(), this);
 
 				if (updated) {
 					// Get count of latest G tables

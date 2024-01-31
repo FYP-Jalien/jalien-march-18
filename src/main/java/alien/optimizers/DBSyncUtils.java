@@ -54,9 +54,10 @@ public class DBSyncUtils {
 	 *
 	 * @param initFrequency Frequency of updates, default value for this class
 	 * @param classname Class to update
+	 * @param instance feed back the sleep time set in the database to the calling class
 	 * @return Success of update query
 	 */
-	public static boolean updatePeriodic(final int initFrequency, final String classname) {
+	public static boolean updatePeriodic(final int initFrequency, final String classname, final Optimizer instance) {
 		boolean updated = false;
 		final Long timestamp = Long.valueOf(System.currentTimeMillis());
 		try (DBFunctions db = ConfigUtils.getDB("alice_users");) {
@@ -74,6 +75,9 @@ public class DBSyncUtils {
 				final int frequency = db.geti(1);
 				// If the frequency is set to -1 do not run
 				if (frequency > 0) {
+					if (instance != null)
+						instance.setSleepPeriod(frequency);
+
 					final Long lastUpdated = Long.valueOf(System.currentTimeMillis() - frequency);
 					updated = db.query("UPDATE OPTIMIZERS SET lastUpdate = ?, server = ? WHERE class = ? AND lastUpdate < ?",
 							false, timestamp, ConfigUtils.getLocalHostname(), classname, lastUpdated) && db.getUpdateCount() > 0;

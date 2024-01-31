@@ -71,7 +71,7 @@ public class LFNCrawler extends Optimizer {
 		DBSyncUtils.checkLdapSyncTable();
 
 		while (true) {
-			final boolean updated = DBSyncUtils.updatePeriodic(frequency, LFNCrawler.class.getCanonicalName());
+			final boolean updated = DBSyncUtils.updatePeriodic(frequency, LFNCrawler.class.getCanonicalName(), this);
 
 			if (updated) {
 				print("Starting expired LFN crawling iteration in " + (dryRun ? "DRY-RUN" : "NORMAL") + " mode");

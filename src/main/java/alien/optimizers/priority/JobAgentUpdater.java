@@ -35,7 +35,7 @@ public class JobAgentUpdater extends Optimizer {
 
 		while (true) {
 			try {
-				final boolean updated = DBSyncUtils.updatePeriodic(frequency, JobAgentUpdater.class.getCanonicalName());
+				final boolean updated = DBSyncUtils.updatePeriodic(frequency, JobAgentUpdater.class.getCanonicalName(), this);
 				if (updated) {
 					updateComputedPriority();
 				}

@@ -43,7 +43,7 @@ public class PriorityReconciliationService extends Optimizer {
 		int frequency = (int) this.getSleepPeriod();
 
 		while (true) {
-			final boolean updated = DBSyncUtils.updatePeriodic(frequency, PriorityReconciliationService.class.getCanonicalName());
+			final boolean updated = DBSyncUtils.updatePeriodic(frequency, PriorityReconciliationService.class.getCanonicalName(), this);
 			try {
 				if (updated) {
 					reconcilePriority();

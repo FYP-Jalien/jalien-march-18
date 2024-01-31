@@ -57,7 +57,7 @@ public class LTables extends Optimizer {
 				String body = "";
 				String dbLog = "";
 
-				final boolean updated = DBSyncUtils.updatePeriodic(frequency, LTables.class.getCanonicalName());
+				final boolean updated = DBSyncUtils.updatePeriodic(frequency, LTables.class.getCanonicalName(), this);
 				if (updated) {
 					// Get count of latest L8 tables
 					db.setReadOnly(true);

@@ -36,9 +36,11 @@ public class PriorityRapidUpdater extends Optimizer {
 	public void run() {
 		this.setSleepPeriod(60 * 5 * 1000); // 5m
 
-		DBSyncUtils.updatePeriodic((int) getSleepPeriod(), PriorityRapidUpdater.class.getCanonicalName());
-
 		while (true) {
+			// Ignore the returned value, each server has to flush at the same frequency, independently of each other.
+			// It is called in the loop just to feed back the frequency from the database, in case we tune it != default value
+			DBSyncUtils.updatePeriodic((int) getSleepPeriod(), PriorityRapidUpdater.class.getCanonicalName(), this);
+			
 			try {
 				updatePriority();
 			}
@@ -169,7 +171,7 @@ public class PriorityRapidUpdater extends Optimizer {
 					registerLog.append(" Counter registry is empty - nothing to update\n");
 				}
 
-				DBSyncUtils.registerLog(PriorityRapidUpdater.class.getCanonicalName(), registerLog.toString());
+				DBSyncUtils.updateManual(PriorityRapidUpdater.class.getCanonicalName(), registerLog.toString());
 			}
 		}
 		catch (Exception e) {
