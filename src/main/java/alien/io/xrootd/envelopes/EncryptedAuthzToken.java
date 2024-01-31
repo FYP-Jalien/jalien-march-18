@@ -16,6 +16,9 @@ import javax.crypto.KeyGenerator;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.SecretKeySpec;
 
+import alien.api.TomcatServer;
+import alien.catalogue.access.XrootDEnvelope;
+import alien.config.ConfigUtils;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 /**
@@ -67,6 +70,9 @@ public class EncryptedAuthzToken {
 	private RSAPrivateKey SEPrivKey;
 	private final RSAPublicKey SEPubKey;
 
+	// Use JWTGenerator to sign the envelope using SciTokens
+	private boolean useSciTokensAuthz = false;
+
 	static {
 		// the security provider used for decryption/verification
 		Security.addProvider(new BouncyCastleProvider());
@@ -105,6 +111,20 @@ public class EncryptedAuthzToken {
 
 		final Envelope env = new Envelope();
 		envelope = (env.create_ALICE_SE_Envelope(message)).getBytes();
+
+		if (useSciTokensAuthz) {
+			// We will generate a token with both read and write capabilities
+			final XrootDEnvelope xrootDEnvelope = new XrootDEnvelope(env.create_ALICE_SE_Envelope(message));
+            return JWTGenerator.create()
+					.withIssuer("https://" + ConfigUtils.getLocalHostname() + ":" + TomcatServer.getPort() + "/")
+					.withSubject("aliprod")
+					.withAudience("https://wlcg.cern.ch/jwt/v1/any")
+					.withPrivateKey(this.AuthenPrivKey)
+					.withExpirationTime(3600)
+					.withScope("storage.read:" + xrootDEnvelope.getTransactionURL() +
+							" storage.write:" + xrootDEnvelope.getTransactionURL())
+					.sign();
+		}
 
 		// System.out.println("starting encryption of:" + (new
 		// String(envelope)));

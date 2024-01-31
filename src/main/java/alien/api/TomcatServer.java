@@ -14,7 +14,6 @@ import java.util.logging.Logger;
 
 import org.apache.catalina.Context;
 import org.apache.catalina.LifecycleState;
-import org.apache.catalina.Wrapper;
 import org.apache.catalina.authenticator.SSLAuthenticator;
 import org.apache.catalina.connector.Connector;
 import org.apache.catalina.servlets.DefaultServlet;
@@ -82,13 +81,16 @@ public class TomcatServer {
 		// Add an empty Tomcat context
 		final Context ctx = tomcat.addContext("", null);
 
-		// Configure websocket context listener
+		// Configure websocket context listener and add the servlets
 		ctx.addApplicationListener(WebsocketListener.class.getName());
 		Tomcat.addServlet(ctx, "default", new DefaultServlet());
 		ctx.addServletMappingDecoded("/", "default");
-
-		final Wrapper wrapper = Tomcat.addServlet(ctx, "WebsocketServlet", WebsocketServlet.class.getName());
-		wrapper.addMapping("/websocket/*");
+		Tomcat.addServlet(ctx, "WebsocketServlet", WebsocketServlet.class.getName());
+		ctx.addServletMappingDecoded("/websocket/*", "WebsocketServlet");
+		Tomcat.addServlet(ctx, "JWKServlet",	alien.servlets.JWKServlet.class.getName());
+		ctx.addServletMappingDecoded("/jwk", "JWKServlet");
+		Tomcat.addServlet(ctx, "OpenIdConfigurationServlet",	alien.servlets.OpenIdConfigurationServlet.class.getName());
+		ctx.addServletMappingDecoded("/.well-known/openid-configuration", "OpenIdConfigurationServlet");
 
 		// Set security constraints in order to use AlienUserPrincipal later
 		final SecurityCollection securityCollection = new SecurityCollection();

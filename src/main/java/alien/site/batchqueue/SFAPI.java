@@ -17,7 +17,6 @@ import java.security.KeyFactory;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.util.Base64;
-import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -29,13 +28,11 @@ import java.util.stream.Collectors;
 
 import javax.net.ssl.HttpsURLConnection;
 
+import alien.io.xrootd.envelopes.JWTGenerator;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 import org.json.simple.parser.JSONParser;
 import org.json.simple.parser.ParseException;
-
-import com.auth0.jwt.JWT;
-import com.auth0.jwt.algorithms.Algorithm;
 
 import alien.site.Functions;
 import lazyj.Utils;
@@ -296,13 +293,13 @@ public class SFAPI extends BatchQueue {
 		String accessToken = "";
 		try {
 			final RSAPrivateKey rsaPrivateKey = readPrivateKey(new File("./privateKey8"));
-			final Algorithm algorithm = Algorithm.RSA256(rsaPrivateKey);
-			final String token = JWT.create()
+			final String token = JWTGenerator.create()
 					.withIssuer(clientId)
 					.withSubject(clientId)
 					.withAudience("https://oidc.nersc.gov/c2id/token")
-					.withExpiresAt(new Date(System.currentTimeMillis() + 5 * 60 * 1000))
-					.sign(algorithm);
+					.withExpirationTime(5 * 60 * 1000)
+					.withPrivateKey(rsaPrivateKey)
+					.sign();
 			// System.out.println(token);
 
 			final HttpsURLConnection https = getConnection("https://oidc.nersc.gov/c2id/token", "POST");
