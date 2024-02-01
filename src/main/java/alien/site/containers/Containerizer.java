@@ -72,7 +72,7 @@ public abstract class Containerizer {
 	 */
 	public Containerizer() {
 		if (!containerImgPath.equals(DEFAULT_JOB_CONTAINER_PATH)) {
-			logger.log(Level.INFO, "Custom JOB_CONTAINER_PATH set. Will use the following image instead: " + containerImgPath);
+			logger.log(Level.INFO, "JOB_CONTAINER_PATH set. Will use the following image: " + containerImgPath);
 		}
 	}
 
