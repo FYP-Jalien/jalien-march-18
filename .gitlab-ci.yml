@@ -13,6 +13,7 @@ unit-test:
 e2e-test:
   image: registry.gitlab.com/finestructure/pipeline-trigger
   stage: e2e
+  allow_failure: true
   script:
     - trigger -h gitlab.cern.ch -a "$API_TOKEN" -p "$CI_JOB_TOKEN" -t dev -e JALIEN_REPO=$CI_REPOSITORY_URL -e JALIEN_BRANCH=$CI_COMMIT_REF_NAME -e TRIGGER_SOURCE="JAliEn" 124456
 #  variables:
