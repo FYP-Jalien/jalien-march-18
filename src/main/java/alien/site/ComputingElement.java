@@ -12,6 +12,8 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -36,7 +38,10 @@ import alien.monitoring.MonitorFactory;
 import alien.shell.commands.JAliEnCOMMander;
 import alien.site.batchqueue.BatchQueue;
 import alien.site.packman.CVMFS;
+import alien.user.AliEnPrincipal;
 import alien.user.JAKeyStore;
+import alien.user.LDAPHelper;
+import alien.user.UserFactory;
 import apmon.ApMon;
 import apmon.ApMonException;
 import lazyj.ExtProperties;
@@ -182,8 +187,62 @@ public final class ComputingElement extends Thread {
 	public static void main(final String[] args) {
 		ConfigUtils.setApplicationName("CE");
 
+		if (!identitySanityChecks())
+			return;
+
 		final ComputingElement CE = new ComputingElement();
 		CE.start();
+	}
+
+	/**
+	 * @return
+	 */
+	private static boolean identitySanityChecks() {
+		try {
+			final Certificate[] cert = JAKeyStore.getKeyStore().getCertificateChain("User.cert");
+
+			if (cert != null) {
+				System.err.println("Loaded certificate chain:");
+				for (final X509Certificate c : (X509Certificate[]) cert)
+					System.err.println(c.getSubjectX500Principal().getName() + " (expires " + c.getNotAfter() + ")");
+
+				final String dn = ((X509Certificate) (cert[0])).getSubjectX500Principal().getName();
+				final String tdn = UserFactory.transformDN(dn);
+				System.err.println("Infering user from: " + tdn);
+
+				final Set<String> check = LDAPHelper.checkLdapInformation("subject=" + tdn, "ou=People,", "uid");
+
+				if (check == null) {
+					System.err.println("No LDAP account for this DN");
+					return false;
+				}
+
+				System.err.println("Matching accounts: " + check);
+
+				System.err.println("Principal objects loaded by DN: " + UserFactory.getAllByDN(tdn));
+
+				final AliEnPrincipal user = UserFactory.getByCertificate((X509Certificate[]) cert);
+				System.err.println("The default account loaded by the certificate chain: " + user);
+
+				if (user == null)
+					return false;
+
+				if (!user.hasRole("vobox")) {
+					System.err.println("This account doesn't have the VoBox role");
+					return false;
+				}
+
+				return true;
+			}
+
+			System.err.println("No certificate was loaded");
+		}
+		catch (Exception e) {
+			System.err.println("Exception checking the identity: " + e.getMessage());
+			e.printStackTrace();
+		}
+
+		return false;
 	}
 
 	private int getNumberFreeSlots() {
@@ -471,13 +530,13 @@ public final class ComputingElement extends Thread {
 
 		before += startup_customization(0);
 
-//		before += "export ALIENV=\"$( (" + CVMFS.getAlienvPrint() + ") 2> >(if grep -q 'ERROR'; then echo 'export ALIENV_ERRORS=TRUE;'; fi;) )" + "\"\n";
+		// before += "export ALIENV=\"$( (" + CVMFS.getAlienvPrint() + ") 2> >(if grep -q 'ERROR'; then echo 'export ALIENV_ERRORS=TRUE;'; fi;) )" + "\"\n";
 
 		before += startup_customization(1);
 
-//		before += "source <( echo $ALIENV ); " + "\n";
+		// before += "source <( echo $ALIENV ); " + "\n";
 
-//		before += "export XRDCP_ERRORS=$(xrdcp 2> >(if grep -q 'error\\|not found' ; then echo 'TRUE'; fi;) ) " + "\n";
+		// before += "export XRDCP_ERRORS=$(xrdcp 2> >(if grep -q 'error\\|not found' ; then echo 'TRUE'; fi;) ) " + "\n";
 
 		before += "export JALIEN_JOBAGENT_CMD=\"" + getStartup() + "\"\n";
 
