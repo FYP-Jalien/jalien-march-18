@@ -288,7 +288,7 @@ public class CVMFS extends PackMan {
 			if (new File(containerForPlatform).exists())
 				return containerForPlatform;
 		}
-		logger.log(Level.WARNING, "Warning: no compatible containers detected for " + platforms + ".  Falling back to default...");
+		logger.log(Level.WARNING, "Warning: no compatible containers detected for " + identified_platforms[0] + ".  Falling back to default...");
 		return getDefaultContainerPath();
 	}
 
