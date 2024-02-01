@@ -199,6 +199,9 @@ public final class ComputingElement extends Thread {
 	 */
 	private static boolean identitySanityChecks() {
 		try {
+			System.err.println("Local host name: "+ConfigUtils.getLocalHostname());
+			System.err.println("Mapped to site: "+ConfigUtils.getCloseSite());
+			
 			final Certificate[] cert = JAKeyStore.getKeyStore().getCertificateChain("User.cert");
 
 			if (cert != null) {
