@@ -871,6 +871,9 @@ public class TaskQueueUtils {
 					if (extrafields != null)
 						extrafields.put("userId", userId);
 				}
+			} else if (newStatus == JobStatus.EXPIRED || newStatus == JobStatus.ZOMBIE) {
+				final int expectedResubmissionCount = TaskQueueUtils.getResubmission(Long.valueOf(job));
+				setFinalStatusOOM(job, newStatus, expectedResubmissionCount);
 			}
 
 			final String execHost = setJobExtraFields(job, extrafields);
@@ -4420,11 +4423,9 @@ public class TaskQueueUtils {
 	 * @param queueId
 	 * @param finalStatus
 	 * @param resubmissionCounter
-	 * @param hostName
-	 * @param siteName
 	 * @return <code>true</code> if the status update could be done
 	 */
-	public static boolean setFinalStatusOOM(final long queueId, final JobStatus finalStatus, final int resubmissionCounter, final String hostName, final String siteName) {
+	public static boolean setFinalStatusOOM(final long queueId, final JobStatus finalStatus, final int resubmissionCounter) {
 		try (DBFunctions db = getQueueDB()) {
 			if (db == null)
 				return false;
@@ -4435,11 +4436,8 @@ public class TaskQueueUtils {
 			db.setReadOnly(false);
 
 			db.setQueryTimeout(60);
-			int siteId = getSiteId(siteName);
-			Integer hostId = getHostId(hostName, false);
 			int statusId = finalStatus.getAliEnLevel();
-			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where wouldPreempt=" + queueId + " and resubmissionCounter=" + resubmissionCounter + " and hostId=" + hostId
-					+ " and siteId=" + siteId + ";";
+			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where wouldPreempt=" + queueId + " and resubmissionCounter=" + resubmissionCounter + ";";
 
 			if (!db.query(q)) {
 				logger.log(Level.SEVERE, "Error executing the update query `" + q + "`");
