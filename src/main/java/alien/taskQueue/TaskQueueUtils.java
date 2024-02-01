@@ -871,7 +871,8 @@ public class TaskQueueUtils {
 					if (extrafields != null)
 						extrafields.put("userId", userId);
 				}
-			} else if (newStatus == JobStatus.EXPIRED || newStatus == JobStatus.ZOMBIE) {
+			}
+			if (newStatus == JobStatus.EXPIRED || newStatus == JobStatus.ZOMBIE) {
 				final int expectedResubmissionCount = TaskQueueUtils.getResubmission(Long.valueOf(job));
 				setFinalStatusOOM(job, newStatus, expectedResubmissionCount);
 			}
