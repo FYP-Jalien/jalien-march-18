@@ -545,7 +545,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				}
 			});
 
-			payload.waitFor(ttl, TimeUnit.SECONDS);
+			payload.waitFor(!executionType.contains("validation") ? ttl : 900, TimeUnit.SECONDS);
 
 			if (payload.isAlive()) {
 				payload.destroyForcibly();
