@@ -52,6 +52,8 @@ public class NUMAExplorer {
 	HashMap<Integer, Integer> divisionedNUMA;
 	HashMap<Integer, Long> coresPerJob;
 
+	private boolean fullMaskCgroupV2;
+
 	/**
 	 * @param numCPUs
 	 */
@@ -68,6 +70,7 @@ public class NUMAExplorer {
 		activeJAInstances = new HashMap<>();
 		jobToNuma = new HashMap<>();
 		usedCPUs = new int[numCPUs];
+		fullMaskCgroupV2 = false;
 		fillNumaTopology(JobAgent.initialMask, JobAgent.wholeNode, false);
 	}
 
@@ -315,11 +318,32 @@ public class NUMAExplorer {
 		logger.log(Level.INFO, "Current CPU-job mapping: " + getMaskString(usedCPUs));
 		JAToMask.put(Integer.valueOf(jobNumber), finalMask);
 		coresPerJob.put(Integer.valueOf(jobNumber), reqCPU);
+		if (fullMaskCgroupV2) {
+			Integer targetNodeId = jobToNuma.get(Integer.valueOf(jobNumber));
+			byte[] wholeMask = getFullNUMAMask(targetNodeId);
+			logger.log(Level.INFO, "Pinning job " + jobNumber + " to full NUMA mask " + arrayToTaskset(wholeMask));
+			return arrayToTaskset(wholeMask);
+		}
 		addPinningTraceLog(finalMask, Integer.valueOf(jobNumber));
 		byte[] extendedFinalMask = extendFinalMask(finalMask, jobNumber);
-		logger.log(Level.INFO, "Pinning job " + jobNumber + " to mask mask " + getMaskString(extendedFinalMask));
-
+		logger.log(Level.INFO, "Pinning job " + jobNumber + " to mask " + getMaskString(extendedFinalMask));
 		return arrayToTaskset(extendedFinalMask);
+	}
+
+	private byte[] getFullNUMAMask(Integer targetNodeId) {
+		byte[] fullNUMAMask = null;
+		if (targetNodeId.intValue() > -1) {
+			Integer numaNode = divisionedNUMA.get(targetNodeId);
+			fullNUMAMask = initialStructurePerNode.get(targetNodeId).clone();
+			for (Integer subNode : divisionedNUMA.keySet()) {
+				if (divisionedNUMA.get(subNode) == numaNode && subNode != targetNodeId) {
+					for (int i=0; i < initialStructurePerNode.get(targetNodeId).length; i++)
+						fullNUMAMask[i] += initialStructurePerNode.get(subNode)[i];
+				}
+			}
+			logger.log(Level.INFO, "Generating full NUMA mask. subNodeId=" + targetNodeId + ", numaNode=" + numaNode + ". Full NUMA Mask computed to " + arrayToTaskset(fullNUMAMask));
+		}
+		return fullNUMAMask;
 	}
 
 	/**
@@ -400,11 +424,38 @@ public class NUMAExplorer {
 		for (Integer jobId : masksToPin.keySet()) {
 			if (!Arrays.equals(JAToMask.get(jobId), masksToPin.get(jobId))) {
 				if (activeJAInstances.get(jobId) != null) {
-					int pid = activeJAInstances.get(jobId).getChildPID();
-					logger.log(Level.INFO, "Going to apply CPU constraintment to PID " + pid);
-					applyTaskset(arrayToTaskset(masksToPin.get(jobId)), pid);
-					if (!maskExtension) {
-						addPinningTraceLog(masksToPin.get(jobId), jobId);
+					if (fullMaskCgroupV2) {
+						byte[] wholeMask = getFullNUMAMask(jobToNuma.get(jobId));
+						String codedMask = arrayToTaskset(wholeMask);
+						String targetCgroup = activeJAInstances.get(jobId).agentCgroupV2;
+						String patternStr = "(\\d+)-(\\d+)([^\\\"]+)";
+						Pattern pattern = Pattern.compile(patternStr);
+						Matcher matcher = pattern.matcher(CgroupUtils.getCPUCores(targetCgroup));
+						String patternStr2 = "\\d+(,\\d+)*";
+						Pattern pattern2 = Pattern.compile(patternStr2);
+						Matcher matcher2 = pattern2.matcher(CgroupUtils.getCPUCores(targetCgroup));
+						if (matcher.matches() || matcher2.matches()) {
+							String toCheck = "";
+							if (matcher.matches()) {
+								int rangeidx = Integer.parseInt(matcher.group(1));
+								toCheck = String.valueOf(rangeidx);
+							} else if (matcher2.matches()) {
+								String[] cores = CgroupUtils.getCPUCores(targetCgroup).split(",");
+								toCheck = cores[0];
+							}
+							if (!codedMask.contains(toCheck)) {
+								logger.log(Level.INFO, "Changed pinning of cgroup " + targetCgroup + " from " + CgroupUtils.getCPUCores(targetCgroup) + " to " + codedMask);
+								CgroupUtils.assignCPUCores(targetCgroup, codedMask);
+							} else
+								logger.log(Level.INFO, "Did not change pinning of cgroup "  + targetCgroup);
+						}
+					} else {
+						int pid = activeJAInstances.get(jobId).getChildPID();
+						logger.log(Level.INFO, "Going to apply CPU constraintment to PID " + pid);
+						applyTaskset(arrayToTaskset(masksToPin.get(jobId)), pid);
+						if (!maskExtension) {
+							addPinningTraceLog(masksToPin.get(jobId), jobId);
+						}
 					}
 					JAToMask.put(jobId, masksToPin.get(jobId).clone());
 					logger.log(Level.INFO, "Modifying pinning configuration of job ID " + jobId + ". New mask " + getMaskString(JAToMask.get(jobId)));
@@ -654,5 +705,10 @@ public class NUMAExplorer {
 				finalMask[i] = 1;
 		}
 		return finalMask;
+	}
+
+
+	public void setFullNUMAMask() {
+		this.fullMaskCgroupV2 = true;
 	}
 }

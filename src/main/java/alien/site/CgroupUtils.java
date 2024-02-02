@@ -14,8 +14,10 @@ import lazyj.commands.SystemCommand;
  */
 public class CgroupUtils {
 
+	public static long LOW_MEMORY_JA =2000000000l;
+
 	/**
-	 * 
+	 *
 	 * @return true if system uses cgroupsv2
 	 */
 	public static boolean haveCgroupsv2() {
@@ -23,10 +25,10 @@ public class CgroupUtils {
 	}
 
 	/**
-	 * 
+	 *
 	 * Creates new cgroups from current root for JobRunner ("runner") and JobAgents/JobWrappers ("agents"). Also
 	 * moves JobRunner to "runner", and delegates controllers.
-	 * 
+	 *
 	 * @param runnerPid pid for JobRunner
 	 * @return true if both cgroups were created, and process successfully moved
 	 */
@@ -60,9 +62,9 @@ public class CgroupUtils {
 	}
 
 	/**
-	 * 
+	 *
 	 * Creates a new cgroup given a valid path and name
-	 * 
+	 *
 	 * @param name name of the new cgroup to be created
 	 * @param dir location in the fs tree for the new cgroup
 	 * @return true if cgroup was created
@@ -78,9 +80,9 @@ public class CgroupUtils {
 	}
 
 	/**
-	 * 
+	 *
 	 * Moves a process to a new cgroup
-	 * 
+	 *
 	 * @param cgroup destination cgroup
 	 * @param pid process pid
 	 * @return true if process was moved
@@ -96,9 +98,28 @@ public class CgroupUtils {
 	}
 
 	/**
-	 * 
+	 *
+	 * Sets a low memory limit to the cgroup
+	 *
+	 * @param cgroup destination cgroup
+	 * @param lowMemory value to set to the memory.low parameter
+	 * @return true if memory.low was set
+	 */
+	public static boolean setLowMemoryLimit(String cgroup, long lowMemory) {
+		try {
+			Files.writeString(Paths.get(cgroup + "/memory.low"), String.valueOf(lowMemory), StandardOpenOption.WRITE);
+			return Files.readString(Paths.get(cgroup + "/memory.low")).contains(String.valueOf(lowMemory));
+		}
+		catch (final Exception e) {
+			return false;
+		}
+	}
+
+
+	/**
+	 *
 	 * Returns the cgroup of a given pid
-	 * 
+	 *
 	 * @param pid
 	 * @return String path of cgroup in the fs
 	 */
@@ -117,9 +138,9 @@ public class CgroupUtils {
 	}
 
 	/**
-	 * 
+	 *
 	 * Sets memory.high for cgroup of given pid, if possible
-	 * 
+	 *
 	 * @param pid
 	 * @param limit as string with size + unit (e.g. 500M)
 	 */
@@ -133,9 +154,9 @@ public class CgroupUtils {
 	}
 
 	/**
-	 * 
+	 *
 	 * Sets memory.max for cgroup of given pid, if possible
-	 * 
+	 *
 	 * @param pid
 	 * @param limit as string with size + unit (e.g. 500M)
 	 */
@@ -149,9 +170,9 @@ public class CgroupUtils {
 	}
 
 	/**
-	 * 
+	 *
 	 * Deletes all cgroups from the root of the given pid
-	 * 
+	 *
 	 * @param pid
 	 * @return true if no errors when
 	 */
@@ -164,5 +185,49 @@ public class CgroupUtils {
 			return false;
 		}
 		return true;
+	}
+
+	public static String getCPUCores(String cgroup) {
+		try {
+			return Files.readString(Paths.get(cgroup + "/cpuset.cpus")).trim();
+		}
+		catch (final Exception e) {
+			return null;
+		}
+	}
+
+	public static boolean assignCPUCores(String cgroup, String isolCmd) {
+		try {
+			Files.writeString(Paths.get(cgroup + "/cpuset.cpus"), isolCmd, StandardOpenOption.WRITE);
+			return Files.readString(Paths.get(cgroup + "/cpuset.cpus")).contains(isolCmd);
+		}
+		catch (final Exception e) {
+			return false;
+		}
+	}
+
+	public static boolean setCPUUsageQuota(String cgroup, int jobCPU) {
+		try {
+			String timePortions = Files.readString(Paths.get(cgroup + "/cpu.max"));
+			int period = Integer.parseInt(timePortions.split("\\s+")[1]);
+			long quota = Math.round(period * jobCPU);
+			Files.writeString(Paths.get(cgroup + "/cpu.max"), String.valueOf(quota), StandardOpenOption.WRITE);
+			return Files.readString(Paths.get(cgroup + "/cpu.max")).contains(String.valueOf(quota));
+		}
+		catch (final Exception e) {
+			return false;
+		}
+
+	}
+
+	public static boolean hasController(String cgroup, String controller) {
+		try {
+			String controllers = Files.readString(Paths.get(cgroup + "/cgroup.controllers"));
+			if (controllers.contains(controller))
+				return true;
+		} catch (final Exception e) {
+			return false;
+		}
+		return false;
 	}
 }

@@ -316,6 +316,8 @@ public class JobAgent implements Runnable {
 	protected static final Object workDirSizeSync = new Object();
 	private static HashMap<Long, Integer> slotWorkdirsMaxSize;
 
+	protected String agentCgroupV2;
+
 	/**
 	 */
 	public JobAgent() {
@@ -822,7 +824,7 @@ public class JobAgent implements Runnable {
 			}
 
 			// Run jobs in isolated environment
-			if (cpuIsolation == true) {
+			if (cpuIsolation == true && !CgroupUtils.haveCgroupsv2()) {
 				String isolCmd = addIsolation();
 				logger.log(Level.SEVERE, "IsolCmd command" + isolCmd);
 				if (isolCmd != null && isolCmd.compareTo("") != 0)
@@ -901,7 +903,25 @@ public class JobAgent implements Runnable {
 			if (currentCgroup.contains("runner")) {
 				final String agentsCgroup = currentCgroup.replace("runner", "agents");
 				CgroupUtils.createCgroup(agentsCgroup, Thread.currentThread().getName());
-				CgroupUtils.moveProcessToCgroup(agentsCgroup + "/" + Thread.currentThread().getName(), getWrapperPid());
+				agentCgroupV2 = agentsCgroup + "/" + Thread.currentThread().getName();
+				CgroupUtils.moveProcessToCgroup(agentCgroupV2, getWrapperPid());
+				if (numaExplorer == null) {
+					synchronized (cpuSync) {
+						numaExplorer = new NUMAExplorer(RES_NOCPUS.intValue());
+					}
+				}
+				logger.log(Level.INFO, "cgroup controllers set --> cpu: " + CgroupUtils.hasController(agentCgroupV2, "cpu") + " cpuset: " + CgroupUtils.hasController(agentCgroupV2, "cpuset") + " memory: " + CgroupUtils.hasController(agentCgroupV2, "memory"));
+				//if (CgroupUtils.hasController(agentCgroupV2, "memory"))
+				//CgroupUtils.setLowMemoryLimit(agentCgroupV2, CgroupUtils.LOW_MEMORY_JA * cpuCores);
+				if (CgroupUtils.haveCgroupsv2() && CgroupUtils.hasController(agentCgroupV2, "cpu") && cpuIsolation == true) {
+					if (wholeNode && CgroupUtils.hasController(agentCgroupV2, "cpuset")) {
+						numaExplorer.setFullNUMAMask();
+						String isolCmd = addIsolation();
+						logger.log(Level.INFO, "Going to assign cgroup " + agentCgroupV2 + " to CPU cores " + isolCmd);
+						CgroupUtils.assignCPUCores(agentCgroupV2,isolCmd);
+					}
+					CgroupUtils.setCPUUsageQuota(agentCgroupV2, cpuCores);
+				}
 			}
 		}
 		catch (final Exception ioe) {
