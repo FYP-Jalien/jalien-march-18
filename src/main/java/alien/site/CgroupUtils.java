@@ -41,15 +41,12 @@ public class CgroupUtils {
 					final String procsToMove = Files.readString(Paths.get(slotCgroup + "/cgroup.procs"));
 					Arrays.stream(procsToMove.split("\\r?\\n")).forEach(line -> moveProcessToCgroup(slotCgroup + "/runner", Integer.parseInt(line)));
 
-					// TODO: delegate all controllers
-					SystemCommand.bash("echo +memory >> " + slotCgroup + "/cgroup.subtree_control");
-					SystemCommand.bash("echo +memory >> " + slotCgroup + "/agents/cgroup.subtree_control");
+					final String[] controllers = Files.readString(Paths.get(slotCgroup + "/cgroup.controllers")).split(" ");
 
-					SystemCommand.bash("echo +cpu >> " + slotCgroup + "/cgroup.subtree_control");
-					SystemCommand.bash("echo +cpu >> " + slotCgroup + "/agents/cgroup.subtree_control");
-
-					SystemCommand.bash("echo +cpuset >> " + slotCgroup + "/cgroup.subtree_control");
-					SystemCommand.bash("echo +cpuset >> " + slotCgroup + "/agents/cgroup.subtree_control");
+					for (String controller : controllers) {
+						Files.writeString(Paths.get(slotCgroup + "/cgroup.subtree_control"), "+" + controller, StandardOpenOption.APPEND);
+						Files.writeString(Paths.get(slotCgroup + "/agents/cgroup.subtree_control"), "+" + controller, StandardOpenOption.APPEND);
+					}
 
 					return true;
 				}
