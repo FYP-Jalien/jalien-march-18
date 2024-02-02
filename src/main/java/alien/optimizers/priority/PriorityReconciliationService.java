@@ -96,9 +96,8 @@ public class PriorityReconciliationService extends Optimizer {
 
 				Map<Integer, QueueProcessingDto> activeUsersGroupedById = getActiveUsers(db);
 
-				boolean first = true;
 				if (!activeUsersGroupedById.isEmpty()) {
-					updatePriorityForActiveUsers(activeUsersGroupedById, registerLog, first, dbdev);
+					updatePriorityForActiveUsers(activeUsersGroupedById, registerLog, dbdev);
 				}
 				else {
 					logger.log(Level.INFO, "No active users to update");
@@ -170,8 +169,11 @@ public class PriorityReconciliationService extends Optimizer {
 				.append(" ms\n");
 		logger.log(Level.INFO, "Updating priority for non active users took " + t.getMillis() + " ms");
 	}
-	private static void updatePriorityForActiveUsers(Map<Integer, QueueProcessingDto> activeUsersGroupedById, StringBuilder registerLog, boolean first, DBFunctions db) {
+	private static void updatePriorityForActiveUsers(Map<Integer, QueueProcessingDto> activeUsersGroupedById, StringBuilder registerLog, DBFunctions db) {
 		logger.log(Level.INFO, "Updating priority for active users: " + activeUsersGroupedById.size());
+		
+		boolean first = true;
+		
 		try (Timing t5 = new Timing(monitor, "TQ_update_active_ms")) {
 			StringBuilder updateActiveUsersQuery = getUpdatePriorityQuery();
 			for (QueueProcessingDto dto : activeUsersGroupedById.values()) {

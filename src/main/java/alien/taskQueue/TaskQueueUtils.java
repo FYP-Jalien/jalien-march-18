@@ -962,6 +962,14 @@ public class TaskQueueUtils {
 		}
 	}
 
+	/**
+	 * Bulk move jobs selected by query to a new status
+	 * 
+	 * @param db
+	 * @param query
+	 * @param status
+	 * @param log
+	 */
 	public static void moveState(final DBFunctions db, final String query, final JobStatus status, final StringBuilder log) {
 		if (!db.query(query)) {
 			logger.log(Level.SEVERE, "Failed to execute selection query `" + query + "`");

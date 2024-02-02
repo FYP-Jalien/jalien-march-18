@@ -85,10 +85,10 @@ public class InactiveJobHandler extends Optimizer {
 
 				StringBuilder registerLog = new StringBuilder();
 				logger.log(Level.INFO, "InactiveJobHandler starting to move inactive jobs to zombie state. ");
-				moveState(db, activeJobWithoutHeartbeatQuery, JobStatus.ZOMBIE, registerLog);
+				TaskQueueUtils.moveState(db, activeJobWithoutHeartbeatQuery, JobStatus.ZOMBIE, registerLog);
 
 				logger.log(Level.INFO, "InactiveJobHandler starting to move 2h inactive zombie state jobs to expired state. ");
-				moveState(db, inactiveJobsWithoutHeartbeatQuery, JobStatus.EXPIRED, registerLog);
+				TaskQueueUtils.moveState(db, inactiveJobsWithoutHeartbeatQuery, JobStatus.EXPIRED, registerLog);
 
 				t.endTiming();
 				logger.log(Level.INFO, "InactiveJobHandler finished in " + t.getMillis() + " ms");
@@ -111,25 +111,5 @@ public class InactiveJobHandler extends Optimizer {
 				"                                            WHERE q.queueId = qp.queueId\n" +
 				"                                              AND  q.statusId IN (" + activeStates + ")\n" +
 				"                                              AND qp.lastupdate < NOW() - INTERVAL 1 HOUR";
-	}
-
-	private static void moveState(final DBFunctions db, final String query, final JobStatus status, final StringBuilder log) {
-		if (!db.query(query)) {
-			logger.log(Level.SEVERE, "Failed to execute selection query `" + query + "`");
-			return;
-		}
-
-		int okcounter = 0;
-		int failcounter = 0;
-
-		while (db.moveNext()) {
-			if (TaskQueueUtils.setJobStatus(db.getl("queueId"), status, JobStatus.getStatusByAlien(Integer.valueOf(db.geti("statusId")))))
-				okcounter++;
-			else
-				failcounter++;
-		}
-
-		logger.log(Level.INFO, "Moved " + okcounter + " jobs to " + status + " state" + (failcounter > 0 ? ", " + failcounter + " others failed to be moved. " : ""));
-		log.append("Moved ").append(okcounter).append(" jobs to ").append(status).append(" state, while ").append(failcounter + " others failed to be moved. \n");
 	}
 }
