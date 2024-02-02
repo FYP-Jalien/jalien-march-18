@@ -104,7 +104,7 @@ public class GuidTable extends Optimizer {
 
 						if (admins != null && admins.length() > 0) {
 							m.sSubject = "JAliEn CS: G table filling up";
-							m.sFrom = "JAliEnMaster@cern.ch";
+							m.sFrom = "monalisa@cern.ch";
 							m.sTo = admins;
 							final Sendmail s = new Sendmail(m.sFrom, "cernmx.cern.ch");
 
@@ -140,7 +140,7 @@ public class GuidTable extends Optimizer {
 
 		if (admins != null && admins.length() > 0) {
 			m.sSubject = "JAliEn CS: new G" + newTable + "L tables";
-			m.sFrom = "JAliEnMaster@cern.ch";
+			m.sFrom = "monalisa@cern.ch";
 			m.sTo = admins;
 			final Sendmail s = new Sendmail(m.sFrom, "cernmx.cern.ch");
 
