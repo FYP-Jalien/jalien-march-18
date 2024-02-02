@@ -738,8 +738,8 @@ public class JobAgent implements Runnable {
 
 			logger.log(Level.INFO, "Started JA with: " + jdl);
 
-			final String version = !Version.getTag().isEmpty() ? Version.getTag() : "/Git: " + Version.getGitHash() + ". Builddate: " + Version.getCompilationTimestamp();
-			putJobTrace("Running JAliEn JobAgent " + version + " on " + hostName);
+			final String version = !Version.getTag().isEmpty() ? Version.getTag() : "Git: " + Version.getGitHash();
+			putJobTrace("Running JAliEn JobAgent " + version + " on " + hostName + ". Builddate: " + Version.getCompilationTimestamp());
 
 			if (env.getOrDefault("UNAME_M", "").contains("aarch64"))
 				putJobTrace("Warning: this job will be executed on an aarch64 worker");
