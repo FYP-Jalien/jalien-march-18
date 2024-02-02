@@ -74,6 +74,7 @@ public class OverwaitingJobHandler extends Optimizer {
 			registerlog.append("OverwaitingJobHandler finished in ")
 					.append(t1.getMillis())
 					.append(" ms\n");
+			DBSyncUtils.registerLog(OverwaitingJobHandler.class.getCanonicalName(), registerlog.toString());
 		}
 	}
 
