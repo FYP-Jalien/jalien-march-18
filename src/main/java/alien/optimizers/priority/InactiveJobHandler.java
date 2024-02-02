@@ -84,10 +84,10 @@ public class InactiveJobHandler extends Optimizer {
 				t.startTiming();
 
 				StringBuilder registerLog = new StringBuilder();
-				logger.log(Level.INFO, "InactiveJobHandler starting to move inactive jobs to zombie state");
+				logger.log(Level.INFO, "InactiveJobHandler starting to move inactive jobs to zombie state. ");
 				moveState(db, activeJobWithoutHeartbeatQuery, JobStatus.ZOMBIE, registerLog);
 
-				logger.log(Level.INFO, "InactiveJobHandler starting to move 2h inactive zombie state jobs to expired state");
+				logger.log(Level.INFO, "InactiveJobHandler starting to move 2h inactive zombie state jobs to expired state. ");
 				moveState(db, inactiveJobsWithoutHeartbeatQuery, JobStatus.EXPIRED, registerLog);
 
 				t.endTiming();
@@ -129,7 +129,7 @@ public class InactiveJobHandler extends Optimizer {
 				failcounter++;
 		}
 
-		logger.log(Level.INFO, "Moved " + okcounter + " jobs to " + status + " state" + (failcounter > 0 ? ", " + failcounter + " others failed to be moved" : ""));
-		log.append("Moved ").append(okcounter).append(" jobs to ").append(status).append(" state, while ").append(failcounter + " others failed to be moved\n");
+		logger.log(Level.INFO, "Moved " + okcounter + " jobs to " + status + " state" + (failcounter > 0 ? ", " + failcounter + " others failed to be moved. " : ""));
+		log.append("Moved ").append(okcounter).append(" jobs to ").append(status).append(" state, while ").append(failcounter + " others failed to be moved. \n");
 	}
 }

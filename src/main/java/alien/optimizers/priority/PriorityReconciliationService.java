@@ -83,18 +83,7 @@ public class PriorityReconciliationService extends Optimizer {
 				return;
 			}
 
-			Set<String> uniqueStates = Stream.of(JobStatus.runningStates(), JobStatus.finalStates())
-					.flatMap(Set::stream)
-					.map(JobStatus::getAliEnLevel)
-					.map(String::valueOf)
-					.collect(Collectors.toSet());
-			String states = String.join(", ", uniqueStates);
-
-			String findActiveUsersQuery = "SELECT q.userId, p.cost, p.cputime FROM QUEUE q " +
-					"join QUEUEPROC p on q.queueId = p.queueId " +
-					"WHERE q.statusId IN (" + states + ") " +
-					"AND p.lastupdate > NOW() - INTERVAL 1 DAY;";
-
+			String findActiveUsersQuery = getActiveUsersQuery(getRunningAndFinalStates());
 			try (Timing t = new Timing(monitor, "TQ_reconcilePriority_ms"); Timing t2 = new Timing(monitor, "TQ_reconcilePriority_db_ms")) {
 				logger.log(Level.INFO, "Retrieving active users");
 
@@ -105,46 +94,11 @@ public class PriorityReconciliationService extends Optimizer {
 				logger.log(Level.INFO, "Retrieving active users took " + t2.getMillis() + " ms");
 				StringBuilder registerLog = new StringBuilder("Retrieving active users in ").append(t2.getMillis()).append(" ms\n");
 
-				Map<Integer, QueueProcessingDto> activeUsersGroupedById = new HashMap<>();
-				while (db.moveNext()) {
-					Integer userId = Integer.valueOf(db.geti("userId"));
-					double cost = db.getd("cost");
-					long cputime = db.getl("cputime");
-
-					activeUsersGroupedById
-							.computeIfAbsent(
-									userId, k -> new QueueProcessingDto(
-											userId.intValue()))
-							.addAccounting(cost, cputime);
-				}
+				Map<Integer, QueueProcessingDto> activeUsersGroupedById = getActiveUsers(db);
 
 				boolean first = true;
 				if (!activeUsersGroupedById.isEmpty()) {
-					logger.log(Level.INFO, "Updating priority for active users: " + activeUsersGroupedById.size());
-					try (Timing t5 = new Timing(monitor, "TQ_update_active_ms")) {
-						StringBuilder updateActiveUsersQuery = getUpdatePriorityQuery();
-						for (QueueProcessingDto dto : activeUsersGroupedById.values()) {
-							if (first) {
-								first = false;
-							}
-							else {
-								updateActiveUsersQuery.append(", ");
-							}
-							updateActiveUsersQuery.append("(").append(dto.getUserId()).append(", ").append(dto.getCost()).append(", ").append(dto.getCputime()).append(")");
-						}
-
-						final String onDuplicateKey = " ON DUPLICATE KEY UPDATE totalCpuCostLast24h = VALUES(totalCpuCostLast24h), totalRunningTimeLast24h = VALUES(totalRunningTimeLast24h)";
-						updateActiveUsersQuery.append(onDuplicateKey);
-						dbdev.query(updateActiveUsersQuery.toString(), false);
-
-						t5.endTiming();
-						registerLog.append("Updating priority for ")
-								.append(activeUsersGroupedById.size())
-								.append(" active users took ")
-								.append(t5.getMillis())
-								.append(" ms\n");
-						logger.log(Level.INFO, "Updating priority for active users took " + t5.getMillis() + " ms");
-					}
+					updatePriorityForActiveUsers(activeUsersGroupedById, registerLog, first, dbdev);
 				}
 				else {
 					logger.log(Level.INFO, "No active users to update");
@@ -172,30 +126,9 @@ public class PriorityReconciliationService extends Optimizer {
 					logger.log(Level.INFO, "Filtering out non active users took " + t6.getMillis() + " ms");
 				}
 
-				try (Timing t4 = new Timing(monitor, "TQ_update_non_active_ms")) {
+				try (Timing timeNonActive = new Timing(monitor, "TQ_update_non_active_ms")) {
 					if (!nonActiveUsersLast24H.isEmpty()) {
-						logger.log(Level.INFO, "Updating priority for non active users " + nonActiveUsersLast24H.size());
-						StringBuilder updateNonActiveUsersQuery = getUpdatePriorityQuery();
-						first = true;
-						for (Integer userId : nonActiveUsersLast24H) {
-							if (first) {
-								first = false;
-							}
-							else {
-								updateNonActiveUsersQuery.append(", ");
-							}
-							updateNonActiveUsersQuery.append("(").append(userId).append(", ").append(0).append(", ").append(0).append(")");
-						}
-
-						updateNonActiveUsersQuery.append(" ON DUPLICATE KEY UPDATE totalCpuCostLast24h = VALUES(totalCpuCostLast24h), totalRunningTimeLast24h = VALUES(totalRunningTimeLast24h)");
-						dbdev.query(updateNonActiveUsersQuery.toString(), false);
-
-						registerLog.append(" Updating priority for ")
-								.append(nonActiveUsersLast24H.size())
-								.append(" non active users took ")
-								.append(t4.getMillis())
-								.append(" ms\n");
-						logger.log(Level.INFO, "Updating priority for non active users took " + t4.getMillis() + " ms");
+						updatePriorityForNonActiveUsers(nonActiveUsersLast24H, registerLog, dbdev, timeNonActive);
 					}
 					else {
 						logger.log(Level.INFO, "No non active users to update");
@@ -209,6 +142,92 @@ public class PriorityReconciliationService extends Optimizer {
 				CalculateComputedPriority.updateComputedPriority();
 			}
 		}
+	}
+
+	private static void updatePriorityForNonActiveUsers(Set<Integer> nonActiveUsersLast24H, StringBuilder registerLog, DBFunctions db, Timing t) {
+		logger.log(Level.INFO, "Updating priority for non active users " + nonActiveUsersLast24H.size());
+		t.startTiming();
+		StringBuilder updateNonActiveUsersQuery = getUpdatePriorityQuery();
+		boolean first = true;
+		for (Integer userId : nonActiveUsersLast24H) {
+			if (first) {
+				first = false;
+			}
+			else {
+				updateNonActiveUsersQuery.append(", ");
+			}
+			updateNonActiveUsersQuery.append("(").append(userId).append(", ").append(0).append(", ").append(0).append(")");
+		}
+
+		updateNonActiveUsersQuery.append(" ON DUPLICATE KEY UPDATE totalCpuCostLast24h = VALUES(totalCpuCostLast24h), totalRunningTimeLast24h = VALUES(totalRunningTimeLast24h)");
+		db.query(updateNonActiveUsersQuery.toString(), false);
+
+		t.endTiming();
+		registerLog.append(" Updating priority for ")
+				.append(nonActiveUsersLast24H.size())
+				.append(" non active users took ")
+				.append(t.getMillis())
+				.append(" ms\n");
+		logger.log(Level.INFO, "Updating priority for non active users took " + t.getMillis() + " ms");
+	}
+	private static void updatePriorityForActiveUsers(Map<Integer, QueueProcessingDto> activeUsersGroupedById, StringBuilder registerLog, boolean first, DBFunctions db) {
+		logger.log(Level.INFO, "Updating priority for active users: " + activeUsersGroupedById.size());
+		try (Timing t5 = new Timing(monitor, "TQ_update_active_ms")) {
+			StringBuilder updateActiveUsersQuery = getUpdatePriorityQuery();
+			for (QueueProcessingDto dto : activeUsersGroupedById.values()) {
+				if (first) {
+					first = false;
+				}
+				else {
+					updateActiveUsersQuery.append(", ");
+				}
+				updateActiveUsersQuery.append("(").append(dto.getUserId()).append(", ").append(dto.getCost()).append(", ").append(dto.getCputime()).append(")");
+			}
+
+			final String onDuplicateKey = " ON DUPLICATE KEY UPDATE totalCpuCostLast24h = VALUES(totalCpuCostLast24h), totalRunningTimeLast24h = VALUES(totalRunningTimeLast24h)";
+			updateActiveUsersQuery.append(onDuplicateKey);
+			db.query(updateActiveUsersQuery.toString(), false);
+
+			t5.endTiming();
+			registerLog.append("Updating priority for ")
+					.append(activeUsersGroupedById.size())
+					.append(" active users took ")
+					.append(t5.getMillis())
+					.append(" ms\n");
+			logger.log(Level.INFO, "Updating priority for active users took " + t5.getMillis() + " ms");
+		}
+	}
+
+	private static Map<Integer, QueueProcessingDto> getActiveUsers(DBFunctions db) {
+		Map<Integer, QueueProcessingDto> activeUsersGroupedById = new HashMap<>();
+		while (db.moveNext()) {
+			Integer userId = Integer.valueOf(db.geti("userId"));
+			double cost = db.getd("cost");
+			long cputime = db.getl("cputime");
+
+			activeUsersGroupedById
+					.computeIfAbsent(
+							userId, k -> new QueueProcessingDto(
+									userId.intValue()))
+					.addAccounting(cost, cputime);
+		}
+		return activeUsersGroupedById;
+	}
+
+	private static String getRunningAndFinalStates() {
+		Set<String> uniqueStates = Stream.of(JobStatus.runningStates(), JobStatus.finalStates())
+				.flatMap(Set::stream)
+				.map(JobStatus::getAliEnLevel)
+				.map(String::valueOf)
+				.collect(Collectors.toSet());
+        return String.join(", ", uniqueStates);
+	}
+
+	private static String getActiveUsersQuery(String states) {
+		return "SELECT q.userId, p.cost, p.cputime FROM QUEUE q " +
+				"join QUEUEPROC p on q.queueId = p.queueId " +
+				"WHERE q.statusId IN (" + states + ") " +
+				"AND p.lastupdate > NOW() - INTERVAL 1 DAY;";
 	}
 
 	private static StringBuilder getUpdatePriorityQuery() {

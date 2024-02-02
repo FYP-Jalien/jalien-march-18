@@ -732,7 +732,7 @@ public class JobAgent implements Runnable {
 				logger.log(Level.INFO, "Error. Workdir for job could not be created");
 				putJobTrace("Error. Workdir for job could not be created");
 				return -1;
-			}	
+			}
 
 			logger.log(Level.INFO, "Started JA with: " + jdl);
 
