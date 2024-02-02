@@ -102,5 +102,7 @@ public class JAliEnCommandlistSEDistance extends JAliEnBaseCommand {
 
 		if (options.has("site"))
 			this.site = options.valueOf("site").toString();
+		else
+			this.site = commander.getSite();
 	}
 }
