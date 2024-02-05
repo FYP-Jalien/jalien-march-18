@@ -287,8 +287,10 @@ public class CVMFS extends PackMan {
 			final String containerForPlatform = CVMFS_BASE_DIR + "/containers/fs/singularity/compat_" + identified_platforms[0];
 			if (new File(containerForPlatform).exists())
 				return containerForPlatform;
+			logger.log(Level.WARNING, "No specified containers detected for " + identified_platforms[0] + ". Falling back to default...");
 		}
-		logger.log(Level.WARNING, "No specified containers detected for " + identified_platforms[0] + ".  Falling back to default...");
+		else
+			logger.log(Level.WARNING, "Could not identify " + platforms + ". Falling back to default...");
 		return getDefaultContainerPath();
 	}
 
