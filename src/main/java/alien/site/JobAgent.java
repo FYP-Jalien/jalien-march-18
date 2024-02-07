@@ -89,6 +89,7 @@ import utils.Signals;
  */
 public class JobAgent implements Runnable {
 
+	private static final long CHECK_RESOURCES_INTERVAL =  5 * 1000L;
 	private static final long SEND_RESOURCES_INTERVAL = 10 * 60 * 1000L;
 	private static final long SEND_JOBINFO_INTERVAL = 60 * 1000L;
 
@@ -138,6 +139,8 @@ public class JobAgent implements Runnable {
 	private String jarName;
 	private int childPID;
 	private long lastHeartbeat = 0;
+	private Double lastCpuTime = ZERO;
+	private int lowCpuUsageStrikes = 0;
 	private long jobStartupTime;
 	protected final Containerizer containerizer = ContainerizerFactory.getContainerizer();
 	private boolean checkCoreUsingJava = true;
@@ -610,7 +613,7 @@ public class JobAgent implements Runnable {
 				});
 
 				if (platforms != null) {
-					putJobTrace("This has requested packages from the following platforms: " + platforms + ".");
+					putJobTrace("This job has requested packages available on the following platforms: " + platforms + ".");
 					if (containerizer != null && !env.containsKey("JOB_CONTAINER_PATH")) {
 						if (platforms.contains("el6-x86_64"))
 							putJobTrace("Warning: This job has requested a deprecated package, and support may be dropped soon!");
@@ -814,7 +817,7 @@ public class JobAgent implements Runnable {
 
 			// If there is container support present on site, add to launchCmd
 			if (containerizer != null) {
-				putJobTrace("Support for containers detected. Will use: " + containerizer.getContainerizerName());
+				putJobTrace("Support for containers detected. Using " + containerizer.getContainerizerName());
 				containerizer.setWorkdir(jobWorkdir); // Will be bind-mounted to "/workdir" in the container (workaround for unprivileged bind-mounts)
 
 				if (jdl.gets("DebugTag") != null)
@@ -1095,7 +1098,7 @@ public class JobAgent implements Runnable {
 					}
 				}
 				try {
-					Thread.sleep(5 * 1000);
+					Thread.sleep(CHECK_RESOURCES_INTERVAL);
 				}
 				catch (final InterruptedException ie) {
 					logger.log(Level.WARNING, "Interrupted while waiting for the JobWrapper to finish execution: " + ie.getMessage());
@@ -1688,6 +1691,11 @@ public class JobAgent implements Runnable {
 		if (jobOOMPreempted) {
 			return "Job was preempted due to memory overconsumption";
 		}
+
+		lowCpuUsageStrikes = (RES_CPUTIME - lastCpuTime) < 100 ? lowCpuUsageStrikes+=1 : 0;
+		if (lowCpuUsageStrikes > ((900 * 1000) / CHECK_RESOURCES_INTERVAL) && "RUNNING".equals(getWrapperJobStatus())) //900s
+			return "CPU time consumed by payload has been near zero for an extended duration. Aborting";
+		lastCpuTime = RES_CPUTIME;
 
 		// Also check for core directories, and abort if found to avoid filling up disk space
 		if (!env.getOrDefault("SKIP_CORECHECK", "").toLowerCase().contains("true")) {

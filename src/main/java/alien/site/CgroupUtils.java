@@ -7,8 +7,6 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
 
-import lazyj.commands.SystemCommand;
-
 /**
  * @author mstoretv
  */
@@ -47,7 +45,6 @@ public class CgroupUtils {
 						Files.writeString(Paths.get(slotCgroup + "/cgroup.subtree_control"), "+" + controller, StandardOpenOption.APPEND);
 						Files.writeString(Paths.get(slotCgroup + "/agents/cgroup.subtree_control"), "+" + controller, StandardOpenOption.APPEND);
 					}
-
 					return true;
 				}
 				catch (final Exception e) {

@@ -291,6 +291,7 @@ public class CVMFS extends PackMan {
 		}
 		else
 			logger.log(Level.WARNING, "Could not identify " + platforms + ". Falling back to default...");
+
 		return getDefaultContainerPath();
 	}
 
