@@ -11,8 +11,10 @@ import java.io.IOException;
 import java.security.*;
 import java.security.interfaces.RSAPrivateKey;
 import java.time.Instant;
-import java.util.*;
 import java.util.Base64;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
 
 public class JWTGenerator {
 
@@ -62,6 +64,7 @@ public class JWTGenerator {
             return this;
         }
 
+        @SuppressWarnings("unused")
         public Builder withJWTId(String jwtId) {
             this.jwtid = jwtId;
             return this;
