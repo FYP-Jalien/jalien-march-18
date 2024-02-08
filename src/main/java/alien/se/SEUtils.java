@@ -24,9 +24,6 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.concurrent.locks.ReentrantReadWriteLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.ReadLock;
-import java.util.concurrent.locks.ReentrantReadWriteLock.WriteLock;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
@@ -61,25 +58,15 @@ public final class SEUtils {
 
 	private static Map<Integer, SE> seCache = null;
 
-	private static long seCacheUpdated = 0;
-
-	private static final ReentrantReadWriteLock seCacheRWLock = new ReentrantReadWriteLock();
-	private static final ReadLock seCacheReadLock = seCacheRWLock.readLock();
-	private static final WriteLock seCacheWriteLock = seCacheRWLock.writeLock();
-
 	private static Map<Integer, SECounterUpdate> seCounterUpdates = new ConcurrentHashMap<>();
 
 	private static Map<String, Map<Integer, Double>> seDistance = null;
 
-	private static long seDistanceUpdated = 0;
-
-	private static final ReentrantReadWriteLock seDistanceRWLock = new ReentrantReadWriteLock();
-	private static final ReadLock seDistanceReadLock = seDistanceRWLock.readLock();
-	private static final WriteLock seDistanceWriteLock = seDistanceRWLock.writeLock();
-
 	private static final String SEDISTANCE_QUERY;
 
 	private static final int maxAllowedRandomPFNs = 10000;
+
+	private static CacheRefresher refreshLoop = new CacheRefresher();
 
 	static {
 		if (ConfigUtils.isCentralService()) {
@@ -94,6 +81,8 @@ public final class SEUtils {
 
 			updateSECache();
 			updateSEDistanceCache();
+
+			refreshLoop.start();
 		}
 		else
 			SEDISTANCE_QUERY = null;
@@ -101,65 +90,71 @@ public final class SEUtils {
 		ShutdownManager.getInstance().addModule(() -> flushCounterUpdates());
 	}
 
-	private static void updateSECache() {
-		if (!ConfigUtils.isCentralService())
-			return;
+	private static class CacheRefresher extends Thread {
+		public CacheRefresher() {
+			setDaemon(true);
+			setName("SEUtils.CacheRefresher");
+		}
 
-		seCacheReadLock.lock();
-
-		try {
-			if (System.currentTimeMillis() - seCacheUpdated > CatalogueUtils.CACHE_TIMEOUT || seCache == null) {
-				seCacheReadLock.unlock();
-
-				seCacheWriteLock.lock();
+		@Override
+		public void run() {
+			while (true) {
+				try {
+					updateSECache();
+				}
+				catch (Exception e) {
+					logger.log(Level.SEVERE, "Exception running cache refresh", e);
+				}
 
 				try {
-					if (System.currentTimeMillis() - seCacheUpdated > CatalogueUtils.CACHE_TIMEOUT || seCache == null) {
-						if (logger.isLoggable(Level.FINER))
-							logger.log(Level.FINER, "Updating SE cache");
-
-						flushCounterUpdates();
-
-						try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
-							db.setReadOnly(true);
-							db.setQueryTimeout(30);
-
-							if (db.query("SELECT SQL_NO_CACHE * FROM SE WHERE (seioDaemons IS NOT NULL OR seName='no_se');")) {
-								final Map<Integer, SE> ses = new HashMap<>();
-
-								while (db.moveNext()) {
-									final SE se = new SE(db);
-
-									if (se.size >= 0)
-										ses.put(Integer.valueOf(se.seNumber), se);
-								}
-
-								if (ses.size() > 0) {
-									seCache = ses;
-									seCacheUpdated = System.currentTimeMillis();
-								}
-								else {
-									if (seCache == null)
-										seCache = ses;
-
-									// try again soon
-									seCacheUpdated = System.currentTimeMillis() - CatalogueUtils.CACHE_TIMEOUT + 1000 * 30;
-								}
-							}
-							else
-								seCacheUpdated = System.currentTimeMillis() - CatalogueUtils.CACHE_TIMEOUT + 1000 * 10;
-						}
-					}
+					updateSEDistanceCache();
 				}
-				finally {
-					seCacheWriteLock.unlock();
-					seCacheReadLock.lock();
+				catch (Exception e) {
+					logger.log(Level.SEVERE, "Exception running distancecache refresh", e);
+				}
+
+				try {
+					sleep(CatalogueUtils.CACHE_TIMEOUT);
+				}
+				catch (InterruptedException e) {
+					logger.log(Level.WARNING, "Periodic loop interrupted, exiting", e);
+					return;
 				}
 			}
 		}
-		finally {
-			seCacheReadLock.unlock();
+	}
+
+	private static boolean updateSECache() {
+		if (!ConfigUtils.isCentralService())
+			return true;
+
+		if (logger.isLoggable(Level.FINER))
+			logger.log(Level.FINER, "Updating SE cache");
+
+		flushCounterUpdates();
+
+		try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
+			db.setReadOnly(true);
+			db.setQueryTimeout(30);
+
+			if (db.query("SELECT SQL_NO_CACHE * FROM SE WHERE (seioDaemons IS NOT NULL OR seName='no_se');")) {
+				final Map<Integer, SE> ses = new HashMap<>();
+
+				while (db.moveNext()) {
+					final SE se = new SE(db);
+
+					if (se.size >= 0)
+						ses.put(Integer.valueOf(se.seNumber), se);
+				}
+
+				if (ses.size() > 0 || seCache == null) {
+					seCache = ses;
+					return true;
+				}
+			}
 		}
+
+		return false;
 	}
 
 	/**
@@ -190,8 +185,6 @@ public final class SEUtils {
 				return null;
 			}
 
-		updateSECache();
-
 		if (seCache == null)
 			return null;
 
@@ -219,8 +212,6 @@ public final class SEUtils {
 				return null;
 			}
 
-		updateSECache();
-
 		if (seCache == null)
 			return null;
 
@@ -243,8 +234,6 @@ public final class SEUtils {
 	 * @return SE objects matching one of the names/patterns in the argument list
 	 */
 	public static List<SE> getSEs(final List<String> ses) {
-		updateSECache();
-
 		if (seCache == null)
 			return null;
 
@@ -304,74 +293,42 @@ public final class SEUtils {
 		if (!ConfigUtils.isCentralService())
 			return;
 
-		seDistanceReadLock.lock();
+		if (logger.isLoggable(Level.FINER))
+			logger.log(Level.FINER, "Updating SE Ranks cache");
 
-		try {
-			if (System.currentTimeMillis() - seDistanceUpdated > CatalogueUtils.CACHE_TIMEOUT || seDistance == null) {
-				seDistanceReadLock.unlock();
+		try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
+			db.setReadOnly(true);
+			db.setQueryTimeout(60);
 
-				seDistanceWriteLock.lock();
+			if (db.query(SEDISTANCE_QUERY)) {
+				final Map<String, Map<Integer, Double>> newDistance = new HashMap<>();
 
-				try {
-					if (System.currentTimeMillis() - seDistanceUpdated > CatalogueUtils.CACHE_TIMEOUT || seDistance == null) {
-						if (logger.isLoggable(Level.FINER))
-							logger.log(Level.FINER, "Updating SE Ranks cache");
+				String sOldSite = null;
+				Map<Integer, Double> oldMap = null;
 
-						try (DBFunctions db = ConfigUtils.getDB("alice_users")) {
-							db.setReadOnly(true);
-							db.setQueryTimeout(60);
+				while (db.moveNext()) {
+					final String sitename = db.gets(1).trim().toUpperCase();
+					final int seNumber = db.geti(2);
+					final double distance = db.getd(3);
 
-							if (db.query(SEDISTANCE_QUERY)) {
-								final Map<String, Map<Integer, Double>> newDistance = new HashMap<>();
+					if (!sitename.equals(sOldSite) || oldMap == null) {
+						oldMap = newDistance.get(sitename);
 
-								String sOldSite = null;
-								Map<Integer, Double> oldMap = null;
-
-								while (db.moveNext()) {
-									final String sitename = db.gets(1).trim().toUpperCase();
-									final int seNumber = db.geti(2);
-									final double distance = db.getd(3);
-
-									if (!sitename.equals(sOldSite) || oldMap == null) {
-										oldMap = newDistance.get(sitename);
-
-										if (oldMap == null) {
-											oldMap = new LinkedHashMap<>();
-											newDistance.put(sitename, oldMap);
-										}
-
-										sOldSite = sitename;
-									}
-
-									oldMap.put(Integer.valueOf(seNumber), Double.valueOf(distance));
-								}
-
-								if (newDistance.size() > 0) {
-									seDistance = newDistance;
-									seDistanceUpdated = System.currentTimeMillis();
-								}
-								else {
-									if (seDistance == null)
-										seDistance = newDistance;
-
-									// try again soon
-									seDistanceUpdated = System.currentTimeMillis() - CatalogueUtils.CACHE_TIMEOUT + 1000 * 30;
-								}
-							}
-							else
-								seDistanceUpdated = System.currentTimeMillis() - CatalogueUtils.CACHE_TIMEOUT + 1000 * 10;
+						if (oldMap == null) {
+							oldMap = new LinkedHashMap<>();
+							newDistance.put(sitename, oldMap);
 						}
+
+						sOldSite = sitename;
 					}
-				}
-				finally {
-					seDistanceWriteLock.unlock();
+
+					oldMap.put(Integer.valueOf(seNumber), Double.valueOf(distance));
 				}
 
-				seDistanceReadLock.lock();
+				if (newDistance.size() > 0 || seDistance == null) {
+					seDistance = newDistance;
+				}
 			}
-		}
-		finally {
-			seDistanceReadLock.unlock();
 		}
 	}
 
@@ -420,6 +377,7 @@ public final class SEUtils {
 			// the only case left, second one is best
 			return 1;
 		}
+
 	}
 
 	/**
@@ -446,8 +404,6 @@ public final class SEUtils {
 	public static List<SE> getClosestSEs(final String site, final List<SE> exSEs, final boolean write) {
 		if (site == null || site.length() == 0)
 			return getDefaultSEList(write);
-
-		updateSEDistanceCache();
 
 		if (seDistance == null || seDistance.size() == 0)
 			return getDefaultSEList(write);
@@ -580,8 +536,6 @@ public final class SEUtils {
 		if (ret.size() <= 1 || sSite == null || sSite.length() == 0)
 			return ret;
 
-		updateSEDistanceCache();
-
 		if (seDistance == null)
 			return ret;
 
@@ -704,8 +658,6 @@ public final class SEUtils {
 		if ((ret.size() <= 1 || sSite == null || sSite.length() == 0) && (!removeBrokenSEs))
 			return ret;
 
-		updateSEDistanceCache();
-
 		if (seDistance == null)
 			return null;
 
@@ -778,8 +730,6 @@ public final class SEUtils {
 
 		if (se == null)
 			return null;
-
-		updateSEDistanceCache();
 
 		if (seDistance == null)
 			return null;
@@ -1238,8 +1188,6 @@ public final class SEUtils {
 	 * @return A random site, weighted with the average number of jobs ran in the last month
 	 */
 	public static String getRandomSite() {
-		updateSEDistanceCache();
-
 		if (seDistance == null || seDistance.size() == 0)
 			return "CERN";
 
