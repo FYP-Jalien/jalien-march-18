@@ -552,7 +552,7 @@ public class ResyncLDAP extends Optimizer {
 					}
 					if (valid) {
 						try (DBUtils dbu = new DBUtils(db.getConnection())) {
-							dbu.lockTables("SITEQUEUES WRITE");
+							dbu.lockTables("SITEQUEUES WRITE, QUEUE WRITE");
 							try {
 								int siteId = -1;
 								String selectQuery = "SELECT * from `SITEQUEUES` WHERE site='" + Format.escSQL(ceName) + "'";
@@ -605,7 +605,7 @@ public class ResyncLDAP extends Optimizer {
 				}
 
 				try (DBUtils dbu = new DBUtils(db.getConnection())) {
-					dbu.lockTables("SITEQUEUES WRITE");
+					dbu.lockTables("SITEQUEUES WRITE, QUEUE WRITE");
 					try {
 						ArrayList<String> toDelete = new ArrayList<>();
 						String selectQuery = "SELECT site from `SITEQUEUES`";
