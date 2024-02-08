@@ -1691,8 +1691,8 @@ public class JobAgent implements Runnable {
 			return "Job was preempted due to memory overconsumption";
 		}
 
-		lowCpuUsageCounter = (RES_CPUTIME - lastCpuTime) < 100 ? lowCpuUsageCounter+=1 : 0;
-		if (lowCpuUsageCounter > ((900 * 1000) / CHECK_RESOURCES_INTERVAL) && "RUNNING".equals(getWrapperJobStatus())) //900s
+		lowCpuUsageCounter = (RES_CPUTIME - lastCpuTime) < (10 * cpuCores) ? lowCpuUsageCounter += 1 : 0;
+		if (lowCpuUsageCounter > ((900 * 1000) / CHECK_RESOURCES_INTERVAL) && "RUNNING".equals(getWrapperJobStatus())) // 900s
 			return "CPU time consumed by payload has been near zero for an extended duration. Aborting";
 		lastCpuTime = RES_CPUTIME;
 
