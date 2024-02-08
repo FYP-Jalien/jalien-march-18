@@ -120,23 +120,26 @@ public final class DBUtils implements Closeable {
 	@SuppressWarnings("resource")
 	public boolean unlockTables() {
 		try {
-			if (!executeQuery("unlock tables;"))
-				return false;
-
 			dbc.getConnection().commit();
-			dbc.getConnection().setAutoCommit(true);
-
-			correctlyClosed = true;
-
-			return true;
+			correctlyClosed = executeQuery("unlock tables;");
 		}
 		catch (SQLException e) {
 			logger.log(Level.WARNING, "Cannot commit transaction", e);
-			return false;
+			correctlyClosed = false;
 		}
 		finally {
 			executeClose();
 		}
+
+		try {
+			dbc.getConnection().setAutoCommit(true);
+		}
+		catch (SQLException e) {
+			logger.log(Level.WARNING, "Cannot set the autocommit=1 flag", e);
+			dbc.close();
+		}
+
+		return correctlyClosed;
 	}
 
 	/**
