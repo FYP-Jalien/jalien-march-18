@@ -89,6 +89,8 @@ public class SFAPI extends BatchQueue {
 			}
 		}
 
+		this.clientId = environment.getOrDefault("BATCH_ARGS", clientId);
+		this.clientId = environment.getOrDefault("RUN_ARGS", clientId);
 		this.clientId = environment.getOrDefault("CLIENT_ID", clientId);
 	}
 
