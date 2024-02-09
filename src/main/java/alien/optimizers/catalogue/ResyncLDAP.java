@@ -551,50 +551,34 @@ public class ResyncLDAP extends Optimizer {
 						valid = false;
 					}
 					if (valid) {
-						try (DBUtils dbu = new DBUtils(db.getConnection())) {
-							dbu.lockTables("SITEQUEUES WRITE, QUEUE WRITE");
-							try {
-								int siteId = -1;
-								String selectQuery = "SELECT * from `SITEQUEUES` WHERE site='" + Format.escSQL(ceName) + "'";
-								if (!dbu.executeQuery(selectQuery)) {
-									logger.log(Level.SEVERE, "Error getting CEs from DB");
-									return;
-								}
+						int siteId = -1;
+						String selectQuery = "SELECT * from `SITEQUEUES` WHERE site='" + Format.escSQL(ceName) + "'";
+						if (!db.query(selectQuery)) {
+							logger.log(Level.SEVERE, "Error getting CEs from DB");
+							return;
+						}
 
-								try (ResultSet rs = dbu.getResultSet()) {
-									if (rs.next()) {
-										siteId = rs.getInt("siteId");
-										originalCEs = populateCERegistry(rs.getString("site"), rs.getString("maxrunning"), rs.getString("maxqueued"));
-									}
-								}
+						if (db.moveNext()) {
+							siteId = db.geti("siteId");
+							originalCEs = populateCERegistry(db.gets("site"), db.gets("maxrunning"), db.gets("maxqueued"));
+						}
 
-								logger.log(Level.INFO, "Inserting or updating database entry for CE " + ceName);
-								if (siteId != -1) {
-									String updateQuery = "UPDATE SITEQUEUES SET maxrunning=" + Integer.valueOf(maxjobs) + ", maxqueued=" + Integer.valueOf(maxqueuedjobs) + " WHERE site='"
-											+ Format.escSQL(ceName) + "'";
-									if (!dbu.executeQuery(updateQuery)) {
-										logger.log(Level.SEVERE, "Error updating CEs to DB");
-										return;
-									}
-								}
-								else {
-									String insertQuery = "INSERT INTO SITEQUEUES(site,maxrunning,maxqueued) values ('" + Format.escSQL(ceName) + "'," + Integer.valueOf(maxjobs) + ","
-											+ Integer.valueOf(maxqueuedjobs) + ")";
-									if (!dbu.executeQuery(insertQuery)) {
-										logger.log(Level.SEVERE, "Error inserting CE " + ceName + " to DB");
-										return;
-									}
-								}
-							}
-							finally {
-								dbu.unlockTables();
+						logger.log(Level.INFO, "Inserting or updating database entry for CE " + ceName);
+						if (siteId != -1) {
+							String updateQuery = "UPDATE SITEQUEUES SET maxrunning=" + Integer.valueOf(maxjobs) + ", maxqueued=" + Integer.valueOf(maxqueuedjobs) + " WHERE site='"
+									+ Format.escSQL(ceName) + "'";
+							if (!db.query(updateQuery)) {
+								logger.log(Level.SEVERE, "Error updating CEs to DB");
+								return;
 							}
 						}
-						catch (SQLException e) {
-							logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP CEs: " + e.getMessage());
-						}
-						catch (IOException e1) {
-							logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP CEs: " + e1.getMessage());
+						else {
+							String insertQuery = "INSERT INTO SITEQUEUES(site,maxrunning,maxqueued) values ('" + Format.escSQL(ceName) + "'," + Integer.valueOf(maxjobs) + ","
+									+ Integer.valueOf(maxqueuedjobs) + ")";
+							if (!db.query(insertQuery)) {
+								logger.log(Level.SEVERE, "Error inserting CE " + ceName + " to DB");
+								return;
+							}
 						}
 					}
 					final HashMap<String, String> currentCEs = populateCERegistry(ceName, maxjobs, maxqueuedjobs);
@@ -604,43 +588,27 @@ public class ResyncLDAP extends Optimizer {
 						DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".CEs");
 				}
 
-				try (DBUtils dbu = new DBUtils(db.getConnection())) {
-					dbu.lockTables("SITEQUEUES WRITE, QUEUE WRITE");
-					try {
-						ArrayList<String> toDelete = new ArrayList<>();
-						String selectQuery = "SELECT site from `SITEQUEUES`";
-						if (!dbu.executeQuery(selectQuery)) {
-							logger.log(Level.SEVERE, "Error getting CEs from DB");
-							return;
-						}
+				ArrayList<String> toDelete = new ArrayList<>();
+				String selectQuery = "SELECT site from `SITEQUEUES`";
+				if (!db.query(selectQuery)) {
+					logger.log(Level.SEVERE, "Error getting CEs from DB");
+					return;
+				}
 
-						try (ResultSet rs = dbu.getResultSet()) {
-							while (rs.next()) {
-								String ce = rs.getString("site");
-								if (!updatedCEs.stream().anyMatch(ce::equalsIgnoreCase) && !ce.equals("unassigned::site")) {
-									toDelete.add(ce);
-								}
-							}
-						}
-
-						for (String element : toDelete) {
-							logger.log(Level.INFO, "Deleting CE " + element + " from CE database");
-							String deleteQuery = "DELETE from `SITEQUEUES` where site='" + Format.escSQL(element) + "'";
-							if (!dbu.executeQuery(deleteQuery)) {
-								logger.log(Level.SEVERE, "Error deleting CE " + element + " from DB");
-								return;
-							}
-						}
-					}
-					finally {
-						dbu.unlockTables();
+				while (db.moveNext()) {
+					String ce = db.gets("site");
+					if (!updatedCEs.stream().anyMatch(ce::equalsIgnoreCase) && !ce.equals("unassigned::site")) {
+						toDelete.add(ce);
 					}
 				}
-				catch (SQLException e) {
-					logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP CEs: " + e.getMessage());
-				}
-				catch (IOException e1) {
-					logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP CEs: " + e1.getMessage());
+
+				for (String element : toDelete) {
+					logger.log(Level.INFO, "Deleting CE " + element + " from CE database");
+					String deleteQuery = "DELETE from `SITEQUEUES` where site='" + Format.escSQL(element) + "'";
+					if (!db.query(deleteQuery)) {
+						logger.log(Level.SEVERE, "Error deleting CE " + element + " from DB");
+						return;
+					}
 				}
 
 				final String cesLog = "CEs: " + length + " synchronized. " + modifications.size() + " changes. \n" + String.join("\n", modifications.values());
@@ -859,62 +827,47 @@ public class ResyncLDAP extends Optimizer {
 					final String seExclusiveRead = getLdapContentSE(ouSE, se, "seExclusiveRead", "");
 					final String seVersion = getLdapContentSE(ouSE, se, "seVersion", "");
 
-					try (DBUtils dbu = new DBUtils(db.getConnection())) {
-						dbu.lockTables("SE WRITE");
-						try {
-							String selectQuery = "SELECT * from `SE` WHERE seName = '" + Format.escSQL(seName) + "'";
-							if (!dbu.executeQuery(selectQuery)) {
-								logger.log(Level.SEVERE, "Error getting SEs from DB");
-								return;
-							}
+					String selectQuery = "SELECT * from `SE` WHERE seName = '" + Format.escSQL(seName) + "'";
+					if (!db.query(selectQuery)) {
+						logger.log(Level.SEVERE, "Error getting SEs from DB");
+						return;
+					}
 
-							try (ResultSet rs = dbu.getResultSet()) {
-								if (rs.next()) {
-									originalSEs = populateSERegistry(rs.getString("seName"), rs.getString("seioDaemons"), rs.getString("seStoragePath"),
-											rs.getString("seMinSize"), rs.getString("seType"), rs.getString("seQoS"),
-											rs.getString("seExclusiveWrite"), rs.getString("seExclusiveRead"), rs.getString("seVersion"));
-									seNumber = rs.getInt("seNumber");
-								}
-							}
+					if (db.moveNext()) {
+						originalSEs = populateSERegistry(db.gets("seName"), db.gets("seioDaemons"), db.gets("seStoragePath"),
+								db.gets("seMinSize"), db.gets("seType"), db.gets("seQoS"),
+								db.gets("seExclusiveWrite"), db.gets("seExclusiveRead"), db.gets("seVersion"));
+						seNumber = db.geti("seNumber");
+					}
 
-							if (originalSEs.isEmpty())
-								modifications.put(seName, seName + " : new storage element, \n");
+					if (originalSEs.isEmpty())
+						modifications.put(seName, seName + " : new storage element, \n");
 
-							final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, String.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion);
-							printModifications(modifications, originalSEs, currentSEs, seName, "SEs");
+					final HashMap<String, String> currentSEs = populateSERegistry(seName, seioDaemons, path, String.valueOf(minSize), mss, qos, seExclusiveWrite, seExclusiveRead, seVersion);
+					printModifications(modifications, originalSEs, currentSEs, seName, "SEs");
 
-							if (seNumber != -1) {
-								String updateQuery = "UPDATE SE SET seMinSize=" + Integer.valueOf(minSize) + ", seType='" + Format.escSQL(mss) + "', seQoS='" + Format.escSQL(qos)
-										+ "', seExclusiveWrite='" + Format.escSQL(seExclusiveWrite) + "', seExclusiveRead='" + Format.escSQL(seExclusiveWrite) + "', seVersion='" + seVersion
-										+ "', seStoragePath='" + Format.escSQL(path) + "', seioDaemons='" + Format.escSQL(seioDaemons)
-										+ "' WHERE seNumber=" + Integer.valueOf(seNumber) + " and seName='" + Format.escSQL(seName) + "'";
-								if (!dbu.executeQuery(updateQuery)) {
-									logger.log(Level.SEVERE, "Error updating SEs from DB");
-									return;
-								}
-							}
-							else {
-								String insertQuery = "INSERT INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
-										+ "values ('" + Format.escSQL(seName) + "'," + Integer.valueOf(minSize) + ",'" + Format.escSQL(mss) + "','" + Format.escSQL(qos) + "','"
-										+ Format.escSQL(seExclusiveWrite) + "','" + Format.escSQL(seExclusiveRead) + "','" + Format.escSQL(seVersion) + "','" + Format.escSQL(path) + "','"
-										+ Format.escSQL(seioDaemons) + "')";
-								if (!dbu.executeQuery(insertQuery)) {
-									logger.log(Level.SEVERE, "Error inserting SEs to DB");
-									return;
-								}
-							}
-							logger.log(Level.INFO, "Added or updated entry for SE " + seName);
-						}
-						finally {
-							dbu.unlockTables();
+					if (seNumber != -1) {
+						String updateQuery = "UPDATE SE SET seMinSize=" + Integer.valueOf(minSize) + ", seType='" + Format.escSQL(mss) + "', seQoS='" + Format.escSQL(qos)
+								+ "', seExclusiveWrite='" + Format.escSQL(seExclusiveWrite) + "', seExclusiveRead='" + Format.escSQL(seExclusiveWrite) + "', seVersion='" + seVersion
+								+ "', seStoragePath='" + Format.escSQL(path) + "', seioDaemons='" + Format.escSQL(seioDaemons)
+								+ "' WHERE seNumber=" + Integer.valueOf(seNumber) + " and seName='" + Format.escSQL(seName) + "'";
+						if (!db.query(updateQuery)) {
+							logger.log(Level.SEVERE, "Error updating SEs from DB");
+							return;
 						}
 					}
-					catch (SQLException e) {
-						logger.log(Level.SEVERE, "SQL error executing the DB operations in resyncLDAP SEs: " + e.getMessage());
+					else {
+						String insertQuery = "INSERT INTO SE (seName,seMinSize,seType,seQoS,seExclusiveWrite,seExclusiveRead,seVersion,seStoragePath,seioDaemons) "
+								+ "values ('" + Format.escSQL(seName) + "'," + Integer.valueOf(minSize) + ",'" + Format.escSQL(mss) + "','" + Format.escSQL(qos) + "','"
+								+ Format.escSQL(seExclusiveWrite) + "','" + Format.escSQL(seExclusiveRead) + "','" + Format.escSQL(seVersion) + "','" + Format.escSQL(path) + "','"
+								+ Format.escSQL(seioDaemons) + "')";
+						if (!db.query(insertQuery)) {
+							logger.log(Level.SEVERE, "Error inserting SEs to DB");
+							return;
+						}
 					}
-					catch (IOException e1) {
-						logger.log(Level.SEVERE, "IO error executing the DB operations in resyncLDAP SEs: " + e1.getMessage());
-					}
+					logger.log(Level.INFO, "Added or updated entry for SE " + seName);
+
 					if (ind > updateDBCount)
 						DBSyncUtils.setLastActive(ResyncLDAP.class.getCanonicalName() + ".SEs");
 				}
