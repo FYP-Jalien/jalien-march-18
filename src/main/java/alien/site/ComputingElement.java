@@ -232,7 +232,7 @@ public final class ComputingElement extends Thread {
 
 				if (!user.hasRole("vobox")) {
 					System.err.println("This account doesn't have the VoBox role");
-					return false;
+					//return false;
 				}
 
 				return true;
