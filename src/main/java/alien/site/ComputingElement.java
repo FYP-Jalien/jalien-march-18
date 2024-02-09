@@ -594,14 +594,8 @@ public final class ComputingElement extends Thread {
 	}
 
 	private static String getStartup() {
-		final String javaDir;
-
-		if (ConfigUtils.getConfiguration("version").getb("jdkArm", false))
-			javaDir = CVMFS.getJavaArmDir() + "/";
-		else if (!ConfigUtils.getConfiguration("version").getb("jdk64", true))
-			javaDir = CVMFS.getJava32Dir() + "/";
-		else
-			javaDir = CVMFS.getJava64Dir() + "/";
+		final String jdkArch = ConfigUtils.getConfiguration("version").gets("jdk.architecture");
+		final String jdkDir = CVMFS.getJavaDir(jdkArch);
 
 		final String javaCmd = "java -client -Xms16M -Xmx128M -Djdk.lang.Process.launchMechanism=vfork -XX:+UseSerialGC -cp";
 		final String jarPath = CVMFS.getJarPath();
@@ -609,9 +603,9 @@ public final class ComputingElement extends Thread {
 
 		final String jarPathCustom = ConfigUtils.getConfiguration("version").gets("custom.jobagent.jar");
 		if (jarPathCustom != null && !jarPathCustom.isBlank())
-			return javaDir + javaCmd + " " + jarPathCustom + " " + jarClass;
+			return jdkDir + javaCmd + " " + jarPathCustom + " " + jarClass;
 
-		return javaDir + javaCmd + " " + jarPath + " " + jarClass;
+		return jdkDir + javaCmd + " " + jarPath + " " + jarClass;
 	}
 
 	/**
