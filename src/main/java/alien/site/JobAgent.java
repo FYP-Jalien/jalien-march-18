@@ -1226,6 +1226,7 @@ public class JobAgent implements Runnable {
 					}
 					catch (NumberFormatException nfe) {
 						logger.log(Level.WARNING, "Exception parsing a line of output from pgrep: " + readArg, nfe);
+						return new byte[RES_NOCPUS.intValue()];
 					}
 				}
 				return valueToArray(mask, RES_NOCPUS.intValue());

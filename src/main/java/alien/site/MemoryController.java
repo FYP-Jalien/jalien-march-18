@@ -89,6 +89,7 @@ public class MemoryController implements Runnable {
 
 	public MemoryController(long cpus) {
 		cgroupRootPath = "";
+		cgroupId = "";
 		memPastPerJob = new HashMap<>();
 		memCurrentPerJob = new HashMap<>();
 		derivativePerJob = new HashMap<>();
@@ -363,6 +364,7 @@ public class MemoryController implements Runnable {
 	 * Parses cgroup path from /proc files
 	 */
 	protected static String parseCgroupsPath(boolean usingCgroupsv2) {
+		String parsedCgroupId = "";
 		try {
 			String cgroupContents = Files.readString(Path.of("/proc/" + MonitorFactory.getSelfProcessID() + "/cgroup"));
 			try (BufferedReader brCgroup = new BufferedReader(new StringReader(cgroupContents))) {
@@ -373,7 +375,7 @@ public class MemoryController implements Runnable {
 						int idx = s.indexOf(":");
 						String cgroupController = s.substring(0, idx);
 						if (cgroupController.equals("memory")) {
-							cgroupId = s.substring(idx + 1);
+							parsedCgroupId = s.substring(idx + 1);
 							break;
 						}
 					}
@@ -384,7 +386,7 @@ public class MemoryController implements Runnable {
 						int idx = s.indexOf(":");
 						String cgroupController = s.substring(0, idx);
 						if (!cgroupController.equals("freezer")) {
-							cgroupId = s.substring(idx + 1);
+							parsedCgroupId = s.substring(idx + 1);
 							break;
 						}
 					}
@@ -394,7 +396,7 @@ public class MemoryController implements Runnable {
 		catch (final IOException | IllegalArgumentException e) {
 			logger.log(Level.WARNING, "Found exception while processing cgroups exploration ", e);
 		}
-		return cgroupId;
+		return parsedCgroupId;
 	}
 
 	/*

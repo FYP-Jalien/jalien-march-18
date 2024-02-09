@@ -607,7 +607,10 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		boolean usingCgroupsv2 = new File("/sys/fs/cgroup/cgroup.controllers").isFile();
 		String cgroupId = MemoryController.parseCgroupsPath(usingCgroupsv2);
 		String output = getDmesgOutput("dmesg | egrep -i " + cgroupId + " | egrep -Ei 'oom-kill|Memory cgroup stats'");
-		String lastLog = output.split("\n")[output.split("\n").length - 1];
+		String lastLog = "";
+		if (!output.isEmpty()) {
+			lastLog = output.split("\n")[output.split("\n").length - 1];
+		}
 		if (!lastLog.isEmpty()) {
 			Double timing = Double.valueOf(lastLog.substring(lastLog.indexOf("[") + 1, lastLog.indexOf("]")));
 			double uptime = MemoryController.parseUptime();
@@ -659,12 +662,14 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (MemoryController.debugMemoryController)
 			logger.log(Level.INFO, "Parsing dmesg logs with: " + dmesgCmd);
 		CommandOutput co = SystemCommand.bash(dmesgCmd);
-		if (co.stderr != null && !co.stderr.isEmpty())
-			logger.log(Level.WARNING, "Could not execute dmesg on the host to parse OOM");
-		if (MemoryController.debugMemoryController)
-			logger.log(Level.INFO, "Dmesg output " + co);
-
-		return co.stdout;
+		if (co != null) {
+			if (co.stderr != null && !co.stderr.isEmpty())
+				logger.log(Level.WARNING, "Could not execute dmesg on the host to parse OOM");
+			if (MemoryController.debugMemoryController)
+				logger.log(Level.INFO, "Dmesg output " + co);
+			return co.stdout;
+		}
+		return "";
 	}
 
 	private String saveToFile(final String content) {
