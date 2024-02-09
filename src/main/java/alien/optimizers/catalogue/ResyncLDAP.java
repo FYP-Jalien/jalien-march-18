@@ -424,7 +424,7 @@ public class ResyncLDAP extends Optimizer {
 								if (rs.next()) {
 									final int userInstances = rs.getInt(1);
 									if (userInstances == 0) {
-										logger.log(Level.WARNING, "An already deleted user is still associated with role " + role + ". Consider cleaning ldap");
+										logger.log(Level.WARNING, "An already deleted user (" + user + ") is still associated with role " + role + ". Consider cleaning ldap");
 										if (originalUsers.contains(user))
 											originalUsers.remove(user);
 									}
