@@ -217,24 +217,23 @@ public class CVMFS extends PackMan {
 	}
 
 	/**
-	 * @return 32b JRE location in CVMFS, used for WN activities where its much lower virtual memory footprint is required
+	 * @param arch system architecture
+	 * @return JRE location in CVMFS for given architecture
 	 */
-	public static String getJava32Dir() {
-		return JAVA32_DIR;
-	}
+	public static String getJavaDir(String arch) {
+		if (arch == null || arch.isBlank())
+			arch = System.getProperty("os.arch").contains("amd64") ? "x86_64" : System.getProperty("os.arch");
 
-	/**
-	 * @return 64b JRE location in CVMFS, to be used for all WN activities
-	 */
-	public static String getJava64Dir() {
-		return JAVA64_DIR;
-	}
-
-	/**
-	 * @return Aarch64 JRE location in CVMFS, to be used for Arm WNs
-	 */
-	public static String getJavaArmDir() {
-		return JAVA_ARM_DIR;
+		switch (arch) {
+			case "x86":
+				return JAVA32_DIR;
+			case "x86_64":
+				return JAVA64_DIR;
+			case "aarch64":
+				return JAVA_ARM_DIR;
+			default:
+				return JAVA64_DIR;
+		}
 	}
 
 	/**
