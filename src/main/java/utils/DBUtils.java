@@ -156,9 +156,9 @@ public final class DBUtils implements Closeable {
 			logger.log(Level.WARNING, "Detected incomplete transaction, rolling back");
 
 			try {
-				dbc.getConnection().setAutoCommit(false);
 				dbc.getConnection().rollback();
 				executeQuery("unlock tables;");
+				dbc.getConnection().setAutoCommit(false);
 			}
 			catch (SQLException e) {
 				logger.log(Level.WARNING, "Cannot rollback transaction", e);
