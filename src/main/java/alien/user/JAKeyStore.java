@@ -887,7 +887,8 @@ public class JAKeyStore {
 				try {
 					while (true) {
 						sleep(2 * 60 * 60 * 1000);
-						JAKeyStore.requestTokenCert();
+						if (JAKeyStore.requestTokenCert())
+							JAKeyStore.loadTokenKeyStorage();
 					}
 				}
 				catch (final InterruptedException e) {
