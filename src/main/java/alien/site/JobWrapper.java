@@ -304,10 +304,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		logger.log(Level.INFO, "JobWrapper has finished execution");
 		putJobTrace("JobWrapper has finished execution");
 
-		if (runCode > 0)
-			System.exit(0); // Positive runCodes originate from the payload. Ignore. All OK here as far as we're concerned.
-		else
-			System.exit(Math.abs(runCode));
+		// Positive runCodes originate from the payload. Ignore. All OK here as far as we're concerned.
+		System.exit((runCode > 0) ? 0 : Math.abs(runCode));
 	}
 
 	private int runJob() {
@@ -470,7 +468,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (!metavars.containsKey("DISABLE_NESTED_CONTAINERS") && appt.isSupported()) {
 			logger.log(Level.INFO, "Using nested containers");
 			putJobTrace("Using nested containers");
-			cmd = appt.containerize(String.join(" ", cmd), false);
+			cmd = appt.containerize(String.join(" ", cmd) + " ; export exitCode=$? ; echo $exitCode > " + tmpDir + "/.exitFile ; exit $exitCode", false);
 		}
 
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
@@ -570,7 +568,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		if (trackTime) {
 			try {
-
 				putJobLog("proc", "Execution completed. Time spent: " + Files.readString(Paths.get(tmpDir + "/" + timeFilePrefix + "-" + queueId + "-" + executionType)).replace("\n", ", "));
 			}
 			catch (@SuppressWarnings("unused") final Exception te) {
@@ -578,7 +575,12 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			}
 		}
 
-		return payload.exitValue();
+		try {
+			return Integer.parseInt(Files.readString(Paths.get(tmpDir + "/.exitFile")).trim());
+		}
+		catch (final Exception ee) {
+			return payload.exitValue();
+		}
 	}
 
 	/**
