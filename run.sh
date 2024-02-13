@@ -36,11 +36,11 @@ if [ -z "$JALIEN_MEM" ]; then
 fi
 
 if [ -z "$JALIEN_GC" ]; then
-    export JALIEN_GC=" -XX:+UseG1GC -XX:+DisableExplicitGC -XX:MaxTrivialSize=1K"
+    export JALIEN_GC=" -XX:+UseG1GC -XX:+DisableExplicitGC"
 fi
 
 if [ -z "$JALIEN_JVM_OPTIONS" ]; then
-    export JALIEN_JVM_OPTIONS="-server -XX:+OptimizeStringConcat -XX:CompileThreshold=20000"
+    export JALIEN_JVM_OPTIONS="-server -XX:MaxTrivialSize=1K -XX:CompileThreshold=20000"
 fi
 
 JALIEN_OPTS_DEFAULT="$JALIEN_JVM_OPTIONS $JALIEN_MEM $JALIEN_GC -Duserid=$(id -u) -Dcom.sun.jndi.ldap.connect.pool=false"
