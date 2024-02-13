@@ -386,8 +386,12 @@ public class JAliEnCommandaccess extends JAliEnBaseCommand {
 			if (options.has("s"))
 				size = ((Long) options.valueOf("s")).longValue();
 
-			if (options.has("m"))
+			if (options.has("m")) {
 				md5sum = options.valueOf("m").toString();
+				
+				if (md5sum.isBlank())
+					md5sum = null;
+			}
 
 			if (options.has("j"))
 				jobId = ((Long) options.valueOf("j")).longValue();
