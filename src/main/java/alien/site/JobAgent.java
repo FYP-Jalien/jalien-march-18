@@ -89,7 +89,7 @@ import utils.Signals;
  */
 public class JobAgent implements Runnable {
 
-	private static final long CHECK_RESOURCES_INTERVAL =  5 * 1000L;
+	private static final long CHECK_RESOURCES_INTERVAL = 5 * 1000L;
 	private static final long SEND_RESOURCES_INTERVAL = 10 * 60 * 1000L;
 	private static final long SEND_JOBINFO_INTERVAL = 60 * 1000L;
 
@@ -119,8 +119,8 @@ public class JobAgent implements Runnable {
 	private String platforms;
 	private HashMap<String, Object> matchedJob;
 	protected static HashMap<String, Object> siteMap = null;
-	private int workdirMaxSizeMB;
-	protected int jobMaxMemoryMB;
+	private long workdirMaxSizeMB;
+	protected long jobMaxMemoryMB;
 	private MonitoredJob mj;
 	private Double prevCpuTime;
 	private long prevTime = 0;
@@ -262,7 +262,7 @@ public class JobAgent implements Runnable {
 	static Long RUNNING_CPU;
 
 	/**
-	 * Amount of free disk space in the scratch area to advertise
+	 * Amount of free disk space in the scratch area to advertise (in MB)
 	 */
 	static Long RUNNING_DISK;
 
@@ -317,7 +317,10 @@ public class JobAgent implements Runnable {
 	private long jobAgentThreadStartTime = System.currentTimeMillis();
 
 	protected static final Object workDirSizeSync = new Object();
-	private static HashMap<Long, Integer> slotWorkdirsMaxSize;
+	/**
+	 * Map of <job ID, max workdir size in MB>
+	 */
+	private static HashMap<Long, Long> slotWorkdirsMaxSize;
 
 	protected String agentCgroupV2;
 
@@ -417,7 +420,8 @@ public class JobAgent implements Runnable {
 
 				MAX_CPU = Long.valueOf(((Number) siteMap.getOrDefault("CPUCores", Integer.valueOf(1))).longValue());
 				RUNNING_CPU = MAX_CPU;
-				RUNNING_DISK = Long.parseLong(siteMap.getOrDefault("Disk", Long.valueOf(10 * 1024 * 1024 * RUNNING_CPU.longValue()) / 1024).toString());
+				// siteMap.Disk is expected to be in KB here, RUNNING_DISK is in MB
+				RUNNING_DISK = Long.valueOf(((Long) siteMap.getOrDefault("Disk", Long.valueOf(10 * 1024 * 1024 * RUNNING_CPU.longValue()))).longValue() / 1024);
 				origTtl = ((Integer) siteMap.get("TTL")).intValue();
 				RUNNING_JOBAGENTS = 0;
 			}
@@ -538,7 +542,7 @@ public class JobAgent implements Runnable {
 
 		logger.log(Level.INFO, siteMap.toString());
 		try {
-			logger.log(Level.INFO, "Resources available CPU DISK: " + RUNNING_CPU + " " + RUNNING_DISK);
+			logger.log(Level.INFO, "Resources available: " + RUNNING_CPU + " CPU cores and " + RUNNING_DISK + " MB of disk space");
 			synchronized (requestSync) {
 				RUNNING_JOBAGENTS += 1;
 				if (!updateDynamicParameters()) {
@@ -573,9 +577,7 @@ public class JobAgent implements Runnable {
 
 				setStatus(jaStatus.REQUESTING_JOB);
 
-				if (siteMap.containsKey("Disk"))
-					siteMap.put("Disk", (Long) siteMap.get("Disk") * 1024);
-
+				// Brokering expects disk space to be expressed in KB (JOBAGENT table content)
 				final GetMatchJob jobMatch = commander.q_api.getMatchJob(new HashMap<>(siteMap));
 
 				matchedJob = jobMatch.getMatchJob();
@@ -639,13 +641,13 @@ public class JobAgent implements Runnable {
 
 				reqDisk = Long.valueOf(TaskQueueUtils.getWorkDirSizeMB(jdl, reqCPU.intValue()));
 
-				logger.log(Level.INFO, "Job requested CPU Disk: " + reqCPU + " " + reqDisk);
+				logger.log(Level.INFO, "Job requested " + reqCPU + " CPU cores and " + reqDisk + " MB of disk space");
 
 				RUNNING_CPU -= reqCPU;
 				synchronized (env) {
 					RUNNING_DISK = recomputeDiskSpace();
 				}
-				logger.log(Level.INFO, "The recomputed disk space is " + RUNNING_DISK);
+				logger.log(Level.INFO, "The recomputed disk space is " + RUNNING_DISK + " MB");
 				RUNNING_DISK -= reqDisk;
 				logger.log(Level.INFO, "Currently available CPUCores: " + RUNNING_CPU);
 				logger.log(Level.INFO, "Task isolation is set to " + cpuIsolation);
@@ -913,15 +915,16 @@ public class JobAgent implements Runnable {
 						numaExplorer = new NUMAExplorer(RES_NOCPUS.intValue());
 					}
 				}
-				logger.log(Level.INFO, "cgroup controllers set --> cpu: " + CgroupUtils.hasController(agentCgroupV2, "cpu") + " cpuset: " + CgroupUtils.hasController(agentCgroupV2, "cpuset") + " memory: " + CgroupUtils.hasController(agentCgroupV2, "memory"));
-				//if (CgroupUtils.hasController(agentCgroupV2, "memory"))
-				//CgroupUtils.setLowMemoryLimit(agentCgroupV2, CgroupUtils.LOW_MEMORY_JA * cpuCores);
+				logger.log(Level.INFO, "cgroup controllers set --> cpu: " + CgroupUtils.hasController(agentCgroupV2, "cpu") + " cpuset: " + CgroupUtils.hasController(agentCgroupV2, "cpuset")
+						+ " memory: " + CgroupUtils.hasController(agentCgroupV2, "memory"));
+				// if (CgroupUtils.hasController(agentCgroupV2, "memory"))
+				// CgroupUtils.setLowMemoryLimit(agentCgroupV2, CgroupUtils.LOW_MEMORY_JA * cpuCores);
 				if (CgroupUtils.haveCgroupsv2() && CgroupUtils.hasController(agentCgroupV2, "cpu") && cpuIsolation == true) {
 					if (wholeNode && CgroupUtils.hasController(agentCgroupV2, "cpuset")) {
 						numaExplorer.setFullNUMAMask();
 						String isolCmd = addIsolation();
 						logger.log(Level.INFO, "Going to assign cgroup " + agentCgroupV2 + " to CPU cores " + isolCmd);
-						CgroupUtils.assignCPUCores(agentCgroupV2,isolCmd);
+						CgroupUtils.assignCPUCores(agentCgroupV2, isolCmd);
 					}
 					CgroupUtils.setCPUUsageQuota(agentCgroupV2, cpuCores);
 				}
@@ -1331,11 +1334,11 @@ public class JobAgent implements Runnable {
 		RUNNING_DISK = recomputeDiskSpace();
 		if (RUNNING_DISK.longValue() <= 10 * 1024) {
 			if (!System.getenv().containsKey("JALIEN_IGNORE_STORAGE")) {
-				logger.log(Level.WARNING, "There is not enough space left: " + RUNNING_DISK);
+				logger.log(Level.WARNING, "There is not enough space left: " + RUNNING_DISK + " MB");
 				return false;
 			}
 
-			logger.log(Level.INFO, "Ignoring the reported local disk space of " + RUNNING_DISK);
+			logger.log(Level.INFO, "Ignoring the reported local disk space of " + RUNNING_DISK + " MB");
 		}
 
 		if (RUNNING_CPU.longValue() <= 0)
@@ -1347,14 +1350,14 @@ public class JobAgent implements Runnable {
 	/**
 	 * Re-computes the disk space available
 	 *
-	 * @return the amount of disk left
+	 * @return the amount of usable disk space left, in MB
 	 */
 	public Long recomputeDiskSpace() {
 		long recomputedDisk = getFreeSpace((String) siteMap.get("workdir"));
 		logger.log(Level.INFO, "Recomputing disk space of " + (String) siteMap.get("workdir") + ". Starting with a free space of " + recomputedDisk);
 		synchronized (workDirSizeSync) {
 			for (Long runningJob : slotWorkdirsMaxSize.keySet()) {
-				int maxSize = slotWorkdirsMaxSize.get(runningJob).intValue();
+				long maxSize = slotWorkdirsMaxSize.get(runningJob).longValue() * 1024 * 1024;
 				String runningJobWorkdir = (String) siteMap.get("workdir") + "/" + defaultOutputDirPrefix + runningJob;
 
 				Path workdirPath = Paths.get(runningJobWorkdir);
@@ -1373,7 +1376,7 @@ public class JobAgent implements Runnable {
 				logger.log(Level.INFO, "WorkdirSize=" + workdirSize + ", maxSize=" + maxSize + ", recomputedDisk=" + recomputedDisk);
 			}
 		}
-		return Long.valueOf(recomputedDisk);
+		return Long.valueOf(recomputedDisk > 0 ? recomputedDisk / 1024 / 1024 : 0);
 	}
 
 	/**
@@ -1449,7 +1452,8 @@ public class JobAgent implements Runnable {
 
 		siteMap.put("TTL", Integer.valueOf(timeleft));
 		siteMap.put("CPUCores", RUNNING_CPU);
-		siteMap.put("Disk", RUNNING_DISK);
+		// matching is done in KB (see JOBAGENT.disk column)
+		siteMap.put("Disk", Long.valueOf(RUNNING_DISK.longValue() * 1024));
 
 		final int cvmfsRevision = CVMFS.getRevision();
 		if (cvmfsRevision > 0)
@@ -1472,9 +1476,9 @@ public class JobAgent implements Runnable {
 		putJobTrace("Job requested " + cpuCores + " CPU cores to run");
 
 		workdirMaxSizeMB = TaskQueueUtils.getWorkDirSizeMB(jdl, cpuCores);
-		putJobTrace("Local disk space limit: " + workdirMaxSizeMB + "MB");
+		putJobTrace("Local disk space limit: " + workdirMaxSizeMB + " MB");
 		synchronized (workDirSizeSync) {
-			slotWorkdirsMaxSize.put(Long.valueOf(queueId), Integer.valueOf(workdirMaxSizeMB));
+			slotWorkdirsMaxSize.put(Long.valueOf(queueId), Long.valueOf(workdirMaxSizeMB));
 		}
 
 		// Memory use
@@ -1626,31 +1630,37 @@ public class JobAgent implements Runnable {
 	 * @param wouldPreempt
 	 * @return
 	 */
-	protected boolean recordPreemption(final long preemptionTs, final double preemptionSlotMemory, final double PreemptionSlotMemsw, final double preemptionJobMemory, final String reason, final double parsedSlotLimit, final int numConcurrentJobs, long wouldPreempt) {
-		/*synchronized(MemoryController.lockMemoryController) {
-			logger.log(Level.INFO, "Preemption of job " + queueId + " (site: " + ce + " - host: " + hostName + ") starts - going to be killed EVENTUALLY");
-			MemoryController.preemptingJob = true;
-		}*/
-		//if (!alreadyPreempted) {
+	protected boolean recordPreemption(final long preemptionTs, final double preemptionSlotMemory, final double PreemptionSlotMemsw, final double preemptionJobMemory, final String reason,
+			final double parsedSlotLimit, final int numConcurrentJobs, long wouldPreempt) {
+		/*
+		 * synchronized(MemoryController.lockMemoryController) {
+		 * logger.log(Level.INFO, "Preemption of job " + queueId + " (site: " + ce + " - host: " + hostName + ") starts - going to be killed EVENTUALLY");
+		 * MemoryController.preemptingJob = true;
+		 * }
+		 */
+		// if (!alreadyPreempted) {
 		logger.log(Level.INFO, "Recording preemption of job " + wouldPreempt + " (data from co-executor " + queueId + ")");
 		double memoryPerCore = Math.round(preemptionJobMemory / cpuCores * 100.0) / 100.0;
 		double memHardLimitRounded = Math.round(MemoryController.memHardLimit / 1024 * 100.0) / 100.0;
 		double memswHardLimitRounded = Math.round(MemoryController.memswHardLimit / 1024 * 100.0) / 100.0;
-		Double growthDerivative = MemoryController.derivativePerJob.getOrDefault(Long.valueOf(queueId),Double.valueOf(0d));
+		Double growthDerivative = MemoryController.derivativePerJob.getOrDefault(Long.valueOf(queueId), Double.valueOf(0d));
 
-		double elapsedTime = (System.currentTimeMillis() - jobAgentThreadStartTime) /1000.; // convert to seconds
+		double elapsedTime = (System.currentTimeMillis() - jobAgentThreadStartTime) / 1000.; // convert to seconds
 		double timePortion = elapsedTime / ttl;
 		if (MemoryController.debugMemoryController)
 			logger.log(Level.INFO, "Have a time elapsed of " + elapsedTime + ". With ttl of " + ttl + ", time portion is " + timePortion);
 		String cgroupPath = MemoryController.cgroupId;
 		if (CgroupUtils.haveCgroupsv2())
 			cgroupPath = CgroupUtils.getCurrentCgroup(getWrapperPid());
-		if (!commander.q_api.recordPreemption(queueId, preemptionTs, 0, preemptionSlotMemory/1024, PreemptionSlotMemsw/1024, preemptionJobMemory, numConcurrentJobs, resubmission, hostName, ce, memoryPerCore, growthDerivative.doubleValue(), timePortion, username, MemoryController.preemptionRound, wouldPreempt, memHardLimitRounded, memswHardLimitRounded, "", cgroupPath,0d,0d)) {
+		if (!commander.q_api.recordPreemption(queueId, preemptionTs, 0, preemptionSlotMemory / 1024, PreemptionSlotMemsw / 1024, preemptionJobMemory, numConcurrentJobs, resubmission, hostName, ce,
+				memoryPerCore, growthDerivative.doubleValue(), timePortion, username, MemoryController.preemptionRound, wouldPreempt, memHardLimitRounded, memswHardLimitRounded, "", cgroupPath, 0d,
+				0d)) {
 			logger.log(Level.SEVERE, "Preemption could not be recorded in the database");
 			return false;
 		}
 		if (queueId == wouldPreempt) {
-			putJobTrace("Preemption starts. Job consuming " + Format.point(preemptionJobMemory) + " MB (slot has a total usage of " + Format.point(preemptionSlotMemory/1024) + " MB, parsed limit of " + parsedSlotLimit + " MB due to " + reason + ").");
+			putJobTrace("Preemption starts. Job consuming " + Format.point(preemptionJobMemory) + " MB (slot has a total usage of " + Format.point(preemptionSlotMemory / 1024)
+					+ " MB, parsed limit of " + parsedSlotLimit + " MB due to " + reason + ").");
 			alreadyPreempted = true;
 			String cgroupPIDs = "/sys/fs/cgroup/memory" + MemoryController.cgroupId + "/tasks";
 			if (CgroupUtils.haveCgroupsv2())
@@ -1887,12 +1897,12 @@ public class JobAgent implements Runnable {
 			// ignore
 		}
 
-		long space = folderFile.getFreeSpace();
+		long space = folderFile.getUsableSpace();
 		if (space <= 0) {
 			// 32b JRE returns 0 when too much space is available
 
 			try {
-				final String output = ExternalProcesses.getCmdOutput(Arrays.asList("df", "-P", "-B", "1024", folder), true, 30L, TimeUnit.SECONDS);
+				final String output = ExternalProcesses.getCmdOutput(Arrays.asList("df", "-P", "-B", "1", folder), true, 30L, TimeUnit.SECONDS);
 
 				try (BufferedReader br = new BufferedReader(new StringReader(output))) {
 					String sLine = br.readLine();

@@ -4088,7 +4088,7 @@ public class TaskQueueUtils {
 		final int cpuCores = getCPUCores(jdl);
 		params.put("cpucores", Integer.valueOf(cpuCores));
 
-		params.put("disk", Integer.valueOf(getWorkDirSizeMB(jdl, cpuCores) * 1024));
+		params.put("disk", Long.valueOf(getWorkDirSizeMB(jdl, cpuCores) * 1024));
 
 		// Parse Site Sonar constraints
 
@@ -4222,7 +4222,7 @@ public class TaskQueueUtils {
 	 * @param jdl
 	 * @return the requested work directory size (in MB) by this JDL. Cannot be larger than 2x 10GB x number of CPU cores
 	 */
-	public static final int getWorkDirSizeMB(final JDL jdl) {
+	public static final long getWorkDirSizeMB(final JDL jdl) {
 		return getWorkDirSizeMB(jdl, getCPUCores(jdl));
 	}
 
@@ -4233,8 +4233,8 @@ public class TaskQueueUtils {
 	 * @param number
 	 * @return the value converted to MB
 	 */
-	public static int convertStringUnitToIntegerMB(final String unit, final String number) {
-		final int value = Integer.parseInt(number);
+	public static long convertStringUnitToIntegerMB(final String unit, final String number) {
+		final long value = Long.parseLong(number);
 
 		if (unit == null || unit.isBlank())
 			return value;
@@ -4253,7 +4253,7 @@ public class TaskQueueUtils {
 	 * @param cpuCores
 	 * @return the requested work directory size (in MB) by this JDL. Cannot be larger than 2x 10GB x number of CPU cores
 	 */
-	public static final int getWorkDirSizeMB(final JDL jdl, final int cpuCores) {
+	public static final long getWorkDirSizeMB(final JDL jdl, final int cpuCores) {
 		// By default the jobs are allowed to use up to 10GB of disk space * cpuCores in the sandbox
 		final int defaultWorkdirMaxSizeMB = 10 * 1024 * cpuCores;
 
@@ -4267,13 +4267,13 @@ public class TaskQueueUtils {
 						final String number = workdirMaxSize.substring(0, m.start());
 						final String unit = workdirMaxSize.substring(m.start());
 
-						final int value = convertStringUnitToIntegerMB(unit, number);
+						final long value = convertStringUnitToIntegerMB(unit, number);
 
 						if (value > 0 && value <= 2 * defaultWorkdirMaxSizeMB)
 							return value;
 					}
 					else
-						return Integer.parseInt(workdirMaxSize);
+						return Long.parseLong(workdirMaxSize);
 				}
 				catch (@SuppressWarnings("unused") final NumberFormatException nfe) {
 					// ignore
@@ -4284,7 +4284,7 @@ public class TaskQueueUtils {
 			if (reqs != null) { // parse LocalDiskSpace
 				final Matcher m = patDiskSpace.matcher(reqs);
 				if (m.find()) {
-					final int otherDiskSpace = Integer.parseInt(m.group(1));
+					final long otherDiskSpace = Long.parseLong(m.group(1));
 
 					if (otherDiskSpace > 0 && otherDiskSpace <= 2 * defaultWorkdirMaxSizeMB)
 						return otherDiskSpace;
