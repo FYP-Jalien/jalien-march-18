@@ -964,7 +964,7 @@ public class TaskQueueUtils {
 
 	/**
 	 * Bulk move jobs selected by query to a new status
-	 * 
+	 *
 	 * @param db
 	 * @param query
 	 * @param status
@@ -4437,6 +4437,7 @@ public class TaskQueueUtils {
 						return false;
 				}
 				else {
+					values.put("queueId", Long.valueOf(wouldPreempt));
 					q = DBFunctions.composeInsert("oom_preemptions", values);
 					if (!db.query(q))
 						return false;
@@ -4466,15 +4467,28 @@ public class TaskQueueUtils {
 
 			db.setQueryTimeout(60);
 			int statusId = finalStatus.getAliEnLevel();
-			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where wouldPreempt=" + queueId + " and resubmissionCounter=" + resubmissionCounter + ";";
+			String q = "UPDATE oom_preemptions set statusId=" + statusId + " where queueId=" + queueId + " and resubmissionCounter=" + resubmissionCounter + ";";
 
 			if (!db.query(q)) {
 				logger.log(Level.SEVERE, "Error executing the update query `" + q + "`");
 				return false;
 			}
 
-			if (db.getUpdateCount() == 0)
+			if (db.getUpdateCount() == 0) {
 				logger.log(Level.FINE, "Updating status but not in oom db (" + queueId + " - " + finalStatus.toString() + ")");
+				if (finalStatus == JobStatus.EXPIRED || finalStatus == JobStatus.ZOMBIE) {
+					Map<String, Object> values = new HashMap<>();
+					values.put("wouldPreempt", Long.valueOf(queueId));
+					values.put("queueId", Long.valueOf(queueId));
+					values.put("resubmissionCounter", Integer.valueOf(resubmissionCounter));
+					values.put("statusId", Integer.valueOf(statusId));
+					values.put("preemptionTs", Long.valueOf(System.currentTimeMillis()));
+					q = DBFunctions.composeInsert("oom_preemptions", values);
+					if (!db.query(q))
+						return false;
+
+				}
+			}
 		}
 		return true;
 	}

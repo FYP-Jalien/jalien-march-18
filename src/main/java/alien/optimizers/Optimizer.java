@@ -18,7 +18,7 @@ public class Optimizer extends Thread {
 
 	private long sleep_period = 60 * 1000L; // 1min
 
-	private static String[] catalogue_optimizers = { "alien.optimizers.catalogue.LTables", "alien.optimizers.catalogue.GuidTable", "alien.optimizers.catalogue.ResyncLDAP",
+	private static String[] catalogue_optimizers = { "alien.optimizers.catalogue.LTables", "alien.optimizers.catalogue.GuidTable", "alien.optimizers.catalogue.ResyncLDAP", "alien.optimizers.catalogue.MemoryRecorder",
 			"utils.lfncrawler.LFNCrawler", "alien.optimizers.priority.JobAgentUpdater",
 			"alien.optimizers.priority.InactiveJobHandler", "alien.optimizers.sync.OverwaitingJobHandler", "alien.optimizers.sync.OldJobRemover", "alien.optimizers.sync.CheckJobStatus"
 			// , "alien.optimizers.priority.PriorityRapidUpdater", "alien.optimizers.priority.PriorityReconciliationService"

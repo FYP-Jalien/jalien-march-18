@@ -610,9 +610,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		String cgroupId = MemoryController.parseCgroupsPath(usingCgroupsv2);
 		String output = getDmesgOutput("dmesg | egrep -i " + cgroupId + " | egrep -Ei 'oom-kill|Memory cgroup stats'");
 		String lastLog = "";
-		if (!output.isEmpty()) {
+		if (!output.isEmpty())
 			lastLog = output.split("\n")[output.split("\n").length - 1];
-		}
 		if (!lastLog.isEmpty()) {
 			Double timing = Double.valueOf(lastLog.substring(lastLog.indexOf("[") + 1, lastLog.indexOf("]")));
 			double uptime = MemoryController.parseUptime();
