@@ -80,7 +80,7 @@ public class MemoryController implements Runnable {
 	protected static boolean debugMemoryController = false;
 
 	static long SLOT_MEMORY_MARGIN = 50000; // Margin left to the slot before taking the preemption decision. 50MB * NCORES
-	static long SLOT_SWAP_MARGIN = 1000000; // Margin left to the machine swap before taking the preemption decision. 1GB
+	static long SLOT_SWAP_MARGIN = 1000000; // Margin left to the machine swap before taking the preemption decision. 1GB --> If set to negative means no margin considered
 	static long MACHINE_MEMORY_MARGIN = 1000000; // Margin left to the whole machine before taking the preemption decision. 1GB
 	final static double DEFAULT_CGROUP_NOT_CONFIG = 9007199254740988d; // Default set to PAGE_COUNTER_MAX,which is LONG_MAX/PAGE_SIZE on 64-bit platform. In MB
 	final static int EVALUATION_FREQUENCY = 5; // Seconds between iterations
@@ -593,7 +593,7 @@ public class MemoryController implements Runnable {
 			}
 		} else {
 			for (JobAgent runningJA : activeJAInstances.values()) {
-				slotMem += runningJA.RES_RMEM.doubleValue() / 1024; // slotMem is in kB
+				slotMem += runningJA.RES_RMEM.doubleValue() * 1024; // slotMem is in kB
 			}
 		}
 
@@ -691,7 +691,7 @@ public class MemoryController implements Runnable {
 			if (debugMemoryController)
 				logger.log(Level.INFO, "We have a mem Hard limit of " + memHardLimit + " kB and right now we have slotMem " + slotMem + " kB");
 			double tmpMemHardLimit = memHardLimit;
-			if (swapUsageAllowed && memswHardLimit == 0 && parseSystemSwapFree() > 0) {
+			if (swapUsageAllowed && memswHardLimit == 0 && parseSystemSwapFree() > 0 && SLOT_SWAP_MARGIN > 0) {
 				tmpMemHardLimit = memHardLimit + parseSystemSwapFree() - SLOT_SWAP_MARGIN;
 				if (debugMemoryController)
 					logger.log(Level.INFO, "Adding swap to the limit " + parseSystemSwapFree() + " kB (-1 GB margin). Now hard limit is " + tmpMemHardLimit + " kB");
@@ -720,7 +720,7 @@ public class MemoryController implements Runnable {
 			double machineMemFree = parseSystemMemFree();
 			if (debugMemoryController)
 				logger.log(Level.INFO, "We dont have a memHard limit. MachineMemfree= " + machineMemFree + " kB and right now we have slotMem " + slotMem + " kB");
-			if (machineMemFree < MACHINE_MEMORY_MARGIN && parseSystemSwapFree() < SLOT_SWAP_MARGIN) // Leaving margin for the system
+			if (machineMemFree < MACHINE_MEMORY_MARGIN && ((SLOT_SWAP_MARGIN > 0 && parseSystemSwapFree() < SLOT_SWAP_MARGIN) || SLOT_SWAP_MARGIN < 0))
 				return "machine free memory";
 		}
 		return "";
