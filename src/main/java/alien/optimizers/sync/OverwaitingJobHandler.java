@@ -68,7 +68,7 @@ public class OverwaitingJobHandler extends Optimizer {
 			t1.startTiming();
 			db.setReadOnly(false);
 
-			TaskQueueUtils.moveState(db, getQuery(), JobStatus.OVER_WAITING, registerlog);
+			TaskQueueUtils.moveState(db, getQuery(), JobStatus.ERROR_EW, registerlog);
 			t1.endTiming();
 			logger.log(Level.INFO, "OverwaitingJobHandler finished in " + t1.getMillis() + " ms");
 			registerlog.append("OverwaitingJobHandler finished in ")
@@ -79,6 +79,6 @@ public class OverwaitingJobHandler extends Optimizer {
 	}
 
 	private static String getQuery() {
-		return "SELECT queueId, statusId from QUEUE where statusId = " + JobStatus.WAITING.getAliEnLevel() + " and (UNIX_TIMESTAMP() - UNIX_TIMESTAMP(mtime)) > 3600 * 24 * 3";
+		return "SELECT queueId, statusId from QUEUE where statusId = " + JobStatus.WAITING.getAliEnLevel() + " and (UNIX_TIMESTAMP() - UNIX_TIMESTAMP(mtime)) > 3600 * 24 * 7";
 	}
 }
