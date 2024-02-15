@@ -332,7 +332,7 @@ public class MemoryController implements Runnable {
 				if (cgroupsv2 == false)
 					 limitParser += " Parsed cgroup: " + cgroupId;
 				else
-					limitParser += " Parsed cgroup: " + CgroupUtils.getCurrentCgroup(MonitorFactory.getSelfProcessID());
+					limitParser += " Parsed cgroupV2: " + CgroupUtils.getCurrentCgroup(MonitorFactory.getSelfProcessID());
 			}
 		}
 		catch (final IOException | IllegalArgumentException e) {
