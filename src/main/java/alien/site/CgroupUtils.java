@@ -3,9 +3,11 @@ package alien.site;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.util.Arrays;
+import java.util.Comparator;
 
 /**
  * @author mstoretv
@@ -168,17 +170,35 @@ public class CgroupUtils {
 	 * Deletes all cgroups from the root of the given pid
 	 *
 	 * @param pid
-	 * @return true if no errors when
 	 */
-	public static boolean cleanupCgroups(int pid) {
+	public static void cleanupCgroups(int pid) {
+		final File currentCgroupDir = new File(getCurrentCgroup(pid));
+		final File killFile = new File(currentCgroupDir.getAbsolutePath() + "/cgroup.kill");
 		try {
-			// TODO: delete recursively if cgroup.kill is not available.
-			Files.writeString(Paths.get(getCurrentCgroup(pid) + "/cgroup.kill"), "1", StandardOpenOption.WRITE);
+			if (killFile.exists())
+				Files.writeString(killFile.toPath(), "1", StandardOpenOption.WRITE);
+			else {
+				Files.walk(currentCgroupDir.toPath())
+						.map(Path::toFile)
+						.sorted(Comparator.reverseOrder())
+						.forEach(file -> {
+							try {
+								if (file.getName().equals("cgroup.procs")) {
+									Runtime.getRuntime().exec("kill -9 " + Files.readString(file.toPath()).replace(System.lineSeparator(), " "));
+									Thread.sleep(5 * 1000); // Wait for procs to end
+								}
+								else if (file.isDirectory())
+									file.delete();
+							}
+							catch (Exception e) {
+								// ignore
+							}
+						});
+			}
 		}
-		catch (IOException e) {
-			return false;
+		catch (Exception e) {
+			// ignore
 		}
-		return true;
 	}
 
 	public static String getCPUCores(String cgroup) {
