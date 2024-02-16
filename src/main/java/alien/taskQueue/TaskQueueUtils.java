@@ -848,30 +848,16 @@ public class TaskQueueUtils {
 
 			putJobLog(job, "state", "Job state transition from " + oldStatus.name() + " to " + newStatus.name(), null);
 
+			String userIdQuery = "select userId, cpucores from QUEUE where queueId=?";
+
+			if(db.query(userIdQuery, false, Long.valueOf(job))) {
+				updatePriorityRegistry(db, extrafields, oldStatus, newStatus);
+			}
+
 			if (JobStatus.finalStates().contains(newStatus) || newStatus == JobStatus.SAVED_WARN || newStatus == JobStatus.SAVED) {
 				deleteJobToken(job);
-
-				String userIdQuery = "select userId, cpucores from QUEUE where queueId=?";
-				try {
-					db.query(userIdQuery, false, Long.valueOf(job));
-				}
-				catch (Exception e) {
-					logger.log(Level.WARNING, "Could not get userId for queueId: " + job, e);
-					return false;
-				}
-
-				if (db.moveNext()) {
-					final Integer userId = Integer.valueOf(db.geti("userId"));
-					final int activeCores = db.geti("cpucores");
-
-					final JobCounter counter = PriorityRegister.JobCounter.getCounterForUser(userId);
-
-					counter.decRunning(activeCores);
-
-					if (extrafields != null)
-						extrafields.put("userId", userId);
-				}
 			}
+
 			if (newStatus == JobStatus.EXPIRED || newStatus == JobStatus.ZOMBIE) {
 				final int expectedResubmissionCount = TaskQueueUtils.getResubmission(Long.valueOf(job));
 				setFinalStatusOOM(job, newStatus, expectedResubmissionCount);
@@ -885,6 +871,34 @@ public class TaskQueueUtils {
 				checkMasterjobStatus(parentPID);
 
 			return updated;
+		}
+	}
+
+	private static void updatePriorityRegistry(DBFunctions db, HashMap<String, Object> extrafields, JobStatus oldStatus, JobStatus newStatus) {
+		if (db.moveNext()) {
+			final Integer userId = Integer.valueOf(db.geti("userId"));
+			final int activeCores = db.geti("cpucores");
+
+			final JobCounter counter = PriorityRegister.JobCounter.getCounterForUser(userId);
+
+			if(oldStatus == JobStatus.WAITING) {
+				counter.decWaiting();
+			}
+
+			if(JobStatus.runningStates().contains(oldStatus)) {
+				counter.decRunning(activeCores);
+			}
+
+			if(newStatus == JobStatus.WAITING) {
+				counter.incWaiting();
+			}
+
+			if(JobStatus.runningStates().contains(newStatus)) {
+				counter.incRunning(activeCores);
+			}
+
+			if (extrafields != null)
+				extrafields.put("userId", userId);
 		}
 	}
 

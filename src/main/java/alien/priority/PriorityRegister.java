@@ -68,7 +68,7 @@ public class PriorityRegister {
 		}
 
 		/**
-		 * Assigning a job with a given number of CPU cores to a site
+		 * Assigning a job with a given number of CPU cores to a site and subtracts waiting jobs
 		 * 
 		 * @param n
 		 */
@@ -77,6 +77,14 @@ public class PriorityRegister {
 			decWaiting();
 		}
 
+		/**
+		 * Assigning a job with a given number of CPU cores to a site
+		 *
+		 * @param n
+		 */
+		public void incRunning(int n) {
+			running.addAndGet(n);
+		}
 		/**
 		 * Decrease the number of running active cpu cores by n
 		 * 
