@@ -123,8 +123,8 @@ public class PriorityRapidUpdater extends Optimizer {
 					}
 
 					updateQuery.append(" ON DUPLICATE KEY UPDATE ")
-							.append("waiting = waiting + VALUES(waiting), ")
-							.append("running = running + VALUES(running), ")
+							.append("waiting = GREATEST(waiting + VALUES(waiting), 0), ")
+							.append("running = GREATEST(running + VALUES(running), 0), ")
 							.append("totalRunningTimeLast24h = totalRunningTimeLast24h + VALUES(totalRunningTimeLast24h), ")
 							.append("totalCpuCostLast24h = totalCpuCostLast24h + VALUES(totalCpuCostLast24h)");
 
