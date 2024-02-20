@@ -468,7 +468,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (!metavars.containsKey("DISABLE_NESTED_CONTAINERS") && appt.isSupported()) {
 			logger.log(Level.INFO, "Using nested containers");
 			putJobTrace("Using nested containers");
-			cmd = appt.containerize(String.join(" ", cmd) + " ; export exitCode=$? ; echo $exitCode > " + tmpDir + "/.exitFile ; exit $exitCode", false);
+			cmd = appt.containerize(String.join(" ", cmd));
 		}
 
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
@@ -574,13 +574,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				// Ignore
 			}
 		}
-
-		try {
-			return Integer.parseInt(Files.readString(Paths.get(tmpDir + "/.exitFile")).trim());
-		}
-		catch (final Exception ee) {
-			return payload.exitValue();
-		}
+		return payload.exitValue();
 	}
 
 	/**
