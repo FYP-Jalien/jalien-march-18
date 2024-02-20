@@ -660,9 +660,6 @@ public class JobAgent implements Runnable {
 				requestSync.notifyAll();
 			}
 
-			// TODO: commander.setUser(username);
-			// commander.setSite(site);
-
 			logger.log(Level.INFO, jdl.getExecutable());
 			logger.log(Level.INFO, username);
 			logger.log(Level.INFO, Long.toString(queueId));
@@ -1701,7 +1698,6 @@ public class JobAgent implements Runnable {
 		if (jobOOMPreempted) {
 			return "Job was preempted due to memory overconsumption";
 		}
-
 
 		lowCpuUsageCounter = (RES_CPUTIME - lastCpuTime) < ((CHECK_RESOURCES_INTERVAL / 1000.0 / 10.0) * Double.valueOf(cpuCores)) ? lowCpuUsageCounter += 1 : 0;
 		if (lowCpuUsageCounter > ((900 * 1000) / CHECK_RESOURCES_INTERVAL) && "RUNNING".equals(getWrapperJobStatus())) // 900s
