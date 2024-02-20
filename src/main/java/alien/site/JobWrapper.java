@@ -1319,7 +1319,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			final Process process = pb.start();
 
-			process.waitFor(30, TimeUnit.SECONDS);
+			process.waitFor(60, TimeUnit.SECONDS);
 			if (process.isAlive())
 				process.destroyForcibly();
 
