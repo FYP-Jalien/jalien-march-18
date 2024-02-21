@@ -78,7 +78,7 @@ public class InactiveJobHandler extends Optimizer {
 			String inactiveJobsWithoutHeartbeatQuery = "SELECT q.queueId, q.statusId FROM QUEUE q JOIN QUEUEPROC qp\n" +
 					"                                           WHERE q.queueId = qp.queueId\n" +
 					"                                               AND  q.statusId IN (" + JobStatus.ZOMBIE.getAliEnLevel() + ")\n" +
-					"                                               AND qp.lastupdate < NOW() - INTERVAL 2 HOUR";
+					"                                               AND qp.lastupdate < NOW() - INTERVAL 1 HOUR";
 
 			try (Timing t = new Timing(monitor, "InactiveJobHandler")) {
 				t.startTiming();
