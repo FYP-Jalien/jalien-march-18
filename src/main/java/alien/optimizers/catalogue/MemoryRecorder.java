@@ -52,7 +52,7 @@ public class MemoryRecorder extends Optimizer {
 				if (updated) {
 					int ind = 0;
 					long ts = System.currentTimeMillis() - updateMaxInterval;
-					String q = "select queueId, resubmissionCounter,statusId,preemptionTs,systemKillTs from oom_preemptions where MLSync = 0 and (preemptionTs>" + ts + " or systemKillTs>" + ts + ")";
+					String q = "select queueId, resubmissionCounter,statusId,preemptionTs,systemKillTs from oom_preemptions where MLSync = 0 and (preemptionTs>" + ts + " or systemKillTs>" + ts + ") and statusId is not null";
 					if (!db.query(q)) {
 						logger.log(Level.WARNING, "Error getting data from oom_preemptions");
 					}
@@ -94,12 +94,11 @@ public class MemoryRecorder extends Optimizer {
 											swappss = (Double) lastMemoryReports.get(limit_key);
 										}
 									}
-
-									String w = "update oom_preemptions set lastMLPss=" + (pss.doubleValue() / 1024) + ", lastMLSwapPss=" + (swappss.doubleValue() / 1024) + ", MLSync=1 where queueId="
-											+ queueId + " and resubmissionCounter=" + resubmissionCounter + " and statusId is not null";
-									if (!db1.query(w)) {
-										logger.log(Level.WARNING, "Error updating last memory reports from ML in oom_preemptions");
-									}
+								}
+								String w = "update oom_preemptions set lastMLPss=" + (pss.doubleValue() / 1024) + ", lastMLSwapPss=" + (swappss.doubleValue() / 1024) + ", MLSync=1 where queueId="
+										+ queueId + " and resubmissionCounter=" + resubmissionCounter + " and statusId is not null";
+								if (!db1.query(w)) {
+									logger.log(Level.WARNING, "Error updating last memory reports from ML in oom_preemptions");
 								}
 							}
 

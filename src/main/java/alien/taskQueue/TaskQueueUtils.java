@@ -4491,15 +4491,26 @@ public class TaskQueueUtils {
 			if (db.getUpdateCount() == 0) {
 				logger.log(Level.FINE, "Updating status but not in oom db (" + queueId + " - " + finalStatus.toString() + ")");
 				if (finalStatus == JobStatus.EXPIRED || finalStatus == JobStatus.ZOMBIE) {
-					Map<String, Object> values = new HashMap<>();
-					values.put("wouldPreempt", Long.valueOf(queueId));
-					values.put("queueId", Long.valueOf(queueId));
-					values.put("resubmissionCounter", Integer.valueOf(resubmissionCounter));
-					values.put("statusId", Integer.valueOf(statusId));
-					values.put("preemptionTs", Long.valueOf(System.currentTimeMillis()));
-					q = DBFunctions.composeInsert("oom_preemptions", values);
-					if (!db.query(q))
+					q = "select nodeId, siteId, userId from QUEUE where queueId=" + queueId + " and resubmission=" + resubmissionCounter;
+					if (db.query(q)) {
+						int hostId = db.geti("nodeId");
+						int siteId = db.geti("siteId");
+						int userId = db.geti("userId");
+						Map<String, Object> values = new HashMap<>();
+						values.put("wouldPreempt", Long.valueOf(queueId));
+						values.put("queueId", Long.valueOf(queueId));
+						values.put("resubmissionCounter", Integer.valueOf(resubmissionCounter));
+						values.put("statusId", Integer.valueOf(statusId));
+						values.put("preemptionTs", Long.valueOf(System.currentTimeMillis()));
+						values.put("hostId", Integer.valueOf(hostId));
+						values.put("siteId",Integer.valueOf(siteId));
+						values.put("userId", Integer.valueOf(userId));
+						q = DBFunctions.composeInsert("oom_preemptions", values);
+						if (!db.query(q))
+							return false;
+					} else {
 						return false;
+					}
 
 				}
 			}
