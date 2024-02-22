@@ -1700,8 +1700,8 @@ public class JobAgent implements Runnable {
 		}
 
 		lowCpuUsageCounter = (RES_CPUTIME - lastCpuTime) < ((CHECK_RESOURCES_INTERVAL / 1000.0 / 10.0) * Double.valueOf(cpuCores)) ? lowCpuUsageCounter += 1 : 0;
-		if (lowCpuUsageCounter > ((900 * 1000) / CHECK_RESOURCES_INTERVAL) && "RUNNING".equals(getWrapperJobStatus())) // 900s
-			return "CPU time consumed by payload has been near zero for an extended duration. Aborting";
+		if (lowCpuUsageCounter > ((15 * 60 * 1000) / CHECK_RESOURCES_INTERVAL) && "RUNNING".equals(getWrapperJobStatus()))
+			return "CPU time consumed by the payload has been near zero for the last 15 minutes. Aborting";
 		lastCpuTime = RES_CPUTIME;
 
 		// Also check for core directories, and abort if found to avoid filling up disk space
