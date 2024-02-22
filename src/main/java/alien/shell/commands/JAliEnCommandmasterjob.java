@@ -71,7 +71,7 @@ public class JAliEnCommandmasterjob extends JAliEnBaseCommand {
 
 				String key = sj.status().toString();
 
-				System.err.println("Site of " + sj.queueId + " : " + sj.site);
+				// System.err.println("Site of " + sj.queueId + " : " + sj.site);
 
 				if (bPrintSite) {
 					final String site = sj.site != null && !sj.site.isBlank() ? sj.site : "";
