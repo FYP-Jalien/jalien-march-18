@@ -237,13 +237,23 @@ public class CVMFS extends PackMan {
 	}
 
 	/**
-	 * @return JAR location for current tag
+	 * @return JAR location to be used by agents
 	 */
 	public static String getJarPath() {
+		if (!ConfigUtils.getConfiguration("version").gets("jobagent.version", "").isBlank())
+			return getJarPath(ConfigUtils.getConfiguration("version").gets("jobagent.version"));
+
 		if (System.getenv().getOrDefault("CLASSPATH", "").contains("alice.cern.ch"))
 			return System.getenv().get("CLASSPATH");
 
-		return CVMFS_BASE_DIR + "/el7-x86_64/Packages/JAliEn/" + Version.getTag() + "-1" + "/lib/alien-users.jar";
+		return getJarPath(Version.getTag() + "-1");
+	}
+
+	/**
+	 * @return JAR location for given tag
+	 */
+	public static String getJarPath(String tag) {
+		return CVMFS_BASE_DIR + "/el7-x86_64/Packages/JAliEn/" + tag + "/lib/alien-users.jar";
 	}
 
 	/**
