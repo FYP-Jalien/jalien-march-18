@@ -21,7 +21,8 @@ public class Optimizer extends Thread {
 	private static String[] catalogue_optimizers = { "alien.optimizers.catalogue.LTables", "alien.optimizers.catalogue.GuidTable", "alien.optimizers.catalogue.ResyncLDAP", "alien.optimizers.catalogue.MemoryRecorder",
 			"utils.lfncrawler.LFNCrawler", "alien.optimizers.priority.JobAgentUpdater",
 			"alien.optimizers.priority.InactiveJobHandler", "alien.optimizers.sync.OverwaitingJobHandler", "alien.optimizers.sync.OldJobRemover", "alien.optimizers.sync.CheckJobStatus",
-			"alien.optimizers.priority.PriorityRapidUpdater", "alien.optimizers.priority.PriorityReconciliationService", "alien.optimizers.priority.ActiveUserReconciler"
+			"alien.optimizers.priority.PriorityRapidUpdater", "alien.optimizers.priority.PriorityReconciliationService", "alien.optimizers.priority.ActiveUserReconciler",
+			"alien.optimizers.site.SitequeueReconciler"
 	};
 
 	@Override
