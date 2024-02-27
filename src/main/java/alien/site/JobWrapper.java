@@ -468,7 +468,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (!metavars.containsKey("DISABLE_NESTED_CONTAINERS") && appt.isSupported()) {
 			logger.log(Level.INFO, "Using nested containers");
 			putJobTrace("Using nested containers");
-			cmd = appt.containerize(String.join(" ", cmd));
+			cmd = appt.containerize(String.join(" ", cmd), false);
 		}
 
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
