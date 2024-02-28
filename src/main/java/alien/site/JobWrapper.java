@@ -30,6 +30,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import alien.api.Request;
 import alien.api.TomcatServer;
@@ -516,7 +517,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		try {
 			payload = pBuilder.start();
-
 		}
 		catch (final IOException ioe) {
 			logger.log(Level.INFO, "Exception running " + cmd + " : " + ioe.getMessage());
@@ -1306,8 +1306,14 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @return script exit code, or -1 in case of error
 	 */
 	public static int cleanupProcesses(final long queueId, final int pid) {
-		final File cleanupScript = new File(CVMFS.getCleanupScript());
 
+		//Attempt cleanup using Java first
+		ProcessHandle.current().descendants().forEach(descendantProc -> {
+			descendantProc.destroyForcibly();
+		});
+
+		final File cleanupScript = new File(CVMFS.getCleanupScript());
+		
 		if (!cleanupScript.exists()) {
 			logger.log(Level.WARNING, "Script for process cleanup not found in: " + cleanupScript.getAbsolutePath());
 			return -1;
