@@ -1306,10 +1306,14 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 */
 	public static int cleanupProcesses(final long queueId, final int pid) {
 
-		//Attempt cleanup using Java first
-		ProcessHandle.current().descendants().forEach(descendantProc -> {
-			descendantProc.destroyForcibly();
-		});
+		// Attempt cleanup using Java first
+		int cleanupAttempts = 0;
+		while (ProcessHandle.current().descendants().count() > 0 && cleanupAttempts < 10) {
+			ProcessHandle.current().descendants().forEach(descendantProc -> {
+				descendantProc.destroyForcibly();
+			});
+			cleanupAttempts += 1;
+		}
 
 		final File cleanupScript = new File(CVMFS.getCleanupScript());
 		
