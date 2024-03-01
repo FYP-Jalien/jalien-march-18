@@ -33,7 +33,7 @@ public class CalculateComputedPriority {
 	/**
 	 * 
 	 */
-	public static void updateComputedPriority() {
+	public static void updateComputedPriority(boolean onlyActiveUsers) {
 		StringBuilder registerLog = new StringBuilder();
 		try (DBFunctions db = TaskQueueUtils.getQueueDB(); DBFunctions dbdev = TaskQueueUtils.getProcessesDevDB()) {
 			if (db == null) {
@@ -49,7 +49,12 @@ public class CalculateComputedPriority {
 			db.setQueryTimeout(60);
 			dbdev.setQueryTimeout(60);
 
-			String q = "SELECT userId, priority, running, maxParallelJobs, totalRunningTimeLast24h, maxTotalRunningTime from PRIORITY";
+			String q;
+			if(onlyActiveUsers) {
+				q = "SELECT userId, priority, running, maxParallelJobs, totalRunningTimeLast24h, maxTotalRunningTime from PRIORITY where totalRunningTimeLast24h > 0";
+			} else {
+				q = "SELECT userId, priority, running, maxParallelJobs, totalRunningTimeLast24h, maxTotalRunningTime from PRIORITY";
+			}
 
 			Map<Integer, PriorityDto> dtos = new HashMap<>();
 			try (Timing t = new Timing(monitor, "calculateComputedPriority")) {

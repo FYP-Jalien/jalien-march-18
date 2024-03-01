@@ -97,7 +97,7 @@ public class PriorityReconciliationService extends Optimizer {
 				Map<Integer, QueueProcessingDto> activeUsersGroupedById = getActiveUsers(db);
 
 				if (!activeUsersGroupedById.isEmpty()) {
-					updatePriorityForActiveUsers(activeUsersGroupedById, registerLog, dbdev);
+					updateUsageForActiveUsers(activeUsersGroupedById, registerLog, dbdev);
 				}
 				else {
 					logger.log(Level.INFO, "No active users to update");
@@ -127,7 +127,7 @@ public class PriorityReconciliationService extends Optimizer {
 
 				try (Timing timeNonActive = new Timing(monitor, "TQ_update_non_active_ms")) {
 					if (!nonActiveUsersLast24H.isEmpty()) {
-						updatePriorityForNonActiveUsers(nonActiveUsersLast24H, registerLog, dbdev, timeNonActive);
+						updateUsageForNonActiveUsers(nonActiveUsersLast24H, registerLog, dbdev, timeNonActive);
 					}
 					else {
 						logger.log(Level.INFO, "No non active users to update");
@@ -138,12 +138,12 @@ public class PriorityReconciliationService extends Optimizer {
 				registerLog.append(" ReconcilePriority finished after running for ").append(t.getMillis()).append(" ms\n");
 				DBSyncUtils.registerLog(PriorityReconciliationService.class.getCanonicalName(), registerLog.toString());
 
-				CalculateComputedPriority.updateComputedPriority();
+				CalculateComputedPriority.updateComputedPriority(false);
 			}
 		}
 	}
 
-	private static void updatePriorityForNonActiveUsers(Set<Integer> nonActiveUsersLast24H, StringBuilder registerLog, DBFunctions db, Timing t) {
+	private static void updateUsageForNonActiveUsers(Set<Integer> nonActiveUsersLast24H, StringBuilder registerLog, DBFunctions db, Timing t) {
 		logger.log(Level.INFO, "Updating priority for non active users " + nonActiveUsersLast24H.size());
 		t.startTiming();
 		StringBuilder updateNonActiveUsersQuery = getUpdatePriorityQuery();
@@ -169,7 +169,7 @@ public class PriorityReconciliationService extends Optimizer {
 				.append(" ms\n");
 		logger.log(Level.INFO, "Updating priority for non active users took " + t.getMillis() + " ms");
 	}
-	private static void updatePriorityForActiveUsers(Map<Integer, QueueProcessingDto> activeUsersGroupedById, StringBuilder registerLog, DBFunctions db) {
+	private static void updateUsageForActiveUsers(Map<Integer, QueueProcessingDto> activeUsersGroupedById, StringBuilder registerLog, DBFunctions db) {
 		logger.log(Level.INFO, "Updating priority for active users: " + activeUsersGroupedById.size());
 		
 		boolean first = true;
