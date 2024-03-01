@@ -243,7 +243,7 @@ public class JobAgent implements Runnable {
 	private String RES_RESOURCEUSAGE = "";
 	private Long RES_RUNTIME = Long.valueOf(0);
 	private String RES_FRUNTIME = "";
-	private Integer RES_NOCPUS = Integer.valueOf(1);
+	protected static Integer RES_NOCPUS = Integer.valueOf(1);
 	private String RES_CPUMHZ = "";
 	private String RES_CPUFAMILY = "";
 	private String RES_BATCH_INFO = "";
@@ -1379,26 +1379,29 @@ public class JobAgent implements Runnable {
 	/**
 	 * Checks if the workload is already constrained to run in certain cores. If not in whole-node scenario, CPU cores are selected and workload is pinned.
 	 *
+	 * @param alreadyIsol Is the JR already isolated
 	 * @param jobRunnerPid Process ID of the running JobRunner
 	 */
-	public void checkAndApplyIsolation(int jobRunnerPid) {
+	public boolean checkAndApplyIsolation(int jobRunnerPid, boolean alreadyIsol) {
+		boolean tmpIsol = alreadyIsol;
 		synchronized (cpuSync) {
 			byte[] hostMask = getHostMask();
-			boolean alreadyIsol = false;
 			for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
 				if (hostMask[i] != 0) {
-					alreadyIsol = true;
+					tmpIsol = true;
 					break;
 				}
 			}
 
-			if (wholeNode == false && alreadyIsol == false) {
+			if (wholeNode == false && tmpIsol == false && (!CgroupUtils.haveCgroupsv2() ||  (CgroupUtils.haveCgroupsv2() && !CgroupUtils.hasController(CgroupUtils.getCurrentCgroup(jobRunnerPid),"cpu")))) {
 				logger.log(Level.INFO, "Applying isolation to the whole JobRunner CPU allocation - Allocation of " + RUNNING_CPU + " cores");
-				String initMask = numaExplorer.computeInitialMask(RUNNING_CPU);
+				String initMask = numaExplorer.computeInitialMask(RUNNING_CPU, wholeNode);
 				NUMAExplorer.applyTaskset(initMask, jobRunnerPid);
 				logger.log(Level.INFO, "JobRunner pinned to mask " + initMask);
+				tmpIsol = true;
 			}
 		}
+		return tmpIsol;
 	}
 
 	private boolean checkOOMDump() {

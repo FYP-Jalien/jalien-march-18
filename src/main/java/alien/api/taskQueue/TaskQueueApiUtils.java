@@ -551,4 +551,23 @@ public class TaskQueueApiUtils {
 		}
 		return recordingSuccess;
 	}
+		/**
+	 * @param proposedMask
+	 * @param dbRemoval should the entry be removed from db
+	 * @param hostname name of executing workernodes
+	 * @return executing machine pinning config
+	 */
+	public byte[] getPinningInspection(byte[] proposedMask, boolean dbRemoval, String hostname) {
+
+		try {
+			final InspectPinning inspector = Dispatcher.execute(new InspectPinning(commander.getUser(), proposedMask, dbRemoval, hostname));
+
+			return inspector.getResponseMask();
+		}
+		catch (final ServerException e) {
+			System.out.println("Could not get any result for exec host pinning inspection: ");
+			e.getCause().printStackTrace();
+		}
+		return null;
+	}
 }

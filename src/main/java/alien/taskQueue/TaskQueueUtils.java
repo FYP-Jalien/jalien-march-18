@@ -3,6 +3,7 @@ package alien.taskQueue;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.math.BigInteger;
 import java.net.InetAddress;
 import java.nio.file.FileSystem;
 import java.nio.file.FileSystems;
@@ -12,6 +13,7 @@ import java.nio.file.Paths;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.BitSet;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Date;
@@ -97,6 +99,8 @@ public class TaskQueueUtils {
 	public static final int job_limit = 50000;
 
 	private static final Map<String, String> fieldMap;
+
+	private static Thread jrTrackerThread;
 
 	static {
 		fieldMap = new HashMap<>();
@@ -4511,10 +4515,184 @@ public class TaskQueueUtils {
 					} else {
 						return false;
 					}
-
 				}
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Checks and updates the pinning status of the executing machine
+	 *
+	 * @param proposedMask mask proposed by JobAgent
+	 * @param dbRemoval should the entry be removed from db
+	 * @param vmUID uuid of the JA VM
+	 * @param hostname workernode running the job
+	 */
+	public static byte[] getPinningStatus(byte[] proposedMask, boolean dbRemoval, UUID vmUID, String hostname) {
+		logger.log(Level.INFO, "Checking pinning status. Proposed= " + getMaskString(proposedMask) + " UUID= " + vmUID + " hostname= " + hostname);
+		// if (proposedMask.length > 64)
+		if (proposedMask != null && Arrays.equals(new byte[proposedMask.length], proposedMask))
+			return proposedMask;
+
+		try (DBFunctions db = getQueueDB()) {
+			if (db == null)
+				return null;
+
+			Integer hostId = getHostId(hostname, false);
+
+			// When the JR finishes and we want to delete the db entry
+			if (proposedMask == null) {
+				synchronized(JRTracker.pinningTrackerSync) {
+					JRTracker.uuidToUpdate.remove(vmUID);
+				}
+				String subQ = "delete from COREPINNING where hostId=" + hostId + " and binary2string(uuid)='" + vmUID + "';";
+				db.query(subQ);
+				return null;
+			}
+			byte[] responseMask = new byte[proposedMask.length];
+			logger.log(Level.INFO, "Going to inspect pinning config for VM: " + vmUID);
+
+			db.setReadOnly(false);
+			db.setQueryTimeout(60);
+			boolean proposalDiscarded = false;
+
+			boolean canGetLock = inspectAndAquireDBLock(hostId, vmUID, db);
+
+			if (!canGetLock) {
+				byte[] maskLockTaken = new byte[proposedMask.length];
+				Arrays.fill(maskLockTaken, (byte) 3);
+				return maskLockTaken;
+			}
+
+			if (!dbRemoval) {
+				int chunks = (int) Math.ceil(proposedMask.length / 64d);
+				String selectables = "";
+				for (int chunk = 1; chunk < chunks + 1; chunk++) {
+					selectables += "bit_or(coreMask" + chunk + ") as or" + chunk + ",";
+				}
+				String q = "select " + selectables.substring(0, selectables.length() - 1) + " from COREPINNING where hostId = " + hostId + " group by hostId";
+				db.query(q);
+				long maskLength = 64;
+				if (db.moveNext()) {
+					Map<String, Object> valueMap = db.getValuesMap();
+					String binMask = "";
+					for (int chunk = 1; chunk < chunks + 1; chunk++) {
+						BigInteger currentMask = (BigInteger) valueMap.get("or" + chunk);
+						if (chunk == chunks)
+							maskLength = proposedMask.length - (chunks - 1) * 64;
+						String tmpMask = String.format("%" + maskLength + "s", currentMask.toString(2).replaceAll(" ", "0"));
+						binMask += tmpMask;
+					}
+					for (int coreId = 0; coreId < binMask.length(); coreId++) {
+						if (binMask.charAt(coreId) == '1') {
+							responseMask[coreId] = 2;
+							if (proposedMask[coreId] == 1) {
+								// We discard the proposed mask, so we do not have to do any insertions to the db afterwards
+								proposalDiscarded = true;
+							}
+						}
+					}
+				}
+				else {
+					responseMask = Arrays.copyOf(proposedMask, proposedMask.length);
+				}
+			}
+			if (proposalDiscarded == false) {
+				responseMask = Arrays.copyOf(proposedMask, proposedMask.length);
+				int chunks = (int) Math.ceil(responseMask.length / 64d);
+				String columns = "";
+				StringBuilder finalMask = new StringBuilder();
+				for (int chunk = chunks - 1; chunk >= 0; chunk--) {
+					finalMask.append("b'");
+					int top = chunk * 64 + 64;
+					if (responseMask.length < chunk * 64 + 64) {
+						top = responseMask.length;
+						for (int i = 0; i < chunk * 64 + 64 - responseMask.length; i++) {
+							finalMask.append(0);
+						}
+					}
+					for (int i = chunk * 64; i < top; i++) {
+						finalMask.append(responseMask[i]);
+					}
+					finalMask.append("',");
+					columns += "coreMask" + ((chunk + 1)) + ",";
+				}
+				String q = "insert into COREPINNING (hostId," + columns + "uuid,updateTs) values(" + hostId + "," + finalMask + "string2binary('" + vmUID + "'),current_timestamp);";
+				if (!db.query(q)) {
+					logger.log(Level.SEVERE, "Could not insert pinning in db for vmUID " + vmUID + " in host " + hostname);
+				}
+			}
+			String q = "delete from COREPINNING_LOCK where hostId=" + hostId + " and uuid=string2binary('" + vmUID + "');";
+			db.query(q);
+			logger.log(Level.INFO, vmUID + " Returning mask " + getMaskString(responseMask));
+			return responseMask;
+		}
+	}
+
+	/**
+	 * Checks if lock is taken for hostId and acquires it for VM pinning
+	 *
+	 * @param hostId id of the host issuing the request
+	 * @param vmUID unique uuid
+	 * @param db
+	 * @return wether the lock could be taken
+	 */
+	private static boolean inspectAndAquireDBLock(Integer hostId, UUID vmUID, DBFunctions db) {
+		// If we can not insert it means lock is taken
+		String q = "insert into COREPINNING_LOCK (hostId, uuid, lock_timestamp) values (" + hostId + ",string2binary('" + vmUID + "'),current_timestamp);";
+		//TODO: Need to put boolean to false to prevent all error logs every time the lock is taken
+		if (!db.query(q)) {
+			q = "select binary2string(uuid), lock_timestamp from COREPINNING_LOCK where hostId=" + hostId;
+			db.query(q);
+			if (db.moveNext()) {
+				String lockVM = db.gets(1);
+				long lockTimestamp = db.getl(2);
+				long currentTimestamp = System.currentTimeMillis();
+				// Check if it is the vm making the request who has the lock. We update the timestamp
+				// Or if the lock has been taken for too long. We release it and acquire for this VM
+				if (lockVM.equals(vmUID.toString())) {
+					q = "update COREPINNING_LOCK set lock_timestamp=current_timestamp where hostId="+hostId+" and string2binary('" + vmUID + "')=uuid";
+					db.query(q);
+					return true;
+				}
+				if ((currentTimestamp - lockTimestamp) > JRTracker.lockLeasingThreshold) {
+					q = "update COREPINNING_LOCK set lock_timestamp=current_timestamp, uuid= string2binary('" + vmUID + "') where hostId=" + hostId + " set lock_timestamp=current_timestamp ";
+					db.query(q);
+					return true;
+				}
+				// We have to return an empty mask to the client
+				return false;
+			}
+		}
+		else {
+			return true;
+		}
+		return false;
+	}
+
+	/**
+	 * Adds the uuid to the list to update ts
+	 * @param vmUID uuid of the JA VM
+	 */
+	public static void notifyJRAlive(UUID vmUID) {
+		if (jrTrackerThread == null) {
+			jrTrackerThread = new Thread(new JRTracker());
+			jrTrackerThread.start();
+		}
+		synchronized (JRTracker.pinningTrackerSync) {
+			if (JRTracker.uuidToUpdate.size() < 10000)
+				JRTracker.uuidToUpdate.add(vmUID);
+		}
+	}
+
+	static String getMaskString(byte[] cpuRange) {
+		// Aux printing for debugging purposes
+		StringBuilder rangeStr = new StringBuilder();
+		for (int i = 0; i < cpuRange.length; i++) {
+			rangeStr.append(cpuRange[i]);
+			rangeStr.append(" ");
+		}
+		return rangeStr.toString();
 	}
 }

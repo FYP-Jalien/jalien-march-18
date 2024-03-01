@@ -78,10 +78,12 @@ public class NUMAExplorer {
 	 * Fills initial structures
 	 *
 	 * @param initMask mask from which allocation starts
-	 * @param wholeNode wether if we run in a whole-node scenario
+	 * @param wholeNode whether if we run in a whole-node scenario
 	 */
 	private void fillNumaTopology(byte[] initMask, boolean wholeNode, boolean updateInit) {
+		//On init mask: 1 means can not be used. 0 means free to be used
 		logger.log(Level.INFO, "Filling initial NUMA structure with mask " + getMaskString(initMask) + " . Are we updating the initial configuration? " + updateInit);
+
 		availablePerNode.clear();
 		initialAvailablePerNode.clear();
 		structurePerNode.clear();
@@ -148,10 +150,11 @@ public class NUMAExplorer {
 											int numaId = Integer.parseInt(matcherNuma.group(1));
 											divisionedNUMA.put(Integer.valueOf(subcounter), Integer.valueOf(numaId));
 											structurePerNode.put(Integer.valueOf(subcounter), cpuRange);
+											//In structure 1 means can be used to pin, 0 is not available
 											initialStructurePerNode.put(Integer.valueOf(subcounter), cpuRange.clone());
 											logger.log(Level.INFO, "Filling initial structure of sub-node counter " + subcounter + " and mask "
 													+ getMaskString(initialStructurePerNode.get(Integer.valueOf(subcounter))));
-											int coreCount = countAvailableCores(cpuRange);
+											int coreCount = countAvailableCores(cpuRange,(byte)1);
 											availablePerNode.put(Integer.valueOf(subcounter), Integer.valueOf(coreCount));
 											initialAvailablePerNode.put(Integer.valueOf(subcounter), Integer.valueOf(coreCount));
 											subcounter = subcounter + 1;
@@ -214,10 +217,10 @@ public class NUMAExplorer {
 		initialAvailablePerNode.put(Integer.valueOf(0), Integer.valueOf(numCPUs));
 	}
 
-	private static int countAvailableCores(byte[] cpuRange) {
+	private static int countAvailableCores(byte[] cpuRange, byte freeCore) {
 		int counter = 0;
 		for (int i = 0; i < cpuRange.length; i++) {
-			if (cpuRange[i] == 1)
+			if (cpuRange[i] == freeCore)
 				counter = counter + 1;
 		}
 		return counter;
@@ -241,8 +244,51 @@ public class NUMAExplorer {
 		return rangeStr;
 	}
 
-	String computeInitialMask(Long reqCPU) {
+	/**
+	 * Computes the mask to isolate the JobRunner instance
+	 *
+	 * @param reqCPU required amount of CPU
+	 * @param wholeNode whether if we are running in whole node
+	 * @return mask to apply using taskset
+	 */
+	String computeInitialMask(Long reqCPU, boolean wholeNode) {
+
 		byte[] finalMask = new byte[numCPUs];
+		finalMask = checkAndComputeMask(reqCPU);
+
+		for (int i = 0; i < finalMask.length; i++) {
+			if (finalMask[i] == 0) {
+				usedCPUs[i] = -1;
+			}
+		}
+		byte[] checkedFinalMask = Arrays.copyOf(finalMask, numCPUs);
+		int getMaskAttempts = 0;
+		while (getMaskAttempts < numCPUs / reqCPU.longValue()) {
+			checkedFinalMask = checkInitialMaskCS(finalMask, reqCPU, ConfigUtils.getLocalHostname());
+			if (Arrays.equals(checkedFinalMask, finalMask) || countAvailableCores(checkedFinalMask, (byte) 0) == checkedFinalMask.length) {
+				break;
+			}
+			getMaskAttempts += 1;
+			if (countAvailableCores(checkedFinalMask, (byte) 3) != checkedFinalMask.length) {
+				finalMask = Arrays.copyOf(checkedFinalMask, checkedFinalMask.length);
+			}
+		}
+		// Case we do not apply pinning
+		if (getMaskAttempts == numCPUs / reqCPU.longValue()) {
+			logger.log(Level.INFO, "Got to the maximum amount of retries for getting pinning. Running unpinned");
+			checkedFinalMask = new byte[numCPUs];
+		}
+
+		byte[] reversedFinalMask = reverseMask(checkedFinalMask);
+
+		//Restart structures with new pinning
+		fillNumaTopology(reversedFinalMask, wholeNode, true);
+
+		return arrayToTaskset(checkedFinalMask);
+	}
+
+	private byte[] checkAndComputeMask(Long reqCPU) {
+		byte[] finalMask;
 		int numaNode = getNumaNode(reqCPU, System.currentTimeMillis(), null, availablePerNode);
 		if (numaNode < 0) {
 			finalMask = getPartitionedMask(reqCPU, 0, structurePerNode, availablePerNode, null, -1, true);
@@ -251,17 +297,54 @@ public class NUMAExplorer {
 			byte[] availableMask = structurePerNode.get(Integer.valueOf(numaNode));
 			finalMask = buildFinalMask(availableMask, reqCPU, 0, availablePerNode, structurePerNode, null, true);
 		}
+		return finalMask;
+	}
 
-		for (int i = 0; i < finalMask.length; i++) {
-			if (finalMask[i] == 0)
-				usedCPUs[i] = -1;
+	byte[] checkInitialMaskCS(byte[] proposedMask, Long reqCPU, String hostname) {
+		boolean needRecompute = false;
+		byte[] machinePinning = new byte[proposedMask.length];
+		int lockRequests = 0;
+		while (lockRequests < numCPUs/reqCPU.longValue() && !needRecompute) {
+			logger.log(Level.INFO, "Issuing request for pinning inspection to cs");
+			byte[] responseMask = commander.q_api.getPinningInspection(proposedMask, false, hostname);
+			if (responseMask == null) {
+				return new byte[proposedMask.length];
+			}
+			if (Arrays.equals(responseMask, proposedMask)) {
+				break;
+			}
+			logger.log(Level.INFO, "Got response mask " + getMaskString(responseMask));
+			if (responseMask[0] == 3) {
+				if (lockRequests < numCPUs/reqCPU.longValue()) {
+					//Lock is taken, we have to wait random time between 0.5-2.5s for asking again
+					long waitInterval = (long) (500 + Math.random() * 2000);
+					logger.log(Level.INFO, "Lock is taken. Going to wait " + waitInterval + " ms");
+					try {
+						Thread.sleep(waitInterval);
+					}
+					catch (InterruptedException e) {
+						logger.log(Level.INFO, "Exception while waiting for release of CPU pinning lock", e);
+					}
+					lockRequests += 1;
+				} else {
+					//We give up to wait for lock, go to the next request
+					 return responseMask;
+				}
+			} else {
+				for (int cpuId = 0; cpuId < proposedMask.length; cpuId++) {
+					if (responseMask[cpuId] == 2) {
+						needRecompute = true;
+						machinePinning[cpuId] = 1;
+					}
+				}
+			}
 		}
-
-		byte[] reversedFinalMask = reverseMask(finalMask);
-
-		fillNumaTopology(reversedFinalMask, JobAgent.wholeNode, true);
-
-		return arrayToTaskset(finalMask);
+		if (needRecompute) {
+			//Restart structures with discovered pinning of other processes
+			fillNumaTopology(machinePinning, JobAgent.wholeNode, true);
+			return checkAndComputeMask(reqCPU);
+		}
+		return proposedMask;
 	}
 
 	static byte[] reverseMask(byte[] mask) {
@@ -285,7 +368,6 @@ public class NUMAExplorer {
 
 		while (rearrangementNeeded) {
 			int numaNode = getNumaNode(reqCPU, queueId, null, availablePerNode);
-
 			// We have not found the space needed in any node. Proceed to partition
 			if (numaNode < 0) {
 				if (rearrangementCount == 0) {
@@ -304,7 +386,7 @@ public class NUMAExplorer {
 			}
 			else {
 				byte[] availableMask = structurePerNode.get(Integer.valueOf(numaNode));
-				finalMask = buildFinalMask(availableMask, reqCPU, jobNumber, availablePerNode, structurePerNode, usedCPUs, false);
+				finalMask = buildFinalMask(availableMask, reqCPU, jobNumber, availablePerNode, structurePerNode, Arrays.copyOf(usedCPUs, usedCPUs.length), false);
 				rearrangementNeeded = false;
 				jobToNuma.put(Integer.valueOf(jobNumber), Integer.valueOf(numaNode));
 			}
@@ -651,6 +733,7 @@ public class NUMAExplorer {
 
 		for (int i = 0; i < numCPUs; i++) {
 			int numaNode = coresPerNode.get(Integer.valueOf(i)).intValue();
+
 			if (initAssignment == true) {
 				if ((availableMask[i] == 0 && numaNode > 0 && structure.get(Integer.valueOf(numaNode))[i] == 1) || (assignmentDone == true && availableMask[i] == 1)) {
 					structurePerNode.get(Integer.valueOf(numaNode))[i] = 0;

@@ -10,7 +10,7 @@ import alien.api.DispatchSSLClient;
 import alien.config.ConfigUtils;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
-
+import alien.shell.commands.JAliEnCOMMander;
 /**
  * @author sweisz
  * @since Mar 25, 2021
@@ -60,6 +60,8 @@ public class JobRunner extends JobAgent {
 
 		CgroupUtils.setupTopCgroups(jrPid);
 
+		boolean alreadyIsol = false;
+
 		while (timestamp < ttlEnd) {
 			synchronized (JobAgent.requestSync) {
 				try {
@@ -67,8 +69,9 @@ public class JobRunner extends JobAgent {
 						logger.log(Level.INFO, "Spawned thread nr " + i);
 						jaThread = new Thread(new JobAgent(), "JobAgent_" + i);
 						jaThread.start();
-						if (cpuIsolation == true)
-							checkAndApplyIsolation(jrPid);
+						if (cpuIsolation == true && alreadyIsol == false) {
+							alreadyIsol = checkAndApplyIsolation(jrPid,alreadyIsol);
+						}
 						monitor.sendParameter("state", "Waiting for JA to get a job");
 						monitor.sendParameter("statenumeric", Long.valueOf(1));
 						i++;
@@ -95,6 +98,7 @@ public class JobRunner extends JobAgent {
 				monitor.sendParameter("remainingttl", Long.valueOf(ttlEnd - timestamp));
 
 				if (JobAgent.retries.get() >= maxRetries) {
+					JAliEnCOMMander.getInstance().q_api.getPinningInspection(new byte[JobAgent.RES_NOCPUS.intValue()], true, ConfigUtils.getLocalHostname());
 					monitor.sendParameter("state", "Last JA cannot get job");
 					monitor.sendParameter("statenumeric", Long.valueOf(2));
 					logger.log(Level.INFO, "JobRunner going to exit from lack of jobs");
