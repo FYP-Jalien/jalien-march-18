@@ -112,7 +112,7 @@ public class TaskQueueUtils {
 		fieldMap.put("error_table", "QUEUE");
 		fieldMap.put("error_field", "error");
 
-		for (final String column : new String[] { "spyurl", "agentuuid", "maxrsize", "cputime", "ncpu", "batchid", "cost", "mem", "si2k", "runtimes", "maxvsize", "cpu" }) {
+		for (final String column : new String[] { "spyurl", "agentuuid", "maxrsize", "cputime", "ncpu", "batchid", "cost", "mem", "si2k", "runtimes", "maxvsize", "cpu", "killreason" }) {
 			fieldMap.put(column + "_table", "QUEUEPROC");
 			fieldMap.put(column + "_field", column);
 		}
@@ -3811,7 +3811,7 @@ public class TaskQueueUtils {
 
 				if (!db.query("UPDATE QUEUEPROC SET maxrsize=null,cputime=null,ncpu=null,batchid=null,cost=null,cpufamily=null,cpu=null,rsize=null,"
 						+ "spyurl=null,runtime=null,mem=null,si2k=null,cpuspeed=null,vsize=null,runtimes=null,procinfotime=null,maxvsize=null,"
-						+ "agentuuid=null,cpuId=null where queueId=?", false, Long.valueOf(queueId))) {
+						+ "agentuuid=null,cpuId=null,killreason=null where queueId=?", false, Long.valueOf(queueId))) {
 					logger.severe("Resubmit: cannot update QUEUEPROC for job: " + queueId);
 				}
 				else {
