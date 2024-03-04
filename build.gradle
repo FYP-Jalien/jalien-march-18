@@ -4,95 +4,110 @@
  * This is a general purpose Gradle build.
  * Learn how to create Gradle builds at https://guides.gradle.org/creating-new-gradle-builds/
  */
+plugins {
+    id "org.sonarqube" version "4.4.1.3373"
+}
+
+sonar {
+    properties {
+        property "sonar.projectKey", "jalien_jalien_78145297-78e8-46b6-8986-f2edbe8f5cce"
+        property "sonar.projectName", "JAliEn"
+        property "sonar.qualitygate.wait", true
+    }
+}
+
 apply plugin: 'java'
 apply plugin: 'eclipse'
 
 repositories {
-	flatDir(dirs: 'lib')
+    flatDir(dirs: 'lib')
+    mavenCentral()
 }
 
 dependencies {
-	compile 'com.datastax:cassandra-driver-core:3.5.0'
-	compile 'guava:guava:19.0'
-	compile 'io.github.olivierlemasle.ca:java-ca-lib:0.0.1-SNAPSHOT'
-	compile 'jline:jline:2.12.1'
-	compile 'joptsimple:jopt-simple:4.8'
-	compile 'org.bouncycastle:bcpkix-jdk15on:163'
-	compile 'org.bouncycastle:bcprov-jdk15on:163'
-	compile 'org.junit:junit-platform-console-standalone:1.7.0-M1'
-	compile 'org.sqlite:sqlite-jdbc:3.9.1-SNAPSHOT'
-	compile 'org.json:json-simple:1.1.1'
-	compile 'org.nfunk.jep:jep:2.4.0'
+	implementation 'com.datastax:cassandra-driver-core:3.5.0'
+	implementation 'guava:guava:19.0'
+	implementation 'io.github.olivierlemasle.ca:java-ca-lib:0.0.1-SNAPSHOT'
+	implementation 'jline:jline:2.12.1'
+	implementation 'joptsimple:jopt-simple:4.8'
+	implementation 'org.bouncycastle:bcpkix-jdk15on:163'
+	implementation 'org.bouncycastle:bcprov-jdk15on:163'
+	implementation 'org.junit:junit-platform-console-standalone:1.7.0-M1'
+	implementation 'org.sqlite:sqlite-jdbc:3.9.1-SNAPSHOT'
+	implementation 'org.json:json-simple:1.1.1'
+	implementation 'org.nfunk.jep:jep:2.4.0'
 
-	compile name: 'apmon'
-	compile name: 'catalina'
-	compile name: 'FarmMonitor'
-	compile name: 'lazyj'
-	compile name: 'servlet-api'
-	compile name: 'websocket-api'
-	compile name: 'tomcat-api'
-	compile name: 'tomcat-coyote'
-	compile name: 'tomcat-jni'
-	compile name: 'tomcat-juli'
-	compile name: 'tomcat-util'
-	compile name: 'tomcat-util-scan'
-	compile name: 'tomcat-websocket'
+	implementation 'apmon:apmon'
+	implementation 'FarmMonitor:FarmMonitor'
+	implementation 'lazyj:lazyj'
+	implementation 'org.apache.tomcat:catalina:9.0.85'
+	implementation 'org.apache.tomcat:servlet-api:9.0.85'
+	implementation 'org.apache.tomcat:websocket-api:9.0.85'
+	implementation 'org.apache.tomcat:tomcat-api:9.0.85'
+	implementation 'org.apache.tomcat:tomcat-coyote:9.0.85'
+	implementation 'org.apache.tomcat:tomcat-jni:9.0.85'
+	implementation 'org.apache.tomcat:tomcat-juli:9.0.85'
+	implementation 'org.apache.tomcat:tomcat-util:9.0.85'
+	implementation 'org.apache.tomcat:tomcat-util-scan:9.0.85'
+    implementation 'org.apache.tomcat:tomcat-websocket:9.0.85'
 }
 
 processResources {
-	from('.') {
-		include 'config/config.properties'
-		include 'config/monitoring.properties'
-	}
+    from('.') {
+        include 'config/config.properties'
+        include 'config/monitoring.properties'
+    }
 
-	from 'trusted_authorities.jks'
+    from 'trusted_authorities.jks'
 }
 
-jar {
-	archiveName 'alien.jar'
+tasks.jar {
+    archiveFileName = 'alien.jar'
 }
 
 
-task users(type: Jar, dependsOn: jar) {
-	archiveName 'alien-users.jar'
-	from sourceSets.main.output
+tasks.register('users', Jar) {
+    dependsOn jar
+    archiveFileName = 'alien-users.jar'
+    from sourceSets.main.output
 
-	FileTree externalLibs = fileTree(dir: 'lib', includes: [
-		'FarmMonitor.jar',
-		'apmon.jar',
-		'bcp*.jar',
-		'catalina.jar',
-		'javax.json-api-*.jar',
-		'jline-*.jar',
-		'jopt-simple-*.jar',
-		'json-simple-*.jar',
-		'lazyj.jar',
-		'servlet-api.jar',
-		'tomcat-*.jar',
-		'ca-api*.jar',
-		'java-ca-lib*.jar',
-		'annotations-api.jar'
-		])
+    FileTree externalLibs = fileTree(dir: 'lib', includes: [
+            'FarmMonitor.jar',
+            'apmon.jar',
+            'bcp*.jar',
+            'catalina.jar',
+            'javax.json-api-*.jar',
+            'jline-*.jar',
+            'jopt-simple-*.jar',
+            'json-simple-*.jar',
+            'lazyj.jar',
+            'servlet-api.jar',
+            'tomcat-*.jar',
+            'ca-api*.jar',
+            'java-ca-lib*.jar',
+            'annotations-api.jar'
+    ])
 
-	externalLibs.each { from zipTree(it) }
+    externalLibs.each { from zipTree(it) }
 
 }
 
-task cs(type: Jar, dependsOn: jar) {
-	archiveName 'alien-cs.jar'
-	from sourceSets.main.output
+tasks.register('cs', Jar) {
+    dependsOn jar
+    archiveFileName = 'alien-cs.jar'
+    from sourceSets.main.output
 
-	FileTree externalLibs = fileTree(dir: 'lib', include: '*.jar')
-	externalLibs.each { from zipTree(it) }
+    FileTree externalLibs = fileTree(dir: 'lib', include: '*.jar')
+    externalLibs.each { from zipTree(it) }
 }
 
-task all {
-	dependsOn jar, users, cs
+tasks.register('all') {
+    dependsOn jar, users, cs
 }
 
 test {
-	useJUnitPlatform()
-	testLogging {
-		events "passed", "skipped", "failed"
-	}
+    useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
 }
