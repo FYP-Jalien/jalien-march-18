@@ -69,7 +69,7 @@ public class GetUptime extends Request implements Cacheable {
 	}
 
 	private static EnumSet<JobStatus> activeJobsSet = EnumSet.range(JobStatus.ASSIGNED, JobStatus.SAVING);
-	private static EnumSet<JobStatus> waitingJobsSet = EnumSet.range(JobStatus.INSERTING, JobStatus.OVER_WAITING);
+	private static EnumSet<JobStatus> waitingJobsSet = EnumSet.range(JobStatus.INSERTING, JobStatus.WAITING);
 
 	@Override
 	public void run() {

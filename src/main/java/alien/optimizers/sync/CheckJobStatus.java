@@ -179,8 +179,6 @@ public class CheckJobStatus extends Optimizer {
 				JobStatus.ERROR_I.getAliEnLevel() + ", " +
 				JobStatus.ERROR_E.getAliEnLevel() + ", " +
 				JobStatus.ERROR_IB.getAliEnLevel() + ", " +
-				JobStatus.ERROR_M.getAliEnLevel() + ", " +
-				JobStatus.ERROR_RE.getAliEnLevel() + ", " +
 				JobStatus.ERROR_S.getAliEnLevel() + ", " +
 				JobStatus.ERROR_SV.getAliEnLevel() + ", " +
 				JobStatus.ERROR_V.getAliEnLevel() + ", " +
@@ -193,7 +191,6 @@ public class CheckJobStatus extends Optimizer {
 				JobStatus.FAULTY.getAliEnLevel() + ", " +
 				JobStatus.INCORRECT.getAliEnLevel() + ", " +
 				JobStatus.EXPIRED.getAliEnLevel() + ", " +
-				JobStatus.FAILED.getAliEnLevel() + ", " +
 				JobStatus.KILLED.getAliEnLevel() +
 				") THEN 1 ELSE NULL END) AS active_subjobs\n" +
 				"     FROM\n" +

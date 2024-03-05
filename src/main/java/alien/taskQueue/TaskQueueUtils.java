@@ -2532,7 +2532,7 @@ public class TaskQueueUtils {
 
 	// status and jdl
 	private static boolean updateJob(final Job j, final JobStatus newStatus) {
-		if (newStatus.smallerThanEquals(j.status()) && (j.status() == JobStatus.ZOMBIE || j.status() == JobStatus.IDLE || j.status() == JobStatus.INTERACTIV) && j.isMaster())
+		if (newStatus.smallerThanEquals(j.status()) && (j.status() == JobStatus.ZOMBIE) && j.isMaster())
 			return false;
 
 		if (j.status() == JobStatus.WAITING && j.agentid > 0)
@@ -2573,7 +2573,7 @@ public class TaskQueueUtils {
 			}
 		}
 
-		if (newStatus == JobStatus.KILLED || newStatus == JobStatus.SAVED || newStatus == JobStatus.SAVED_WARN || newStatus == JobStatus.STAGING)
+		if (newStatus == JobStatus.KILLED || newStatus == JobStatus.SAVED || newStatus == JobStatus.SAVED_WARN)
 			setAction(newStatus);
 
 		// if the state already was the desired one, return <code>true</code>
@@ -2613,7 +2613,7 @@ public class TaskQueueUtils {
 		}
 		else if (newStatus == JobStatus.SAVING)
 			jdltags.put("error", arg);
-		else if ((newStatus == JobStatus.SAVED && arg != null && !"".equals(arg)) || newStatus == JobStatus.ERROR_V || newStatus == JobStatus.STAGING)
+		else if ((newStatus == JobStatus.SAVED && arg != null && !"".equals(arg)) || newStatus == JobStatus.ERROR_V)
 			jdltags.put("jdl", arg);
 		else if (newStatus == JobStatus.DONE || newStatus == JobStatus.DONE_WARN)
 			jdltags.put("finished", time);

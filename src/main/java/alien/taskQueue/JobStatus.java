@@ -29,29 +29,13 @@ public enum JobStatus {
 	 */
 	SPLITTING(15, 2),
 	/**
-	 * Waiting for files to be staged (16)
-	 */
-	TO_STAGE(16, 17),
-	/**
-	 * (17)
-	 */
-	A_STAGED(17, 18),
-	/**
 	 * Split job (18)
 	 */
 	SPLIT(18, 3),
 	/**
-	 * Currently staging (19)
-	 */
-	STAGING(19, 19),
-	/**
 	 * Waiting to be picked up (20)
 	 */
 	WAITING(20, 5),
-	/**
-	 * User ran out of quota (21)
-	 */
-	OVER_WAITING(21, 21),
 	/**
 	 * Assigned to a site (25)
 	 */
@@ -60,14 +44,6 @@ public enum JobStatus {
 	 * Job agent has started the job (40)
 	 */
 	STARTED(40, 7),
-	/**
-	 * Idle, doing what ? (45)
-	 */
-	IDLE(45, 9),
-	/**
-	 * (46)
-	 */
-	INTERACTIV(46, 8),
 	/**
 	 * Currently running on the WN (50)
 	 */
@@ -88,10 +64,6 @@ public enum JobStatus {
 	 * Zombie (600)
 	 */
 	ZOMBIE(600, -15),
-	/**
-	 * Force merge (700)
-	 */
-	FORCEMERGE(700, 14),
 	/**
 	 * Currently merging (701)
 	 */
@@ -120,14 +92,6 @@ public enum JobStatus {
 	 * Error downloading the input files (903)
 	 */
 	ERROR_IB(903, -4),
-	/**
-	 * Error merging (904)
-	 */
-	ERROR_M(904, -5),
-	/**
-	 * Error registering (905)
-	 */
-	ERROR_RE(905, -17),
 	/**
 	 * ERROR_S (906)
 	 */
@@ -176,10 +140,6 @@ public enum JobStatus {
 	 * Job didn't report for too long (1000)
 	 */
 	EXPIRED(1000, -12),
-	/**
-	 * Failed (1001)
-	 */
-	FAILED(1001, -13),
 	/**
 	 * Terminated (1002)
 	 */
@@ -275,16 +235,7 @@ public enum JobStatus {
 		return level >= 900 && level < 1000;
 	}
 
-	/**
-	 * Is this status a n error state: ERROR_*|FAILED
-	 * 
-	 * @return true if any error state
-	 */
-	public boolean isErrorState() {
-		return isERROR_() || this == FAILED;
-	}
-
-	private static final Set<JobStatus> errorneousStates = Collections.unmodifiableSet(EnumSet.range(ERROR_A, FAILED));
+	private static final Set<JobStatus> errorneousStates = Collections.unmodifiableSet(EnumSet.range(ERROR_A, EXPIRED));
 
 	/**
 	 * All error_*, expired and failed states

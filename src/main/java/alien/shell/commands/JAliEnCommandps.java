@@ -69,27 +69,18 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 			put("D", JobStatus.DONE.name());
 			put("DW", JobStatus.DONE_WARN.name());
 			put("W", JobStatus.WAITING.name());
-			put("OW", JobStatus.OVER_WAITING.name());
 			put("I", JobStatus.INSERTING.name());
 			put("S", JobStatus.SPLIT.name());
 			put("SP", JobStatus.SPLITTING.name());
 			put("SV", JobStatus.SAVING.name());
 			put("SVD", JobStatus.SAVED.name());
 			put("ASG", JobStatus.ASSIGNED.name());
-			put("AST", JobStatus.A_STAGED.name());
-			put("FM", JobStatus.FORCEMERGE.name());
-			put("IDL", JobStatus.IDLE.name());
-			put("INT", JobStatus.INTERACTIV.name());
 			put("M", JobStatus.MERGING.name());
 			put("SW", JobStatus.SAVED_WARN.name());
-			put("ST", JobStatus.STAGING.name());
-			put("TST", JobStatus.TO_STAGE.name());
 			put("EA", JobStatus.ERROR_A.name());
 			put("EE", JobStatus.ERROR_E.name());
 			put("EI", JobStatus.ERROR_I.name());
 			put("EIB", JobStatus.ERROR_IB.name());
-			put("EM", JobStatus.ERROR_M.name());
-			put("ERE", JobStatus.ERROR_RE.name());
 			put("ES", JobStatus.ERROR_S.name());
 			put("ESV", JobStatus.ERROR_SV.name());
 			put("EV", JobStatus.ERROR_V.name());
@@ -98,7 +89,6 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 			put("ESP", JobStatus.ERROR_SPLT.name());
 			put("EW", JobStatus.ERROR_W.name());
 			put("EVE", JobStatus.ERROR_VER.name());
-			put("FF", JobStatus.FAILED.name());
 			put("Z", JobStatus.ZOMBIE.name());
 			put("XP", JobStatus.EXPIRED.name());
 			put("EEW", JobStatus.ERROR_EW.name());
@@ -221,8 +211,6 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 					return padLeft(" DW", 3);
 				case WAITING:
 					return ShellColor.jobStateBlue() + padLeft("  W", 3) + ShellColor.reset();
-				case OVER_WAITING:
-					return padLeft(" OW", 3);
 				case INSERTING:
 					return ShellColor.jobStateYellow() + padLeft("  I", 3) + ShellColor.reset();
 				case SPLIT:
@@ -237,22 +225,10 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 					return padLeft("ANY", 3); // shouldn't happen!
 				case ASSIGNED:
 					return padLeft("ASG", 3);
-				case A_STAGED:
-					return padLeft("AST", 3);
-				case FORCEMERGE:
-					return padLeft(" FM", 3);
-				case IDLE:
-					return padLeft("IDL", 3);
-				case INTERACTIV:
-					return padLeft("INT", 3);
 				case MERGING:
 					return padLeft("  M", 3);
 				case SAVED_WARN:
 					return padLeft(" SW", 3);
-				case STAGING:
-					return padLeft(" SG", 3);
-				case TO_STAGE:
-					return padLeft("TST", 3);
 				case ERROR_A:
 					e = " EA";
 					break;
@@ -264,12 +240,6 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 					break;
 				case ERROR_IB:
 					e = "EIB";
-					break;
-				case ERROR_M:
-					e = " EM";
-					break;
-				case ERROR_RE:
-					e = "ERE";
 					break;
 				case ERROR_S:
 					e = " ES";
@@ -294,9 +264,6 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 					break;
 				case ERROR_VER:
 					e = "EVE";
-					break;
-				case FAILED:
-					e = " FF";
 					break;
 				case ZOMBIE:
 					e = "  Z";
@@ -336,8 +303,6 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 				return padLeft(" DW", 3);
 			case WAITING:
 				return padLeft("  W", 3);
-			case OVER_WAITING:
-				return padLeft(" OW", 3);
 			case INSERTING:
 				return padLeft("  I", 3);
 			case SPLIT:
@@ -352,22 +317,10 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 				return padLeft("ANY", 3); // shouldn't happen!
 			case ASSIGNED:
 				return padLeft("ASG", 3);
-			case A_STAGED:
-				return padLeft("AST", 3);
-			case FORCEMERGE:
-				return padLeft(" FM", 3);
-			case IDLE:
-				return padLeft("IDL", 3);
-			case INTERACTIV:
-				return padLeft("INT", 3);
 			case MERGING:
 				return padLeft("  M", 3);
 			case SAVED_WARN:
 				return padLeft(" SW", 3);
-			case STAGING:
-				return padLeft(" ST", 3);
-			case TO_STAGE:
-				return padLeft("TST", 3);
 			case ERROR_A:
 				e = " EA";
 				break;
@@ -379,12 +332,6 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 				break;
 			case ERROR_IB:
 				e = "EIB";
-				break;
-			case ERROR_M:
-				e = " EM";
-				break;
-			case ERROR_RE:
-				e = "ERE";
 				break;
 			case ERROR_S:
 				e = " ES";
@@ -409,9 +356,6 @@ public class JAliEnCommandps extends JAliEnBaseCommand {
 				break;
 			case ERROR_VER:
 				e = "EVE";
-				break;
-			case FAILED:
-				e = " FF";
 				break;
 			case ZOMBIE:
 				e = "  Z";
