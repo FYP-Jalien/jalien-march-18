@@ -932,7 +932,7 @@ public class JobAgent implements Runnable {
 			setStatus(jaStatus.ERROR_START);
 
 			putJobTrace("Error starting JobWrapper: exception running " + launchCommand + " : " + ioe.getMessage());
-			changeJobStatus(JobStatus.ERROR_IB, -1);
+			changeJobStatus(JobStatus.ERROR_A, -1);
 
 			setUsedCores(0);
 
@@ -1148,7 +1148,7 @@ public class JobAgent implements Runnable {
 				}
 				else if (endState.isBlank()) {
 					putJobTrace("ERROR: The JobWrapper was killed before job start");
-					changeJobStatus(JobStatus.ERROR_IB, code); // JobWrapper was killed before payload start
+					changeJobStatus(JobStatus.ERROR_A, code); // JobWrapper was killed before payload start
 				}
 			}
 		}
