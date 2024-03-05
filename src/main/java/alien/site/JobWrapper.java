@@ -356,15 +356,17 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (valExitCode != 0) {
 				logger.log(Level.SEVERE, "Validation failed");
 
-				if (valExitCode < 0)
+				final JobStatus valEndState;
+				if (valExitCode < 0) {
 					putJobTrace("Failed to start validation. Exit code: " + Math.abs(valExitCode));
-				else
+					valEndState = JobStatus.ERROR_VN;
+				}
+				else {
 					putJobTrace("Validation failed. Exit code: " + valExitCode);
-
-				final JobStatus valEndState = !killSigReceived ? JobStatus.ERROR_V : JobStatus.ERROR_VT;
-				final int valUploadExitCode = uploadOutputFiles(valEndState, valExitCode) ? valExitCode : -1;
-
-				return valUploadExitCode;
+					valEndState = !killSigReceived ? JobStatus.ERROR_V : JobStatus.ERROR_VT;
+				}
+				
+				return uploadOutputFiles(valEndState, valExitCode) ? valExitCode : -1;
 			}
 
 			if (!uploadOutputFiles(JobStatus.DONE)) {
