@@ -1791,9 +1791,10 @@ public class JobAgent implements Runnable {
 			}
 
 			// check memory usage (with 20% buffer)
-			if (jobMaxMemoryMB != 0 && RES_VMEM.doubleValue() > jobMaxMemoryMB * 1.2)
+			if (jobMaxMemoryMB != 0 && RES_VMEM.doubleValue() > jobMaxMemoryMB * 1.2) {
 				killreason = 80;
 				error = "Killing the job (using more than " + jobMaxMemoryMB + " MB memory (right now ~" + Math.round(RES_VMEM.doubleValue()) + "MB))";
+			}
 		}
 		catch (final IOException e) {
 			logger.log(Level.WARNING, "Problem with the monitoring objects: " + e.toString());
