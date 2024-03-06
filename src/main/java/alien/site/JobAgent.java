@@ -772,7 +772,7 @@ public class JobAgent implements Runnable {
 		finally {
 			boolean oom = checkOOMDump();
 			endState = getWrapperJobStatus();
-			if (oom && !endState.startsWith("ERROR")) {
+			if (oom && !"DONE".equals(endState) && !endState.startsWith("ERROR")) {
 				killreason = 10;
 				changeJobStatus(JobStatus.ERROR_E, -1);
 				if (p != null)
