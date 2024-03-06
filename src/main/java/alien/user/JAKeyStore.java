@@ -586,6 +586,9 @@ public class JAKeyStore {
 
 			return null;
 		}
+		finally {
+			source.close();
+		}
 	}
 
 	/**
@@ -652,6 +655,14 @@ public class JAKeyStore {
 		}
 		catch (final IOException e) {
 			e.printStackTrace();
+		}
+		finally {
+			try {
+				source.close();
+			}
+			catch (@SuppressWarnings("unused") final IOException e2) {
+				// ignore
+			}
 		}
 
 		return null;
@@ -1101,7 +1112,7 @@ public class JAKeyStore {
 
 		// update in place or completely reload the default user identity ?
 		AuthorizationFactory.checkIdentityReload();
-		
+
 		return certificateCheckCode = 0;
 	}
 }

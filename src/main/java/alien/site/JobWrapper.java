@@ -151,6 +151,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 */
 	private Process payload;
 
+	private final Object lock = new Object();
+
 	private final Thread statusSenderThread = new Thread("JobWrapper.statusSenderThread") {
 		@Override
 		public void run() {
@@ -189,9 +191,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					logger.log(Level.WARNING, "Cannot send status updates to ML", e);
 				}
 
-				synchronized (this) {
+				synchronized (lock) {
 					try {
-						wait(1000 * 60);
+						lock.wait(1000 * 60);
 					}
 					catch (@SuppressWarnings("unused") final InterruptedException e) {
 						return;
@@ -580,13 +582,20 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 	/**
 	 * Records job killed by the system due to oom
+	 * @param usedMemory 
+	 * @param limitMemory 
+	 * @param usedSwap 
+	 * @param limitSwap 
+	 * @param killedProcessCmd 
+	 * @param cgroupId 
 	 *
 	 * @return <code>true</code> if the recording could be done
 	 */
 	protected boolean recordKilling(double usedMemory, double limitMemory, double usedSwap, double limitSwap, String killedProcessCmd, String cgroupId) {
 		logger.log(Level.INFO, "Recording system kill of job " + queueId + " (site: " + ce + " - host: " + hostName + ")");
 		putJobTrace("System might have killed job due to OOM");
-		if (!commander.q_api.recordPreemption(0l, 0l, System.currentTimeMillis(), 0d, 0d, 0d, 0, resubmission, hostName, ce, 0d, 0d, 0d, username, 0, queueId, limitMemory, limitSwap, killedProcessCmd, cgroupId,usedMemory, usedSwap)) {
+		if (!commander.q_api.recordPreemption(0l, 0l, System.currentTimeMillis(), 0d, 0d, 0d, 0, resubmission, hostName, ce, 0d, 0d, 0d, username, 0, queueId, limitMemory, limitSwap, killedProcessCmd,
+				cgroupId, usedMemory, usedSwap)) {
 			logger.log(Level.SEVERE, "System oom kill could not be recorded in the database");
 			return false;
 		}
@@ -628,11 +637,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 								limitMemory = Double.parseDouble(matcher.group(2));
 							else
 								limitMemory = 0;
-						} else if (component.contains("swap")) {
+						}
+						else if (component.contains("swap")) {
 							usedSwap = Double.parseDouble(matcher.group(1));
 							if (Double.parseDouble(matcher.group(2)) != MemoryController.DEFAULT_CGROUP_NOT_CONFIG) {
 								limitSwap = Double.parseDouble(matcher.group(2));
-							} else
+							}
+							else
 								limitSwap = 0;
 						}
 					}
@@ -646,7 +657,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					killedProcessCmd = matcher.group(2);
 				}
 
-				return recordKilling(usedMemory/1024, limitMemory/1024, usedSwap/1024, limitSwap/1024, killedProcessCmd, cgroupId);
+				return recordKilling(usedMemory / 1024, limitMemory / 1024, usedSwap / 1024, limitSwap / 1024, killedProcessCmd, cgroupId);
 			}
 		}
 		else
@@ -1245,8 +1256,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			logger.log(Level.WARNING, "An error occurred when attempting to change current job status: " + e);
 		}
 
-		synchronized (statusSenderThread) {
-			statusSenderThread.notifyAll();
+		synchronized (lock) {
+			lock.notifyAll();
 		}
 
 		return true;
@@ -1318,7 +1329,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		}
 
 		final File cleanupScript = new File(CVMFS.getCleanupScript());
-		
+
 		if (!cleanupScript.exists()) {
 			logger.log(Level.WARNING, "Script for process cleanup not found in: " + cleanupScript.getAbsolutePath());
 			return -1;

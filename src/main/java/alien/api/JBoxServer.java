@@ -228,6 +228,7 @@ public class JBoxServer extends Thread {
 
 				// Get the DOM Builder Factory
 				final DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+				factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
 				// Get the DOM Builder
 				final DocumentBuilder builder = factory.newDocumentBuilder();
 				// Load and Parse the XML document

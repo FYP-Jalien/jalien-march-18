@@ -418,7 +418,7 @@ public class NUMAExplorer {
 			Integer numaNode = divisionedNUMA.get(targetNodeId);
 			fullNUMAMask = initialStructurePerNode.get(targetNodeId).clone();
 			for (Integer subNode : divisionedNUMA.keySet()) {
-				if (divisionedNUMA.get(subNode) == numaNode && subNode != targetNodeId) {
+				if (divisionedNUMA.get(subNode).equals(numaNode) && !targetNodeId.equals(subNode)) {
 					for (int i=0; i < initialStructurePerNode.get(targetNodeId).length; i++)
 						fullNUMAMask[i] += initialStructurePerNode.get(subNode)[i];
 				}
