@@ -798,6 +798,10 @@ public class JobAgent implements Runnable {
 				logger.log(Level.INFO, cmdCheck[i]);
 				if (cmdCheck[i].contains("-cp"))
 					i++;
+				else if (cmdCheck[i].contains("-Xms"))
+					launchCmd.add("-Xms60M");
+				else if (cmdCheck[i].contains("-Xmx"))
+					launchCmd.add("-Xmx60M");
 				else if (cmdCheck[i].contains("alien.site.JobRunner") || cmdCheck[i].contains("alien.site.JobAgent")) {
 					launchCmd.add("-XX:OnOutOfMemoryError=\"echo 'Process %p has run out of memory' > ./" + queueId + ".oom\"");
 					launchCmd.add("-Djobagent.vmid=" + queueId);
