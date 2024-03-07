@@ -21,6 +21,7 @@ import java.util.Hashtable;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.Vector;
@@ -367,7 +368,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					putJobTrace("Validation failed. Exit code: " + valExitCode);
 					valEndState = !killSigReceived ? JobStatus.ERROR_V : JobStatus.ERROR_VT;
 				}
-				
+
 				return uploadOutputFiles(valEndState, valExitCode) ? valExitCode : -1;
 			}
 
@@ -542,9 +543,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				killSigReceived = true;
 				System.err.println("SIGTERM received. Killing payload and proceeding to upload.");
 				putJobTrace("JobWrapper: SIGTERM received. Killing payload and proceeding to upload.");
-				if (payload.isAlive()) {
-					payload.destroyForcibly();
-				}
+				cleanupProcesses(queueId, (int) payload.pid());
 			});
 
 			payload.waitFor(!executionType.contains("validation") ? ttl : 900, TimeUnit.SECONDS);
@@ -582,12 +581,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 	/**
 	 * Records job killed by the system due to oom
-	 * @param usedMemory 
-	 * @param limitMemory 
-	 * @param usedSwap 
-	 * @param limitSwap 
-	 * @param killedProcessCmd 
-	 * @param cgroupId 
+	 * 
+	 * @param usedMemory
+	 * @param limitMemory
+	 * @param usedSwap
+	 * @param limitSwap
+	 * @param killedProcessCmd
+	 * @param cgroupId
 	 *
 	 * @return <code>true</code> if the recording could be done
 	 */
@@ -1318,14 +1318,35 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @return script exit code, or -1 in case of error
 	 */
 	public static int cleanupProcesses(final long queueId, final int pid) {
+		final Optional<ProcessHandle> ohandle = ProcessHandle.of(pid);
 
-		// Attempt cleanup using Java first
-		int cleanupAttempts = 0;
-		while (ProcessHandle.current().descendants().count() > 0 && cleanupAttempts < 10) {
-			ProcessHandle.current().descendants().forEach(descendantProc -> {
-				descendantProc.destroyForcibly();
+		if (ohandle.isPresent()) {
+			logger.log(Level.INFO, "Killing the children processes with TERM and then KILL, at most 30s after TERM");
+			
+			final ProcessHandle handle = ohandle.get();
+
+			handle.descendants().forEach(descendantProc -> {
+				descendantProc.destroy();
 			});
-			cleanupAttempts += 1;
+
+			for (int i = 0; i < 30 && handle.isAlive(); i++) {
+				try {
+					Thread.sleep(1000);
+				}
+				catch (@SuppressWarnings("unused") InterruptedException ie) {
+					// just exit now
+					return -1;
+				}
+			}
+
+			// Attempt cleanup using Java first
+			int cleanupAttempts = 0;
+			while (handle.descendants().count() > 0 && cleanupAttempts < 10) {
+				handle.descendants().forEach(descendantProc -> {
+					descendantProc.destroyForcibly();
+				});
+				cleanupAttempts += 1;
+			}
 		}
 
 		final File cleanupScript = new File(CVMFS.getCleanupScript());
