@@ -338,16 +338,15 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 									if (targetFile == null)
 										targetFile = File.createTempFile("zip-extract", null, IOUtils.getTemporaryDirectory());
 
-									final FileOutputStream fos = new FileOutputStream(targetFile);
+									try (final FileOutputStream fos = new FileOutputStream(targetFile)) {
+										final byte[] buf = new byte[8192];
 
-									final byte[] buf = new byte[8192];
+										int n;
 
-									int n;
+										while ((n = zi.read(buf, 0, buf.length)) > -1)
+											fos.write(buf, 0, n);
+									}
 
-									while ((n = zi.read(buf, 0, buf.length)) > -1)
-										fos.write(buf, 0, n);
-
-									fos.close();
 									zi.closeEntry();
 
 									output = targetFile;

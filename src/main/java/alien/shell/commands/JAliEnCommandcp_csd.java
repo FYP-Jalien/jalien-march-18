@@ -223,16 +223,15 @@ public class JAliEnCommandcp_csd extends JAliEnBaseCommand {
 
 							while ((zipentry = zi.getNextEntry()) != null)
 								if (zipentry.getName().equals(archiveFileName)) {
-									final FileOutputStream fos = new FileOutputStream(file);
+									try (final FileOutputStream fos = new FileOutputStream(file)) {
+										final byte[] buf = new byte[8192];
 
-									final byte[] buf = new byte[8192];
+										int n;
 
-									int n;
+										while ((n = zi.read(buf, 0, buf.length)) > -1)
+											fos.write(buf, 0, n);
+									}
 
-									while ((n = zi.read(buf, 0, buf.length)) > -1)
-										fos.write(buf, 0, n);
-
-									fos.close();
 									zi.closeEntry();
 
 									output = file;

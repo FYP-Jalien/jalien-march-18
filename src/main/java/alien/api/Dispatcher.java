@@ -5,6 +5,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import alien.api.taskQueue.GetMatchJob;
+import alien.api.taskQueue.InspectPinning;
 import alien.api.taskQueue.JobKilledException;
 import alien.api.taskQueue.PutJobLog;
 import alien.api.taskQueue.RecordPreemption;
@@ -99,6 +100,10 @@ public class Dispatcher {
 				if (passesFirewallRules(r)) {
 					try {
 						r.run();
+						final AliEnPrincipal requester = r.getEffectiveRequester();
+						if (requester.isJobAgent()) {
+							TaskQueueUtils.notifyJRAlive(r.getVMUUID());
+						}
 					}
 					catch (final Throwable t) {
 						throw new ServerException(t.getMessage(), t);
@@ -182,6 +187,9 @@ public class Dispatcher {
 				return true;
 
 			if (r instanceof RecordPreemption)
+				return true;
+
+			if (r instanceof InspectPinning)
 				return true;
 
 			// TODO : add above all commands that a JobAgent should run (setting job status, uploading traces)

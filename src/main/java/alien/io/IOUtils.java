@@ -304,16 +304,15 @@ public class IOUtils {
 								else
 									target = File.createTempFile(guid.guid + "#" + archiveFileName + ".", null, getTemporaryDirectory());
 
-								final FileOutputStream fos = new FileOutputStream(target);
+								try (final FileOutputStream fos = new FileOutputStream(target)) {
+									final byte[] buf = new byte[8192];
 
-								final byte[] buf = new byte[8192];
+									int n;
 
-								int n;
-
-								while ((n = zi.read(buf, 0, buf.length)) > -1)
-									fos.write(buf, 0, n);
-
-								fos.close();
+									while ((n = zi.read(buf, 0, buf.length)) > -1)
+										fos.write(buf, 0, n);
+								}
+								
 								zi.closeEntry();
 								break;
 							}

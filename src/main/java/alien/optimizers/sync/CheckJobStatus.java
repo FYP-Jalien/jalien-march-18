@@ -173,7 +173,29 @@ public class CheckJobStatus extends Optimizer {
 		return "SELECT masterjobid FROM\n" +
 				"    (SELECT\n" +
 				"         qmaster.queueId AS masterjobid,\n" +
-				"         count(NULLIF(NULLIF(qsubjob.statusId," + JobStatus.DONE.getAliEnLevel() + "), " + JobStatus.DONE_WARN.getAliEnLevel() + ")) AS active_subjobs\n" +
+				"         count(CASE WHEN qsubjob.statusId NOT IN (" + JobStatus.DONE.getAliEnLevel() + ", " +
+				JobStatus.DONE_WARN.getAliEnLevel() + ", " +
+				JobStatus.ERROR_A.getAliEnLevel() + ", " +
+				JobStatus.ERROR_I.getAliEnLevel() + ", " +
+				JobStatus.ERROR_E.getAliEnLevel() + ", " +
+				JobStatus.ERROR_IB.getAliEnLevel() + ", " +
+				JobStatus.ERROR_M.getAliEnLevel() + ", " +
+				JobStatus.ERROR_RE.getAliEnLevel() + ", " +
+				JobStatus.ERROR_S.getAliEnLevel() + ", " +
+				JobStatus.ERROR_SV.getAliEnLevel() + ", " +
+				JobStatus.ERROR_V.getAliEnLevel() + ", " +
+				JobStatus.ERROR_VN.getAliEnLevel() + ", " +
+				JobStatus.ERROR_VT.getAliEnLevel() + ", " +
+				JobStatus.ERROR_EW.getAliEnLevel() + ", " +
+				JobStatus.ERROR_W.getAliEnLevel() + ", " +
+				JobStatus.ERROR_SPLT.getAliEnLevel() + ", " +
+				JobStatus.ERROR_VER.getAliEnLevel() + ", " +
+				JobStatus.FAULTY.getAliEnLevel() + ", " +
+				JobStatus.INCORRECT.getAliEnLevel() + ", " +
+				JobStatus.EXPIRED.getAliEnLevel() + ", " +
+				JobStatus.FAILED.getAliEnLevel() + ", " +
+				JobStatus.KILLED.getAliEnLevel() +
+				") THEN 1 ELSE NULL END) AS active_subjobs\n" +
 				"     FROM\n" +
 				"         QUEUE qmaster JOIN QUEUE qsubjob ON qsubjob.split=qmaster.queueId\n" +
 				"     WHERE\n" +
@@ -181,6 +203,7 @@ public class CheckJobStatus extends Optimizer {
 				"     GROUP BY qmaster.queueId) x\n" +
 				"WHERE active_subjobs=0;";
 	}
+
 
 	private static String getQueryToFindMasterjobsInFinalState() {
 		String runningStates = JobStatus.INSERTING.getAliEnLevel() + ","

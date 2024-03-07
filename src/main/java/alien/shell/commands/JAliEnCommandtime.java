@@ -19,13 +19,19 @@ public class JAliEnCommandtime extends JAliEnBaseCommand {
 
 		final ArrayList<String> args = new ArrayList<>();
 		args.addAll(alArguments);
-		int times = 0;
+		int times;
 		try {
 			times = Integer.parseInt(alArguments.get(0));
 			args.remove(alArguments.get(0));
 		}
 		catch (@SuppressWarnings("unused") final NumberFormatException e) {
 			printHelp();
+			return;
+		}
+		
+		if (times<=0) {
+			printHelp();
+			return;
 		}
 
 		final StringBuilder command = new StringBuilder(alArguments.get(1));

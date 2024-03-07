@@ -122,8 +122,7 @@ public class JobAgent implements Runnable {
 	private long workdirMaxSizeMB;
 	protected long jobMaxMemoryMB;
 	private MonitoredJob mj;
-	private Double prevCpuTime;
-	private long prevTime = 0;
+	private Double prevCpuTime = ZERO;
 	protected int cpuCores = 1;
 	private long ttl;
 	private String endState = "";
@@ -139,11 +138,11 @@ public class JobAgent implements Runnable {
 	private String jarName;
 	private int childPID;
 	private long lastHeartbeat = 0;
-	private Double lastCpuTime = ZERO;
 	private int lowCpuUsageCounter = 0;
 	private long jobStartupTime;
 	protected final Containerizer containerizer = ContainerizerFactory.getContainerizer();
 	private boolean checkCoreUsingJava = true;
+	private int killreason = 0;
 
 	private enum jaStatus {
 		/**
@@ -243,7 +242,7 @@ public class JobAgent implements Runnable {
 	private String RES_RESOURCEUSAGE = "";
 	private Long RES_RUNTIME = Long.valueOf(0);
 	private String RES_FRUNTIME = "";
-	private Integer RES_NOCPUS = Integer.valueOf(1);
+	protected static Integer RES_NOCPUS = Integer.valueOf(1);
 	private String RES_CPUMHZ = "";
 	private String RES_CPUFAMILY = "";
 	private String RES_BATCH_INFO = "";
@@ -660,9 +659,6 @@ public class JobAgent implements Runnable {
 				requestSync.notifyAll();
 			}
 
-			// TODO: commander.setUser(username);
-			// commander.setSite(site);
-
 			logger.log(Level.INFO, jdl.getExecutable());
 			logger.log(Level.INFO, username);
 			logger.log(Level.INFO, Long.toString(queueId));
@@ -776,7 +772,8 @@ public class JobAgent implements Runnable {
 		finally {
 			boolean oom = checkOOMDump();
 			endState = getWrapperJobStatus();
-			if (oom && !endState.startsWith("ERROR")) {
+			if (oom && !"DONE".equals(endState) && !endState.startsWith("ERROR")) {
+				killreason = 10;
 				changeJobStatus(JobStatus.ERROR_E, -1);
 				if (p != null)
 					killGracefully(p);
@@ -802,9 +799,9 @@ public class JobAgent implements Runnable {
 				if (cmdCheck[i].contains("-cp"))
 					i++;
 				else if (cmdCheck[i].contains("-Xms"))
-					launchCmd.add("-Xms50M");
+					launchCmd.add("-Xms60M");
 				else if (cmdCheck[i].contains("-Xmx"))
-					launchCmd.add("-Xmx50M");
+					launchCmd.add("-Xmx60M");
 				else if (cmdCheck[i].contains("alien.site.JobRunner") || cmdCheck[i].contains("alien.site.JobAgent")) {
 					launchCmd.add("-XX:OnOutOfMemoryError=\"echo 'Process %p has run out of memory' > ./" + queueId + ".oom\"");
 					launchCmd.add("-Djobagent.vmid=" + queueId);
@@ -935,7 +932,7 @@ public class JobAgent implements Runnable {
 			setStatus(jaStatus.ERROR_START);
 
 			putJobTrace("Error starting JobWrapper: exception running " + launchCommand + " : " + ioe.getMessage());
-			changeJobStatus(JobStatus.ERROR_IB, -1);
+			changeJobStatus(JobStatus.ERROR_A, -1);
 
 			setUsedCores(0);
 
@@ -1005,6 +1002,7 @@ public class JobAgent implements Runnable {
 				logger.log(Level.SEVERE, "Timeout has occurred. Killing job!");
 				putJobTrace("Killing the job (it was running for longer than its TTL)");
 				killGracefully(p);
+				killreason = 20;
 			}
 		};
 
@@ -1150,7 +1148,7 @@ public class JobAgent implements Runnable {
 				}
 				else if (endState.isBlank()) {
 					putJobTrace("ERROR: The JobWrapper was killed before job start");
-					changeJobStatus(JobStatus.ERROR_IB, code); // JobWrapper was killed before payload start
+					changeJobStatus(JobStatus.ERROR_A, code); // JobWrapper was killed before payload start
 				}
 			}
 		}
@@ -1382,26 +1380,29 @@ public class JobAgent implements Runnable {
 	/**
 	 * Checks if the workload is already constrained to run in certain cores. If not in whole-node scenario, CPU cores are selected and workload is pinned.
 	 *
+	 * @param alreadyIsol Is the JR already isolated
 	 * @param jobRunnerPid Process ID of the running JobRunner
 	 */
-	public void checkAndApplyIsolation(int jobRunnerPid) {
+	public boolean checkAndApplyIsolation(int jobRunnerPid, boolean alreadyIsol) {
+		boolean tmpIsol = alreadyIsol;
 		synchronized (cpuSync) {
 			byte[] hostMask = getHostMask();
-			boolean alreadyIsol = false;
 			for (int i = 0; i < RES_NOCPUS.intValue(); i++) {
 				if (hostMask[i] != 0) {
-					alreadyIsol = true;
+					tmpIsol = true;
 					break;
 				}
 			}
 
-			if (wholeNode == false && alreadyIsol == false) {
+			if (wholeNode == false && tmpIsol == false && (!CgroupUtils.haveCgroupsv2() ||  (CgroupUtils.haveCgroupsv2() && !CgroupUtils.hasController(CgroupUtils.getCurrentCgroup(jobRunnerPid),"cpu")))) {
 				logger.log(Level.INFO, "Applying isolation to the whole JobRunner CPU allocation - Allocation of " + RUNNING_CPU + " cores");
-				String initMask = numaExplorer.computeInitialMask(RUNNING_CPU);
+				String initMask = numaExplorer.computeInitialMask(RUNNING_CPU, wholeNode);
 				NUMAExplorer.applyTaskset(initMask, jobRunnerPid);
 				logger.log(Level.INFO, "JobRunner pinned to mask " + initMask);
+				tmpIsol = true;
 			}
 		}
+		return tmpIsol;
 	}
 
 	private boolean checkOOMDump() {
@@ -1568,6 +1569,7 @@ public class JobAgent implements Runnable {
 			extrafields.put("batchid", RES_BATCH_INFO); // TODO - send from sendBatchInfo();
 			extrafields.put("CE", ce);
 			extrafields.put("node", hostName);
+			extrafields.put("killreason", killreason);
 
 			if (!TaskQueueApiUtils.setJobStatus(queueId, resubmission, null, extrafields)) {
 				jobKilled = true;
@@ -1695,25 +1697,31 @@ public class JobAgent implements Runnable {
 	}
 
 	protected String checkProcessResources() { // checks and maintains sandbox
-		if (jobKilled)
+		if (jobKilled) {
+			killreason = 30;
 			return "Job was killed";
+		}
 
 		if (jobOOMPreempted) {
+			killreason = 40;
 			return "Job was preempted due to memory overconsumption";
 		}
 
-
-		lowCpuUsageCounter = (RES_CPUTIME - lastCpuTime) < ((CHECK_RESOURCES_INTERVAL / 1000.0 / 10.0) * Double.valueOf(cpuCores)) ? lowCpuUsageCounter += 1 : 0;
-		if (lowCpuUsageCounter > ((900 * 1000) / CHECK_RESOURCES_INTERVAL) && "RUNNING".equals(getWrapperJobStatus())) // 900s
-			return "CPU time consumed by payload has been near zero for an extended duration. Aborting";
-		lastCpuTime = RES_CPUTIME;
+		lowCpuUsageCounter = (RES_CPUTIME - prevCpuTime) < ((CHECK_RESOURCES_INTERVAL / 1000.0 / 20.0) * Double.valueOf(cpuCores)) ? lowCpuUsageCounter += 1 : 0;
+		if (lowCpuUsageCounter > ((15 * 60 * 1000) / CHECK_RESOURCES_INTERVAL) && "RUNNING".equals(getWrapperJobStatus())) {
+			killreason = 50;
+			return "CPU time consumed by the payload has been near zero for the last 15 minutes. Aborting";
+		}
+		prevCpuTime = RES_CPUTIME;
 
 		// Also check for core directories, and abort if found to avoid filling up disk space
 		if (!env.getOrDefault("SKIP_CORECHECK", "").toLowerCase().contains("true")) {
 			try {
 				final String coreDir = checkForCoreDirectories(checkCoreUsingJava);
-				if (coreDir != null)
+				if (coreDir != null) {
+					killreason = 60;
 					return "Core directory detected: " + coreDir + ". Aborting!";
+				}
 			}
 			catch (final Exception e1) {
 				logger.log(Level.WARNING, "Exception while checking for core directories: ", e1);
@@ -1777,30 +1785,16 @@ public class JobAgent implements Runnable {
 						Long.valueOf((RES_RUNTIME.longValue() - (RES_RUNTIME.longValue() / 3600) * 3600) % 60));
 
 			// check disk usage
-			if (workdirMaxSizeMB != 0 && RES_WORKDIR_SIZE.doubleValue() > workdirMaxSizeMB)
+			if (workdirMaxSizeMB != 0 && RES_WORKDIR_SIZE.doubleValue() > workdirMaxSizeMB) {
+				killreason = 70;
 				error = "Killing the job (using more than " + workdirMaxSizeMB + "MB of diskspace (right now we were using " + RES_WORKDIR_SIZE + "))";
+			}
 
 			// check memory usage (with 20% buffer)
-			if (jobMaxMemoryMB != 0 && RES_VMEM.doubleValue() > jobMaxMemoryMB * 1.2)
+			if (jobMaxMemoryMB != 0 && RES_VMEM.doubleValue() > jobMaxMemoryMB * 1.2) {
+				killreason = 80;
 				error = "Killing the job (using more than " + jobMaxMemoryMB + " MB memory (right now ~" + Math.round(RES_VMEM.doubleValue()) + "MB))";
-
-			// cpu
-			final long time = System.currentTimeMillis();
-
-			if (prevTime != 0 && prevTime + (20 * 60 * 1000) < time && RES_CPUTIME.equals(prevCpuTime))
-				error = "Killing the job (due to zero CPU consumption in the last 20 minutes!)";
-			else {
-				prevCpuTime = RES_CPUTIME;
-				prevTime = time;
 			}
-			/*
-			 * if (cpuIsolation == false && mj.isOverConsuming()) {
-			 * cpuIsolation = true;
-			 * logger.log(Level.SEVERE, "CPU resources overconsumption detected in job " + queueId + ". Going to constrain job to allocated cores.");
-			 * constrainJobCPU();
-			 * }
-			 */
-
 		}
 		catch (final IOException e) {
 			logger.log(Level.WARNING, "Problem with the monitoring objects: " + e.toString());

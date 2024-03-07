@@ -127,17 +127,12 @@ public class JSh {
 					color = false;
 					boombox = new BusyBox(addr, port, password);
 
-					if (boombox != null) {
-						final StringTokenizer st = new StringTokenizer(joinSecondArgs(args), ",");
+					final StringTokenizer st = new StringTokenizer(joinSecondArgs(args), ",");
 
-						while (st.hasMoreTokens())
-							boombox.callJBox(st.nextToken().trim());
+					while (st.hasMoreTokens())
+						boombox.callJBox(st.nextToken().trim());
 
-						System.exit(boombox.wasLastCommandSuccessful() ? 0 : 1);
-					}
-					else
-						printErrConnJBox();
-
+					System.exit(boombox.wasLastCommandSuccessful() ? 0 : 1);
 				}
 				else
 					boombox = new BusyBox(addr, port, password, user, true);

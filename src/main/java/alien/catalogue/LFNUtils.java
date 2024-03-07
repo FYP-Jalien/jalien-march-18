@@ -324,8 +324,8 @@ public class LFNUtils {
 
 		final LFN tLFN = getLFN(newpath, true);
 
-		if (tLFN.exists || !tLFN.getParentDir().exists || !AuthorizationChecker.canWrite(tLFN.getParentDir(), user)) {
-			logger.log(Level.WARNING, "Not possible to move to [" + tLFN.getCanonicalName() + "]");
+		if (tLFN == null || tLFN.exists || !tLFN.getParentDir().exists || !AuthorizationChecker.canWrite(tLFN.getParentDir(), user)) {
+			logger.log(Level.WARNING, "Not possible to move to [" + (tLFN != null ? tLFN.getCanonicalName() : newpath) + "]");
 			return null;
 		}
 
@@ -944,6 +944,9 @@ public class LFNUtils {
 			return null;
 
 		final LFN lfn = getLFN(collectionName, true);
+
+		if (lfn == null)
+			return null;
 
 		if (lfn.exists) {
 			if (lfn.isCollection() && AuthorizationChecker.canWrite(lfn, owner))

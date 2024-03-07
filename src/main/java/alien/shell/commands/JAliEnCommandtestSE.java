@@ -187,7 +187,7 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 
 		if ("https".equals(url.getProtocol())) {
 			try {
-				final SSLContext sc = SSLContext.getInstance("SSL");
+				final SSLContext sc = SSLContext.getInstance("TLSv1.2");
 				sc.init(null, JAKeyStore.trusts, new java.security.SecureRandom());
 
 				((HttpsURLConnection) conn).setSSLSocketFactory(sc.getSocketFactory());

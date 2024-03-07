@@ -884,9 +884,13 @@ public final class GUIDUtils {
 			final List<LFN> lfns = LFNUtils.getLFNsFromUUIDs(Set.of(guid));
 
 			for (final LFN lfn : lfns) {
-				final String guidMD5 = GUIDUtils.getGUID(lfn).getMD5();
-				if (guidMD5 != null && guidMD5.length() > 0)
-					GUIDUtils.checkMD5(lfn);
+				final GUID g = GUIDUtils.getGUID(lfn);
+
+				if (g != null) {
+					final String guidMD5 = g.getMD5();
+					if (guidMD5 != null && guidMD5.length() > 0)
+						GUIDUtils.checkMD5(lfn);
+				}
 			}
 		}
 

@@ -17,6 +17,10 @@ import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
 import lazyj.DBFunctions;
 
+/**
+ * @author Marta
+ * @since Feb 2024
+ */
 public class MemoryRecorder extends Optimizer {
 
 	/**
@@ -24,7 +28,7 @@ public class MemoryRecorder extends Optimizer {
 	 */
 	static final Logger logger = ConfigUtils.getLogger(LTables.class.getCanonicalName());
 
-	private final String memoryReporterUrl = "http://pcalimonitor4.cern.ch:8080/agent/memoryreporter/";
+	private final String memoryReporterUrl = "http://pcalimonitor4.cern.ch:8080/memoryreporter/";
 
 	private final int SLEEP_PERIOD = 600 * 1000;
 	private final long updateMaxInterval = 6 * 60 * 60 * 1000; // 6 hours
@@ -48,7 +52,7 @@ public class MemoryRecorder extends Optimizer {
 				if (updated) {
 					int ind = 0;
 					long ts = System.currentTimeMillis() - updateMaxInterval;
-					String q = "select queueId, resubmissionCounter,statusId,preemptionTs,systemKillTs from oom_preemptions where MLSync = 0 and (preemptionTs>" + ts + " or systemKillTs>" + ts + ")";
+					String q = "select queueId, resubmissionCounter,statusId,preemptionTs,systemKillTs from oom_preemptions where MLSync = 0 and (preemptionTs>" + ts + " or systemKillTs>" + ts + ") and statusId is not null";
 					if (!db.query(q)) {
 						logger.log(Level.WARNING, "Error getting data from oom_preemptions");
 					}
@@ -64,16 +68,19 @@ public class MemoryRecorder extends Optimizer {
 							if (preemptionTs > 0) {
 								if (systemKillTs > 0) {
 									lastRecordTs = Math.max(preemptionTs, systemKillTs);
-								} else {
+								}
+								else {
 									lastRecordTs = preemptionTs;
 								}
-							} else {
+							}
+							else {
 								if (systemKillTs > 0) {
 									lastRecordTs = systemKillTs;
 								}
 							}
 							if (queueId > 0l && statusId != 0 && lastRecordTs > 0) {
-								logger.log(Level.FINE, "Recording last pss,swappss for queueId " + queueId + " and resubmissionCOunt " + resubmissionCounter + " and statusId=" + statusId + " at time " + lastRecordTs);
+								logger.log(Level.FINE, "Recording last pss,swappss for queueId " + queueId + " and resubmissionCOunt " + resubmissionCounter + " and statusId=" + statusId + " at time "
+										+ lastRecordTs);
 								JSONObject lastMemoryReports = getLastMemoryReport(queueId, lastRecordTs);
 
 								Double pss = Double.valueOf(0d), swappss = Double.valueOf(0d);
@@ -87,14 +94,16 @@ public class MemoryRecorder extends Optimizer {
 											swappss = (Double) lastMemoryReports.get(limit_key);
 										}
 									}
-
-									String w = "update oom_preemptions set lastMLPss=" + (pss.doubleValue() / 1024) + ", lastMLSwapPss=" + (swappss.doubleValue() / 1024) + ", MLSync=1 where queueId="
-											+ queueId + " and resubmissionCounter=" + resubmissionCounter + " and statusId is not null";
-									if (!db1.query(w)) {
-										logger.log(Level.WARNING, "Error updating last memory reports from ML in oom_preemptions");
-									}
+								}
+								String w = "update oom_preemptions set lastMLPss=" + (pss.doubleValue() / 1024) + ", lastMLSwapPss=" + (swappss.doubleValue() / 1024) + ", MLSync=1 where queueId="
+										+ queueId + " and resubmissionCounter=" + resubmissionCounter + " and statusId is not null";
+								if (!db1.query(w)) {
+									logger.log(Level.WARNING, "Error updating last memory reports from ML in oom_preemptions");
 								}
 							}
+
+							// don't let other instances start in parallel with this one if the loop takes longer than 10min
+							DBSyncUtils.setLastActive(MemoryRecorder.class.getCanonicalName());
 						}
 						String log = "ML Sync " + ind + " jobs";
 						DBSyncUtils.registerLog(MemoryRecorder.class.getCanonicalName(), log);
@@ -122,7 +131,7 @@ public class MemoryRecorder extends Optimizer {
 		return null;
 	}
 
-	protected static JSONObject makeRequest(URL url, long queueId, Logger logg) {
+	private static JSONObject makeRequest(URL url, long queueId, Logger logg) {
 		try {
 			JSONParser jsonParser = new JSONParser();
 			logg.log(Level.FINE, "Making HTTP call to " + url + " from " + queueId);

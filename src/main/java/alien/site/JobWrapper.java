@@ -21,6 +21,7 @@ import java.util.Hashtable;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.StringTokenizer;
 import java.util.Vector;
@@ -151,6 +152,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 */
 	private Process payload;
 
+	private final Object lock = new Object();
+
 	private final Thread statusSenderThread = new Thread("JobWrapper.statusSenderThread") {
 		@Override
 		public void run() {
@@ -189,9 +192,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					logger.log(Level.WARNING, "Cannot send status updates to ML", e);
 				}
 
-				synchronized (this) {
+				synchronized (lock) {
 					try {
-						wait(1000 * 60);
+						lock.wait(1000 * 60);
 					}
 					catch (@SuppressWarnings("unused") final InterruptedException e) {
 						return;
@@ -356,15 +359,17 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			if (valExitCode != 0) {
 				logger.log(Level.SEVERE, "Validation failed");
 
-				if (valExitCode < 0)
+				final JobStatus valEndState;
+				if (valExitCode < 0) {
 					putJobTrace("Failed to start validation. Exit code: " + Math.abs(valExitCode));
-				else
+					valEndState = JobStatus.ERROR_VN;
+				}
+				else {
 					putJobTrace("Validation failed. Exit code: " + valExitCode);
+					valEndState = !killSigReceived ? JobStatus.ERROR_V : JobStatus.ERROR_VT;
+				}
 
-				final JobStatus valEndState = !killSigReceived ? JobStatus.ERROR_V : JobStatus.ERROR_VT;
-				final int valUploadExitCode = uploadOutputFiles(valEndState, valExitCode) ? valExitCode : -1;
-
-				return valUploadExitCode;
+				return uploadOutputFiles(valEndState, valExitCode) ? valExitCode : -1;
 			}
 
 			if (!uploadOutputFiles(JobStatus.DONE)) {
@@ -468,7 +473,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (!metavars.containsKey("DISABLE_NESTED_CONTAINERS") && appt.isSupported()) {
 			logger.log(Level.INFO, "Using nested containers");
 			putJobTrace("Using nested containers");
-			cmd = appt.containerize(String.join(" ", cmd) + " ; export exitCode=$? ; echo $exitCode > " + tmpDir + "/.exitFile ; exit $exitCode", false);
+			cmd = appt.containerize(String.join(" ", cmd), false);
 		}
 
 		logger.log(Level.INFO, "Executing: " + cmd + ", arguments is " + arguments + " pid: " + pid);
@@ -516,7 +521,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 		try {
 			payload = pBuilder.start();
-
 		}
 		catch (final IOException ioe) {
 			logger.log(Level.INFO, "Exception running " + cmd + " : " + ioe.getMessage());
@@ -539,9 +543,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				killSigReceived = true;
 				System.err.println("SIGTERM received. Killing payload and proceeding to upload.");
 				putJobTrace("JobWrapper: SIGTERM received. Killing payload and proceeding to upload.");
-				if (payload.isAlive()) {
-					payload.destroyForcibly();
-				}
+				cleanupProcesses(queueId, (int) payload.pid());
 			});
 
 			payload.waitFor(!executionType.contains("validation") ? ttl : 900, TimeUnit.SECONDS);
@@ -574,24 +576,26 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				// Ignore
 			}
 		}
-
-		try {
-			return Integer.parseInt(Files.readString(Paths.get(tmpDir + "/.exitFile")).trim());
-		}
-		catch (final Exception ee) {
-			return payload.exitValue();
-		}
+		return payload.exitValue();
 	}
 
 	/**
 	 * Records job killed by the system due to oom
+	 * 
+	 * @param usedMemory
+	 * @param limitMemory
+	 * @param usedSwap
+	 * @param limitSwap
+	 * @param killedProcessCmd
+	 * @param cgroupId
 	 *
 	 * @return <code>true</code> if the recording could be done
 	 */
 	protected boolean recordKilling(double usedMemory, double limitMemory, double usedSwap, double limitSwap, String killedProcessCmd, String cgroupId) {
 		logger.log(Level.INFO, "Recording system kill of job " + queueId + " (site: " + ce + " - host: " + hostName + ")");
 		putJobTrace("System might have killed job due to OOM");
-		if (!commander.q_api.recordPreemption(0l, 0l, System.currentTimeMillis(), 0d, 0d, 0d, 0, resubmission, hostName, ce, 0d, 0d, 0d, username, 0, queueId, limitMemory, limitSwap, killedProcessCmd, cgroupId,usedMemory, usedSwap)) {
+		if (!commander.q_api.recordPreemption(0l, 0l, System.currentTimeMillis(), 0d, 0d, 0d, 0, resubmission, hostName, ce, 0d, 0d, 0d, username, 0, queueId, limitMemory, limitSwap, killedProcessCmd,
+				cgroupId, usedMemory, usedSwap)) {
 			logger.log(Level.SEVERE, "System oom kill could not be recorded in the database");
 			return false;
 		}
@@ -633,11 +637,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 								limitMemory = Double.parseDouble(matcher.group(2));
 							else
 								limitMemory = 0;
-						} else if (component.contains("swap")) {
+						}
+						else if (component.contains("swap")) {
 							usedSwap = Double.parseDouble(matcher.group(1));
 							if (Double.parseDouble(matcher.group(2)) != MemoryController.DEFAULT_CGROUP_NOT_CONFIG) {
 								limitSwap = Double.parseDouble(matcher.group(2));
-							} else
+							}
+							else
 								limitSwap = 0;
 						}
 					}
@@ -651,7 +657,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					killedProcessCmd = matcher.group(2);
 				}
 
-				return recordKilling(usedMemory/1024, limitMemory/1024, usedSwap/1024, limitSwap/1024, killedProcessCmd, cgroupId);
+				return recordKilling(usedMemory / 1024, limitMemory / 1024, usedSwap / 1024, limitSwap / 1024, killedProcessCmd, cgroupId);
 			}
 		}
 		else
@@ -1250,8 +1256,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			logger.log(Level.WARNING, "An error occurred when attempting to change current job status: " + e);
 		}
 
-		synchronized (statusSenderThread) {
-			statusSenderThread.notifyAll();
+		synchronized (lock) {
+			lock.notifyAll();
 		}
 
 		return true;
@@ -1312,6 +1318,37 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 * @return script exit code, or -1 in case of error
 	 */
 	public static int cleanupProcesses(final long queueId, final int pid) {
+		final Optional<ProcessHandle> ohandle = ProcessHandle.of(pid);
+
+		if (ohandle.isPresent()) {
+			logger.log(Level.INFO, "Killing the children processes with TERM and then KILL, at most 30s after TERM");
+			
+			final ProcessHandle handle = ohandle.get();
+
+			handle.descendants().forEach(descendantProc -> {
+				descendantProc.destroy();
+			});
+
+			for (int i = 0; i < 30 && handle.isAlive(); i++) {
+				try {
+					Thread.sleep(1000);
+				}
+				catch (@SuppressWarnings("unused") InterruptedException ie) {
+					// just exit now
+					return -1;
+				}
+			}
+
+			// Attempt cleanup using Java first
+			int cleanupAttempts = 0;
+			while (handle.descendants().count() > 0 && cleanupAttempts < 10) {
+				handle.descendants().forEach(descendantProc -> {
+					descendantProc.destroyForcibly();
+				});
+				cleanupAttempts += 1;
+			}
+		}
+
 		final File cleanupScript = new File(CVMFS.getCleanupScript());
 
 		if (!cleanupScript.exists()) {
@@ -1325,7 +1362,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			final Process process = pb.start();
 
-			process.waitFor(30, TimeUnit.SECONDS);
+			process.waitFor(60, TimeUnit.SECONDS);
 			if (process.isAlive())
 				process.destroyForcibly();
 
