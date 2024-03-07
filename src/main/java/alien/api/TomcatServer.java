@@ -94,7 +94,7 @@ public class TomcatServer {
 
 		// Set security constraints in order to use AlienUserPrincipal later
 		final SecurityCollection securityCollection = new SecurityCollection();
-		securityCollection.addPattern("/*");
+		securityCollection.addPattern("/websocket/*");
 		final SecurityConstraint securityConstraint = new SecurityConstraint();
 		securityConstraint.addCollection(securityCollection);
 		securityConstraint.setAuthConstraint(true);
@@ -219,7 +219,7 @@ public class TomcatServer {
 			logger.log(Level.INFO, "Creating the initial Tomcat SSL host configuration");
 			hostconfig = new SSLHostConfig();
 			hostconfig.setHostName("_default_");
-			hostconfig.setCertificateVerification("require");
+			hostconfig.setCertificateVerification("optional");
 			hostconfig.setTrustStore(JAKeyStore.trustStore);
 			hostconfig.setTruststorePassword(keystorePass);
 			hostconfig.setSslProtocol("TLS");
