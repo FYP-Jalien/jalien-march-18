@@ -543,7 +543,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				killSigReceived = true;
 				System.err.println("SIGTERM received. Killing payload and proceeding to upload.");
 				putJobTrace("JobWrapper: SIGTERM received. Killing payload and proceeding to upload.");
-				cleanupProcesses(queueId, (int) payload.pid());
+				cleanupProcesses(queueId, payload.pid());
 			});
 
 			payload.waitFor(!executionType.contains("validation") ? ttl : 900, TimeUnit.SECONDS);
@@ -1317,12 +1317,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	 *
 	 * @return script exit code, or -1 in case of error
 	 */
-	public static int cleanupProcesses(final long queueId, final int pid) {
+	public static int cleanupProcesses(final long queueId, final long pid) {
+		// Attempt cleanup using Java first
 		final Optional<ProcessHandle> ohandle = ProcessHandle.of(pid);
 
 		if (ohandle.isPresent()) {
 			logger.log(Level.INFO, "Killing the children processes with TERM and then KILL, at most 30s after TERM");
-			
+
 			final ProcessHandle handle = ohandle.get();
 
 			handle.descendants().forEach(descendantProc -> {
@@ -1339,13 +1340,32 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				}
 			}
 
-			// Attempt cleanup using Java first
 			int cleanupAttempts = 0;
-			while (handle.descendants().count() > 0 && cleanupAttempts < 10) {
+			while (handle.isAlive() && handle.descendants().count() > 0 && cleanupAttempts < 10) {
 				handle.descendants().forEach(descendantProc -> {
 					descendantProc.destroyForcibly();
 				});
 				cleanupAttempts += 1;
+			}
+
+			if (handle.isAlive()) {
+				if (handle.descendants().count() > 0)
+					logger.log(Level.SEVERE, "Even after SIGKILL some of the children processes didn't terminate, will kill the payload entry point now");
+
+				handle.destroy();
+
+				for (int i = 0; i < 30 && handle.isAlive(); i++) {
+					try {
+						Thread.sleep(1000);
+					}
+					catch (@SuppressWarnings("unused") InterruptedException ie) {
+						// just exit now
+						return -1;
+					}
+				}
+
+				if (handle.isAlive())
+					handle.destroyForcibly();
 			}
 		}
 
