@@ -131,16 +131,16 @@ public class Xrd3cp extends Xrootd {
 			command.add(targetPath);
 
 			if (sourceEnvelope)
-				if (source.ticket.envelope.getEncryptedEnvelope() != null)
-					command.add(QUOTES + "authz=" + source.ticket.envelope.getEncryptedEnvelope() + QUOTES);
-				else if (source.ticket.envelope.getSignedEnvelope() != null)
-					command.add(source.ticket.envelope.getSignedEnvelope());
+				if (source.ticket.envelope.getSecureEnvelope() != null)
+					command.add((source.ticket.envelope.getAuthzAttribute().equals("authz=") ? QUOTES + "authz=" : "") +
+							source.ticket.envelope.getSecureEnvelope() +
+							(source.ticket.envelope.getAuthzAttribute().equals("authz=") ? QUOTES : ""));
 
 			if (targetEnvelope)
-				if (target.ticket.envelope.getEncryptedEnvelope() != null)
-					command.add(QUOTES + "authz=" + target.ticket.envelope.getEncryptedEnvelope() + QUOTES);
-				else if (target.ticket.envelope.getSignedEnvelope() != null)
-					command.add(target.ticket.envelope.getSignedEnvelope());
+				if (target.ticket.envelope.getSecureEnvelope() != null)
+					command.add((target.ticket.envelope.getAuthzAttribute().equals("authz=") ? QUOTES + "authz=" : "") +
+							target.ticket.envelope.getSecureEnvelope() +
+							(target.ticket.envelope.getAuthzAttribute().equals("authz=") ? QUOTES : ""));
 
 			setLastCommand(command);
 
@@ -189,7 +189,7 @@ public class Xrd3cp extends Xrootd {
 					logger.log(Level.WARNING, "Retrying xrdstat, maybe the file shows up with the correct size in a few seconds");
 
 					try {
-						final String ret = xrdstat(target, (target.ticket.envelope.getSignedEnvelope() == null));
+						final String ret = xrdstat(target, true);
 
 						if (ret != null) {
 							logger.log(Level.WARNING, "xrdstat is ok, assuming transfer was successful");
@@ -214,7 +214,7 @@ public class Xrd3cp extends Xrootd {
 				throw new IOException(sMessage);
 			}
 
-			return xrdstat(target, (target.ticket.envelope.getSignedEnvelope() == null));
+			return xrdstat(target, true);
 		}
 		catch (final IOException ioe) {
 			throw ioe;

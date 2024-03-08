@@ -163,7 +163,7 @@ public class TokenAuthzHandler {
 	private static Envelope decodeEnvelope(String authzTokenString, KeyPair keypair) throws GeneralSecurityException, CorruptedEnvelopeException {
 		EncryptedAuthzToken token = new EncryptedAuthzToken((RSAPrivateKey) keypair.getPrivate(), (RSAPublicKey) keypair.getPublic(), true);
 
-		token.decrypt(authzTokenString);
+		token.unseal(authzTokenString);
 		return token.getEnvelope();
 	}
 

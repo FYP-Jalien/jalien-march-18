@@ -1,14 +1,18 @@
 package alien.io.xrootd.envelopes;
 
+import alien.catalogue.access.XrootDEnvelope;
+import alien.config.ConfigUtils;
+import alien.se.SE;
+import alien.user.JAKeyStore;
+import alien.user.UserFactory;
+import org.bouncycastle.jce.provider.BouncyCastleProvider;
+import org.bouncycastle.operator.OperatorCreationException;
+import org.bouncycastle.pkcs.PKCSException;
+
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.security.GeneralSecurityException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.security.Security;
-import java.security.Signature;
-import java.security.SignatureException;
+import java.security.*;
 import java.security.cert.X509Certificate;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
@@ -16,16 +20,6 @@ import java.util.HashMap;
 import java.util.StringTokenizer;
 import java.util.logging.Level;
 import java.util.logging.Logger;
-
-import org.bouncycastle.jce.provider.BouncyCastleProvider;
-import org.bouncycastle.operator.OperatorCreationException;
-import org.bouncycastle.pkcs.PKCSException;
-
-import alien.catalogue.access.XrootDEnvelope;
-import alien.config.ConfigUtils;
-import alien.config.JAliEnIAm;
-import alien.user.JAKeyStore;
-import alien.user.UserFactory;
 
 /**
  * @author ron
@@ -105,44 +99,35 @@ public class XrootDEnvelopeSigner {
 	}
 
 	/**
-	 * @param envelope
-	 * @throws NoSuchAlgorithmException
-	 * @throws InvalidKeyException
-	 * @throws SignatureException
+	 * @param envelope XRootD envelope to be encrypted/signed
+	 * @throws NoSuchAlgorithmException thrown by SignedAuthzToken
+	 * @throws InvalidKeyException thrown by SignedAuthzToken
+	 * @throws SignatureException thrown by SignedAuthzToken
+     * @throws GeneralSecurityException thrown by seal() method
 	 */
-	public static void signEnvelope(final XrootDEnvelope envelope) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
+	public static void sealEnvelope(final XrootDEnvelope envelope) throws GeneralSecurityException, NoSuchAlgorithmException, InvalidKeyException, SignatureException {
+		final AuthzToken authz;
+		final SE referenceSE = envelope.pfn.getSE();
 
-		final long issued = System.currentTimeMillis() / 1000L;
-		final long expires = issued + 60 * 60 * 24;
+		if (referenceSE == null || referenceSE.needsEncryptedEnvelope)
+			authz = new EncryptedAuthzToken(JAuthZPrivKey, SEPubKey, false);
+		else if (referenceSE.needsSciTokensEnvelope)
+			authz = new SciTokensAuthzToken(JAuthZPrivKey);
+		else
+			authz = new SignedAuthzToken(JAuthZPrivKey);
 
-		final String toBeSigned = envelope.getUnsignedEnvelope() + "-issuer-issued-expires&issuer=" + JAliEnIAm.whatsMyName() + "_" + ConfigUtils.getLocalHostname() + "&issued=" + issued + "&expires="
-				+ expires;
+		if (logger.isLoggable(Level.FINEST))
+			logger.log(Level.FINEST, "Encrypting this envelope:\n" + envelope.getPlainEnvelope());
 
-		final Signature signer = Signature.getInstance("SHA384withRSA");
-
-		signer.initSign(JAuthZPrivKey);
-
-		signer.update(toBeSigned.getBytes());
-
-		envelope.setSignedEnvelope(toBeSigned + "&signature=" + Base64.encode(signer.sign()));
+		envelope.setSecureEnvelope(authz.seal(envelope));
 
 	}
 
 	/**
-	 * @param envelope
-	 * @param selfSigned
-	 * @return <code>true</code> if the signature verifies
-	 * @throws NoSuchAlgorithmException
-	 * @throws InvalidKeyException
-	 * @throws SignatureException
-	 */
-	public static boolean verifyEnvelope(final XrootDEnvelope envelope, final boolean selfSigned) throws NoSuchAlgorithmException, InvalidKeyException, SignatureException {
-
-		return verifyEnvelope(envelope.getSignedEnvelope(), selfSigned);
-	}
-
-	/**
-	 * @param envelope
+     * Verify signed envelope
+     * Doesn't work with encrypted envelopes and sciTokens
+     *
+	 * @param envelope signed envelope
 	 * @param selfSigned
 	 * @return <code>true</code> if the signature verifies
 	 * @throws NoSuchAlgorithmException
@@ -212,40 +197,28 @@ public class XrootDEnvelopeSigner {
 	}
 
 	/**
-	 * @param envelope
-	 * @throws GeneralSecurityException
-	 */
-	public static void encryptEnvelope(final XrootDEnvelope envelope) throws GeneralSecurityException {
-		final EncryptedAuthzToken authz = new EncryptedAuthzToken(JAuthZPrivKey, SEPubKey, false);
-
-		final String plainEnvelope = envelope.getUnEncryptedEnvelope();
-
-		if (logger.isLoggable(Level.FINEST))
-			logger.log(Level.FINEST, "Encrypting this envelope:\n" + plainEnvelope);
-
-		envelope.setEncryptedEnvelope(authz.encrypt(plainEnvelope));
-	}
-
-	/**
-	 * @param envelope
+     * Decrypt envelope
+     * Doesn't work with signed envelopes and sciTokens
+     *
+	 * @param envelope encrypted envelope
 	 * @return a loaded XrootDEnvelope with the verified values
 	 * @throws GeneralSecurityException
 	 */
 	public static XrootDEnvelope decryptEnvelope(final String envelope) throws GeneralSecurityException {
 		final EncryptedAuthzToken authz = new EncryptedAuthzToken(SEPrivKey, JAuthZPubKey, true);
 
-		return new XrootDEnvelope(authz.decrypt(envelope));
+		return new XrootDEnvelope(authz.unseal(envelope));
 	}
 
 	/**
-	 * @param envelope
+	 * @param envelope encrypted envelope
 	 * @return the decrypted envelope, for debugging
 	 * @throws GeneralSecurityException
 	 */
 	public static String decrypt(final String envelope) throws GeneralSecurityException {
 		final EncryptedAuthzToken authz = new EncryptedAuthzToken(SEPrivKey, JAuthZPubKey, true);
 
-		return authz.decrypt(envelope);
+		return authz.unseal(envelope);
 	}
 
 	/**

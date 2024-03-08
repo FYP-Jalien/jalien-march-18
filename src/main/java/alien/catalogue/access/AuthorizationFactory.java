@@ -230,17 +230,11 @@ public final class AuthorizationFactory {
 		else
 			return "Unknown access type : " + access;
 
-		final SE referenceSE = pfn.getSE();
-
 		final XrootDEnvelope env = new XrootDEnvelope(access, pfn);
 
 		try {
 			if (pfn.getPFN().startsWith("root://"))
-				if (referenceSE == null || referenceSE.needsEncryptedEnvelope)
-					// System.out.println("SE needs encrypted envelope");
-					XrootDEnvelopeSigner.encryptEnvelope(env);
-				else
-					XrootDEnvelopeSigner.signEnvelope(env);
+				XrootDEnvelopeSigner.sealEnvelope(env);
 		}
 		catch (final GeneralSecurityException gse) {
 			logger.log(Level.SEVERE, "Cannot sign and encrypt envelope", gse);
@@ -306,11 +300,7 @@ public final class AuthorizationFactory {
 
 		try {
 			if (pfn.getPFN().startsWith("root://"))
-				if (referenceSE == null || referenceSE.needsEncryptedEnvelope)
-					// System.out.println("SE needs encrypted envelope");
-					XrootDEnvelopeSigner.encryptEnvelope(env);
-				else
-					XrootDEnvelopeSigner.signEnvelope(env);
+				XrootDEnvelopeSigner.sealEnvelope(env);
 		}
 		catch (final GeneralSecurityException gse) {
 			logger.log(Level.SEVERE, "Cannot sign and encrypt envelope", gse);

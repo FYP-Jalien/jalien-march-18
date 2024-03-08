@@ -965,17 +965,13 @@ public class JAliEnCommandcp_csd extends JAliEnBaseCommand {
 				// }
 
 				if (pfn.ticket != null && pfn.ticket.envelope != null)
-					if (pfn.ticket.envelope.getSignedEnvelope() != null)
-						if (pfn.ticket.envelope.getEncryptedEnvelope() == null)
+					if (pfn.ticket.envelope.getSecureEnvelope() != null)
+						if (!pfn.ticket.envelope.getAuthzAttribute().equals("authz="))
 							// signed envelopes were passed to the storage, it should have replied in kind
 							returnEnvelope = targetPFNResult;
 						else
-							// give back to the central services the signed envelopes
-							returnEnvelope = pfn.ticket.envelope.getSignedEnvelope();
-					else
-					// no signed envelopes, return the encrypted one, if any
-					if (pfn.ticket.envelope.getEncryptedEnvelope() != null)
-						returnEnvelope = pfn.ticket.envelope.getEncryptedEnvelope();
+							// give back to the central services the signed envelopes or the encrypted one
+							returnEnvelope = pfn.ticket.envelope.getSecureEnvelope();
 					else
 						// what kind of ticket was this?
 						returnEnvelope = targetPFNResult;

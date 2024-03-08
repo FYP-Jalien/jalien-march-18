@@ -10,7 +10,6 @@ import java.nio.file.Paths;
 import java.nio.file.attribute.BasicFileAttributeView;
 import java.nio.file.attribute.FileTime;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -1143,17 +1142,13 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 				// + " to " + pfn.getPFN());
 
 				if (pfn.ticket != null && pfn.ticket.envelope != null)
-					if (pfn.ticket.envelope.getSignedEnvelope() != null)
-						if (pfn.ticket.envelope.getEncryptedEnvelope() == null)
+					if (pfn.ticket.envelope.getSecureEnvelope() != null)
+						if (!pfn.ticket.envelope.getAuthzAttribute().equals("authz="))
 							// signed envelopes were passed to the storage, it should have replied in kind
 							returnEnvelope = targetPFNResult;
 						else
-							// give back to the central services the signed envelopes
-							returnEnvelope = pfn.ticket.envelope.getSignedEnvelope();
-					else
-					// no signed envelopes, return the encrypted one, if any
-					if (pfn.ticket.envelope.getEncryptedEnvelope() != null)
-						returnEnvelope = pfn.ticket.envelope.getEncryptedEnvelope();
+							// give back to the central services the signed envelopes or the encrypted one
+							returnEnvelope = pfn.ticket.envelope.getSecureEnvelope();
 					else
 						// what kind of ticket was this?
 						returnEnvelope = targetPFNResult;
@@ -1164,14 +1159,11 @@ public class JAliEnCommandcp extends JAliEnBaseCommand {
 			else {
 				// release the file for immediate collection
 				if (pfn.ticket != null && pfn.ticket.envelope != null) {
-					String rejectEnvelope = pfn.ticket.envelope.getEncryptedEnvelope();
-
-					if (rejectEnvelope == null)
-						rejectEnvelope = pfn.ticket.envelope.getSignedEnvelope();
+					String rejectEnvelope = pfn.ticket.envelope.getSecureEnvelope();
 
 					// blind call to the central services to reject this failed copy
 					if (rejectEnvelope != null)
-						commander.c_api.registerEnvelopes(Arrays.asList(rejectEnvelope), BOOKING_STATE.REJECTED);
+						commander.c_api.registerEnvelopes(List.of(rejectEnvelope), BOOKING_STATE.REJECTED);
 				}
 
 				SE se = commander.c_api.getSE(pfn.seNumber);

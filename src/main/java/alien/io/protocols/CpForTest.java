@@ -246,7 +246,7 @@ public class CpForTest extends Protocol {
 
 				throw new IOException(sMessage);
 			}
-			return pfn.ticket.envelope.getSignedEnvelope();
+			return pfn.ticket.envelope.getSecureEnvelope();
 		}
 		catch (final IOException ioe) {
 			throw ioe;

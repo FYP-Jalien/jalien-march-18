@@ -5,6 +5,7 @@ import java.security.Security;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 
+import alien.catalogue.access.XrootDEnvelope;
 import org.bouncycastle.jce.provider.BouncyCastleProvider;
 
 import alien.io.xrootd.envelopes.EncryptedAuthzToken;
@@ -85,13 +86,13 @@ public class CreateAndCheckEnvelopes {
 		try {
 			final EncryptedAuthzToken enAuthz = new EncryptedAuthzToken(AuthenPrivKey, SEPubKey, false);
 
-			final String enticket = enAuthz.encrypt(ticket);
+			final String enticket = enAuthz.seal(new XrootDEnvelope(ticket));
 
 			System.out.println("We encrypted: " + enticket);
 
 			final EncryptedAuthzToken deAuthz = new EncryptedAuthzToken(SEPrivKey, AuthenPubKey, true);
 
-			final String deticket = deAuthz.decrypt(enticket);
+			final String deticket = deAuthz.unseal(enticket);
 
 			System.out.println("We decrypted: " + deticket);
 			System.out.println();
@@ -114,7 +115,7 @@ public class CreateAndCheckEnvelopes {
 
 			final EncryptedAuthzToken deAuthz2 = new EncryptedAuthzToken(SEPrivKey, AuthenPubKey, true);
 
-			final String deticket2 = deAuthz2.decrypt(enticket2);
+			final String deticket2 = deAuthz2.unseal(enticket2);
 
 			System.out.println("We decrypted: " + deticket2);
 
@@ -137,7 +138,7 @@ public class CreateAndCheckEnvelopes {
 
 			final EncryptedAuthzToken deAuthz3 = new EncryptedAuthzToken(SEPrivKey, AuthenPubKey, true);
 
-			final String deticket5 = deAuthz3.decrypt(t5);
+			final String deticket5 = deAuthz3.unseal(t5);
 
 			System.out.println("We decrypted: " + deticket5);
 

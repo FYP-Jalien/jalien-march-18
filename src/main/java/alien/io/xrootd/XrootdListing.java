@@ -108,15 +108,8 @@ public class XrootdListing {
 			String envelope = null;
 
 			try {
-				if (se.needsEncryptedEnvelope) {
-					XrootDEnvelopeSigner.encryptEnvelope(env);
-					envelope = "?authz=" + env.getEncryptedEnvelope();
-				}
-				else {
-					// new xrootd implementations accept signed-only envelopes
-					XrootDEnvelopeSigner.signEnvelope(env);
-					envelope = "?" + env.getSignedEnvelope();
-				}
+				XrootDEnvelopeSigner.sealEnvelope(env);
+				envelope = "?" + env.getAuthzAttribute() + env.getSecureEnvelope();
 			}
 			catch (final GeneralSecurityException e) {
 				e.printStackTrace();

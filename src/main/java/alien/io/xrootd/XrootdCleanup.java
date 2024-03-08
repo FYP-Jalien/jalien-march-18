@@ -267,11 +267,7 @@ public class XrootdCleanup {
 		final XrootDEnvelope env = new XrootDEnvelope(AccessType.DELETE, pfn);
 
 		try {
-			if (se.needsEncryptedEnvelope)
-				XrootDEnvelopeSigner.encryptEnvelope(env);
-			else
-				// new xrootd implementations accept signed-only envelopes
-				XrootDEnvelopeSigner.signEnvelope(env);
+			XrootDEnvelopeSigner.sealEnvelope(env);
 		}
 		catch (final GeneralSecurityException e) {
 			e.printStackTrace();

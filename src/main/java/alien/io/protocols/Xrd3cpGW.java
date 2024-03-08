@@ -140,16 +140,14 @@ public class Xrd3cpGW extends Xrootd {
 			}
 
 			if (sourceEnvelope)
-				if (source.ticket.envelope.getEncryptedEnvelope() != null)
-					sourcePath = addURLParameter(sourcePath, "authz=" + source.ticket.envelope.getEncryptedEnvelope());
-				else if (source.ticket.envelope.getSignedEnvelope() != null)
-					sourcePath = addURLParameter(sourcePath, source.ticket.envelope.getSignedEnvelope());
+				if (source.ticket.envelope.getSecureEnvelope() != null)
+					sourcePath = addURLParameter(sourcePath, source.ticket.envelope.getAuthzAttribute() +
+							source.ticket.envelope.getSecureEnvelope());
 
 			if (targetEnvelope)
-				if (target.ticket.envelope.getEncryptedEnvelope() != null)
-					targetPath = addURLParameter(targetPath, "authz=" + target.ticket.envelope.getEncryptedEnvelope());
-				else if (target.ticket.envelope.getSignedEnvelope() != null)
-					targetPath = addURLParameter(targetPath, target.ticket.envelope.getSignedEnvelope());
+				if (target.ticket.envelope.getSecureEnvelope() != null)
+					targetPath = addURLParameter(targetPath, target.ticket.envelope.getAuthzAttribute() +
+							target.ticket.envelope.getSecureEnvelope());
 
 			command.add(sourcePath);
 			command.add(targetPath);
@@ -196,7 +194,7 @@ public class Xrd3cpGW extends Xrootd {
 					logger.log(Level.WARNING, "Retrying xrdstat, maybe the file shows up with the correct size in a few seconds");
 
 					try {
-						final String ret = xrdstat(target, (target.ticket.envelope.getSignedEnvelope() == null));
+						final String ret = xrdstat(target, true);
 
 						if (ret != null) {
 							logger.log(Level.WARNING, "xrdstat is ok, assuming transfer was successful");
@@ -221,7 +219,7 @@ public class Xrd3cpGW extends Xrootd {
 				throw new IOException(sMessage);
 			}
 
-			return xrdstat(target, (target.ticket.envelope.getSignedEnvelope() == null));
+			return xrdstat(target, true);
 		}
 		catch (final IOException ioe) {
 			throw ioe;

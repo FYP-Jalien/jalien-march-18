@@ -307,7 +307,7 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 
 					wasAdded = true;
 
-					commander.c_api.registerEnvelopes(Arrays.asList(writeTicket.envelope.getEncryptedEnvelope()), BOOKING_STATE.COMMITED);
+					commander.c_api.registerEnvelopes(Arrays.asList(writeTicket.envelope.getSecureEnvelope()), BOOKING_STATE.COMMITED);
 				}
 				catch (final IOException ioe) {
 					commander.printOutln("cannot write" + expected());
@@ -345,7 +345,7 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 
 					wasAdded = true;
 
-					commander.c_api.registerEnvelopes(Arrays.asList(writeTicket.envelope.getEncryptedEnvelope()), BOOKING_STATE.COMMITED);
+					commander.c_api.registerEnvelopes(Arrays.asList(writeTicket.envelope.getSecureEnvelope()), BOOKING_STATE.COMMITED);
 				}
 				catch (final IOException ioe) {
 					commander.printOutln("cannot write " + notOK() + "\n    " + ioe.getMessage());
@@ -392,7 +392,8 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 						if (httpURL != null) {
 							t.startTiming();
 
-							String authURL = httpURL + "?authz=" + XrootDEnvelope.urlEncodeEnvelope(infoPFN.ticket.envelope.getEncryptedEnvelope());
+							String authURL = httpURL + "?" + infoPFN.ticket.envelope.getAuthzAttribute() +
+									XrootDEnvelope.urlEncodeEnvelope(infoPFN.ticket.envelope.getSecureEnvelope());
 
 							commander.printOut("  Authenticated HTTP read access: ");
 							try {

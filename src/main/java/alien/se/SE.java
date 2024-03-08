@@ -119,6 +119,11 @@ public class SE implements Serializable, Comparable<SE> {
 	public final boolean needsEncryptedEnvelope;
 
 	/**
+	 * Access by SciTokens
+	 */
+	public final boolean needsSciTokensEnvelope;
+
+	/**
 	 * Demote write factor
 	 */
 	public final double demoteWrite;
@@ -155,6 +160,7 @@ public class SE implements Serializable, Comparable<SE> {
 
 		this.seVersion = 0;
 		this.needsEncryptedEnvelope = true;
+		this.needsSciTokensEnvelope = false;
 
 		this.seStoragePath = seStoragePath;
 		this.seioDaemons = seioDaemons;
@@ -187,6 +193,8 @@ public class SE implements Serializable, Comparable<SE> {
 		// TODO: remove this, when the version in the DB is working and not
 		// anymore overwritten to null
 		needsEncryptedEnvelope = (seVersion < 200) && (!"ALICE::CERN::SETEST".equals(seName));
+
+		needsSciTokensEnvelope = (seVersion >= 200);
 
 		seioDaemons = StringFactory.get(db.gets("seioDaemons"));
 
