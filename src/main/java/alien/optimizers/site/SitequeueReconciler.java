@@ -12,9 +12,7 @@ import alien.taskQueue.TaskQueueUtils;
 import lazyj.DBFunctions;
 
 import java.sql.Connection;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -34,9 +32,9 @@ public class SitequeueReconciler extends Optimizer {
         int frequency = (int) this.getSleepPeriod();
 
         while (true) {
-            final boolean updated = DBSyncUtils.updatePeriodic(frequency, SitequeueReconciler.class.getCanonicalName(), this);
+//            final boolean updated = DBSyncUtils.updatePeriodic(frequency, SitequeueReconciler.class.getCanonicalName(), this);
             try {
-                if (updated) {
+                if (true) {
                     reconcileSitequeue();
                 }
             } catch (Exception e) {
@@ -83,24 +81,36 @@ public class SitequeueReconciler extends Optimizer {
                     .collect(Collectors.groupingBy(SiteStatusDTO::getSiteId, Collectors.groupingBy(SiteStatusDTO::getStatusId, Collectors.summingLong(SiteStatusDTO::getCount))));
 
 
-            updateCost(totalCostBySite, dbdev, registerLog);
+//            updateCost(totalCostBySite, dbdev, registerLog);
             updateCount(countBySiteAndStatus, dbdev, registerLog);
 
-            DBSyncUtils.registerLog(SitequeueReconciler.class.getCanonicalName(), registerLog.toString());
+//            DBSyncUtils.registerLog(SitequeueReconciler.class.getCanonicalName(), registerLog.toString());
 
         }
     }
 
     private void updateCount(Map<String, Map<String, Long>> countBySiteAndStatus, DBFunctions db, StringBuilder registerlog) {
         AtomicInteger counter = new AtomicInteger();
-        String q = "UPDATE SITEQUEUE SET count = ? WHERE siteid = ? AND statusId = ?;";
+
         try (Timing t = new Timing(monitor, "SitequeueReconciler_updateCount")) {
             t.startTiming();
             countBySiteAndStatus.forEach((siteId, statusCount) -> {
+                StringBuilder query = new StringBuilder("EXPLAIN UPDATE SITEQUEUES SET ");
+                int size = statusCount.size();
+                Object[] parameters = new Object[size + 1];
+                AtomicInteger index = new AtomicInteger(0);
                 statusCount.forEach((statusId, count) -> {
+                    logger.log(Level.INFO, "SiteId: " + siteId + " StatusId: " + statusId + " Count: " + count);
+                    logger.log(Level.INFO, "StatusId: " + JobStatus.getStatusByAlien(Integer.valueOf(statusId)));
+                    query.append(JobStatus.getStatusByAlien(Integer.valueOf(statusId))).append(" = ?, ");
+                    parameters[index.getAndIncrement()] = count;
                     counter.getAndIncrement();
-                    db.query(q, false, count, siteId, statusId);
                 });
+                query.delete(query.length() - 2, query.length());
+                query.append(" WHERE siteId = ?");
+                parameters[size] = siteId;
+                logger.log(Level.INFO, "Query: " + query.toString());
+                db.query(query.toString(), false, parameters);
             });
             t.endTiming();
             logger.log(Level.INFO, "Updated " + counter.get() + " counts");
@@ -111,7 +121,7 @@ public class SitequeueReconciler extends Optimizer {
 
     private void updateCost(Map<String, Long> totalCostBySite, DBFunctions db, StringBuilder registerlog) {
         AtomicInteger counter = new AtomicInteger();
-        String q = "UPDATE SITEQUEUE SET totalCost = ? WHERE siteid = ?;";
+        String q = "UPDATE SITEQUEUES SET totalCost = ? WHERE siteid = ?;";
         try (Timing t = new Timing(monitor, "SitequeueReconciler_updateCost")) {
             t.startTiming();
             totalCostBySite.forEach((siteId, totalCost) -> {
