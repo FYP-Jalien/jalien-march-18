@@ -6,7 +6,6 @@ import alien.monitoring.MonitorFactory;
 import alien.monitoring.Timing;
 import alien.optimizers.DBSyncUtils;
 import alien.optimizers.Optimizer;
-import alien.optimizers.priority.PriorityReconciliationService;
 import alien.site.SiteStatusDTO;
 import alien.taskQueue.JobStatus;
 import alien.taskQueue.TaskQueueUtils;
@@ -14,7 +13,9 @@ import lazyj.DBFunctions;
 
 import java.sql.Connection;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.stream.Collectors;
@@ -33,9 +34,9 @@ public class SitequeueReconciler extends Optimizer {
         int frequency = (int) this.getSleepPeriod();
 
         while (true) {
-//            final boolean updated = DBSyncUtils.updatePeriodic(frequency, SitequeueReconciler.class.getCanonicalName(), this);
+            final boolean updated = DBSyncUtils.updatePeriodic(frequency, SitequeueReconciler.class.getCanonicalName(), this);
             try {
-                if (true) {
+                if (updated) {
                     reconcileSitequeue();
                 }
             } catch (Exception e) {
@@ -57,56 +58,98 @@ public class SitequeueReconciler extends Optimizer {
     }
 
     private void reconcileSitequeue() {
-        logger.log(Level.INFO, "Reconciling sitequeue... trying to establish database connections");
+        logger.log(Level.INFO, "SitequeueReconciler... trying to establish database connections");
         try (DBFunctions db = TaskQueueUtils.getQueueDB(); DBFunctions dbdev = TaskQueueUtils.getProcessesDevDB()) {
             if (db == null) {
-                logger.log(Level.SEVERE, "ReconcilePriority could not get a DB connection");
+                logger.log(Level.SEVERE, "SitequeueReconciler could not get a DB connection");
                 return;
             }
 
             db.setQueryTimeout(60);
 
             if (dbdev == null) {
-                logger.log(Level.SEVERE, "ReconcilePriority(processesDev) could not get a DB connection");
+                logger.log(Level.SEVERE, "SitequeueReconciler(processesDev) could not get a DB connection");
                 return;
             }
             logger.log(Level.INFO, "Reconciling sitequeue obtained database connections");
 
-            StringBuilder registerlog = new StringBuilder();
-            Set<SiteStatusDTO> totalCostForSites = getTotalCostForSites(db, getTotalCostQuery(), registerlog);
+            StringBuilder registerLog = new StringBuilder();
+            Set<SiteStatusDTO> sites = executeTotalCostQuery(db, getTotalCostQuery(), registerLog);
+
+            Map<String, Long> totalCostBySite = sites.stream()
+                    .collect(Collectors.groupingBy(SiteStatusDTO::getSiteId, Collectors.summingLong(SiteStatusDTO::getTotalCost)));
+
+            Map<String, Map<String, Long>> countBySiteAndStatus = sites.stream()
+                    .collect(Collectors.groupingBy(SiteStatusDTO::getSiteId, Collectors.groupingBy(SiteStatusDTO::getStatusId, Collectors.summingLong(SiteStatusDTO::getCount))));
 
 
+            updateCost(totalCostBySite, dbdev, registerLog);
+            updateCount(countBySiteAndStatus, dbdev, registerLog);
 
-
-//            DBSyncUtils.registerLog(SitequeueReconciler.class.getCanonicalName(), registerLog.toString());
+            DBSyncUtils.registerLog(SitequeueReconciler.class.getCanonicalName(), registerLog.toString());
 
         }
     }
 
-    private Set<SiteStatusDTO> getTotalCostForSites(DBFunctions db, String totalCostQuery, StringBuilder registerlog) {
-            db.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
-            db.setQueryTimeout(60);
-            Timing t = new Timing(monitor, "SitequeueReconciler");
+    private void updateCount(Map<String, Map<String, Long>> countBySiteAndStatus, DBFunctions db, StringBuilder registerlog) {
+        AtomicInteger counter = new AtomicInteger();
+        String q = "UPDATE SITEQUEUE SET count = ? WHERE siteid = ? AND statusId = ?;";
+        try (Timing t = new Timing(monitor, "SitequeueReconciler_updateCount")) {
             t.startTiming();
-            boolean res = db.query(totalCostQuery);
-            logger.log(Level.INFO, "ReconcileSitequeue result: " + res);
+            countBySiteAndStatus.forEach((siteId, statusCount) -> {
+                statusCount.forEach((statusId, count) -> {
+                    counter.getAndIncrement();
+                    db.query(q, false, count, siteId, statusId);
+                });
+            });
             t.endTiming();
-            logger.log(Level.INFO, "ReconcileSitequeue took " + t.getMillis() + " ms");
-            registerlog.append("ReconcileSitequeue took ").append(t.getMillis()).append(" ms\n");
+            logger.log(Level.INFO, "Updated " + counter.get() + " counts");
+            logger.log(Level.INFO, "SitequeueReconciler updateCount executed in " + t.getMillis() + " ms");
+            registerlog.append("SitequeueReconciler updateCount executed in ").append(t.getMillis()).append(" ms\n");
+        }
+    }
 
-            Set<SiteStatusDTO> dtos = new HashSet<>();
-            while(db.moveNext()) {
-                String siteId = db.gets(1);
-                String statusId = db.gets(2);
-                long count = db.getl(3);
-                long totalCost = db.getl(4);
-                dtos.add(new SiteStatusDTO(siteId, statusId, count, totalCost));
-                logger.log(Level.INFO, "SiteId: " + siteId + ", statusId: " + statusId + ", count: " + count + ", totalCost: " + totalCost);
-            }
+    private void updateCost(Map<String, Long> totalCostBySite, DBFunctions db, StringBuilder registerlog) {
+        AtomicInteger counter = new AtomicInteger();
+        String q = "UPDATE SITEQUEUE SET totalCost = ? WHERE siteid = ?;";
+        try (Timing t = new Timing(monitor, "SitequeueReconciler_updateCost")) {
+            t.startTiming();
+            totalCostBySite.forEach((siteId, totalCost) -> {
+                counter.getAndIncrement();
+                db.query(q, false, totalCost, siteId);
+            });
+            t.endTiming();
+            logger.log(Level.INFO, "Updated " + counter.get() + " total costs");
+            logger.log(Level.INFO, "SitequeueReconciler updateCost executed in " + t.getMillis() + " ms");
+            registerlog.append("SitequeueReconciler updateCost executed in ").append(t.getMillis()).append(" ms\n");
+        }
+    }
 
-            registerlog.append("ReconcileSitequeue retrieved: ").append(dtos.size()).append(" elements\n");
-            logger.log(Level.INFO, "ReconcileSitequeue retrieved: " + dtos.size() + " elements");
-            return dtos;
+
+    private Set<SiteStatusDTO> executeTotalCostQuery(DBFunctions db, String totalCostQuery, StringBuilder registerlog) {
+        db.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
+        db.setQueryTimeout(60);
+        Timing t = new Timing(monitor, "SitequeueReconciler");
+        t.startTiming();
+        boolean res = db.query(totalCostQuery);
+        logger.log(Level.INFO, "SitequeueReconciler result: " + res);
+        t.endTiming();
+        logger.log(Level.INFO, "SitequeueReconciler select executed in " + t.getMillis() + " ms");
+        registerlog.append("SitequeueReconciler select executed in ")
+                .append(t.getMillis()).append(" ms\n");
+
+        Set<SiteStatusDTO> dtos = new HashSet<>();
+        while (db.moveNext()) {
+            String siteId = db.gets(1);
+            String statusId = db.gets(2);
+            long count = db.getl(3);
+            long totalCost = db.getl(4);
+            dtos.add(new SiteStatusDTO(siteId, statusId, count, totalCost));
+        }
+
+        registerlog.append("SitequeueReconciler retrieved: ").append(dtos.size()).append(" elements\n");
+        logger.log(Level.INFO, "SitequeueReconciler retrieved: " + dtos.size() + " elements");
+        return dtos;
     }
 
     private String getTotalCostQuery() {
