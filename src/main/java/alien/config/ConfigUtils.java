@@ -34,6 +34,8 @@ import java.util.logging.Logger;
 import alien.api.JBoxServer;
 import alien.api.TomcatServer;
 import alien.catalogue.access.AuthorizationFactory;
+import alien.io.protocols.Factory;
+import alien.io.protocols.SciTag;
 import alien.monitoring.MonitorFactory;
 import alien.site.Functions;
 import alien.user.AliEnPrincipal;
@@ -224,6 +226,29 @@ public class ConfigUtils {
 		System.setProperty("http.agent", appName);
 
 		return oldValue;
+	}
+
+	private static SciTag userDefinedSciTag = SciTag.DEFAULT;
+
+	/**
+	 * @return application-wide value for the tag
+	 */
+	public static SciTag getSciTag() {
+		return userDefinedSciTag;
+	}
+
+	/**
+	 * @param newTag
+	 * @return previously set SciTag
+	 */
+	public static SciTag setSciTag(final SciTag newTag) {
+		final SciTag prevTag = userDefinedSciTag;
+
+		userDefinedSciTag = newTag;
+
+		Factory.xrootd.setInstanceSciTag(newTag);
+		
+		return prevTag;
 	}
 
 	/**

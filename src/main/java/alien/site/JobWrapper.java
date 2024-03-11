@@ -42,6 +42,7 @@ import alien.catalogue.PFN;
 import alien.catalogue.XmlCollection;
 import alien.config.ConfigUtils;
 import alien.io.IOUtils;
+import alien.io.protocols.SciTag;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.monitoring.MonitoringObject;
@@ -320,6 +321,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 			final PackagesResolver packResolver = new PackagesResolver();
 			packResolver.start();
 
+			ConfigUtils.setSciTag(SciTag.JOB_PREPARATION);
+
 			final InputFilesDownloader downloader = new InputFilesDownloader();
 			downloader.start();
 
@@ -332,10 +335,14 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				return -3;
 			}
 
+			ConfigUtils.setSciTag(SciTag.DATA_ACCESS);
+
 			// run payload
 			final int execExitCode = executeJob(packResolver.environment_packages);
 
 			getTraceFromFile();
+
+			ConfigUtils.setSciTag(SciTag.JOB_OUTPUT);
 
 			if (execExitCode != 0) {
 				logger.log(Level.SEVERE, "Failed to run payload");

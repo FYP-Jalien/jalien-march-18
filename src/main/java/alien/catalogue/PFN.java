@@ -8,12 +8,14 @@ import java.util.logging.Logger;
 
 import alien.catalogue.access.AccessTicket;
 import alien.config.ConfigUtils;
+import alien.io.protocols.SciTag;
 import alien.monitoring.Monitor;
 import alien.monitoring.MonitorFactory;
 import alien.se.SE;
 import alien.se.SEUtils;
 import alien.shell.commands.JAliEnCOMMander;
 import lazyj.DBFunctions;
+import lazyj.Format;
 import lazyj.StringFactory;
 
 /**
@@ -227,9 +229,11 @@ public class PFN implements Serializable, Comparable<PFN> {
 	}
 
 	/**
+	 * @param applicationName
+	 * @param tag
 	 * @return the URL to the same file, if the SE supports HTTP or HTTPS (must have a "http" tag and set at least one of "http_port" or "https_port" options to an integer value), or <code>null</code> if not
 	 */
-	public String getHttpURL() {
+	public String getHttpURL(final String applicationName, final SciTag tag) {
 		if (!pfn.startsWith("root://"))
 			return null;
 
@@ -262,6 +266,14 @@ public class PFN implements Serializable, Comparable<PFN> {
 				httpUrl = protocol + url.substring(0, idxColumn + 1) + httpPort + url.substring(idxSlash);
 			else if (idxSlash > 0)
 				httpUrl = protocol + url.substring(0, idxSlash) + ":" + httpPort + url.substring(idxSlash);
+
+			if (httpUrl != null) {
+				if (tag != null)
+					httpUrl += (httpUrl.contains("?") ? "&" : "?") + "scitag.flow=" + tag.getTag();
+
+				if (applicationName != null && !applicationName.isBlank())
+					httpUrl += (httpUrl.contains("?") ? "&" : "?") + "eos.app=" + Format.encode(applicationName);
+			}
 		}
 
 		return httpUrl;
