@@ -14,6 +14,7 @@ import alien.catalogue.LFN;
 import alien.catalogue.PFN;
 import alien.catalogue.access.AccessType;
 import alien.catalogue.access.XrootDEnvelope;
+import alien.io.protocols.SciTag;
 import alien.se.SE;
 import alien.shell.ErrNo;
 import joptsimple.OptionException;
@@ -214,7 +215,7 @@ public class JAliEnCommandaccess extends JAliEnBaseCommand {
 
 		for (final PFN pfn : pfns) {
 			commander.outNextResult();
-			commander.printOutln(httpURLs ? pfn.getHttpURL() : pfn.pfn);
+			commander.printOutln(httpURLs ? pfn.getHttpURL(null, null) : pfn.pfn);
 			final SE se = commander.c_api.getSE(pfn.seNumber);
 
 			if (se != null) {
@@ -230,12 +231,24 @@ public class JAliEnCommandaccess extends JAliEnBaseCommand {
 							if (httpURLs)
 								envelope = XrootDEnvelope.urlEncodeEnvelope(envelope);
 
+							if (accessRequest == AccessType.WRITE)
+								envelope += "&scitag.flow=" + SciTag.CLI_UPLOAD.getTag() + "&eos.app=cliUpload";
+							else
+								envelope += "&scitag.flow=" + SciTag.DATA_ACCESS.getTag() + "&eos.app=dataAccess";
+
 							commander.printOut("envelope", envelope);
 							commander.printOutln("Encrypted envelope:\n" + envelope);
 						}
 						else {
-							commander.printOut("envelope", env.getSignedEnvelope());
-							commander.printOutln("Signed envelope:\n" + env.getSignedEnvelope());
+							String envelope = env.getEncryptedEnvelope();
+
+							if (accessRequest == AccessType.WRITE)
+								envelope += "&scitag.flow=" + SciTag.CLI_UPLOAD.getTag() + "&eos.app=cliUpload";
+							else
+								envelope += "&scitag.flow=" + SciTag.DATA_ACCESS.getTag() + "&eos.app=dataAccess";
+
+							commander.printOut("envelope", envelope);
+							commander.printOutln("Signed envelope:\n" + envelope);
 						}
 
 					// If archive member access requested, add it's filename as anchor
@@ -388,7 +401,7 @@ public class JAliEnCommandaccess extends JAliEnBaseCommand {
 
 			if (options.has("m")) {
 				md5sum = options.valueOf("m").toString();
-				
+
 				if (md5sum.isBlank())
 					md5sum = null;
 			}

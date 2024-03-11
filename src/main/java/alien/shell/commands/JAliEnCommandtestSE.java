@@ -30,7 +30,9 @@ import alien.catalogue.PFN;
 import alien.catalogue.access.AccessTicket;
 import alien.catalogue.access.AccessType;
 import alien.catalogue.access.XrootDEnvelope;
+import alien.config.ConfigUtils;
 import alien.io.protocols.Factory;
+import alien.io.protocols.SciTag;
 import alien.io.protocols.SpaceInfo;
 import alien.io.protocols.TempFileManager;
 import alien.io.protocols.Xrootd;
@@ -75,18 +77,18 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 
 		return f;
 	}
-	
+
 	private final String expected() {
 		if (commander.bColour)
 			return " (" + ShellColor.jobStateGreen() + "expected" + ShellColor.reset() + ")";
-	
+
 		return " (expected)";
 	}
 
 	private final String notOK() {
 		if (commander.bColour)
 			return " (" + ShellColor.jobStateRed() + "NOT OK" + ShellColor.reset() + ")";
-		
+
 		return " (NOT OK)";
 	}
 
@@ -154,7 +156,7 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 
 			afterCommandPrinting(t, xrootd);
 
-			final String httpURL = pTarget.getHttpURL();
+			final String httpURL = pTarget.getHttpURL(ConfigUtils.getApplicationName(null), SciTag.FUNCTIONAL_TESTS);
 
 			if (httpURL != null) {
 				commander.printOut("  Open HTTP read test: ");
@@ -292,6 +294,8 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 
 				final Xrootd xrootd = (Xrootd) Factory.xrootd.clone();
 
+				xrootd.setInstanceSciTag(SciTag.FUNCTIONAL_TESTS);
+
 				boolean wasAdded = false;
 
 				final AccessTicket writeTicket = pTarget.ticket;
@@ -370,7 +374,7 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 
 						infoPFN = readPFNs.iterator().next();
 
-						final String httpURL = infoPFN.getHttpURL();
+						final String httpURL = infoPFN.getHttpURL(ConfigUtils.getApplicationName(null), SciTag.FUNCTIONAL_TESTS);
 
 						File tempFile = null;
 						try {
@@ -392,7 +396,7 @@ public class JAliEnCommandtestSE extends JAliEnBaseCommand {
 						if (httpURL != null) {
 							t.startTiming();
 
-							String authURL = httpURL + "?authz=" + XrootDEnvelope.urlEncodeEnvelope(infoPFN.ticket.envelope.getEncryptedEnvelope());
+							String authURL = httpURL + "&authz=" + XrootDEnvelope.urlEncodeEnvelope(infoPFN.ticket.envelope.getEncryptedEnvelope());
 
 							commander.printOut("  Authenticated HTTP read access: ");
 							try {

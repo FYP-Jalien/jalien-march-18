@@ -104,6 +104,8 @@ public class Xrootd extends Protocol {
 	private long rateLimit = 0;
 	private char rateLimitUnit = 'm';
 
+	private SciTag instanceTag = ConfigUtils.getSciTag();
+
 	static {
 		try {
 			org.apache.catalina.webresources.TomcatURLStreamHandlerFactory.getInstance().addUserFactory(new ROOTURLStreamHandlerFactory());
@@ -585,10 +587,10 @@ public class Xrootd extends Protocol {
 	 */
 	@Override
 	public File get(final PFN pfn, final File localFile) throws IOException {
-		return get(pfn, localFile, null);
+		return get(pfn, localFile, null, SciTag.DEFAULT);
 	}
 
-	private File get(final PFN pfn, final File localFile, final String applicationName) throws IOException {
+	private File get(final PFN pfn, final File localFile, final String applicationName, final SciTag sciTag) throws IOException {
 		File target = null;
 
 		if (localFile != null) {
@@ -693,7 +695,7 @@ public class Xrootd extends Protocol {
 				else if (pfn.ticket.envelope.getSignedEnvelope() != null)
 					transactionURL += "?" + pfn.ticket.envelope.getSignedEnvelope();
 
-			transactionURL = decorateOpaqueParams(transactionURL, applicationName);
+			transactionURL = decorateOpaqueParams(transactionURL, applicationName, sciTag);
 
 			command.add(transactionURL);
 			command.add(target.getCanonicalPath());
@@ -838,10 +840,10 @@ public class Xrootd extends Protocol {
 	 * @throws IOException in case of upload problems
 	 */
 	public String put(final PFN pfn, final File localFile, final boolean enforceTicket) throws IOException {
-		return put(pfn, localFile, null, enforceTicket);
+		return put(pfn, localFile, null, enforceTicket, instanceTag);
 	}
 
-	private String put(final PFN pfn, final File localFile, final String applicationName, final boolean enforceTicket) throws IOException {
+	private String put(final PFN pfn, final File localFile, final String applicationName, final boolean enforceTicket, final SciTag tag) throws IOException {
 		if (localFile == null || !localFile.exists() || !localFile.isFile() || !localFile.canRead())
 			throw new TargetException("Local file " + localFile + " cannot be read");
 
@@ -916,7 +918,7 @@ public class Xrootd extends Protocol {
 					transactionURL += "?" + pfn.ticket.envelope.getSignedEnvelope();
 			}
 
-			transactionURL = decorateOpaqueParams(transactionURL, applicationName);
+			transactionURL = decorateOpaqueParams(transactionURL, applicationName, tag);
 
 			command.add(transactionURL);
 
@@ -1084,24 +1086,26 @@ public class Xrootd extends Protocol {
 		pBuilder.environment().putAll(env);
 	}
 
-	private static String decorateOpaqueParams(final String params, final String defaultApplicationName) {
+	private static String decorateOpaqueParams(final String params, final String defaultApplicationName, final SciTag tag) {
 		final String appName = ConfigUtils.getApplicationName(defaultApplicationName);
 
+		String ret = params;
+
+		if (ret.startsWith("-O")) {
+			if (ret.contains("="))
+				ret += "&";
+		}
+		else if (ret.contains("?")) {
+			if (!ret.endsWith("&"))
+				ret += "&";
+		}
+		else
+			ret += "?";
+
+		ret += "scitag.flow=" + tag.getTag();
+
 		if (appName != null) {
-			String ret = params;
-
-			if (ret.startsWith("-O")) {
-				if (ret.contains("="))
-					ret += "&";
-			}
-			else if (ret.contains("?")) {
-				if (!ret.endsWith("&"))
-					ret += "&";
-			}
-			else
-				ret += "?";
-
-			ret += "eos.app=" + appName;
+			ret += "&eos.app=" + appName;
 
 			return ret;
 		}
@@ -1620,10 +1624,10 @@ public class Xrootd extends Protocol {
 		if (xrootdNewerThan4)
 			return transferv4(source, target, TPC_DEFAULT);
 
-		final File temp = get(source, null, "transfer");
+		final File temp = get(source, null, "transfer", SciTag.DATA_REPLICATION);
 
 		try {
-			return put(target, temp, "transfer", true);
+			return put(target, temp, "transfer", true, SciTag.DATA_REPLICATION);
 		}
 		finally {
 			TempFileManager.release(temp);
@@ -1724,8 +1728,8 @@ public class Xrootd extends Protocol {
 				else if (target.ticket.envelope.getSignedEnvelope() != null)
 					targetPath += "?" + target.ticket.envelope.getSignedEnvelope();
 
-			sourcePath = decorateOpaqueParams(sourcePath, "transfer-3rd");
-			targetPath = decorateOpaqueParams(targetPath, "transfer-3rd");
+			sourcePath = decorateOpaqueParams(sourcePath, "transfer-3rd", SciTag.DATA_REPLICATION);
+			targetPath = decorateOpaqueParams(targetPath, "transfer-3rd", SciTag.DATA_REPLICATION);
 
 			command.add(sourcePath);
 			command.add(targetPath);
@@ -2267,5 +2271,17 @@ public class Xrootd extends Protocol {
 	public void setRateLimit(final long rate, final char unit) {
 		this.rateLimit = rate;
 		this.rateLimitUnit = unit;
+	}
+
+	/**
+	 * @param newTag
+	 * @return the previously set value for this instance
+	 */
+	public SciTag setInstanceSciTag(final SciTag newTag) {
+		final SciTag ret = instanceTag;
+
+		instanceTag = newTag;
+
+		return ret;
 	}
 }
