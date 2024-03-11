@@ -587,7 +587,7 @@ public class Xrootd extends Protocol {
 	 */
 	@Override
 	public File get(final PFN pfn, final File localFile) throws IOException {
-		return get(pfn, localFile, null, SciTag.DEFAULT);
+		return get(pfn, localFile, null, instanceTag);
 	}
 
 	private File get(final PFN pfn, final File localFile, final String applicationName, final SciTag sciTag) throws IOException {
