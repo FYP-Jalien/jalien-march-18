@@ -1087,30 +1087,33 @@ public class Xrootd extends Protocol {
 	}
 
 	private static String decorateOpaqueParams(final String params, final String defaultApplicationName, final SciTag tag) {
-		final String appName = ConfigUtils.getApplicationName(defaultApplicationName);
+		String ret = addToParams(params, "eos.app", ConfigUtils.getApplicationName(defaultApplicationName));
 
+		if (tag != null)
+			ret = addToParams(ret, "scitag.flow", String.valueOf(tag.getTag()));
+
+		return ret;
+	}
+
+	private static String addToParams(final String params, final String key, final String value) {
 		String ret = params;
 
-		if (ret.startsWith("-O")) {
-			if (ret.contains("="))
-				ret += "&";
-		}
-		else if (ret.contains("?")) {
-			if (!ret.endsWith("&"))
-				ret += "&";
-		}
-		else
-			ret += "?";
+		if (key != null && value != null && !key.isBlank()) {
+			if (ret.startsWith("-O")) {
+				if (ret.contains("="))
+					ret += "&";
+			}
+			else if (ret.contains("?")) {
+				if (!ret.endsWith("&"))
+					ret += "&";
+			}
+			else
+				ret += "?";
 
-		ret += "scitag.flow=" + tag.getTag();
-
-		if (appName != null) {
-			ret += "&eos.app=" + appName;
-
-			return ret;
+			ret += Format.encode(key) + "=" + Format.encode(value);
 		}
 
-		return params;
+		return ret;
 	}
 
 	/**
@@ -1730,6 +1733,9 @@ public class Xrootd extends Protocol {
 
 			sourcePath = decorateOpaqueParams(sourcePath, "transfer-3rd", SciTag.DATA_REPLICATION);
 			targetPath = decorateOpaqueParams(targetPath, "transfer-3rd", SciTag.DATA_REPLICATION);
+
+			sourcePath = addToParams(sourcePath, "tpc.ttl", ConfigUtils.getConfig().gets("xrootd.tpc.ttl", "3600"));
+			targetPath = addToParams(targetPath, "tpc.ttl", ConfigUtils.getConfig().gets("xrootd.tpc.ttl", "3600"));
 
 			command.add(sourcePath);
 			command.add(targetPath);
