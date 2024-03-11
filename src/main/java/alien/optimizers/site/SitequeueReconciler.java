@@ -82,59 +82,58 @@ public class SitequeueReconciler extends Optimizer {
 
 
 //            updateCost(totalCostBySite, dbdev, registerLog);
-            updateCount(countBySiteAndStatus, dbdev, registerLog);
+            updateCountAndCost(countBySiteAndStatus, totalCostBySite, dbdev, registerLog);
 
 //            DBSyncUtils.registerLog(SitequeueReconciler.class.getCanonicalName(), registerLog.toString());
 
         }
     }
 
-    private void updateCount(Map<String, Map<String, Long>> countBySiteAndStatus, DBFunctions db, StringBuilder registerlog) {
+    private void updateCountAndCost(Map<String, Map<String, Long>> countBySiteAndStatus,Map<String, Long> totalCostBySite, DBFunctions db, StringBuilder registerlog) {
         AtomicInteger counter = new AtomicInteger();
 
         try (Timing t = new Timing(monitor, "SitequeueReconciler_updateCount")) {
             t.startTiming();
             countBySiteAndStatus.forEach((siteId, statusCount) -> {
-                StringBuilder query = new StringBuilder("EXPLAIN UPDATE SITEQUEUES SET ");
+                StringBuilder query = new StringBuilder("UPDATE SITEQUEUES SET ");
                 int size = statusCount.size();
-                Object[] parameters = new Object[size + 1];
+                Object[] parameters = new Object[size + 2]; // +2 for cost and siteId
                 AtomicInteger index = new AtomicInteger(0);
                 statusCount.forEach((statusId, count) -> {
-                    logger.log(Level.INFO, "SiteId: " + siteId + " StatusId: " + statusId + " Count: " + count);
-                    logger.log(Level.INFO, "StatusId: " + JobStatus.getStatusByAlien(Integer.valueOf(statusId)));
                     query.append(JobStatus.getStatusByAlien(Integer.valueOf(statusId))).append(" = ?, ");
                     parameters[index.getAndIncrement()] = count;
                     counter.getAndIncrement();
                 });
+
+                addCostToUpdateQuery(totalCostBySite, query, parameters, size, siteId);
                 query.delete(query.length() - 2, query.length());
                 query.append(" WHERE siteId = ?");
-                parameters[size] = siteId;
-                logger.log(Level.INFO, "Query: " + query.toString());
+                parameters[size +1 ] = siteId;
+                logger.log(Level.INFO, "index is:" + index + " ,parameter second last value(cost): " + parameters[index.get()] + " last parameter value(siteId): " + parameters[index.get() + 1]);
+                logFullQuery(query, parameters);
                 db.query(query.toString(), false, parameters);
             });
             t.endTiming();
             logger.log(Level.INFO, "Updated " + counter.get() + " counts");
-            logger.log(Level.INFO, "SitequeueReconciler updateCount executed in " + t.getMillis() + " ms");
-            registerlog.append("SitequeueReconciler updateCount executed in ").append(t.getMillis()).append(" ms\n");
+            logger.log(Level.INFO, "SitequeueReconciler updateCountAndCost executed in " + t.getMillis() + " ms");
+            registerlog.append("SitequeueReconciler updateCountAndCost executed in ").append(t.getMillis()).append(" ms\n");
         }
     }
 
-    private void updateCost(Map<String, Long> totalCostBySite, DBFunctions db, StringBuilder registerlog) {
-        AtomicInteger counter = new AtomicInteger();
-        String q = "UPDATE SITEQUEUES SET totalCost = ? WHERE siteid = ?;";
-        try (Timing t = new Timing(monitor, "SitequeueReconciler_updateCost")) {
-            t.startTiming();
-            totalCostBySite.forEach((siteId, totalCost) -> {
-                counter.getAndIncrement();
-                db.query(q, false, totalCost, siteId);
-            });
-            t.endTiming();
-            logger.log(Level.INFO, "Updated " + counter.get() + " total costs");
-            logger.log(Level.INFO, "SitequeueReconciler updateCost executed in " + t.getMillis() + " ms");
-            registerlog.append("SitequeueReconciler updateCost executed in ").append(t.getMillis()).append(" ms\n");
+    private void logFullQuery(StringBuilder query, Object[] parameters) {
+        logger.log(Level.INFO, parameters.length + " parameters");
+        for (Object parameter : parameters) {
+            query.replace(query.indexOf("?"), query.indexOf("?") + 1, parameter.toString());
         }
+        logger.log(Level.INFO, "Executing query: " + query.toString());
     }
 
+    private void addCostToUpdateQuery(Map<String, Long> totalCostBySite, StringBuilder query, Object[] parameters, int size, String siteId) {
+        Long cost = totalCostBySite.get(siteId);
+        logger.log(Level.INFO, "Cost for siteId: " + siteId + " is: " + cost);
+        query.append("cost = ?, ");
+        parameters[size] = cost;
+    }
 
     private Set<SiteStatusDTO> executeTotalCostQuery(DBFunctions db, String totalCostQuery, StringBuilder registerlog) {
         db.setTransactionIsolation(Connection.TRANSACTION_READ_UNCOMMITTED);
