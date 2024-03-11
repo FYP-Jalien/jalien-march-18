@@ -32,9 +32,9 @@ public class SitequeueReconciler extends Optimizer {
         int frequency = (int) this.getSleepPeriod();
 
         while (true) {
-//            final boolean updated = DBSyncUtils.updatePeriodic(frequency, SitequeueReconciler.class.getCanonicalName(), this);
+            final boolean updated = DBSyncUtils.updatePeriodic(frequency, SitequeueReconciler.class.getCanonicalName(), this);
             try {
-                if (true) {
+                if (updated) {
                     reconcileSitequeue();
                 }
             } catch (Exception e) {
@@ -74,22 +74,21 @@ public class SitequeueReconciler extends Optimizer {
             StringBuilder registerLog = new StringBuilder();
             Set<SiteStatusDTO> sites = executeTotalCostQuery(db, getTotalCostQuery(), registerLog);
 
-            Map<String, Long> totalCostBySite = sites.stream()
-                    .collect(Collectors.groupingBy(SiteStatusDTO::getSiteId, Collectors.summingLong(SiteStatusDTO::getTotalCost)));
+            Map<String, Double> totalCostBySite = sites.stream()
+                    .collect(Collectors.groupingBy(SiteStatusDTO::getSiteId, Collectors.summingDouble(SiteStatusDTO::getTotalCost)));
 
-            Map<String, Map<String, Long>> countBySiteAndStatus = sites.stream()
-                    .collect(Collectors.groupingBy(SiteStatusDTO::getSiteId, Collectors.groupingBy(SiteStatusDTO::getStatusId, Collectors.summingLong(SiteStatusDTO::getCount))));
+            Map<String, Map<String, Double>> countBySiteAndStatus = sites.stream()
+                    .collect(Collectors.groupingBy(SiteStatusDTO::getSiteId, Collectors.groupingBy(SiteStatusDTO::getStatusId, Collectors.summingDouble(SiteStatusDTO::getCount))));
 
 
-//            updateCost(totalCostBySite, dbdev, registerLog);
             updateCountAndCost(countBySiteAndStatus, totalCostBySite, dbdev, registerLog);
 
-//            DBSyncUtils.registerLog(SitequeueReconciler.class.getCanonicalName(), registerLog.toString());
+            DBSyncUtils.registerLog(SitequeueReconciler.class.getCanonicalName(), registerLog.toString());
 
         }
     }
 
-    private void updateCountAndCost(Map<String, Map<String, Long>> countBySiteAndStatus,Map<String, Long> totalCostBySite, DBFunctions db, StringBuilder registerlog) {
+    private void updateCountAndCost(Map<String, Map<String, Double>> countBySiteAndStatus,Map<String, Double> totalCostBySite, DBFunctions db, StringBuilder registerlog) {
         AtomicInteger counter = new AtomicInteger();
 
         try (Timing t = new Timing(monitor, "SitequeueReconciler_updateCount")) {
@@ -104,33 +103,30 @@ public class SitequeueReconciler extends Optimizer {
                     parameters[index.getAndIncrement()] = count;
                     counter.getAndIncrement();
                 });
-
                 addCostToUpdateQuery(totalCostBySite, query, parameters, size, siteId);
                 query.delete(query.length() - 2, query.length());
                 query.append(" WHERE siteId = ?");
                 parameters[size +1 ] = siteId;
-                logger.log(Level.INFO, "index is:" + index + " ,parameter second last value(cost): " + parameters[index.get()] + " last parameter value(siteId): " + parameters[index.get() + 1]);
-                logFullQuery(query, parameters);
                 db.query(query.toString(), false, parameters);
+                logFullQuery(query, parameters);
             });
             t.endTiming();
             logger.log(Level.INFO, "Updated " + counter.get() + " counts");
             logger.log(Level.INFO, "SitequeueReconciler updateCountAndCost executed in " + t.getMillis() + " ms");
+            registerlog.append("Updated ").append(counter.get()).append(" counts\n");
             registerlog.append("SitequeueReconciler updateCountAndCost executed in ").append(t.getMillis()).append(" ms\n");
         }
     }
 
     private void logFullQuery(StringBuilder query, Object[] parameters) {
-        logger.log(Level.INFO, parameters.length + " parameters");
         for (Object parameter : parameters) {
             query.replace(query.indexOf("?"), query.indexOf("?") + 1, parameter.toString());
         }
-        logger.log(Level.INFO, "Executing query: " + query.toString());
+        logger.log(Level.INFO, "SitequeueReconciler executing query: " + query.toString());
     }
 
-    private void addCostToUpdateQuery(Map<String, Long> totalCostBySite, StringBuilder query, Object[] parameters, int size, String siteId) {
-        Long cost = totalCostBySite.get(siteId);
-        logger.log(Level.INFO, "Cost for siteId: " + siteId + " is: " + cost);
+    private void addCostToUpdateQuery(Map<String, Double> totalCostBySite, StringBuilder query, Object[] parameters, int size, String siteId) {
+        Double cost = totalCostBySite.get(siteId);
         query.append("cost = ?, ");
         parameters[size] = cost;
     }
