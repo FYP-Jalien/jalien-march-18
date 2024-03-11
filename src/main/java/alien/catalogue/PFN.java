@@ -229,6 +229,13 @@ public class PFN implements Serializable, Comparable<PFN> {
 	}
 
 	/**
+	 * @return the URL to the same file, if the SE supports HTTP or HTTPS (must have a "http" tag and set at least one of "http_port" or "https_port" options to an integer value), or <code>null</code> if not
+	 */
+	public String getHttpURL() {
+		return getHttpURL(ConfigUtils.getApplicationName("JAliEn"), ConfigUtils.getSciTag());
+	}
+
+	/**
 	 * @param applicationName
 	 * @param tag
 	 * @return the URL to the same file, if the SE supports HTTP or HTTPS (must have a "http" tag and set at least one of "http_port" or "https_port" options to an integer value), or <code>null</code> if not
