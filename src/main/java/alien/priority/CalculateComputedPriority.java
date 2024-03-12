@@ -90,8 +90,8 @@ public class CalculateComputedPriority {
             t.startTiming();
             dtos.forEach((id, dto) -> {
                 Timing t2 = new Timing(monitor, "TQ_single_row_update_ms");
-                String query = updateUserQuery(id, dto);
-                dbdev.query(query);
+                String query = "UPDATE PRIORITY SET userload = ?, computedPriority = ? WHERE userId = ?;";
+                dbdev.query(query, false, dto.getUserload(), dto.getComputedPriority(), id);
                 t2.endTiming();
                 logger.log(Level.INFO, "Updating PRIORITY row for user " + id + " completed in " + t2.getMillis() + " ms");
             });
@@ -100,12 +100,6 @@ public class CalculateComputedPriority {
             logger.log(Level.INFO, "Finished updating PRIORITY table row by row, took " + t.getMillis() + " ms");
             registerLog.append("Updating PRIORITY table row by row completed in ").append(t.getMillis()).append(" ms\n");
         }
-    }
-
-    private static String updateUserQuery(Integer userId, PriorityDto dto) {
-        return "UPDATE PRIORITY SET userload = " + dto.getUserload()
-                + ", computedPriority = " + dto.getComputedPriority()
-                + " WHERE userId = " + userId;
     }
 
     private static void updateComputedPriority(PriorityDto dto) {
