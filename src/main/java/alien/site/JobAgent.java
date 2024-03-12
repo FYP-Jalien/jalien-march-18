@@ -924,6 +924,7 @@ public class JobAgent implements Runnable {
 						logger.log(Level.INFO, "Going to assign cgroup " + agentCgroupV2 + " to CPU cores " + isolCmd);
 						CgroupUtils.assignCPUCores(agentCgroupV2, isolCmd);
 					}
+					putJobTrace("Limiting CPU bandwidth of cgroup " + agentCgroupV2);
 					CgroupUtils.setCPUUsageQuota(agentCgroupV2, cpuCores);
 				}
 			}
