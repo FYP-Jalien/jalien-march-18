@@ -80,6 +80,10 @@ public final class ComputingElement extends Thread {
 		try {
 			config = ConfigUtils.getConfigFromLdap();
 			site = (String) config.get("site_accountname");
+
+			if (site == null)
+				throw new NullPointerException("Site is null! Please check if the accountName entry is correct");
+
 			getSiteMap();
 
 			ExtProperties ep = ConfigUtils.getConfiguration("ce-logging");
