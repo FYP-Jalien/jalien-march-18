@@ -1359,20 +1359,18 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				if (handle.descendants().count() > 0)
 					logger.log(Level.SEVERE, "Even after SIGKILL some of the children processes didn't terminate, will kill the payload entry point now");
 
-				handle.destroy();
+				try {
+					handle.destroy();
 
-				for (int i = 0; i < 30 && handle.isAlive(); i++) {
-					try {
+					for (int i = 0; i < 30 && handle.isAlive(); i++)
 						Thread.sleep(1000);
-					}
-					catch (@SuppressWarnings("unused") InterruptedException ie) {
-						// just exit now
-						return -1;
-					}
-				}
 
-				if (handle.isAlive())
-					handle.destroyForcibly();
+					if (handle.isAlive())
+						handle.destroyForcibly();
+				}
+				catch (Exception ex) {
+					// Ignore
+				}
 			}
 		}
 
