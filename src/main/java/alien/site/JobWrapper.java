@@ -555,15 +555,13 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			payload.waitFor(!executionType.contains("validation") ? ttl : 900, TimeUnit.SECONDS);
 
-			cleanupProcesses(queueId, payload.pid());
-
 			if (payload.isAlive()) {
-				payload.destroyForcibly();
+				cleanupProcesses(queueId, payload.pid());
 				killSigReceived = true;
-				logger.log(Level.SEVERE, "Payload process destroyed by timeout in wrapper!");
-				putJobTrace("JobWrapper: Payload process destroyed by timeout in wrapper!");
+				logger.log(Level.SEVERE, "Execution aborted by timeout in wrapper!");
+				putJobTrace("JobWrapper: Execution aborted by timeout in wrapper!");
 			}
-			
+
 			if (payload.exitValue() != 0) {
 				boolean detectedOOM = checkOOMEvents();
 
@@ -982,6 +980,8 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	}
 
 	private boolean uploadOutputFiles(final JobStatus exitStatus, final int exitCode) {
+		cleanupProcesses(queueId, pid);
+
 		boolean uploadedAllOutFiles = true;
 		boolean uploadedNotAllCopies = false;
 
@@ -1355,7 +1355,7 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 				cleanupAttempts += 1;
 			}
 
-			if (handle.isAlive()) {
+			if (handle.isAlive() && pid != ProcessHandle.current().pid()) {
 				if (handle.descendants().count() > 0)
 					logger.log(Level.SEVERE, "Even after SIGKILL some of the children processes didn't terminate, will kill the payload entry point now");
 
