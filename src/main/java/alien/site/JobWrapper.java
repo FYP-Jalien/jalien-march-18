@@ -555,13 +555,15 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 
 			payload.waitFor(!executionType.contains("validation") ? ttl : 900, TimeUnit.SECONDS);
 
+			cleanupProcesses(queueId, payload.pid());
+
 			if (payload.isAlive()) {
 				payload.destroyForcibly();
 				killSigReceived = true;
 				logger.log(Level.SEVERE, "Payload process destroyed by timeout in wrapper!");
 				putJobTrace("JobWrapper: Payload process destroyed by timeout in wrapper!");
 			}
-
+			
 			if (payload.exitValue() != 0) {
 				boolean detectedOOM = checkOOMEvents();
 
@@ -980,8 +982,6 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 	}
 
 	private boolean uploadOutputFiles(final JobStatus exitStatus, final int exitCode) {
-		cleanupProcesses(queueId, pid);
-
 		boolean uploadedAllOutFiles = true;
 		boolean uploadedNotAllCopies = false;
 
