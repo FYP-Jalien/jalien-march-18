@@ -263,7 +263,7 @@ public abstract class Protocol implements Serializable, Comparable<Protocol>, Cl
 				if (!first)
 					sb.append(' ');
 
-				if (cmdToken.contains(" ") || cmdToken.contains("\n") || cmdToken.contains("\t"))
+				if (cmdToken.contains(" ") || cmdToken.contains("\n") || cmdToken.contains("\t") || cmdToken.contains("?") || cmdToken.contains("&"))
 					cmdToken = "'" + Format.replace(cmdToken, "'", "\\'") + "'";
 
 				sb.append(cmdToken);
