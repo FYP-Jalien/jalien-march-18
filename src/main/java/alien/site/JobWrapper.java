@@ -1331,35 +1331,27 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 		if (ohandle.isPresent()) {
 			logger.log(Level.INFO, "Killing the children processes with TERM and then KILL, at most 30s after TERM");
 
-			final ProcessHandle handle = ohandle.get();
-
-			handle.descendants().forEach(descendantProc -> {
-				descendantProc.destroy();
-			});
-
-			for (int i = 0; i < 30 && handle.isAlive(); i++) {
-				try {
-					Thread.sleep(1000);
-				}
-				catch (@SuppressWarnings("unused") InterruptedException ie) {
-					// just exit now
-					return -1;
-				}
-			}
-
-			int cleanupAttempts = 0;
-			while (handle.isAlive() && handle.descendants().count() > 0 && cleanupAttempts < 10) {
+			try {
+				final ProcessHandle handle = ohandle.get();
 				handle.descendants().forEach(descendantProc -> {
-					descendantProc.destroyForcibly();
+					descendantProc.destroy();
 				});
-				cleanupAttempts += 1;
-			}
 
-			if (handle.isAlive() && pid != ProcessHandle.current().pid()) {
-				if (handle.descendants().count() > 0)
-					logger.log(Level.SEVERE, "Even after SIGKILL some of the children processes didn't terminate, will kill the payload entry point now");
+				for (int i = 0; i < 30 && handle.isAlive() && handle.descendants().count() > 0; i++)
+					Thread.sleep(1000);
 
-				try {
+				int forcedCleanupAttempts = 0;
+				while (handle.isAlive() && handle.descendants().count() > 0 && forcedCleanupAttempts < 10) {
+					handle.descendants().forEach(descendantProc -> {
+						descendantProc.destroyForcibly();
+					});
+					forcedCleanupAttempts += 1;
+				}
+
+				if (handle.isAlive() && pid != ProcessHandle.current().pid()) {
+					if (handle.descendants().count() > 0)
+						logger.log(Level.SEVERE, "Even after SIGKILL some of the children processes didn't terminate, will kill the payload entry point now");
+
 					handle.destroy();
 
 					for (int i = 0; i < 30 && handle.isAlive(); i++)
@@ -1368,9 +1360,9 @@ public final class JobWrapper implements MonitoringObject, Runnable {
 					if (handle.isAlive())
 						handle.destroyForcibly();
 				}
-				catch (Exception ex) {
-					// Ignore
-				}
+			}
+			catch (Exception ex) {
+				// Ignore
 			}
 		}
 
