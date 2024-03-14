@@ -135,7 +135,7 @@ public final class ComputingElement extends Thread {
 			try {
 				if (JAKeyStore.checkExpireSoonAndReload() >= 2) {
 					// we need at least a couple of days if valid identity to request JA tokens with
-					logger.log(Level.WARNING, "Certificate is about to expire and a newer one was not available");
+					logger.log(Level.SEVERE, "Certificate is about to expire and a newer one was not available");
 					System.exit(0);
 				}
 			}
