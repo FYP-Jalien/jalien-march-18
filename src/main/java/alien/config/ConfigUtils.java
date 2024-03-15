@@ -228,12 +228,35 @@ public class ConfigUtils {
 		return oldValue;
 	}
 
-	private static SciTag userDefinedSciTag = SciTag.DEFAULT;
+	private static SciTag userDefinedSciTag = null;
 
 	/**
 	 * @return application-wide value for the tag
 	 */
 	public static SciTag getSciTag() {
+		if (userDefinedSciTag == null) {
+			final String configTag = getConfig().gets("scitag", "DEFAULT").toUpperCase();
+
+			try {
+				final int tagValue = Integer.parseInt(configTag);
+
+				for (final SciTag tag : SciTag.values())
+					if (tag.getTag() == tagValue)
+						userDefinedSciTag = tag;
+			}
+			catch (@SuppressWarnings("unused") NumberFormatException nfe) {
+				try {
+					userDefinedSciTag = SciTag.valueOf(configTag);
+				}
+				catch (Exception e) {
+					// ignore
+				}
+			}
+		}
+
+		if (userDefinedSciTag == null)
+			userDefinedSciTag = SciTag.DEFAULT;
+
 		return userDefinedSciTag;
 	}
 
@@ -247,7 +270,7 @@ public class ConfigUtils {
 		userDefinedSciTag = newTag;
 
 		Factory.xrootd.setInstanceSciTag(newTag);
-		
+
 		return prevTag;
 	}
 
