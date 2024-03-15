@@ -254,6 +254,12 @@ public class NUMAExplorer {
 	String computeInitialMask(Long reqCPU, boolean wholeNode) {
 
 		byte[] finalMask = new byte[numCPUs];
+
+		if (availablePerNode.keySet().size() == 0) {
+			logger.log(Level.INFO, "Can not set NUMA architecture aware cpuIsolation");
+			return arrayToTaskset(finalMask);
+		}
+
 		finalMask = checkAndComputeMask(reqCPU);
 
 		for (int i = 0; i < finalMask.length; i++) {
@@ -361,6 +367,11 @@ public class NUMAExplorer {
 	 */
 	String pickCPUs(Long reqCPU, int jobNumber) {
 		byte[] finalMask = new byte[numCPUs];
+
+		if (availablePerNode.keySet().size() == 0) {
+			logger.log(Level.INFO, "Can not set NUMA architecture aware cpuIsolation");
+			return arrayToTaskset(finalMask);
+		}
 
 		boolean rearrangementNeeded = true;
 		int rearrangementCount = 0;
