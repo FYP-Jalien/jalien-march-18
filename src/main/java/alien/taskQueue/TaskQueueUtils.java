@@ -432,7 +432,10 @@ public class TaskQueueUtils {
 				else
 					status = JobStatus.getStatus(db.gets(2));
 
-				m.put(status, Integer.valueOf(db.geti(3)));
+				if (status != null)
+					m.put(status, Integer.valueOf(db.geti(3)));
+				else
+					logger.log(Level.SEVERE, "Unknown jobs status code " + db.geti(3) + " for " + j);
 			}
 
 			// now, what is left, something that doesn't have subjobs ?
@@ -853,7 +856,7 @@ public class TaskQueueUtils {
 
 			String userIdQuery = "select userId, cpucores from QUEUE where queueId=?";
 
-			if(db.query(userIdQuery, false, Long.valueOf(job))) {
+			if (db.query(userIdQuery, false, Long.valueOf(job))) {
 				updatePriorityRegistry(db, extrafields, oldStatus, newStatus);
 			}
 
@@ -884,19 +887,19 @@ public class TaskQueueUtils {
 
 			final JobCounter counter = PriorityRegister.JobCounter.getCounterForUser(userId);
 
-			if(oldStatus == JobStatus.WAITING) {
+			if (oldStatus == JobStatus.WAITING) {
 				counter.decWaiting();
 			}
 
-			if(JobStatus.runningStates().contains(oldStatus)) {
+			if (JobStatus.runningStates().contains(oldStatus)) {
 				counter.decRunning(activeCores);
 			}
 
-			if(newStatus == JobStatus.WAITING) {
+			if (newStatus == JobStatus.WAITING) {
 				counter.incWaiting();
 			}
 
-			if(JobStatus.runningStates().contains(newStatus)) {
+			if (JobStatus.runningStates().contains(newStatus)) {
 				counter.incRunning(activeCores);
 			}
 
@@ -2784,15 +2787,15 @@ public class TaskQueueUtils {
 
 			// TODO remove this when jobs send again heartbeat monitoring data
 			/*
-			try (DBFunctions db = getQueueDB()) {
-				if (db == null)
-					return false;
-
-				db.setQueryTimeout(60);
-
-				db.query("UPDATE QUEUEPROC SET lastupdate=NOW() WHERE queueId=?", false, Long.valueOf(queueId));
-			}
-			*/
+			 * try (DBFunctions db = getQueueDB()) {
+			 * if (db == null)
+			 * return false;
+			 * 
+			 * db.setQueryTimeout(60);
+			 * 
+			 * db.query("UPDATE QUEUEPROC SET lastupdate=NOW() WHERE queueId=?", false, Long.valueOf(queueId));
+			 * }
+			 */
 			return true;
 		}
 
@@ -4506,12 +4509,13 @@ public class TaskQueueUtils {
 						values.put("statusId", Integer.valueOf(statusId));
 						values.put("preemptionTs", Long.valueOf(System.currentTimeMillis()));
 						values.put("hostId", Integer.valueOf(hostId));
-						values.put("siteId",Integer.valueOf(siteId));
+						values.put("siteId", Integer.valueOf(siteId));
 						values.put("userId", Integer.valueOf(userId));
 						q = DBFunctions.composeInsert("oom_preemptions", values);
 						if (!db.query(q))
 							return false;
-					} else {
+					}
+					else {
 						return false;
 					}
 				}
@@ -4542,7 +4546,7 @@ public class TaskQueueUtils {
 
 			// When the JR finishes and we want to delete the db entry
 			if (proposedMask == null) {
-				synchronized(JRTracker.pinningTrackerSync) {
+				synchronized (JRTracker.pinningTrackerSync) {
 					JRTracker.uuidToUpdate.remove(vmUID);
 				}
 				String subQ = "delete from COREPINNING where hostId=" + hostId + " and binary2string(uuid)='" + vmUID + "';";
@@ -4640,7 +4644,7 @@ public class TaskQueueUtils {
 	private static boolean inspectAndAquireDBLock(Integer hostId, UUID vmUID, DBFunctions db) {
 		// If we can not insert it means lock is taken
 		String q = "insert into COREPINNING_LOCK (hostId, uuid, lock_timestamp) values (" + hostId + ",string2binary('" + vmUID + "'),current_timestamp);";
-		//TODO: Need to put boolean to false to prevent all error logs every time the lock is taken
+		// TODO: Need to put boolean to false to prevent all error logs every time the lock is taken
 		if (!db.query(q)) {
 			q = "select binary2string(uuid), lock_timestamp from COREPINNING_LOCK where hostId=" + hostId;
 			db.query(q);
@@ -4651,7 +4655,7 @@ public class TaskQueueUtils {
 				// Check if it is the vm making the request who has the lock. We update the timestamp
 				// Or if the lock has been taken for too long. We release it and acquire for this VM
 				if (lockVM.equals(vmUID.toString())) {
-					q = "update COREPINNING_LOCK set lock_timestamp=current_timestamp where hostId="+hostId+" and string2binary('" + vmUID + "')=uuid";
+					q = "update COREPINNING_LOCK set lock_timestamp=current_timestamp where hostId=" + hostId + " and string2binary('" + vmUID + "')=uuid";
 					db.query(q);
 					return true;
 				}
@@ -4672,6 +4676,7 @@ public class TaskQueueUtils {
 
 	/**
 	 * Adds the uuid to the list to update ts
+	 * 
 	 * @param vmUID uuid of the JA VM
 	 */
 	public static void notifyJRAlive(UUID vmUID) {
