@@ -435,7 +435,7 @@ public class TaskQueueUtils {
 				if (status != null)
 					m.put(status, Integer.valueOf(db.geti(3)));
 				else
-					logger.log(Level.SEVERE, "Unknown jobs status code " + db.geti(3) + " for " + j);
+					logger.log(Level.SEVERE, "Unknown jobs status code " + db.geti(2) + " for " + j);
 			}
 
 			// now, what is left, something that doesn't have subjobs ?
