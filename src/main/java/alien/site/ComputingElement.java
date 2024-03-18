@@ -600,14 +600,10 @@ public final class ComputingElement extends Thread {
 	}
 
 	private static String getStartup() {
-		final String jdkArch = ConfigUtils.getConfiguration("version").gets("jdk.architecture");
-		final String jdkDir = CVMFS.getJavaDir(jdkArch);
-
 		final String javaCmd = "java -client -Xms16M -Xmx128M -Djdk.lang.Process.launchMechanism=vfork -XX:+UseSerialGC -cp";
 		final String jarPath = !ConfigUtils.getConfiguration("version").gets("custom.jobagent.jar", "").isBlank() ? ConfigUtils.getConfiguration("version").gets("custom.jobagent.jar") : CVMFS.getJarPath();
 		final String jarClass = "alien.site.JobRunner";
-
-		return jdkDir + "/" + javaCmd + " " + jarPath + " " + jarClass;
+		return javaCmd + " " + jarPath + " " + jarClass;
 	}
 
 	/**
