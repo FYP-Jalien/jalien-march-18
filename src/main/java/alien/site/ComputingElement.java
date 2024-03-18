@@ -467,6 +467,8 @@ public final class ComputingElement extends Thread {
 
 		// pass environment variables
 		before += "export HOME=`pwd`" + "\n";
+		before += "export PATH=`echo $PATH`" + "\n";
+		before += "export LD_LIBRARY_PATH=`echo $LD_LIBRARY_PATH`" + "\n";
 		before += "export TMP=$HOME" + "\n";
 		before += "export TMPDIR=$TMP" + "\n";
 		if (config.containsKey("host_logdir") || config.containsKey("site_logdir"))
@@ -598,14 +600,10 @@ public final class ComputingElement extends Thread {
 	}
 
 	private static String getStartup() {
-		final String jdkArch = ConfigUtils.getConfiguration("version").gets("jdk.architecture");
-		final String jdkDir = CVMFS.getJavaDir(jdkArch);
-
 		final String javaCmd = "java -client -Xms16M -Xmx128M -Djdk.lang.Process.launchMechanism=vfork -XX:+UseSerialGC -cp";
 		final String jarPath = !ConfigUtils.getConfiguration("version").gets("custom.jobagent.jar", "").isBlank() ? ConfigUtils.getConfiguration("version").gets("custom.jobagent.jar") : CVMFS.getJarPath();
 		final String jarClass = "alien.site.JobRunner";
-
-		return jdkDir + "/" + javaCmd + " " + jarPath + " " + jarClass;
+		return javaCmd + " " + jarPath + " " + jarClass;
 	}
 
 	/**
