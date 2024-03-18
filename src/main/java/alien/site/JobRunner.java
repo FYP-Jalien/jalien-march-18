@@ -58,7 +58,12 @@ public class JobRunner extends JobAgent {
 
 		int jrPid = MonitorFactory.getSelfProcessID();
 
-		CgroupUtils.setupTopCgroups(jrPid);
+		try {
+			CgroupUtils.setupTopCgroups(jrPid);
+		}
+		catch (Exception e) {
+			logger.log(Level.WARNING, "Error creating top cgroup: ", e);
+		}
 
 		boolean alreadyIsol = false;
 

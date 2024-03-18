@@ -31,27 +31,23 @@ public class CgroupUtils {
 	 *
 	 * @param runnerPid pid for JobRunner
 	 * @return true if both cgroups were created, and process successfully moved
+	 * @throws IOException
 	 */
-	public static boolean setupTopCgroups(int runnerPid) {
+	public static boolean setupTopCgroups(int runnerPid) throws IOException {
 		if (haveCgroupsv2()) {
 			final String slotCgroup = getCurrentCgroup(runnerPid);
 
 			if (createCgroup(slotCgroup, "runner") && createCgroup(slotCgroup, "agents")) {
-				try {
-					final String procsToMove = Files.readString(Paths.get(slotCgroup + "/cgroup.procs"));
-					Arrays.stream(procsToMove.split("\\r?\\n")).forEach(line -> moveProcessToCgroup(slotCgroup + "/runner", Integer.parseInt(line)));
+				final String procsToMove = Files.readString(Paths.get(slotCgroup + "/cgroup.procs"));
+				Arrays.stream(procsToMove.split("\\r?\\n")).forEach(line -> moveProcessToCgroup(slotCgroup + "/runner", Integer.parseInt(line)));
 
-					final String[] controllers = Files.readString(Paths.get(slotCgroup + "/cgroup.controllers")).split(" ");
+				final String[] controllers = Files.readString(Paths.get(slotCgroup + "/cgroup.controllers")).split(" ");
 
-					for (String controller : controllers) {
-						Files.writeString(Paths.get(slotCgroup + "/cgroup.subtree_control"), "+" + controller, StandardOpenOption.APPEND);
-						Files.writeString(Paths.get(slotCgroup + "/agents/cgroup.subtree_control"), "+" + controller, StandardOpenOption.APPEND);
-					}
-					return true;
+				for (String controller : controllers) {
+					Files.writeString(Paths.get(slotCgroup + "/cgroup.subtree_control"), "+" + controller, StandardOpenOption.APPEND);
+					Files.writeString(Paths.get(slotCgroup + "/agents/cgroup.subtree_control"), "+" + controller, StandardOpenOption.APPEND);
 				}
-				catch (final Exception e) {
-					// Ignore
-				}
+				return true;
 			}
 		}
 		return false;
