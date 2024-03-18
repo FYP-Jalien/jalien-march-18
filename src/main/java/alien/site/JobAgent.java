@@ -827,6 +827,9 @@ public class JobAgent implements Runnable {
 
 			final String currentCgroup = CgroupUtils.getCurrentCgroup(Math.toIntExact(MonitorFactory.getSelfProcessID()));
 			// Run jobs in isolated environment
+			if (cpuIsolation == true && CgroupUtils.haveCgroupsv2() && !currentCgroup.contains("runner")) {
+				putJobTrace("The runner cgroupv2 could not be created. Running in cgroup " + currentCgroup);
+			}
 			if (cpuIsolation == true && (!CgroupUtils.haveCgroupsv2() || (CgroupUtils.haveCgroupsv2() && !currentCgroup.contains("runner")))) {
 				String isolCmd = addIsolation();
 				logger.log(Level.SEVERE, "IsolCmd command" + isolCmd);
